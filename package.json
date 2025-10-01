@@ -1,0 +1,27 @@
+{
+	"name": "@cc-workflows/citation-manager",
+	"version": "1.0.0",
+	"description": "Citation link validator and manager for Obsidian markdown files",
+	"type": "module",
+	"private": true,
+	"main": "src/citation-manager.js",
+	"scripts": {
+		"test": "vitest",
+		"start": "node src/citation-manager.js"
+	},
+	"keywords": [
+		"citation",
+		"validator",
+		"markdown",
+		"obsidian"
+	],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"commander": "^14.0.1",
+		"marked": "^15.0.12"
+	},
+	"devDependencies": {
+		"vitest": "^3.2.4"
+	}
+}
