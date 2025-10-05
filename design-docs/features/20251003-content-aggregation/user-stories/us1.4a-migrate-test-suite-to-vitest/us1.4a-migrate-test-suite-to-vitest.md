@@ -177,7 +177,7 @@ All 50+ existing tests must pass after migration to confirm zero regression:
 
 ### Phase 1: Test File Relocation and Setup
 
-- [ ] **1.1. Relocate Test Files and Fixtures to Workspace Structure** ^US1-4aT1-1
+- [x] **1.1. Relocate Test Files and Fixtures to Workspace Structure** ^US1-4aT1-1
   - **Agent**: code-developer-agent
   - **Objective**: Move all test files and fixture markdown files from legacy location to workspace-aligned directory structure
   - **Input**: 7 test files and 18 fixture files at `src/tools/utility-scripts/citation-links/test/`
@@ -225,7 +225,7 @@ All 50+ existing tests must pass after migration to confirm zero regression:
 
 ### Phase 2: Framework Conversion
 
-- [ ] **2.1. Convert Core Validation Tests to Vitest** ^US1-4aT2-1
+- [x] **2.1. Convert Core Validation Tests to Vitest** ^US1-4aT2-1
   - **Agent**: test-writer
   - **Objective**: Convert validation.test.js and warning-validation.test.js from node:test to Vitest framework
   - **Input**: Two test files using node:test/node:assert at new location from Phase 1
@@ -249,7 +249,7 @@ All 50+ existing tests must pass after migration to confirm zero regression:
   - _Leverage_: Vitest expect API documentation, existing test logic from node:test version
   - _Implementation Details_: [Will be populated in Phase 4]
 
-- [ ] **2.2. Convert Enhanced Citation Tests to Vitest** ^US1-4aT2-2
+- [x] **2.2. Convert Enhanced Citation Tests to Vitest** ^US1-4aT2-2
   - **Agent**: test-writer
   - **Objective**: Convert enhanced-citations.test.js and story-validation.test.js from node:test to Vitest framework
   - **Input**: Two test files using node:test/node:assert at new location from Phase 1
@@ -271,7 +271,7 @@ All 50+ existing tests must pass after migration to confirm zero regression:
   - _Leverage_: Vitest expect API, conversion patterns from Task 2.1
   - _Implementation Details_: [Will be populated in Phase 4]
 
-- [ ] **2.3. Convert CLI Output Tests to Vitest** ^US1-4aT2-3
+- [x] **2.3. Convert CLI Output Tests to Vitest** ^US1-4aT2-3
   - **Agent**: test-writer
   - **Objective**: Convert cli-warning-output.test.js from node:test to Vitest framework
   - **Input**: Single test file using node:test/node:assert at new location from Phase 1
@@ -292,7 +292,7 @@ All 50+ existing tests must pass after migration to confirm zero regression:
   - _Leverage_: Vitest expect API, conversion patterns from Task 2.1
   - _Implementation Details_: [Will be populated in Phase 4]
 
-- [ ] **2.4. Convert Path Conversion Tests to Vitest** ^US1-4aT2-4
+- [x] **2.4. Convert Path Conversion Tests to Vitest** ^US1-4aT2-4
   - **Agent**: test-writer
   - **Objective**: Convert path-conversion.test.js from node:test to Vitest framework, including component unit tests
   - **Input**: Test file with both CLI integration tests and component unit tests using node:test/node:assert
@@ -313,7 +313,7 @@ All 50+ existing tests must pass after migration to confirm zero regression:
   - _Leverage_: Vitest expect API, conversion patterns from Task 2.1, accepted technical debt for non-DI component instantiation
   - _Implementation Details_: [Will be populated in Phase 4]
 
-- [ ] **2.5. Convert Auto-Fix Tests to Vitest** ^US1-4aT2-5
+- [x] **2.5. Convert Auto-Fix Tests to Vitest** ^US1-4aT2-5
   - **Agent**: test-writer
   - **Objective**: Convert auto-fix.test.js from node:test to Vitest framework
   - **Input**: Test file using node:test/node:assert at new location from Phase 1
@@ -336,7 +336,7 @@ All 50+ existing tests must pass after migration to confirm zero regression:
 
 ### Phase 3: Legacy Cleanup and Validation
 
-- [ ] **3.1. Remove Legacy Test Location** ^US1-4aT3-1
+- [x] **3.1. Remove Legacy Test Location** ^US1-4aT3-1
   - **Agent**: code-developer-agent
   - **Objective**: Remove legacy test directory after confirming all tests pass at new location
   - **Input**: Passing test suite at new location from Phase 2, legacy directory at `src/tools/utility-scripts/citation-links/test/`
@@ -352,26 +352,54 @@ All 50+ existing tests must pass after migration to confirm zero regression:
   - **Commands**: `ls src/tools/utility-scripts/citation-links/test/ 2>&1 | grep "No such file" && npm test`
   - _Requirements_: [[#^US1-4aAC6|AC6]]
   - _Leverage_: Passing test validation from Phase 2 tasks
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [tasks/03-3-1-remove-legacy-test-location-us1.4a.md](tasks/03-3-1-remove-legacy-test-location-us1.4a.md)
 
-- [ ] **3.2. Execute Full Regression Validation** ^US1-4aT3-2
+- [ ] **3.2. Implement CLI Test Helper for Process Cleanup** ^US1-4aT3-2
+  - **Agent**: test-writer
+  - **Objective**: Create reusable CLI test helper with proper cleanup to prevent Vitest worker process accumulation while maintaining parallel test execution
+  - **Input**: Current 7 test files using direct `execSync()` calls, observed worker process accumulation (7 workers × ~4GB each)
+  - **Output**: CLI helper created, all test files updated, vitest.config adjusted for controlled parallelism
+  - **Files**:
+    - `tools/citation-manager/test/helpers/cli-runner.js` (create)
+    - `tools/citation-manager/test/validation.test.js` (modify)
+    - `tools/citation-manager/test/warning-validation.test.js` (modify)
+    - `tools/citation-manager/test/enhanced-citations.test.js` (modify)
+    - `tools/citation-manager/test/cli-warning-output.test.js` (modify)
+    - `tools/citation-manager/test/path-conversion.test.js` (modify)
+    - `tools/citation-manager/test/auto-fix.test.js` (modify)
+    - `tools/citation-manager/test/story-validation.test.js` (modify)
+    - `vitest.config.js` (modify)
+  - **Scope**:
+    - Create CLI helper with proper cleanup: `tools/citation-manager/test/helpers/cli-runner.js`
+    - Replace all direct `execSync()` calls with helper usage in 7 test files
+    - Update `vitest.config.js`: replace `singleFork: true` with `maxForks: 4` for controlled parallelism
+    - Add cleanup hints (garbage collection) in helper finally block
+    - Verify parallel execution preserved with controlled worker count
+  - **Test**: All tests pass, max 4 worker processes during execution, no hanging processes after completion, parallel execution preserved
+  - **Commands**: `npm test && ps aux | grep vitest | grep -v grep`
+  - _Requirements_: [[#^US1-4aAC3|AC3]], [[#^US1-4aAC5|AC5]]
+  - _Leverage_: Existing test suite, workspace Vitest configuration
+  - _Implementation Details_: [tasks/03-3-2-implement-cli-test-helper-us1.4a.md](tasks/03-3-2-implement-cli-test-helper-us1.4a.md)
+
+- [ ] **3.3. Execute Full Regression Validation** ^US1-4aT3-3
   - **Agent**: qa-validation
-  - **Objective**: Execute complete test suite to validate zero regression after framework migration
-  - **Input**: All migrated tests from Phase 2, legacy location removed from Phase 3.1
-  - **Output**: Validation report confirming all 50+ tests pass with zero regressions
+  - **Objective**: Execute complete test suite to validate zero regression after framework migration AND process cleanup
+  - **Input**: All migrated tests from Phase 2, legacy location removed from Task 3.1, CLI helper implemented from Task 3.2
+  - **Output**: Validation report confirming all 50+ tests pass with zero regressions and proper process cleanup
   - **Files**: (validation only - no file modifications)
   - **Scope**:
     - Execute full test suite from workspace root: `npm test`
     - Validate all 50+ existing tests pass with Vitest runner
     - Confirm Vitest discovers tests via workspace glob pattern `tools/**/test/**/*.test.js`
     - Validate test execution time reasonable (no significant performance regression)
+    - Verify worker process cleanup (max 4 workers during execution, no hanging processes after completion)
     - Confirm zero test failures, zero regressions from node:test baseline
-    - Document test execution results with pass/fail counts
-  - **Test**: All 50+ tests pass using Vitest framework, confirming zero regression from node:test migration
-  - **Commands**: `npm test`
+    - Document test execution results with pass/fail counts and process cleanup verification
+  - **Test**: All 50+ tests pass using Vitest framework, confirming zero regression from node:test migration and proper process cleanup
+  - **Commands**: `npm test && ps aux | grep vitest | grep -v grep`
   - _Requirements_: [[#^US1-4aAC3|AC3]], [[#^US1-4aAC5|AC5]]
-  - _Leverage_: Complete migrated test suite from Phase 2, workspace Vitest configuration
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Leverage_: Complete migrated test suite from Phase 2, workspace Vitest configuration, CLI helper from Task 3.2
+  - _Implementation Details_: [tasks/03-3-3-execute-full-regression-validation-us1.4a.md](tasks/03-3-3-execute-full-regression-validation-us1.4a.md)
 
 ### Acceptance Criteria Coverage
 
@@ -386,7 +414,8 @@ All 50+ existing tests must pass after migration to confirm zero regression:
 - Task 2.5: Convert auto-fix tests to Vitest
 
 **AC3 Coverage** ([[#^US1-4aAC3|AC3]] - npm test executes via shared Vitest configuration):
-- Task 3.2: Execute full regression validation via workspace npm test
+- Task 3.2: Implement CLI helper with proper process cleanup
+- Task 3.3: Execute full regression validation via workspace npm test
 
 **AC4 Coverage** ([[#^US1-4aAC4|AC4]] - Tests reference workspace-relative CLI paths):
 - Task 2.1: Update CLI paths in validation tests
@@ -401,14 +430,15 @@ All 50+ existing tests must pass after migration to confirm zero regression:
 - Task 2.3: CLI output tests pass
 - Task 2.4: Path conversion tests pass
 - Task 2.5: Auto-fix tests pass
-- Task 3.2: Full regression validation confirms all tests pass
+- Task 3.2: CLI helper maintains test passing status
+- Task 3.3: Full regression validation confirms all tests pass
 
 **AC6 Coverage** ([[#^US1-4aAC6|AC6]] - Legacy test location removed):
 - Task 3.1: Remove legacy test location
 
 **Error Scenarios**: All Phase 2 tasks maintain existing error handling test coverage from node:test version
-**Happy Path**: Task 3.2 validates successful end-to-end test execution with Vitest
-**Integration Points**: All Phase 2 tasks validate CLI integration via execSync() patterns
+**Happy Path**: Task 3.3 validates successful end-to-end test execution with Vitest and proper process cleanup
+**Integration Points**: All Phase 2 tasks validate CLI integration via execSync() patterns, Task 3.2 wraps execSync() in cleanup helper
 
 ### Task Sequencing
 
@@ -421,7 +451,10 @@ All 50+ existing tests must pass after migration to confirm zero regression:
 - Dependency Rationale: Legacy location removal is only safe after confirming all tests execute successfully from new location with Vitest framework
 
 **Task 3.1 → Task 3.2**: Task [[#^US1-4aT3-1|3.1]] must complete before Task [[#^US1-4aT3-2|3.2]]
-- Dependency Rationale: Final regression validation must confirm test suite remains functional after legacy directory removal completes
+- Dependency Rationale: CLI helper implementation (3.2) requires clean workspace state after legacy directory removal (3.1)
+
+**Task 3.2 → Task 3.3**: Task [[#^US1-4aT3-2|3.2]] must complete before Task [[#^US1-4aT3-3|3.3]]
+- Dependency Rationale: Final regression validation (3.3) should run with proper cleanup configuration in place to verify production-ready test suite
 
 #### Parallel Execution Groups
 
@@ -457,9 +490,9 @@ All 50+ existing tests must pass after migration to confirm zero regression:
   - CLI path references updated to `join(__dirname, "..", "src", "citation-manager.js")` workspace-relative pattern
   - Test execution time reasonable (no significant performance degradation from node:test baseline)
 
-**Handoff 3: code-developer-agent → qa-validation** (After Task 3.1)
+**Handoff 3: code-developer-agent → test-writer** (After Task 3.1)
 - Outgoing Agent: code-developer-agent
-- Incoming Agent: qa-validation
+- Incoming Agent: test-writer
 - Deliverable: Legacy test location completely removed, workspace structure as only test location
 - Validation Gate:
   - Legacy directory no longer exists: `ls src/tools/utility-scripts/citation-links/test/ 2>&1` returns "No such file or directory"
@@ -467,6 +500,18 @@ All 50+ existing tests must pass after migration to confirm zero regression:
   - Tests continue passing after cleanup: `npm test` shows zero failures
   - Vitest discovers exactly 7 test files from new location only (verified via `npm test -- --reporter=verbose` output)
   - Test coverage maintained at pre-cleanup levels
+
+**Handoff 4: test-writer → qa-validation** (After Task 3.2)
+- Outgoing Agent: test-writer
+- Incoming Agent: qa-validation
+- Deliverable: CLI helper implemented, all test files updated, vitest config adjusted for controlled parallelism
+- Validation Gate:
+  - Helper file created at `tools/citation-manager/test/helpers/cli-runner.js`
+  - All 7 test files use helper (no direct `execSync()` calls remain in test files)
+  - vitest.config uses `maxForks: 4` (not `singleFork: true`)
+  - All tests pass with controlled worker count
+  - No hanging processes after test completion: `ps aux | grep vitest | grep -v grep` returns empty
+  - Parallel execution preserved (test duration unchanged ±10%)
 
 #### Scope Validation Checkpoints
 
@@ -521,19 +566,32 @@ Each code-developer-agent and test-writer task completion triggers an applicatio
 - Agent: application-tech-lead
 - Input: Same task specification from Wave 3a (task 3.1)
 - Validation: Legacy directory successfully deleted (ls command fails with "No such file"), no remaining references to legacy path in codebase (grep search returns empty), tests continue passing after removal (`npm test` shows zero failures), Vitest discovers tests only from workspace location, scope limited to directory removal only (no test content changes), AC6 requirements met
-- **Block Condition**: Wave 4 blocked until validation PASS
+- **Block Condition**: Wave 3c blocked until validation PASS
 
-**Wave 4 - Final Regression Validation** (Estimated: 10-15 min):
+**Wave 3c - Execute Process Cleanup Implementation** (Estimated: 30-40 min):
 - Execute: Task [[#^US1-4aT3-2|3.2]]
-- Agent: qa-validation
+- Agent: test-writer
 - Prerequisite: Wave 3b PASS (requires legacy cleanup complete)
-- Deliverable: Comprehensive validation report confirming all 50+ tests pass with Vitest framework, zero regressions from node:test baseline
-- Validation Scope: Execute full test suite from workspace root, confirm test count matches baseline (50+ tests), verify test discovery via Vitest glob pattern, validate execution time acceptable, document pass/fail counts and any warnings
+- Deliverable: CLI helper created at `tools/citation-manager/test/helpers/cli-runner.js`, all 7 test files updated to use helper, vitest config adjusted with `maxForks: 4` for controlled parallelism
+
+**Wave 3d - Validate Process Cleanup Implementation** (Estimated: 10-15 min):
+- Validate: Task [[#^US1-4aT3-2|3.2]]
+- Agent: application-tech-lead
+- Input: Same task specification from Wave 3c (task 3.2)
+- Validation: Helper file created, all 7 test files use helper (no direct `execSync()` calls remain), vitest.config uses `maxForks: 4` (not `singleFork: true`), all tests pass, worker count ≤ 4 during execution, no hanging processes after completion, parallel execution preserved (duration unchanged ±10%), AC3/AC5 requirements met
+- **Block Condition**: Wave 5 blocked until validation PASS
+
+**Wave 5 - Final Regression Validation** (Estimated: 10-15 min):
+- Execute: Task [[#^US1-4aT3-3|3.3]]
+- Agent: qa-validation
+- Prerequisite: Wave 3d PASS (requires process cleanup implemented)
+- Deliverable: Comprehensive validation report confirming all 50+ tests pass with Vitest framework, zero regressions from node:test baseline, proper process cleanup verified
+- Validation Scope: Execute full test suite from workspace root, confirm test count matches baseline (50+ tests), verify test discovery via Vitest glob pattern, validate execution time acceptable, verify worker cleanup (max 4 workers, no hanging processes), document pass/fail counts and process cleanup verification
 - Note: No validation checkpoint needed (qa-validation is already a validation agent)
 
-**Total Estimated Duration**: 2.5-3 hours (with parallelization + validation)
-**Critical Path**: Wave 1a → 1b → 2a (bottleneck: 75-90 min) → 2b → 3a → 3b → 4
-**Time Savings**: 60-75 minutes vs sequential execution (Phase 2 parallel conversion of 5 tasks saves 12-15 min each after first completes)
+**Total Estimated Duration**: 3.0-3.5 hours (with parallelization + validation)
+**Critical Path**: Wave 1a → 1b → 2a (bottleneck: 75-90 min) → 2b → 3a → 3b → 3c → 3d → 5
+**Time Savings**: 60-75 minutes vs sequential execution (Phase 2 parallel conversion saves time)
 **Longest Single Wave**: Wave 2a (75-90 min) - parallel execution of 5 test file conversions, driven by test-writer processing time per file
 
 ## Change Log

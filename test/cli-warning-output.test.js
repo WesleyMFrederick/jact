@@ -1,15 +1,14 @@
-import { strict as assert } from "node:assert";
-import { execSync } from "node:child_process";
 import { dirname, join } from "node:path";
-import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { describe, it, expect } from "vitest";
+import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "citation-manager.js");
+const citationManagerPath = join(__dirname, "..", "src", "citation-manager.js");
 
 describe("CLI Warning Output Display Tests", () => {
-	test("should display warnings section with proper formatting and tree structure", async () => {
+	it("should display warnings section with proper formatting and tree structure", async () => {
 		const testFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const scopeFolder = join(__dirname, "fixtures");
 
@@ -17,10 +16,9 @@ describe("CLI Warning Output Display Tests", () => {
 		let commandSucceeded = false;
 
 		try {
-			output = execSync(
+			output = runCLI(
 				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
 				{
-					encoding: "utf8",
 					cwd: __dirname,
 				},
 			);
@@ -31,116 +29,76 @@ describe("CLI Warning Output Display Tests", () => {
 		}
 
 		// Validate we got output
-		assert(
-			output.length > 0,
-			`CLI should produce output. Command succeeded: ${commandSucceeded}. Output: ${output}`,
-		);
+		expect(output.length).toBeGreaterThan(0);
 
 		// Validate warning section header with emoji and count
-		assert(
-			output.includes("⚠️  WARNINGS (") && output.includes(")"),
-			"CLI output should contain warnings section header with emoji and count in format '⚠️  WARNINGS (n)'",
-		);
+		expect(output).toContain("⚠️  WARNINGS (");
+		expect(output).toContain(")");
 
 		// Validate tree structure formatting for warnings
-		assert(
-			output.includes("├─") || output.includes("└─"),
-			"Warning section should use tree formatting with proper branch characters",
-		);
+		expect(output.includes("├─") || output.includes("└─")).toBe(true);
 
 		// Validate line number information is included
-		assert(
-			/Line \d+:/.test(output),
-			"Warning items should include line number information",
-		);
+		expect(output).toMatch(/Line \d+:/);
 
 		// Validate the specific warning citation is displayed
-		assert(
-			output.includes("../wrong-path/warning-test-target.md"),
-			"Warning section should display the problematic citation path",
-		);
+		expect(output).toContain("../wrong-path/warning-test-target.md");
 
 		// Validate warning suggestion is provided with proper indentation
-		assert(
-			output.includes("│  └─") &&
-				(output.includes("Found via file cache") ||
-					output.includes("Found in scope")),
-			"Warning items should include suggestion or resolution information with proper nested indentation",
-		);
+		expect(output).toContain("│  └─");
+		expect(
+			output.includes("Found via file cache") ||
+				output.includes("Found in scope")
+		).toBe(true);
 	});
 
-	test("should include warnings count in summary statistics with proper formatting", async () => {
+	it("should include warnings count in summary statistics with proper formatting", async () => {
 		const testFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const scopeFolder = join(__dirname, "fixtures");
 
 		try {
-			const output = execSync(
+			const output = runCLI(
 				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
 				{
-					encoding: "utf8",
 					cwd: __dirname,
 				},
 			);
 
 			// Validate summary section exists
-			assert(
-				output.includes("SUMMARY:"),
-				"CLI output should contain SUMMARY section",
-			);
+			expect(output).toContain("SUMMARY:");
 
 			// Validate warnings count is included in summary
-			assert(
-				/- Warnings: \d+/.test(output),
-				"Summary should include warnings count in format '- Warnings: n'",
-			);
+			expect(output).toMatch(/- Warnings: \d+/);
 
 			// Validate summary contains all expected fields
-			assert(
-				output.includes("- Total citations:"),
-				"Summary should include total citations count",
-			);
-			assert(
-				output.includes("- Valid:"),
-				"Summary should include valid citations count",
-			);
-			assert(
-				output.includes("- Critical errors:"),
-				"Summary should include errors count",
-			);
-			assert(
-				output.includes("- Validation time:"),
-				"Summary should include validation time",
-			);
+			expect(output).toContain("- Total citations:");
+			expect(output).toContain("- Valid:");
+			expect(output).toContain("- Critical errors:");
+			expect(output).toContain("- Validation time:");
 
 			// Extract warnings count to ensure it's greater than zero
 			const warningsMatch = output.match(/- Warnings: (\d+)/);
-			assert(warningsMatch, "Should find warnings count in summary");
+			expect(warningsMatch).toBeTruthy();
 
 			const warningsCount = parseInt(warningsMatch[1], 10);
-			assert(
-				warningsCount > 0,
-				`Warnings count should be greater than zero, got: ${warningsCount}`,
-			);
+			expect(warningsCount).toBeGreaterThan(0);
 		} catch (error) {
 			// Handle case where command exits with error but still produces summary
 			const output = error.stdout || "";
 
-			assert(
-				output.includes("SUMMARY:") && /- Warnings: \d+/.test(output),
-				`CLI should display summary with warnings count even on error exit. Output: ${output}`,
-			);
+			expect(output).toContain("SUMMARY:");
+			expect(output).toMatch(/- Warnings: \d+/);
 		}
 	});
 
-	test("should mark warnings as fixable issues distinct from valid and error sections", async () => {
+	it("should mark warnings as fixable issues distinct from valid and error sections", async () => {
 		const testFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const scopeFolder = join(__dirname, "fixtures");
 
 		try {
-			const output = execSync(
+			const output = runCLI(
 				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
 				{
-					encoding: "utf8",
 					cwd: __dirname,
 				},
 			);
@@ -156,10 +114,7 @@ describe("CLI Warning Output Display Tests", () => {
 				);
 
 			// Should have separate sections for different status types
-			assert(
-				sections.length > 0,
-				"Should have clearly separated sections for different citation statuses",
-			);
+			expect(sections.length).toBeGreaterThan(0);
 
 			// Validate warning section appears before valid section (if both exist)
 			if (
@@ -168,10 +123,7 @@ describe("CLI Warning Output Display Tests", () => {
 			) {
 				const warningIndex = output.indexOf("⚠️  WARNINGS");
 				const validIndex = output.indexOf("✅ VALID CITATIONS");
-				assert(
-					warningIndex < validIndex,
-					"Warnings section should appear before valid citations section",
-				);
+				expect(warningIndex).toBeLessThan(validIndex);
 			}
 
 			// Validate warnings indicate they are fixable/actionable
@@ -181,24 +133,20 @@ describe("CLI Warning Output Display Tests", () => {
 			);
 
 			// Warning should provide actionable information (suggestion, resolution path, etc.)
-			assert(
+			expect(
 				warningSection.includes("Found in scope") ||
 					warningSection.includes("resolved") ||
-					warningSection.includes("└─"),
-				"Warning section should indicate warnings are actionable with resolution information or suggestions",
-			);
+					warningSection.includes("└─")
+			).toBe(true);
 		} catch (error) {
 			// Validate output structure even on error exit
 			const output = error.stdout || "";
 
-			assert(
-				output.includes("⚠️  WARNINGS"),
-				`CLI should display properly formatted warnings section. Output: ${output}`,
-			);
+			expect(output).toContain("⚠️  WARNINGS");
 		}
 	});
 
-	test("should display warnings with consistent formatting regardless of exit code", async () => {
+	it("should display warnings with consistent formatting regardless of exit code", async () => {
 		const testFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const scopeFolder = join(__dirname, "fixtures");
 
@@ -206,10 +154,9 @@ describe("CLI Warning Output Display Tests", () => {
 		let exitedWithError = false;
 
 		try {
-			output = execSync(
+			output = runCLI(
 				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
 				{
-					encoding: "utf8",
 					cwd: __dirname,
 				},
 			);
@@ -220,36 +167,21 @@ describe("CLI Warning Output Display Tests", () => {
 		}
 
 		// Core assertions should pass regardless of exit code
-		assert(
-			output.length > 0,
-			"CLI should produce output regardless of exit code",
-		);
+		expect(output.length).toBeGreaterThan(0);
 
 		// Warning formatting should be consistent
 		if (output.includes("⚠️  WARNINGS")) {
 			// Validate warning count is properly formatted
-			assert(
-				/⚠️ {2}WARNINGS \(\d+\)/.test(output),
-				"Warning header should include count in parentheses",
-			);
+			expect(output).toMatch(/⚠️ {2}WARNINGS \(\d+\)/);
 
 			// Validate at least one warning item with proper formatting
-			assert(
-				output.includes("├─") || output.includes("└─"),
-				"Warning items should use tree-style formatting",
-			);
+			expect(output.includes("├─") || output.includes("└─")).toBe(true);
 		}
 
 		// Summary should be present and formatted consistently
-		assert(
-			output.includes("SUMMARY:"),
-			"Summary section should be present regardless of exit code",
-		);
+		expect(output).toContain("SUMMARY:");
 
-		assert(
-			/- Warnings: \d+/.test(output),
-			"Summary should include warnings count with consistent formatting",
-		);
+		expect(output).toMatch(/- Warnings: \d+/);
 
 		// Note whether command exited with error for debugging
 		console.log(
@@ -257,15 +189,14 @@ describe("CLI Warning Output Display Tests", () => {
 		);
 	});
 
-	test("should provide clear visual separation between warning and other status sections", async () => {
+	it("should provide clear visual separation between warning and other status sections", async () => {
 		const testFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const scopeFolder = join(__dirname, "fixtures");
 
 		try {
-			const output = execSync(
+			const output = runCLI(
 				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
 				{
-					encoding: "utf8",
 					cwd: __dirname,
 				},
 			);
@@ -295,10 +226,7 @@ describe("CLI Warning Output Display Tests", () => {
 				}
 			}
 
-			assert(
-				hasProperSeparation,
-				"Warning section should be visually separated from other sections with empty lines",
-			);
+			expect(hasProperSeparation).toBe(true);
 
 			// Validate distinct visual markers for different sections
 			const sectionMarkers = {
@@ -309,10 +237,7 @@ describe("CLI Warning Output Display Tests", () => {
 
 			Object.entries(sectionMarkers).forEach(([sectionType, emoji]) => {
 				if (output.includes(emoji)) {
-					assert(
-						output.includes(emoji),
-						`${sectionType} section should have distinct visual marker: ${emoji}`,
-					);
+					expect(output).toContain(emoji);
 				}
 			});
 		} catch (error) {
@@ -320,10 +245,7 @@ describe("CLI Warning Output Display Tests", () => {
 			const output = error.stdout || "";
 
 			if (output.includes("⚠️  WARNINGS")) {
-				assert(
-					output.includes("⚠️"),
-					"Warning section should maintain visual markers even on error exit",
-				);
+				expect(output).toContain("⚠️");
 			}
 		}
 	});
