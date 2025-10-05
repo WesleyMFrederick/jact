@@ -336,6 +336,17 @@ Follows workspace testing strategy from [Architecture: Testing Strategy](../../.
 - **BDD Structure**: Given-When-Then comment structure required
 - **Real Systems**: Zero-tolerance policy for mocking
 
+### Process Management
+
+Citation-manager test suite uses CLI integration testing via `execSync()`, which can leave Vitest worker processes in memory after test completion. See [Workspace Testing Infrastructure - Vitest Process Management](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Vitest%20Process%20Management%20and%20Cleanup) for configuration best practices and cleanup procedures.
+
+**Quick Cleanup**:
+
+```bash
+# Kill hanging Vitest worker processes
+pkill -f "vitest"
+```
+
 ---
 
 ## Technology Stack
@@ -405,6 +416,30 @@ This tool follows workspace design principles defined in [Architecture Principle
 - US1.4a (Test Migration) → Epic 2 Architecture Design → US1.4b (DI Refactoring) → US2.1 (Feature Implementation)
 
 **Status**: Time-boxed technical debt, scheduled for resolution before Epic 2 feature work begins
+
+### Stale Auto-Fix Test Assertions
+
+**Risk Category**: Testing / Maintenance
+
+**Description**: The auto-fix test suite (`auto-fix.test.js`) contains assertions that expect deprecated CLI output format. The CLI has evolved to use emoji-enhanced reporting with detailed fix summaries, but test assertions still check for old format strings like "Fixed 2 kebab-case citation" instead of the current format "✅ Fixed 2 citations in [file]:\n   - 2 anchor corrections".
+
+**Impact**:
+- **Low**: Auto-fix functionality works correctly; only test assertions are stale
+- **Scope**: Affects 3 tests in auto-fix.test.js
+- **Test Maintenance**: Tests fail not due to broken functionality but due to outdated string matching expectations
+
+**Rationale for Accepting Risk**: This technical debt was discovered during US1.4a Vitest migration. The Vitest framework conversion is complete and correct - test failures are due to CLI output evolution, not conversion errors. Updating test assertions is deferred to avoid scope creep during framework migration task.
+
+**Mitigation Strategy**: Update test assertions to match current CLI output format in separate maintenance task
+
+**Resolution Criteria**:
+- Update auto-fix.test.js assertions to expect current emoji-enhanced output format
+- Replace hardcoded string matches with pattern matching for format flexibility
+- All 3 auto-fix tests pass with current CLI implementation
+
+**Timeline**: Address after US1.4a completion, before Epic 2 feature work
+
+**Status**: Documented technical debt, low priority (functionality works, tests report false failures)
 
 ---
 
