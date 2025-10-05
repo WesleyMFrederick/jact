@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { MarkdownParser } from "./MarkdownParser.js";
 
@@ -11,8 +11,8 @@ export class CitationValidator {
 		this.patterns = {
 			CARET_SYNTAX: {
 				regex:
-					/^\^([A-Z]{2,3}\d+(?:-\d+(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Z]+\d+|MVP-P\d+)$/,
-				examples: ["^FR1", "^US1-1AC1", "^NFR2", "^MVP-P1"],
+					/^\^([A-Za-z]{2,3}\d+(?:-\d+[a-z]?(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Za-z]+\d+|MVP-P\d+)$/,
+				examples: ["^FR1", "^US1-1AC1", "^US1-4bT1-1", "^NFR2", "^MVP-P1"],
 				description: "Caret syntax for requirements and criteria",
 			},
 			EMPHASIS_MARKED: {
@@ -40,6 +40,14 @@ export class CitationValidator {
 			return realpathSync(path);
 		} catch (_error) {
 			return path; // Return original path if realpath fails
+		}
+	}
+
+	isFile(path) {
+		try {
+			return existsSync(path) && statSync(path).isFile();
+		} catch (_error) {
+			return false;
 		}
 	}
 
@@ -401,14 +409,14 @@ export class CitationValidator {
 		const sourceDir = dirname(sourceFile);
 		const standardPath = resolve(sourceDir, decodedRelativePath);
 
-		if (existsSync(standardPath)) {
+		if (this.isFile(standardPath)) {
 			return standardPath;
 		}
 
 		// Also try with original (non-decoded) path for backwards compatibility
 		if (decodedRelativePath !== relativePath) {
 			const originalStandardPath = resolve(sourceDir, relativePath);
-			if (existsSync(originalStandardPath)) {
+			if (this.isFile(originalStandardPath)) {
 				return originalStandardPath;
 			}
 		}
@@ -419,7 +427,7 @@ export class CitationValidator {
 				decodedRelativePath,
 				sourceFile,
 			);
-			if (obsidianPath && existsSync(obsidianPath)) {
+			if (obsidianPath && this.isFile(obsidianPath)) {
 				return obsidianPath;
 			}
 		}
@@ -432,14 +440,14 @@ export class CitationValidator {
 
 				// Try with decoded path first
 				const symlinkResolvedPath = resolve(realSourceDir, decodedRelativePath);
-				if (existsSync(symlinkResolvedPath)) {
+				if (this.isFile(symlinkResolvedPath)) {
 					return symlinkResolvedPath;
 				}
 
 				// Try with original path as fallback
 				if (decodedRelativePath !== relativePath) {
 					const originalSymlinkPath = resolve(realSourceDir, relativePath);
-					if (existsSync(originalSymlinkPath)) {
+					if (this.isFile(originalSymlinkPath)) {
 						return originalSymlinkPath;
 					}
 				}

@@ -4,7 +4,7 @@
 
 **Status**: DRAFT - Component-level architecture in development
 
-**Parent Architecture**: [CC Workflows Workspace Architecture](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md)
+**Parent Architecture**: [CC Workflows Workspace Architecture](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md)
 
 ---
 
@@ -60,7 +60,7 @@ graph TB
 
 ## Level 2: Container Context
 
-**Container Classification**: Citation-manager is a **Tool Package Container** within the [CC Workflows Workspace](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Level%202%20Containers) software system.
+**Container Classification**: Citation-manager is a **Tool Package Container** within the [CC Workflows Workspace](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Level%202%20Containers) software system.
 
 **Container Details**:
 - **Name**: Citation Manager
@@ -169,7 +169,7 @@ sequenceDiagram
 
     User->>+CLI: validate <file> --scope <dir> [--fix]
 
-    alt Scope Provided
+    alt FLAG: "--scope <dir>"
         CLI->>+Cache: buildCache(scopeDir)
         Cache->>FS: Scan directories recursively
         FS-->>Cache: Return file list
@@ -184,16 +184,16 @@ sequenceDiagram
     Parser->>FS: Read markdown file
     Parser-->>-Validator: Return {links, anchors, headings}
 
-    loop For each citation
-        alt File exists via standard path
+    loop FOR EACH: citation-link
+        alt IF: File EXISTS via standard path
             Validator->>FS: existsSync(targetPath)
             FS-->>Validator: true
-        else Use File Cache (if configured)
+        else ELSE: Use File Cache (if configured)
             Validator->>Cache: resolveFile(filename)
             Cache-->>Validator: Return absolutePath
         end
 
-        opt Anchor validation needed
+        opt IF: Anchor validation needed
             Validator->>+Parser: parseFile(targetFile)
             Parser->>FS: Read target file
             Parser-->>-Validator: Return {anchors}
@@ -203,24 +203,24 @@ sequenceDiagram
 
     Validator-->>-CLI: Return validation results with suggestions
 
-    alt --fix flag provided
+    alt FLAG: --fix flag provided
         CLI->>CLI: Identify fixable issues (path conversions, anchor corrections)
 
-        alt Has fixable issues
+        alt HAS: fixable issues
             CLI->>FS: Read source file content
             FS-->>CLI: Return file content
 
-            loop For each fixable citation
+            loop FOR EACH: fixable citation
                 CLI->>CLI: Apply path conversion (if warning with pathConversion)
                 CLI->>CLI: Apply anchor correction (if error with suggestion)
             end
 
             CLI->>FS: Write corrected file content
             CLI-->>User: Report fixes applied (counts + details)
-        else No fixable issues
+        else ELSE: No fixable issues
             CLI-->>User: No auto-fixable citations found
         end
-    else No --fix flag
+    else ELSE: No --fix flag
         CLI->>CLI: formatForCLI(results)
         CLI-->>User: Display validation report
     end
@@ -276,7 +276,7 @@ src/tools/utility-scripts/citation-links/
 **Type**: ECMAScript Modules (ESM)
 - Uses `import`/`export` syntax
 - Explicit `.js` extensions in import paths
-- Confirmed in [US1.3 Implementation Note](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-prd.md#Story%201.3%20Make%20Migrated%20%60citation-manager%60%20Executable)
+- Confirmed in [US1.3 Implementation Note](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/user-stories/us1.3-make-migrated-citation-manager-executable/us1.3-make-migrated-citation-manager-executable.md)
 
 **Import Pattern Example**:
 
@@ -286,7 +286,7 @@ import { CitationValidator } from "./src/CitationValidator.js";
 
 ### Coding Standards
 
-Follows workspace coding standards defined in [Architecture: Coding Standards](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Coding%20Standards%20and%20Conventions):
+Follows workspace coding standards defined in [Architecture: Coding Standards](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Coding%20Standards%20and%20Conventions):
 - Files: `kebab-case.js`
 - Functions/Variables: `camelCase`
 - Classes: `TitleCase`
@@ -330,7 +330,7 @@ src/tools/utility-scripts/citation-links/test/
 
 ### Testing Principles
 
-Follows workspace testing strategy from [Architecture: Testing Strategy](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Testing%20Strategy):
+Follows workspace testing strategy from [Architecture: Testing Strategy](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Testing%20Strategy):
 - **MVP-Focused**: Target 0.3:1 to 0.5:1 test-to-code ratio
 - **Integration-Driven**: Real file system operations, no mocking
 - **BDD Structure**: Given-When-Then comment structure required
@@ -342,16 +342,16 @@ Follows workspace testing strategy from [Architecture: Testing Strategy](../../.
 
 | Technology | Version | Purpose | Source |
 |------------|---------|---------|--------|
-| **Node.js** | ≥18.0.0 | Runtime environment | [Workspace Tech Stack](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
+| **Node.js** | ≥18.0.0 | Runtime environment | [Workspace Tech Stack](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
 | **Commander.js** | [TBD] | CLI command parsing | Tool-specific dependency |
-| **Vitest** | latest | Testing framework (shared) | [Workspace Tech Stack](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
-| **Biome** | latest | Linting/formatting (shared) | [Workspace Tech Stack](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
+| **Vitest** | latest | Testing framework (shared) | [Workspace Tech Stack](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
+| **Biome** | latest | Linting/formatting (shared) | [Workspace Tech Stack](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
 
 ---
 
 ## Cross-Cutting Concerns
 
-As a tool within the CC Workflows Workspace, the Citation Manager inherits all of its cross-cutting architectural patterns from the [parent system](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Cross-Cutting%20Concerns).
+As a tool within the CC Workflows Workspace, the Citation Manager inherits all of its cross-cutting architectural patterns from the [parent system](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Cross-Cutting%20Concerns).
 
 ### Code Quality and Consistency
 All source code within the `citation-manager` package must adhere to the shared `biome.json` configuration located at the workspace root. This includes standards for **tab indentation** and **double quotes** for strings.
@@ -362,20 +362,83 @@ The tool's test suite, located in `tools/citation-manager/test/`, is executed by
 ### Dependency Management
 The tool's dependencies, such as `commander` and `marked`, are declared in its local `package.json` but are managed and hoisted by **NPM Workspaces** at the root level.
 
-### Dependency Injection and Technical Debt
-The `citation-manager` currently **deviates** from the workspace's dependency injection (DI) principle. The main `CitationManager` class creates its dependencies directly, leading to tight coupling. This is recognized as technical debt, and a refactor is planned to align the tool with the workspace's DI strategy, which favors injecting real components to facilitate high-confidence integration testing.
-
 ---
 
 ## Design Principles Adherence
 
-This tool follows workspace design principles defined in [Architecture Principles](../../../design-docs/Architecture%20Principles.md):
+This tool follows workspace design principles defined in [Architecture Principles](../../../../../design-docs/Architecture%20Principles.md):
 
 **Key Principles**:
-- [**Modular Design**](../../../design-docs/Architecture%20Principles.md#Modular%20Design%20Principles): Component-based architecture with clear boundaries
-- [**Deterministic Offloading**](../../../design-docs/Architecture%20Principles.md#Deterministic%20Offloading%20Principles): Predictable, mechanical citation processing
-- [**Safety-First**](../../../design-docs/Architecture%20Principles.md#Safety-First%20Design%20Patterns): Backup creation before auto-fix, dry-run capability
-- [**Self-Contained Naming**](../../../design-docs/Architecture%20Principles.md#Self-Contained%20Naming%20Principles): Descriptive command and component names
+- [**Modular Design**](../../../../../design-docs/Architecture%20Principles.md#Modular%20Design%20Principles): Component-based architecture with clear boundaries
+- [**Deterministic Offloading**](../../../../../design-docs/Architecture%20Principles.md#Deterministic%20Offloading%20Principles): Predictable, mechanical citation processing
+- [**Safety-First**](../../../../../design-docs/Architecture%20Principles.md#Safety-First%20Design%20Patterns): Backup creation before auto-fix, dry-run capability
+- [**Self-Contained Naming**](../../../../../design-docs/Architecture%20Principles.md#Self-Contained%20Naming%20Principles): Descriptive command and component names
+
+---
+
+## Known Risks and Technical Debt
+
+### Lack of Dependency Injection
+
+**Risk Category**: Architecture / Testing
+
+**Description**: The `citation-manager` tool currently deviates from the workspace's dependency injection (DI) principle. The main `CitationManager` class creates its dependencies directly (e.g., `MarkdownParser`, `FileCache`, `CitationValidator`) rather than receiving them via constructor injection, leading to tight coupling.
+
+**Impact**:
+- **Moderate**: Reduces testability and makes component boundaries implicit
+- **Scope**: Affects all components in citation-manager tool
+- **Testing Constraint**: Cannot easily inject real dependencies for integration testing per workspace's "Real Systems, Fake Fixtures" philosophy
+
+**Rationale for Accepting Risk**: This is legacy code migrated from standalone utility scripts. Addressing this debt is planned as **US1.4b: Component DI Refactoring** (scheduled after Epic 2 architecture design per ADR-001). Phased approach separates test framework conversion (US1.4a) from architectural alignment (US1.4b), reducing risk and enabling Epic 2 patterns to inform refactoring decisions.
+
+**Mitigation Strategy**: **Implemented via US1.4b** (scheduled after Epic 2 architecture design)
+
+**US1.4b Acceptance Criteria**:
+- AC1: Refactor components to accept dependencies via constructor ^US1-4bAC1
+- AC2: Implement factory pattern at `src/factories/componentFactory.js` ^US1-4bAC2
+- AC3: Update CLI to use factory functions ^US1-4bAC3
+- AC4: Update tests to inject real dependencies via constructors ^US1-4bAC4
+- AC5: Add component integration tests per workspace strategy ^US1-4bAC5
+- AC6: Mark technical debt as resolved ^US1-4bAC6
+
+**Timeline**:
+- US1.4a (Test Migration) → Epic 2 Architecture Design → US1.4b (DI Refactoring) → US2.1 (Feature Implementation)
+
+**Status**: Time-boxed technical debt, scheduled for resolution before Epic 2 feature work begins
+
+---
+
+## Architecture Decision Records (ADRs)
+
+### ADR-001: Phased Test Migration Strategy
+
+- **Status**: Accepted
+- **Date**: 2025-10-04
+- **Context**: Analysis of US1.4 scope revealed that test migration involves two distinct, separable work streams with different risk profiles:
+ 1. **Test Framework Conversion**: Migrating 1,863 lines across 7 test files from `node:test` to Vitest with `expect()` assertions
+ 2. **Component DI Refactoring**: Restructuring CitationValidator, MarkdownParser, and FileCache for constructor-based dependency injection with factory pattern implementation
+
+ Combining both efforts creates compound risk: test conversion failures could mask DI refactoring issues, and vice versa. Additionally, Epic 2 architecture design will establish DI patterns for new components (ContentExtractor), making it more effective to refactor existing components after new patterns are proven.
+
+- **Decision**: Split US1.4 into two sequential stories:
+  - **US1.4a - Test Migration**: Convert test suite to Vitest, update assertions to expect(), fix paths to workspace structure. Accept non-DI component instantiation as temporary technical debt.
+  - **US1.4b - DI Refactoring**: Implement constructor-based DI, create factory pattern, update tests for DI usage, add integration tests. Resolves documented technical debt.
+
+- **Alternatives Considered**:
+  - **Comprehensive US1.4**: Do both simultaneously - rejected due to compound risk and delayed Epic 2 delivery
+  - **Minimal US1.4 with indefinite debt**: Accept non-DI architecture permanently - rejected as violates workspace architecture principles
+
+- **Consequences**:
+  - **Positive**: Risk isolation - test conversion validated independently before component refactoring begins
+  - **Positive**: Faster Epic 2 start - US1.4a unblocks architecture design for new components
+  - **Positive**: Better DI patterns - Epic 2 design informs US1.4b refactoring approach
+  - **Positive**: Incremental validation - clear gates between test migration and DI implementation
+  - **Negative**: Temporary architectural non-compliance during US1.4a execution (mitigated by time-boxed technical debt)
+  - **Negative**: Two-phase migration overhead (mitigated by reduced compound risk)
+
+- **Implementation Timeline**:
+  - US1.4a: Immediate (Epic 1 completion)
+  - US1.4b: After Epic 2 architecture design, before US2.1 implementation
 
 ---
 
@@ -405,7 +468,9 @@ npm run citation:base-paths <file-path> -- --format json
 |-----------|----------------|-----------------|---------|
 | **Source Code** | `src/tools/utility-scripts/citation-links/` | `tools/citation-manager/src/` | ✓ US1.2 Complete |
 | **CLI Executability** | N/A | Via workspace npm scripts | ✓ US1.3 Complete |
-| **Test Suite** | `src/tools/utility-scripts/citation-links/test/` | `tools/citation-manager/test/` | ⏳ US1.4 In Progress |
+| **Test Suite** | `src/tools/utility-scripts/citation-links/test/` | `tools/citation-manager/test/` | ⏳ US1.4a In Progress |
+| **DI Architecture** | N/A | Component constructor injection | 📅 US1.4b Planned |
+| **Factory Pattern** | N/A | `src/factories/componentFactory.js` | 📅 US1.4b Planned |
 | **Documentation** | Scattered | `tools/citation-manager/design-docs/` | ⏳ In Progress |
 
 ---
@@ -418,7 +483,7 @@ npm run citation:base-paths <file-path> -- --format json
 - Support both section-specific and full-file extraction
 - Provide metadata-rich output for AI context management
 
-**Reference**: [Epic 2: citation-manager Content Aggregation Enhancement](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-prd.md#Epic%202%20%60citation-manager%60%20Content%20Aggregation%20Enhancement)
+**Reference**: [Epic 2: citation-manager Content Aggregation Enhancement](content-aggregation-prd.md#Feature%20Epics)
 
 ---
 
@@ -427,19 +492,15 @@ npm run citation:base-paths <file-path> -- --format json
 **Last Updated**: 2025-10-01
 **Version**: 0.1 (Draft)
 **Next Steps**:
-- Complete US1.4 test migration
-- Analyze migrated code to refine component boundaries
-- Document component interfaces and data contracts
-- Create component interaction diagrams
-- Define API specifications for each component
+- Complete US1.4a test migration to Vitest
+- Design Epic 2 architecture with DI patterns for ContentExtractor
+- Implement US1.4b DI refactoring informed by Epic 2 patterns
+- Document component interfaces and data contracts (after DI refactoring)
+- Create component interaction diagrams (after DI refactoring)
 
 ---
 
 ## Related Documentation
 
-- [CC Workflows Workspace Architecture](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md) - Parent architecture
-- [CC Workflows Workspace PRD](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-prd.md) - Requirements and epic breakdown
-- [Architecture Principles](../../../design-docs/Architecture%20Principles.md) - Design principles and patterns
-- [Story 1.2: Migrate Source Code](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/user-stories/us1.2-migrate-citation-manager-source-code/us1.2-migrate-citation-manager-source-code.md)
-- [Story 1.3: Make Executable](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/user-stories/us1.3-make-migrated-citation-manager-executable/us1.3-make-migrated-citation-manager-executable.md)
-- [Story 1.4: Migrate Test Suite](features/20251003-content-aggregation/user-stories/us1.4-migrate-and-validate-citation-manager-test-suite/us1.4-migrate-and-validate-citation-manager-test-suite.md)
+- [Architecture Principles](../../../../../design-docs/Architecture%20Principles.md) - Design principles and patterns
+- [citation-guidelines](../../../../../agentic-workflows/rules/citation-guidelines.md) - Citation linking guidelines

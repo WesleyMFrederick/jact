@@ -4,7 +4,7 @@ import { marked } from "marked";
 export class MarkdownParser {
 	constructor() {
 		this.anchorPatterns = {
-			CARET: /\^([A-Z0-9-]+)/g,
+			CARET: /\^([A-Za-z0-9-]+)/g,
 			OBSIDIAN_BLOCK_REF: /\^([a-zA-Z0-9\-_]+)$/g, // End-of-line block references
 			EMPHASIS_MARKED: /==\*\*([^*]+)\*\*==/g,
 			STANDARD_HEADER: /^#+\s+(.+)$/gm,
@@ -99,7 +99,23 @@ export class MarkdownParser {
 				match = relativeDocRegex.exec(line);
 			}
 
-			// Wiki-style links
+			// Wiki-style cross-document links: [[file.md#anchor|text]]
+			const wikiCrossDocRegex = /\[\[([^#\]]+\.md)(#([^\]|]+))?\|([^\]]+)\]\]/g;
+			match = wikiCrossDocRegex.exec(line);
+			while (match !== null) {
+				links.push({
+					type: "cross-document",
+					file: match[1],
+					anchor: match[3] || null,
+					text: match[4],
+					fullMatch: match[0],
+					line: index + 1,
+					column: match.index,
+				});
+				match = wikiCrossDocRegex.exec(line);
+			}
+
+			// Wiki-style links (internal anchors only)
 			const wikiRegex = /\[\[#([^|]+)\|([^\]]+)\]\]/g;
 			match = wikiRegex.exec(line);
 			while (match !== null) {
@@ -115,7 +131,7 @@ export class MarkdownParser {
 			}
 
 			// Caret syntax references
-			const caretRegex = /\^([A-Z0-9-]+)/g;
+			const caretRegex = /\^([A-Za-z0-9-]+)/g;
 			match = caretRegex.exec(line);
 			while (match !== null) {
 				links.push({
@@ -176,7 +192,7 @@ export class MarkdownParser {
 			}
 
 			// Caret syntax anchors (legacy format, keep for compatibility)
-			const caretRegex = /\^([A-Z0-9-]+)/g;
+			const caretRegex = /\^([A-Za-z0-9-]+)/g;
 			match = caretRegex.exec(line);
 			while (match !== null) {
 				// Skip if this is already captured as an Obsidian block reference

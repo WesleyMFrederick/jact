@@ -71,7 +71,7 @@ npm run citation:validate path/to/file.md -- --lines 148-160 --scope /path/to/pr
 npm run citation:validate path/to/file.md -- --fix --scope /path/to/project/docs
 
 # Direct CLI usage
-node utility-scripts/citation-links/citation-manager.js validate path/to/file.md --lines 157 --scope /path/to/docs
+# node utility-scripts/citation-links/citation-manager.js validate path/to/file.md --lines 157 --scope /path/to/docs
 ```
 
 ### Enhanced Fix Command
