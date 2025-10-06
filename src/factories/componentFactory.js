@@ -12,8 +12,8 @@ export function createFileCache() {
 	return new FileCache(fs, path);
 }
 
-export function createCitationValidator() {
-	const parser = createMarkdownParser();
-	const fileCache = createFileCache();
-	return new CitationValidator(parser, fileCache);
+export function createCitationValidator(parser = null, fileCache = null) {
+	const _parser = parser || createMarkdownParser();
+	const _fileCache = fileCache || createFileCache();
+	return new CitationValidator(_parser, _fileCache);
 }

@@ -232,6 +232,8 @@ No debug logs required - implementation completed without errors.
 #### Completion Notes
 Task 2.1 completed successfully. Created component factory module with three factory functions for DI-refactored components. All factory functions create fully-wired production instances with real Node.js dependencies (fs, path). Factory wiring pattern implemented: createCitationValidator() calls createMarkdownParser() and createFileCache() internally to compose dependencies.
 
+**Post-Implementation Enhancement (2025-10-05):** Updated `createCitationValidator()` to accept optional `parser` and `fileCache` parameters per Architecture Baseline guidance (Constructor-Based DI Wiring Overhead mitigation strategy). This allows CLI to pass shared instances when needed for direct access (ast command, cache building) while maintaining factory pattern benefits. Signature: `createCitationValidator(parser = null, fileCache = null)`. Default behavior unchanged - creates instances internally when parameters not provided.
+
 #### File List
 Created files:
 - `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/src/factories/componentFactory.js`

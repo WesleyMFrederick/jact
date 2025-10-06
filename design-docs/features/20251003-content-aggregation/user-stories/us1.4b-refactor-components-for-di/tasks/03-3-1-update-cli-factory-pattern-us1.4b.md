@@ -248,6 +248,8 @@ No debug logs required - straightforward refactoring task.
 #### Completion Notes
 Task completed successfully. Replaced direct component instantiation with factory function calls in citation-manager.js. All CLI commands (validate, ast, base-paths) tested and working correctly. Changes limited to imports and constructor as specified.
 
+**Corrective Implementation (2025-10-05):** Initial implementation was incomplete - CLI constructor created 4 component instances instead of 2, and attempted to call non-existent `setFileCache()` method (lines 35, 257). **Root Cause:** CitationValidator was refactored to DI pattern in Phase 1 (constructor injection), but CLI was not fully updated to work with this pattern. **Fix Applied:** Updated constructor to pass shared `parser` and `fileCache` instances to `createCitationValidator(parser, fileCache)` factory, enabling CLI to maintain direct access for ast command and cache building while sharing same instances with validator. Removed both `setFileCache()` calls. See componentFactory.js enhancement notes for factory signature change details.
+
 #### File List
 **Modified:**
 - `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/src/citation-manager.js`

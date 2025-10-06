@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
-import { CitationValidator } from "../src/CitationValidator.js";
+import { createCitationValidator } from "../src/factories/componentFactory.js";
 import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,7 +10,7 @@ const citationManagerPath = join(__dirname, "..", "src", "citation-manager.js");
 
 describe("Path Conversion Calculation", () => {
 	it("should calculate correct relative path for cross-directory resolution", () => {
-		const validator = new CitationValidator();
+		const validator = createCitationValidator();
 		const sourceFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const targetFile = join(
 			__dirname,
@@ -28,7 +28,7 @@ describe("Path Conversion Calculation", () => {
 	});
 
 	it("should calculate relative path for same directory files", () => {
-		const validator = new CitationValidator();
+		const validator = createCitationValidator();
 		const sourceFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const targetFile = join(__dirname, "fixtures", "test-target.md");
 
@@ -40,7 +40,7 @@ describe("Path Conversion Calculation", () => {
 	});
 
 	it("should calculate relative path for parent directory access", () => {
-		const validator = new CitationValidator();
+		const validator = createCitationValidator();
 		const sourceFile = join(
 			__dirname,
 			"fixtures",
@@ -57,7 +57,7 @@ describe("Path Conversion Calculation", () => {
 	});
 
 	it("should calculate relative path for nested subdirectories", () => {
-		const validator = new CitationValidator();
+		const validator = createCitationValidator();
 		const sourceFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const targetFile = join(__dirname, "fixtures", "nested", "deep", "file.md");
 
@@ -69,7 +69,7 @@ describe("Path Conversion Calculation", () => {
 	});
 
 	it("should handle absolute paths by converting to relative paths", () => {
-		const validator = new CitationValidator();
+		const validator = createCitationValidator();
 		const sourceFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const targetFile = join(
 			__dirname,
@@ -147,7 +147,7 @@ describe("Path Conversion Suggestion Integration", () => {
 	});
 
 	it("should preserve anchor fragments in conversion suggestions", () => {
-		const validator = new CitationValidator();
+		const validator = createCitationValidator();
 
 		// Test anchor preservation with URL encoding
 		const sourceFile = join(__dirname, "fixtures", "warning-test-source.md");
@@ -177,7 +177,7 @@ describe("Path Conversion Suggestion Integration", () => {
 	});
 
 	it("should handle citations without anchors in conversion suggestions", () => {
-		const validator = new CitationValidator();
+		const validator = createCitationValidator();
 
 		const sourceFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const targetFile = join(
@@ -201,7 +201,7 @@ describe("Path Conversion Suggestion Integration", () => {
 	});
 
 	it("should generate conversion suggestions for various directory structures", () => {
-		const validator = new CitationValidator();
+		const validator = createCitationValidator();
 
 		// Test multiple directory scenarios
 		const testCases = [

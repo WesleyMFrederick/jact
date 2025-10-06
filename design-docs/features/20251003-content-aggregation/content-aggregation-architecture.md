@@ -111,15 +111,338 @@ Based on analysis of the migrated codebase, here are the actual components with 
   - _outputs_ formatted results to stdout/stderr (synchronous)
 
 #### Citation Manager.Markdown Parser
-- **Path(s):** ==`tools/citation-manager/src/MarkdownParser.js` (_MIGRATED_)==
-  %% Legacy: `src/tools/utility-scripts/citation-links/src/MarkdownParser.js` %%
-- **Technology:** `Node.js` class, `marked` markdown tokenizer library, ESM modules
+- **Path(s):** `tools/citation-manager/src/MarkdownParser.js`
+- **Technology:**
+	- `Node.js` class
+	- `marked` markdown tokenizer library
+	- ESM modules
 - **Technology Status:** Production
-- **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (Obsidian block refs, caret syntax, emphasis-marked, standard headers), generates multiple anchor format variations for compatibility.
-- **Interactions:**
-  - _reads_ markdown files directly from file system (synchronous)
-  - _tokenizes_ markdown content using `marked` library (synchronous)
-  - _provides_ structured AST data to `CLI Orchestrator` and `Citation Validator` (synchronous)
+- **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates multiple anchor format variations for compatibility.
+
+##### Interactions
+- _reads_ markdown files directly from file system (synchronous)
+- _tokenizes_ markdown content using `marked` library (synchronous)
+- _provides_ structured AST data to `CLI Orchestrator` and `Citation Validator` (synchronous)
+
+##### Boundaries
+The component is exclusively responsible for transforming a raw markdown string into the structured **Parser Output Contract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** responsible for:
+
+- Validating the existence or accessibility of file paths.
+- Verifying the semantic correctness of links or anchors.
+- Interpreting or executing any code within the document.
+
+##### Input Public Contract
+The component's contract requires two inputs for operation:
+
+1. **`File System interface`**, provided at instantiation, which must be capable of reading file contents.
+2. **`file path`** `(string)`, provided to its public `parseFile()` method, identifying the document to be parsed.
+
+##### Output Public Contract
+The component's `parseFile()` method guarantees a return object (**Parser Output Contract**) with the following properties:
+
+- **`filePath`**: The absolute path of the source document.
+- **`content`**: The full, unmodified string content of the source document.
+- **`tokens`**: An array of raw token objects from the underlying `marked` lexer.
+- **`links`**: An array of **Link Objects**, representing every identified outgoing link.
+- **`anchors`**: An array of **Anchor Objects**, representing every potential link target.
+
+###### Markdown Parser.Output Contract Data Definition
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cc-workflows.com/parser-output.schema.json",
+  "title": "Parser Output Contract",
+  "description": "The complete output from the MarkdownParser's parseFile() method, containing all structural information about a markdown document.",
+  "type": "object",
+  "properties": {
+    "filePath": {
+      "description": "The absolute path of the file that was parsed.",
+      "type": "string"
+    },
+    "content": {
+      "description": "The full, raw string content of the parsed file.",
+      "type": "string"
+    },
+    "tokens": {
+      "description": "An array of raw token objects from the 'marked' library's lexer. The structure of these objects is defined by the external `marked` package and is not controlled by this contract. For example:\n\n```json\n{\n  \"type\": \"list_item\",\n  \"raw\": \"- FR1: Core requirement. ^FR1\",\n  \"text\": \"FR1: Core requirement. ^FR1\",\n  \"tokens\": [...]\n}\n```",
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "links": {
+      "description": "An array of all outgoing links found in the document.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/linkObject"
+      }
+    },
+    "anchors": {
+      "description": "An array of all available anchors (targets) defined in the document.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/anchorObject"
+      }
+    }
+  },
+  "required": [
+    "filePath",
+    "content",
+    "tokens",
+    "links",
+    "anchors"
+  ],
+  "$defs": {
+    "linkObject": {
+      "title": "Link Object",
+      "description": "Represents a single clickable link found within the document.",
+      "type": "object",
+      "properties": {
+        "linkType": {
+          "description": "Describes the link's markdown syntax style.",
+          "type": "string",
+          "enum": [
+            "markdown",
+            "wiki"
+          ]
+        },
+        "scope": {
+          "description": "Specifies if the link points within the same document or to a different one.",
+          "type": "string",
+          "enum": [
+            "internal",
+            "cross-document"
+          ]
+        },
+        "anchorType": {
+          "description": "Describes the kind of content the anchor targets. It is null for full-file links.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "header",
+            "block",
+            null
+          ]
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "absolute": {
+                  "description": "The absolute path of the file being parsed.",
+                  "type": "string"
+                }
+              },
+              "required": ["absolute"]
+            }
+          },
+          "required": ["path"]
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "object",
+              "properties": {
+                "raw": {
+                  "description": "The raw path string exactly as it appears in the link's markdown.",
+                  "type": ["string", "null"]
+                },
+                "absolute": {
+                  "description": "The resolved absolute path to the target file. Null if the path is invalid or internal.",
+                  "type": ["string", "null"]
+                },
+                "relative": {
+                  "description": "The correctly calculated relative path from the source file to the target file.",
+                  "type": ["string", "null"]
+                }
+              },
+              "required": ["raw", "absolute", "relative"]
+            },
+            "anchor": {
+              "description": "The raw anchor/fragment identifier from the link.",
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["path", "anchor"]
+        },
+        "text": {
+          "description": "The display text of the link.",
+          "type": ["string", "null"]
+        },
+        "fullMatch": {
+          "description": "The entire raw markdown string that was parsed to create this object.",
+          "type": "string"
+        },
+        "line": {
+          "description": "The line number in the source file where the link was found.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "description": "The column number on the line where the link begins.",
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "linkType",
+        "scope",
+        "anchorType",
+        "source",
+        "target",
+        "text",
+        "fullMatch",
+        "line",
+        "column"
+      ]
+    },
+    "anchorObject": {
+      "title": "Anchor Object",
+      "description": "Represents a potential target for a link within a document.",
+      "type": "object",
+      "properties": {
+        "anchorType": {
+          "description": "Describes the kind of anchor.",
+          "type": "string",
+          "enum": [
+            "header",
+            "block"
+          ]
+        },
+        "id": {
+          "description": "The unique identifier for the anchor used in links (e.g., URL-encoded header text or a block ID).",
+          "type": "string"
+        },
+        "rawText": {
+          "description": "The original, un-encoded text of the anchor, if applicable.",
+          "type": ["string", "null"]
+        },
+        "fullMatch": {
+          "description": "The full markdown string that defined the anchor (e.g., '## Header' or '^block-id').",
+          "type": "string"
+        },
+        "line": {
+          "description": "The line number in the source file where the anchor was found.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "description": "The column number on the line where the anchor begins.",
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "anchorType",
+        "id",
+        "rawText",
+        "fullMatch",
+        "line",
+        "column"
+      ]
+    }
+  }
+}
+```
+
+###### Markdown Parser.Output JSON Example
+```json
+{
+  "filePath": "/project/tools/citation-manager/test/fixtures/enhanced-citations.md",
+  "content": "# Enhanced Citations Test File\n\nThis file tests new citation patterns...\n...",
+  "tokens": [
+    {
+      "type": "heading",
+      "depth": 1,
+      "text": "Enhanced Citations Test File",
+      "raw": "# Enhanced Citations Test File",
+      "tokens": [
+	      {
+		      "type": ... // tokens can be recurrsive
+	      }
+      ]
+    }
+  ],
+  "links": [
+    {
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "anchorType": "header",
+      "source": {
+        "path": {
+          "absolute": "/project/tools/citation-manager/test/fixtures/enhanced-citations.md"
+        }
+      },
+      "target": {
+        "path": {
+          "raw": "test-target.md",
+          "absolute": "/project/tools/citation-manager/test/fixtures/test-target.md",
+          "relative": "test-target.md"
+        },
+        "anchor": "auth-service"
+      },
+      "text": "Component Details",
+      "fullMatch": "[Component Details](test-target.md#auth-service)",
+      "line": 5,
+      "column": 3
+    },
+    {
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "anchorType": null,
+      "source": {
+        "path": {
+          "absolute": "/project/tools/citation-manager/test/fixtures/enhanced-citations.md"
+        }
+      },
+      "target": {
+        "path": {
+          "raw": "test-target.md",
+          "absolute": "/project/tools/citation-manager/test/fixtures/test-target.md",
+          "relative": "test-target.md"
+        },
+        "anchor": null
+      },
+      "text": "Implementation Guide",
+      "fullMatch": "[Implementation Guide](test-target.md)",
+      "line": 11,
+      "column": 3
+    }
+  ],
+  "anchors": [
+    {
+      "anchorType": "header",
+      "id": "Caret%20References",
+      "rawText": "Caret References",
+      "fullMatch": "## Caret References",
+      "line": 26,
+      "column": 1
+    },
+    {
+      "anchorType": "block",
+      "id": "FR1",
+      "rawText": null,
+      "fullMatch": "^FR1",
+      "line": 28,
+      "column": 26
+    },
+    {
+      "anchorType": "header",
+      "id": "auth-service",
+      "rawText": "Auth Service",
+      "fullMatch": "### Auth Service {#auth-service}",
+      "line": 32,
+      "column": 1
+    }
+  ]
+}
+```
+
 
 #### Citation Manager.File Cache
 - **Path(s):** ==`tools/citation-manager/src/FileCache.js` (_MIGRATED_)==
@@ -389,34 +712,6 @@ This tool follows workspace design principles defined in [Architecture Principle
 
 ## Known Risks and Technical Debt
 
-### Lack of Dependency Injection
-
-**Risk Category**: Architecture / Testing
-
-**Description**: The `citation-manager` tool currently deviates from the workspace's dependency injection (DI) principle. The main `CitationManager` class creates its dependencies directly (e.g., `MarkdownParser`, `FileCache`, `CitationValidator`) rather than receiving them via constructor injection, leading to tight coupling.
-
-**Impact**:
-- **Moderate**: Reduces testability and makes component boundaries implicit
-- **Scope**: Affects all components in citation-manager tool
-- **Testing Constraint**: Cannot easily inject real dependencies for integration testing per workspace's "Real Systems, Fake Fixtures" philosophy
-
-**Rationale for Accepting Risk**: This is legacy code migrated from standalone utility scripts. Addressing this debt is planned as **US1.4b: Component DI Refactoring** (scheduled after Epic 2 architecture design per ADR-001). Phased approach separates test framework conversion (US1.4a) from architectural alignment (US1.4b), reducing risk and enabling Epic 2 patterns to inform refactoring decisions.
-
-**Mitigation Strategy**: **Implemented via US1.4b** (scheduled after Epic 2 architecture design)
-
-**US1.4b Acceptance Criteria**:
-- AC1: Refactor components to accept dependencies via constructor ^US1-4bAC1
-- AC2: Implement factory pattern at `src/factories/componentFactory.js` ^US1-4bAC2
-- AC3: Update CLI to use factory functions ^US1-4bAC3
-- AC4: Update tests to inject real dependencies via constructors ^US1-4bAC4
-- AC5: Add component integration tests per workspace strategy ^US1-4bAC5
-- AC6: Mark technical debt as resolved ^US1-4bAC6
-
-**Timeline**:
-- US1.4a (Test Migration) → Epic 2 Architecture Design → US1.4b (DI Refactoring) → US2.1 (Feature Implementation)
-
-**Status**: Time-boxed technical debt, scheduled for resolution before Epic 2 feature work begins
-
 ### Stale Auto-Fix Test Assertions
 
 **Risk Category**: Testing / Maintenance
@@ -503,9 +798,9 @@ npm run citation:base-paths <file-path> -- --format json
 |-----------|----------------|-----------------|---------|
 | **Source Code** | `src/tools/utility-scripts/citation-links/` | `tools/citation-manager/src/` | ✓ US1.2 Complete |
 | **CLI Executability** | N/A | Via workspace npm scripts | ✓ US1.3 Complete |
-| **Test Suite** | `src/tools/utility-scripts/citation-links/test/` | `tools/citation-manager/test/` | ⏳ US1.4a In Progress |
-| **DI Architecture** | N/A | Component constructor injection | 📅 US1.4b Planned |
-| **Factory Pattern** | N/A | `src/factories/componentFactory.js` | 📅 US1.4b Planned |
+| **Test Suite** | `src/tools/utility-scripts/citation-links/test/` | `tools/citation-manager/test/` | ✓ US1.4a Complete |
+| **DI Architecture** | N/A | Component constructor injection | ✓ US1.4b Complete |
+| **Factory Pattern** | N/A | `src/factories/componentFactory.js` | ✓ US1.4b Complete |
 | **Documentation** | Scattered | `tools/citation-manager/design-docs/` | ⏳ In Progress |
 
 ---
@@ -524,14 +819,14 @@ npm run citation:base-paths <file-path> -- --format json
 
 ## Document Status
 
-**Last Updated**: 2025-10-01
-**Version**: 0.1 (Draft)
+**Last Updated**: 2025-10-05
+**Version**: 0.2 (Draft)
 **Next Steps**:
-- Complete US1.4a test migration to Vitest
+- ✓ Complete US1.4a test migration to Vitest (DONE)
+- ✓ Implement US1.4b DI refactoring with factory pattern (DONE)
 - Design Epic 2 architecture with DI patterns for ContentExtractor
-- Implement US1.4b DI refactoring informed by Epic 2 patterns
-- Document component interfaces and data contracts (after DI refactoring)
-- Create component interaction diagrams (after DI refactoring)
+- Document component interfaces and data contracts
+- Create component interaction diagrams
 
 ---
 
@@ -539,3 +834,7 @@ npm run citation:base-paths <file-path> -- --format json
 
 - [Architecture Principles](../../../../../design-docs/Architecture%20Principles.md) - Design principles and patterns
 - [citation-guidelines](../../../../../agentic-workflows/rules/citation-guidelines.md) - Citation linking guidelines
+
+## Whiteboard
+
+### Anchor Object Definition 

@@ -236,7 +236,7 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
 
 ### Phase 1: Component Constructor Refactoring
 
-- [ ] **1.1. Refactor Components for Constructor DI** ^US1-4bT1-1
+- [x] **1.1. Refactor Components for Constructor DI** ^US1-4bT1-1
   - **Agent**: code-developer-agent (single session)
   - **Objective**: Refactor CitationValidator, MarkdownParser, and FileCache to accept all dependencies via constructor parameters instead of creating them internally
   - **Input**: Three components with hard-coded dependencies (direct imports, internal instantiation)
@@ -258,11 +258,11 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
     - `npm test -- FileCache`
   - _Requirements_: [[#^US1-4bAC1|AC1]]
   - _Leverage_: Existing component logic, constructor DI pattern from workspace architecture
-  - _Implementation Details_: [tasks/us1.4b-t1.1-component-di-refactoring.md]
+  - _Implementation Details_: [01-1-1-refactor-components-constructor-di-us1.4b](tasks/01-1-1-refactor-components-constructor-di-us1.4b.md)
 
 ### Phase 2: Factory Pattern Implementation
 
-- [ ] **2.1. Implement Component Factory** ^US1-4bT2-1
+- [x] **2.1. Implement Component Factory** ^US1-4bT2-1
   - **Agent**: code-developer-agent
   - **Objective**: Create component factory module with factory functions for all DI-refactored components
   - **Input**: DI-refactored CitationValidator, MarkdownParser, and FileCache from Phase 1
@@ -281,11 +281,11 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm test -- factory`
   - _Requirements_: [[#^US1-4bAC2|AC2]]
   - _Leverage_: Factory pattern from workspace architecture, DI-refactored components from Phase 1
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [02-2-1-implement-component-factory-us1.4b](tasks/02-2-1-implement-component-factory-us1.4b.md)
 
 ### Phase 3: CLI Integration
 
-- [ ] **3.1. Update CLI to Use Factory Pattern** ^US1-4bT3-1
+- [x] **3.1. Update CLI to Use Factory Pattern** ^US1-4bT3-1
   - **Agent**: code-developer-agent
   - **Objective**: Replace direct component instantiation in CLI with factory function calls
   - **Input**: citation-manager.js with direct component instantiation, componentFactory from Phase 2
@@ -303,11 +303,11 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm run citation:validate <test-file>`, `npm run citation:ast <test-file>`
   - _Requirements_: [[#^US1-4bAC3|AC3]]
   - _Leverage_: componentFactory from Phase 2, existing CLI command logic
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [03-3-1-update-cli-factory-pattern-us1.4b](tasks/03-3-1-update-cli-factory-pattern-us1.4b.md)
 
 ### Phase 4: Test Updates
 
-- [ ] **4.1. Update Path Conversion Tests** ^US1-4bT4-1
+- [x] **4.1. Update Path Conversion Tests** ^US1-4bT4-1
   - **Agent**: test-writer
   - **Objective**: Update path-conversion.test.js to use factory pattern for component instantiation
   - **Input**: path-conversion.test.js with direct component instantiation, componentFactory from Phase 2
@@ -325,9 +325,9 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm test -- path-conversion`
   - _Requirements_: [[#^US1-4bAC4|AC4]]
   - _Leverage_: componentFactory from Phase 2, existing test fixtures and assertions
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [04-4-1-update-path-conversion-tests-us1.4b](tasks/04-4-1-update-path-conversion-tests-us1.4b.md)
 
-- [ ] **4.2. Update Validation Tests** ^US1-4bT4-2
+- [x] **4.2. Update Validation Tests** ^US1-4bT4-2
   - **Agent**: test-writer
   - **Objective**: Update validation.test.js and auto-fix.test.js to use factory pattern for component instantiation
   - **Input**: validation.test.js and auto-fix.test.js with direct component instantiation, componentFactory from Phase 2
@@ -344,9 +344,9 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm test -- validation && npm test -- auto-fix`
   - _Requirements_: [[#^US1-4bAC4|AC4]]
   - _Leverage_: componentFactory from Phase 2, existing test fixtures and assertions
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [04-4-2-update-validation-tests-us1.4b](tasks/04-4-2-update-validation-tests-us1.4b.md)
 
-- [ ] **4.3. Update Enhanced Citation Tests** ^US1-4bT4-3
+- [x] **4.3. Update Enhanced Citation Tests** ^US1-4bT4-3
   - **Agent**: test-writer
   - **Objective**: Update enhanced-citations.test.js, story-validation.test.js, and cli-warning-output.test.js to use factory pattern
   - **Input**: Three test files with direct component instantiation, componentFactory from Phase 2
@@ -364,9 +364,9 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm test -- enhanced-citations && npm test -- story-validation && npm test -- cli-warning`
   - _Requirements_: [[#^US1-4bAC4|AC4]]
   - _Leverage_: componentFactory from Phase 2, existing test fixtures and assertions
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [04-4-3-update-enhanced-citation-tests-us1.4b](tasks/04-4-3-update-enhanced-citation-tests-us1.4b.md)
 
-- [ ] **4.4. Update Warning Validation Tests** ^US1-4bT4-4
+- [x] **4.4. Update Warning Validation Tests** ^US1-4bT4-4
   - **Agent**: test-writer
   - **Objective**: Update warning-validation.test.js to use factory pattern for component instantiation
   - **Input**: warning-validation.test.js with direct component instantiation, componentFactory from Phase 2
@@ -382,9 +382,9 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm test -- warning-validation`
   - _Requirements_: [[#^US1-4bAC4|AC4]]
   - _Leverage_: componentFactory from Phase 2, existing test fixtures and assertions
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [04-4-4-update-warning-validation-tests-us1.4b](tasks/04-4-4-update-warning-validation-tests-us1.4b.md)
 
-- [ ] **4.5. Create Component Integration Tests** ^US1-4bT4-5
+- [x] **4.5. Create Component Integration Tests** ^US1-4bT4-5
   - **Agent**: test-writer
   - **Objective**: Create integration tests validating CitationValidator, MarkdownParser, and FileCache collaboration using real file system operations
   - **Input**: componentFactory from Phase 2, existing test fixtures
@@ -404,12 +404,12 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm test -- integration/citation-validator`
   - _Requirements_: [[#^US1-4bAC5|AC5]]
   - _Leverage_: componentFactory from Phase 2, existing test fixtures from tools/citation-manager/test/fixtures/
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [04-4-5-create-component-integration-tests-us1.4b](tasks/04-4-5-create-component-integration-tests-us1.4b.md)
 
 ### Phase 5: Documentation & Validation
 
 - [ ] **5.1. Update Architecture Documentation** ^US1-4bT5-1
-  - **Agent**: code-developer-agent
+  - **Agent**: application-tech-lead
   - **Objective**: Update content-aggregation-architecture.md to mark "Lack of Dependency Injection" technical debt as resolved
   - **Input**: content-aggregation-architecture.md with documented technical debt, completed DI refactoring from Phases 1-4
   - **Output**: Architecture documentation reflecting resolved technical debt and updated migration status
@@ -425,9 +425,9 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm run citation:validate tools/citation-manager/design-docs/features/20251003-content-aggregation/content-aggregation-architecture.md`
   - _Requirements_: [[#^US1-4bAC6|AC6]]
   - _Leverage_: ADR-001 phased migration strategy, US1.4b completion evidence from Phases 1-4
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [tasks/us1.4b-t5.1-update-architecture-documentation.md]
 
-- [ ] **5.2. Execute Full Regression Validation** ^US1-4bT5-2
+- [x] **5.2. Execute Full Regression Validation** ^US1-4bT5-2
   - **Agent**: qa-validation
   - **Objective**: Execute complete test suite to validate zero regression after DI refactoring
   - **Input**: All refactored components and tests from Phases 1-4
@@ -443,7 +443,7 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
   - **Commands**: `npm test`
   - _Requirements_: [[#^US1-4bAC6|AC6]]
   - _Leverage_: Complete test suite from Phase 4, validation criteria from acceptance criteria
-  - _Implementation Details_: [Will be populated in Phase 4]
+  - _Implementation Details_: [tasks/us1.4b-t5.2-execute-full-regression-validation.md]
 
 ### Acceptance Criteria Coverage
 
@@ -628,4 +628,3 @@ Each code-developer-agent and test-writer task completion triggers an applicatio
 - [Content Aggregation PRD](../../content-aggregation-prd.md) - Parent feature PRD with story definition
 - [Content Aggregation Architecture](../../content-aggregation-architecture.md) - Tool architecture with ADR-001 and technical debt documentation
 - [Workspace Architecture](../../../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md) - Workspace DI patterns and testing strategy
-- [US1.4a: Migrate Test Suite to Vitest](../us1.4a-migrate-test-suite-to-vitest/us1.4a-migrate-test-suite-to-vitest.md) - Prerequisite test migration story

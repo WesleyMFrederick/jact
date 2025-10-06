@@ -10,8 +10,8 @@ import {
 class CitationManager {
 	constructor() {
 		this.parser = createMarkdownParser();
-		this.validator = createCitationValidator();
 		this.fileCache = createFileCache();
+		this.validator = createCitationValidator(this.parser, this.fileCache);
 	}
 
 	async validate(filePath, options = {}) {
@@ -32,7 +32,6 @@ class CitationManager {
 						);
 					}
 				}
-				this.validator.setFileCache(this.fileCache);
 			}
 
 			const result = await this.validator.validateFile(filePath);
@@ -254,7 +253,6 @@ class CitationManager {
 				if (cacheStats.duplicates > 0) {
 					console.log(`⚠️  Found ${cacheStats.duplicates} duplicate filenames`);
 				}
-				this.validator.setFileCache(this.fileCache);
 			}
 
 			// First, validate to find fixable issues
