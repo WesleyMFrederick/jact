@@ -84,9 +84,9 @@ const validator = new CitationValidator();  // Cannot control dependencies
 ```javascript
 // Components accept dependencies via constructor
 class CitationValidator {
-  constructor(parser, cache) {
+  constructor(parser, fileCache) {
     this.parser = parser;   // Injected dependency
-    this.cache = cache;     // Injected dependency
+    this.fileCache = fileCache;     // Injected dependency
   }
 }
 
@@ -115,8 +115,8 @@ import { CitationValidator } from '../components/CitationValidator.js';
 
 export function createCitationValidator() {
   const parser = createMarkdownParser();
-  const cache = createFileCache();
-  return new CitationValidator(parser, cache);
+  const fileCache = createFileCache();
+  return new CitationValidator(parser, fileCache);
 }
 
 export function createMarkdownParser() {
@@ -246,7 +246,7 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
     - `tools/citation-manager/src/MarkdownParser.js` (modify)
     - `tools/citation-manager/src/FileCache.js` (modify)
   - **Scope**:
-    - **CitationValidator**: Update constructor to `constructor(parser, cache)`, remove internal `new MarkdownParser()` and `new FileCache()`, store as `this.parser` and `this.cache`
+    - **CitationValidator**: Update constructor to `constructor(parser, fileCache)`, remove internal `new MarkdownParser()` and `new FileCache()`, store as `this.parser` and `this.fileCache`
     - **MarkdownParser**: Update constructor to `constructor(fileSystem)`, remove direct `import fs`, store as `this.fs`, update all `fs.*` calls to `this.fs.*`
     - **FileCache**: Update constructor to `constructor(fileSystem)`, remove direct `import fs`, store as `this.fs`, update all `fs.*` calls to `this.fs.*`
     - Preserve all existing validation/parsing/caching logic unchanged across all components

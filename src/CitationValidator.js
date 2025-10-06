@@ -1,11 +1,10 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { MarkdownParser } from "./MarkdownParser.js";
 
 export class CitationValidator {
-	constructor() {
-		this.parser = new MarkdownParser();
-		this.fileCache = null;
+	constructor(parser, fileCache) {
+		this.parser = parser;
+		this.fileCache = fileCache;
 
 		// Pattern validation rules with precedence order
 		this.patterns = {
@@ -30,9 +29,6 @@ export class CitationValidator {
 		};
 	}
 
-	setFileCache(fileCache) {
-		this.fileCache = fileCache;
-	}
 
 	// Symlink resolution utilities
 	safeRealpathSync(path) {

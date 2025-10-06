@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
 import { marked } from "marked";
 
 export class MarkdownParser {
-	constructor() {
+	constructor(fileSystem) {
+		this.fs = fileSystem;
 		this.anchorPatterns = {
 			CARET: /\^([A-Za-z0-9-]+)/g,
 			OBSIDIAN_BLOCK_REF: /\^([a-zA-Z0-9\-_]+)$/g, // End-of-line block references
@@ -19,7 +19,7 @@ export class MarkdownParser {
 	}
 
 	async parseFile(filePath) {
-		const content = readFileSync(filePath, "utf8");
+		const content = this.fs.readFileSync(filePath, "utf8");
 		const tokens = marked.lexer(content);
 
 		return {

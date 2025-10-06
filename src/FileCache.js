@@ -1,8 +1,7 @@
-import { readdirSync, realpathSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
-
 export class FileCache {
-	constructor() {
+	constructor(fileSystem, pathModule) {
+		this.fs = fileSystem;
+		this.path = pathModule;
 		this.cache = new Map(); // filename -> absolute path
 		this.duplicates = new Set(); // filenames that appear multiple times
 	}
@@ -12,11 +11,11 @@ export class FileCache {
 		this.duplicates.clear();
 
 		// Resolve symlinks to get the real path, but only scan the resolved path
-		const absoluteScopeFolder = resolve(scopeFolder);
+		const absoluteScopeFolder = this.path.resolve(scopeFolder);
 		let targetScanFolder;
 
 		try {
-			targetScanFolder = realpathSync(absoluteScopeFolder);
+			targetScanFolder = this.fs.realpathSync(absoluteScopeFolder);
 		} catch (_error) {
 			// If realpath fails, use the original path
 			targetScanFolder = absoluteScopeFolder;
@@ -42,11 +41,11 @@ export class FileCache {
 
 	scanDirectory(dirPath) {
 		try {
-			const entries = readdirSync(dirPath);
+			const entries = this.fs.readdirSync(dirPath);
 
 			for (const entry of entries) {
-				const fullPath = join(dirPath, entry);
-				const stat = statSync(fullPath);
+				const fullPath = this.path.join(dirPath, entry);
+				const stat = this.fs.statSync(fullPath);
 
 				if (stat.isDirectory()) {
 					// Recursively scan subdirectories

@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { CitationValidator } from "./CitationValidator.js";
-import { FileCache } from "./FileCache.js";
-import { MarkdownParser } from "./MarkdownParser.js";
+import {
+	createCitationValidator,
+	createFileCache,
+	createMarkdownParser,
+} from "./factories/componentFactory.js";
 
 class CitationManager {
 	constructor() {
-		this.parser = new MarkdownParser();
-		this.validator = new CitationValidator();
-		this.fileCache = new FileCache();
+		this.parser = createMarkdownParser();
+		this.validator = createCitationValidator();
+		this.fileCache = createFileCache();
 	}
 
 	async validate(filePath, options = {}) {
