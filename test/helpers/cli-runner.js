@@ -17,12 +17,8 @@ export function runCLI(command, options = {}) {
 	try {
 		const result = execSync(command, defaultOptions);
 		return result;
-	} catch (error) {
-		// Re-throw with output attached for test assertions
-		throw error;
 	} finally {
 		// Hint garbage collector (helps but doesn't force)
 		if (global.gc) global.gc();
 	}
 }
-2

@@ -1,4 +1,4 @@
-import { resolve, normalize } from 'node:path';
+import { normalize, resolve } from "node:path";
 
 export class ParsedFileCache {
 	constructor(markdownParser) {

@@ -29,7 +29,6 @@ export class CitationValidator {
 		};
 	}
 
-
 	// Symlink resolution utilities
 	safeRealpathSync(path) {
 		try {
@@ -93,7 +92,7 @@ export class CitationValidator {
 
 		// Check if it's an Obsidian absolute path
 		if (this.isObsidianAbsolutePath(relativePath)) {
-			debugParts.push(`Detected Obsidian absolute path format`);
+			debugParts.push("Detected Obsidian absolute path format");
 		}
 
 		return debugParts.join("; ");
@@ -182,21 +181,20 @@ export class CitationValidator {
 	}
 
 	validateCaretPattern(citation) {
-		let anchor = citation.target.anchor || citation.fullMatch.substring(1); // Remove ^ from fullMatch
+		const anchor = citation.target.anchor || citation.fullMatch.substring(1); // Remove ^ from fullMatch
 
 		// If anchor already starts with ^, don't add another one
-		const anchorToTest = anchor.startsWith('^') ? anchor : `^${anchor}`;
+		const anchorToTest = anchor.startsWith("^") ? anchor : `^${anchor}`;
 
 		if (this.patterns.CARET_SYNTAX.regex.test(anchorToTest)) {
 			return this.createValidationResult(citation, "valid");
-		} else {
-			return this.createValidationResult(
-				citation,
-				"error",
-				`Invalid caret pattern: ${anchorToTest}`,
-				`Use format: ${this.patterns.CARET_SYNTAX.examples.join(", ")}`,
-			);
 		}
+		return this.createValidationResult(
+			citation,
+			"error",
+			`Invalid caret pattern: ${anchorToTest}`,
+			`Use format: ${this.patterns.CARET_SYNTAX.examples.join(", ")}`,
+		);
 	}
 
 	validateEmphasisPattern(citation) {
@@ -204,25 +202,24 @@ export class CitationValidator {
 
 		if (this.patterns.EMPHASIS_MARKED.regex.test(anchor)) {
 			return this.createValidationResult(citation, "valid");
-		} else {
-			// Check common malformations
-			if (anchor.includes("==") && anchor.includes("**")) {
-				if (!anchor.startsWith("==**") || !anchor.endsWith("**==")) {
-					return this.createValidationResult(
-						citation,
-						"error",
-						"Malformed emphasis anchor - incorrect marker placement",
-						`Use format: ==**ComponentName**== (found: ${anchor})`,
-					);
-				}
-			} else {
+		}
+		// Check common malformations
+		if (anchor.includes("==") && anchor.includes("**")) {
+			if (!anchor.startsWith("==**") || !anchor.endsWith("**==")) {
 				return this.createValidationResult(
 					citation,
 					"error",
-					"Malformed emphasis anchor - missing ** markers",
+					"Malformed emphasis anchor - incorrect marker placement",
 					`Use format: ==**ComponentName**== (found: ${anchor})`,
 				);
 			}
+		} else {
+			return this.createValidationResult(
+				citation,
+				"error",
+				"Malformed emphasis anchor - missing ** markers",
+				`Use format: ==**ComponentName**== (found: ${anchor})`,
+			);
 		}
 
 		return this.createValidationResult(
@@ -239,7 +236,10 @@ export class CitationValidator {
 		const sourceDir = dirname(sourceFile);
 		const standardPath = resolve(sourceDir, decodedRelativePath);
 
-		const targetPath = this.resolveTargetPath(citation.target.path.raw, sourceFile);
+		const targetPath = this.resolveTargetPath(
+			citation.target.path.raw,
+			sourceFile,
+		);
 
 		// Check if target file exists
 		if (!existsSync(targetPath)) {
@@ -338,7 +338,12 @@ export class CitationValidator {
 							);
 						}
 
-						return this.createValidationResult(citation, baseStatus, null, crossDirMessage);
+						return this.createValidationResult(
+							citation,
+							baseStatus,
+							null,
+							crossDirMessage,
+						);
 					}
 				}
 
@@ -353,7 +358,8 @@ export class CitationValidator {
 						`File not found: ${citation.target.path.raw}`,
 						`${cacheResult.message}. ${debugInfo}`,
 					);
-				} else if (cacheResult.reason === "not_found") {
+				}
+				if (cacheResult.reason === "not_found") {
 					return this.createValidationResult(
 						citation,
 						"error",

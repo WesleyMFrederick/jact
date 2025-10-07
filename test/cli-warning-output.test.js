@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,7 +48,7 @@ describe("CLI Warning Output Display Tests", () => {
 		expect(output).toContain("│  └─");
 		expect(
 			output.includes("Found via file cache") ||
-				output.includes("Found in scope")
+				output.includes("Found in scope"),
 		).toBe(true);
 	});
 
@@ -80,7 +80,7 @@ describe("CLI Warning Output Display Tests", () => {
 			const warningsMatch = output.match(/- Warnings: (\d+)/);
 			expect(warningsMatch).toBeTruthy();
 
-			const warningsCount = parseInt(warningsMatch[1], 10);
+			const warningsCount = Number.parseInt(warningsMatch[1], 10);
 			expect(warningsCount).toBeGreaterThan(0);
 		} catch (error) {
 			// Handle case where command exits with error but still produces summary
@@ -117,10 +117,7 @@ describe("CLI Warning Output Display Tests", () => {
 			expect(sections.length).toBeGreaterThan(0);
 
 			// Validate warning section appears before valid section (if both exist)
-			if (
-				output.includes("WARNINGS") &&
-				output.includes("VALID CITATIONS")
-			) {
+			if (output.includes("WARNINGS") && output.includes("VALID CITATIONS")) {
 				const warningIndex = output.indexOf("WARNINGS");
 				const validIndex = output.indexOf("VALID CITATIONS");
 				expect(warningIndex).toBeLessThan(validIndex);
@@ -136,7 +133,7 @@ describe("CLI Warning Output Display Tests", () => {
 			expect(
 				warningSection.includes("Found in scope") ||
 					warningSection.includes("resolved") ||
-					warningSection.includes("└─")
+					warningSection.includes("└─"),
 			).toBe(true);
 		} catch (error) {
 			// Validate output structure even on error exit

@@ -1,5 +1,5 @@
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { marked } from "marked";
-import { dirname, isAbsolute, resolve, relative } from "node:path";
 
 export class MarkdownParser {
 	constructor(fileSystem) {
@@ -322,7 +322,7 @@ export class MarkdownParser {
 		const headings = [];
 
 		const extractFromTokens = (tokenList) => {
-			tokenList.forEach((token) => {
+			for (const token of tokenList) {
 				if (token.type === "heading") {
 					headings.push({
 						level: token.depth,
@@ -335,7 +335,7 @@ export class MarkdownParser {
 				if (token.tokens) {
 					extractFromTokens(token.tokens);
 				}
-			});
+			}
 		};
 
 		extractFromTokens(tokens);

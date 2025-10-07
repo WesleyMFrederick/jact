@@ -9,12 +9,7 @@
 		"test": "vitest",
 		"start": "node src/citation-manager.js"
 	},
-	"keywords": [
-		"citation",
-		"validator",
-		"markdown",
-		"obsidian"
-	],
+	"keywords": ["citation", "validator", "markdown", "obsidian"],
 	"author": "",
 	"license": "ISC",
 	"dependencies": {

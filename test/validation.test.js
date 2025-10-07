@@ -1,7 +1,7 @@
 import { unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -72,12 +72,9 @@ describe("Citation Manager Integration Tests", () => {
 		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 
 		try {
-			const output = runCLI(
-				`node "${citationManagerPath}" ast "${testFile}"`,
-				{
-					cwd: __dirname,
-				},
-			);
+			const output = runCLI(`node "${citationManagerPath}" ast "${testFile}"`, {
+				cwd: __dirname,
+			});
 
 			const ast = JSON.parse(output);
 			expect(ast.filePath).toBeTruthy();
@@ -165,7 +162,9 @@ describe("Citation Manager Integration Tests", () => {
 			const result = JSON.parse(output);
 			expect(result.lineRange).toBe("13-14");
 			expect(Array.isArray(result.results)).toBe(true);
-			expect(result.results.every((r) => r.line >= 13 && r.line <= 14)).toBe(true);
+			expect(result.results.every((r) => r.line >= 13 && r.line <= 14)).toBe(
+				true,
+			);
 		} catch (error) {
 			const output = error.stdout || "";
 			// Try to parse even if validation failed
@@ -233,12 +232,9 @@ describe("Citation Manager Integration Tests", () => {
 		const testFile = join(__dirname, "fixtures", "complex-headers.md");
 
 		try {
-			const output = runCLI(
-				`node "${citationManagerPath}" ast "${testFile}"`,
-				{
-					cwd: __dirname,
-				},
-			);
+			const output = runCLI(`node "${citationManagerPath}" ast "${testFile}"`, {
+				cwd: __dirname,
+			});
 
 			const ast = JSON.parse(output);
 
@@ -253,10 +249,10 @@ describe("Citation Manager Integration Tests", () => {
 			// 1. type="header" with raw text anchors
 			// 2. type="header-obsidian" with URL-encoded anchors
 			// Both are valid - we just verify that anchors are generated
-			backtickHeaders.forEach((header) => {
+			for (const header of backtickHeaders) {
 				expect(header.id).toBeDefined();
 				expect(header.id.length).toBeGreaterThan(0);
-			});
+			}
 
 			// Verify plain text headers also get anchors
 			const plainHeaders = ast.anchors.filter(
@@ -271,9 +267,9 @@ describe("Citation Manager Integration Tests", () => {
 			);
 
 			// Plain headers should have anchors defined
-			plainHeaders.forEach((header) => {
+			for (const header of plainHeaders) {
 				expect(header.id).toBeDefined();
-			});
+			}
 		} catch (error) {
 			expect.fail(
 				`Markdown header anchor generation should work: ${error.stdout || error.message}`,

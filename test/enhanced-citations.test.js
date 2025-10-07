@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -55,7 +55,9 @@ describe("Enhanced Citation Pattern Tests", () => {
 		expect(citeFormat.length).toBeGreaterThanOrEqual(3);
 
 		// Should find caret references
-		const caretRefs = citations.filter((c) => c.scope === "internal" && c.linkType === "markdown");
+		const caretRefs = citations.filter(
+			(c) => c.scope === "internal" && c.linkType === "markdown",
+		);
 		expect(caretRefs.length).toBeGreaterThanOrEqual(2);
 	});
 

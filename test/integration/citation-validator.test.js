@@ -1,6 +1,6 @@
-import { join, dirname } from "node:path";
-import { describe, it, expect } from "vitest";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 import { createCitationValidator } from "../../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -9,7 +9,6 @@ const fixturesDir = join(__dirname, "..", "fixtures");
 
 describe("Component Integration", () => {
 	describe("CitationValidator with MarkdownParser and FileCache", () => {
-
 		it("should validate citations using real file operations", async () => {
 			// Given: Factory creates validator with production dependencies
 			const validator = createCitationValidator();
@@ -26,9 +25,9 @@ describe("Component Integration", () => {
 			expect(result.results).toBeInstanceOf(Array);
 			expect(result.results.length).toBe(result.summary.total);
 			// Verify all results have valid status
-			result.results.forEach(citation => {
+			for (const citation of result.results) {
 				expect(citation.status).toBe("valid");
-			});
+			}
 		});
 
 		it("should detect broken links using component collaboration", async () => {
@@ -44,13 +43,13 @@ describe("Component Integration", () => {
 			expect(result.summary.total).toBeGreaterThan(0);
 			expect(result.summary.errors).toBeGreaterThan(0);
 			// Verify that errors are properly detected
-			const errorResults = result.results.filter(r => r.status === "error");
+			const errorResults = result.results.filter((r) => r.status === "error");
 			expect(errorResults.length).toBe(result.summary.errors);
 			// Verify error messages are populated
-			errorResults.forEach(errorResult => {
+			for (const errorResult of errorResults) {
 				expect(errorResult.error).toBeDefined();
 				expect(typeof errorResult.error).toBe("string");
-			});
+			}
 		});
 
 		it("should validate citations with cache-assisted resolution", async () => {
@@ -65,16 +64,18 @@ describe("Component Integration", () => {
 			expect(result.file).toBe(testFile);
 			expect(result.summary.total).toBeGreaterThan(0);
 			// Verify cache can resolve valid citations
-			const validResults = result.results.filter(r => r.status === "valid" || r.status === "warning");
+			const validResults = result.results.filter(
+				(r) => r.status === "valid" || r.status === "warning",
+			);
 			expect(validResults.length).toBeGreaterThan(0);
 			// Verify component collaboration through result structure
-			result.results.forEach(citation => {
+			for (const citation of result.results) {
 				expect(citation).toHaveProperty("line");
 				expect(citation).toHaveProperty("citation");
 				expect(citation).toHaveProperty("status");
 				expect(citation).toHaveProperty("linkType");
 				expect(citation).toHaveProperty("scope");
-			});
+			}
 		});
 	});
 });

@@ -13,7 +13,10 @@ class CitationManager {
 		this.parser = createMarkdownParser();
 		this.parsedFileCache = createParsedFileCache(this.parser);
 		this.fileCache = createFileCache();
-		this.validator = createCitationValidator(this.parsedFileCache, this.fileCache);
+		this.validator = createCitationValidator(
+			this.parsedFileCache,
+			this.fileCache,
+		);
 	}
 
 	async validate(filePath, options = {}) {
@@ -49,16 +52,14 @@ class CitationManager {
 				);
 				if (options.format === "json") {
 					return this.formatAsJSON(filteredResult);
-				} else {
-					return this.formatForCLI(filteredResult);
 				}
+				return this.formatForCLI(filteredResult);
 			}
 
 			if (options.format === "json") {
 				return this.formatAsJSON(result);
-			} else {
-				return this.formatForCLI(result);
 			}
+			return this.formatForCLI(result);
 		} catch (error) {
 			if (options.format === "json") {
 				return JSON.stringify(
@@ -70,9 +71,8 @@ class CitationManager {
 					null,
 					2,
 				);
-			} else {
-				return `ERROR: ${error.message}`;
 			}
+			return `ERROR: ${error.message}`;
 		}
 	}
 
@@ -102,12 +102,11 @@ class CitationManager {
 		if (lineRange.includes("-")) {
 			const [start, end] = lineRange
 				.split("-")
-				.map((n) => parseInt(n.trim(), 10));
+				.map((n) => Number.parseInt(n.trim(), 10));
 			return { startLine: start, endLine: end };
-		} else {
-			const line = parseInt(lineRange.trim(), 10);
-			return { startLine: line, endLine: line };
 		}
+		const line = Number.parseInt(lineRange.trim(), 10);
+		return { startLine: line, endLine: line };
 	}
 
 	formatForCLI(result) {
@@ -208,7 +207,7 @@ class CitationManager {
 			const basePaths = new Set();
 			const sourceDir = dirname(filePath);
 
-			result.results.forEach((citation) => {
+			for (const citation of result.results) {
 				// Extract path from citation link - handle multiple patterns
 				let path = null;
 
@@ -233,7 +232,7 @@ class CitationManager {
 						: resolve(sourceDir, path);
 					basePaths.add(absolutePath);
 				}
-			});
+			}
 
 			return Array.from(basePaths).sort();
 		} catch (error) {
@@ -253,7 +252,9 @@ class CitationManager {
 					`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 				);
 				if (cacheStats.duplicates > 0) {
-					console.log(`WARNING: Found ${cacheStats.duplicates} duplicate filenames`);
+					console.log(
+						`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
+					);
 				}
 			}
 
@@ -264,10 +265,13 @@ class CitationManager {
 			const fixableResults = validationResult.results.filter(
 				(result) =>
 					(result.status === "warning" && result.pathConversion) ||
-					(result.status === "error" && result.suggestion && (
-						result.suggestion.includes("Use raw header format for better Obsidian compatibility") ||
-						(result.error.startsWith("Anchor not found") && result.suggestion.includes("Available headers:"))
-					)),
+					(result.status === "error" &&
+						result.suggestion &&
+						(result.suggestion.includes(
+							"Use raw header format for better Obsidian compatibility",
+						) ||
+							(result.error.startsWith("Anchor not found") &&
+								result.suggestion.includes("Available headers:")))),
 			);
 
 			if (fixableResults.length === 0) {
@@ -301,8 +305,11 @@ class CitationManager {
 				if (
 					result.status === "error" &&
 					result.suggestion &&
-					(result.suggestion.includes("Use raw header format for better Obsidian compatibility") ||
-					(result.error.startsWith("Anchor not found") && result.suggestion.includes("Available headers:")))
+					(result.suggestion.includes(
+						"Use raw header format for better Obsidian compatibility",
+					) ||
+						(result.error.startsWith("Anchor not found") &&
+							result.suggestion.includes("Available headers:")))
 				) {
 					newCitation = this.applyAnchorFix(newCitation, result);
 					anchorFixesApplied++;
@@ -343,17 +350,16 @@ class CitationManager {
 
 				output.push("", "Changes made:");
 
-				fixes.forEach((fix) => {
+				for (const fix of fixes) {
 					output.push(`  Line ${fix.line} (${fix.type}):`);
 					output.push(`    - ${fix.old}`);
 					output.push(`    + ${fix.new}`);
 					output.push("");
-				});
+				}
 
 				return output.join("\n");
-			} else {
-				return `WARNING: Found ${fixableResults.length} fixable citations but could not apply fixes`;
 			}
+			return `WARNING: Found ${fixableResults.length} fixable citations but could not apply fixes`;
 		} catch (error) {
 			return `ERROR: ${error.message}`;
 		}
@@ -370,29 +376,31 @@ class CitationManager {
 	// Parse "Available headers: \"Vision Statement\" → #Vision Statement, ..."
 	parseAvailableHeaders(suggestion) {
 		const headerRegex = /"([^"]+)"\s*→\s*#([^,]+)/g;
-		return [...suggestion.matchAll(headerRegex)].map(match => ({
+		return [...suggestion.matchAll(headerRegex)].map((match) => ({
 			text: match[1].trim(),
-			anchor: `#${match[2].trim()}`
+			anchor: `#${match[2].trim()}`,
 		}));
 	}
 
 	// Convert "#kebab-case-format" to "kebab case format"
 	normalizeAnchorForMatching(anchor) {
-		return anchor.replace('#', '').replace(/-/g, ' ').toLowerCase();
+		return anchor.replace("#", "").replace(/-/g, " ").toLowerCase();
 	}
 
 	// Find best header match using fuzzy logic
 	findBestHeaderMatch(brokenAnchor, availableHeaders) {
 		const searchText = this.normalizeAnchorForMatching(brokenAnchor);
-		return availableHeaders.find(header =>
-			header.text.toLowerCase() === searchText ||
-			header.text.toLowerCase().replace(/[.\s]/g, '') === searchText.replace(/\s/g, '')
+		return availableHeaders.find(
+			(header) =>
+				header.text.toLowerCase() === searchText ||
+				header.text.toLowerCase().replace(/[.\s]/g, "") ===
+					searchText.replace(/\s/g, ""),
 		);
 	}
 
 	// Apply URL encoding: "Vision Statement" → "Vision%20Statement"
 	urlEncodeAnchor(headerText) {
-		return headerText.replace(/ /g, '%20').replace(/\./g, '%2E');
+		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
 	}
 
 	// Helper method for applying anchor fixes (maintain existing logic)
@@ -410,13 +418,19 @@ class CitationManager {
 		}
 
 		// Handle anchor not found errors
-		if (result.error.startsWith("Anchor not found") && result.suggestion.includes("Available headers:")) {
+		if (
+			result.error.startsWith("Anchor not found") &&
+			result.suggestion.includes("Available headers:")
+		) {
 			const availableHeaders = this.parseAvailableHeaders(result.suggestion);
 			const citationMatch = citation.match(/\[([^\]]+)\]\(([^)]+)#([^)]+)\)/);
 
 			if (citationMatch && availableHeaders.length > 0) {
 				const [, linkText, filePath, brokenAnchor] = citationMatch;
-				const bestMatch = this.findBestHeaderMatch(`#${brokenAnchor}`, availableHeaders);
+				const bestMatch = this.findBestHeaderMatch(
+					`#${brokenAnchor}`,
+					availableHeaders,
+				);
 
 				if (bestMatch) {
 					const encodedAnchor = this.urlEncodeAnchor(bestMatch.text);
