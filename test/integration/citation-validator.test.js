@@ -72,7 +72,8 @@ describe("Component Integration", () => {
 				expect(citation).toHaveProperty("line");
 				expect(citation).toHaveProperty("citation");
 				expect(citation).toHaveProperty("status");
-				expect(citation).toHaveProperty("type");
+				expect(citation).toHaveProperty("linkType");
+				expect(citation).toHaveProperty("scope");
 			});
 		});
 	});

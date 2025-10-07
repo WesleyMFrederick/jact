@@ -54,6 +54,7 @@ This feature directly supports the CC Workflows vision by:
 |------|---------|-------------|---------|
 | 2025-10-03 | 1.0 | Initial feature PRD creation with Epic 2 and US 1.4 from workspace PRD | Product Manager Agent |
 | 2025-10-04 | 2.1 | Split US1.4 into US1.4a (Test Migration) and US1.4b (DI Refactoring) per ADR-001, rewrote all AC in EARS format, updated dependency chain for Epic 2 | Application Tech Lead |
+| 2025-10-07 | 2.2 | Mark US1.5 as COMPLETE, update Technical Lead Feedback sections: Parser data contract RESOLVED (US1.5 Phase 1), US1.5 caching feedback IMPLEMENTED, Epic 2 feedback remains active for Stories 2.2-2.3 | Application Tech Lead |
 
 ---
 
@@ -75,16 +76,19 @@ This feature directly supports the CC Workflows vision by:
 
 ## Technical Considerations
 
-> [!warning] **Technical Lead Feedback**: Parser output data contract design required
-> _Architecture Impact_: The data contract for the parser's output must be designed to clearly communicate the type of link (full-file vs. section) and any associated metadata to downstream components.
-> _Relevant Architecture Principles_: [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [primitive-first-design](../../../../../design-docs/Architecture%20Principles.md#^primitive-first-design), [illegal-states-unrepresentable](../../../../../design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable), [explicit-relationships](../../../../../design-docs/Architecture%20Principles.md#^explicit-relationships)
+> [!success] **Technical Lead Feedback**: Parser output data contract design ✅ RESOLVED
+> _Resolution_: Parser Output Contract schema validated and documented via [US1.5 Phase 1](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md#Phase%201%20Parser%20Output%20Contract%20Validation%20&%20Documentation). Base schema includes `{ filePath, content, tokens, links, headings, anchors }` with LinkObject and AnchorObject structures.
+> _Resolution Date_: 2025-10-07
+> _Epic 2 Note_: Base schema sufficient for ContentExtractor. May require minor extensions for content extraction metadata if Story 2.1 analysis identifies gaps.
 <!-- -->
-> [!warning] **Technical Lead Feedback**: Parser-extractor interaction model design required
+> [!warning] **Technical Lead Feedback**: Parser-extractor interaction model design required (Epic 2)
 > _Architecture Impact_: The interaction model between the parser and the new extractor component needs to be designed, including the specific data structures they will use to communicate.
+> _Status_: Active - Required before Story 2.2 implementation
 > _Relevant Architecture Principles_: [black-box-interfaces](../../../../../design-docs/Architecture%20Principles.md#^black-box-interfaces), [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [single-responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility)
 <!-- -->
-> [!warning] **Technical Lead Feedback**: CLI interface design decision needed
+> [!warning] **Technical Lead Feedback**: CLI interface design decision needed (Epic 2)
 > _Architecture Impact_: Research and a design decision are needed to confirm if adding a feature flag to the `validate` command is the correct long-term CLI interface, or if a new, dedicated `extract` command would be more intuitive and extensible.
+> _Status_: Active - Required before Story 2.3 implementation
 > _Relevant Architecture Principles_: [simplicity-first](../../../../../design-docs/Architecture%20Principles.md#^simplicity-first), [follow-conventions](../../../../../design-docs/Architecture%20Principles.md#^follow-conventions), [immediate-understanding](../../../../../design-docs/Architecture%20Principles.md#^immediate-understanding), [extension-over-modification](../../../../../design-docs/Architecture%20Principles.md#^extension-over-modification)
 
 ---
@@ -178,14 +182,21 @@ _Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#St
 _Closes Technical Debt_: [Redundant File Parsing During Validation](content-aggregation-architecture.md#Redundant%20File%20Parsing%20During%20Validation)
 _Functional Requirements_: [[#^FR8|FR8]]
 _Non-Functional Requirements_: [[#^NFR5|NFR5]]
-_User Story Link:_ [To Be Populated]
+_User Story Link:_ [us1.5-implement-cache-for-parsed-files](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md)
+_Status_: ✅ COMPLETE (2025-10-07)
 
-> [!warning] **Technical Lead Feedback**: Caching Layer for Performance and Modularity
-> _Architecture Impact_: The primary architectural impact of `us1.5` is the introduction of a new **caching component** that will sit between the `CitationValidator` and the `MarkdownParser`. This directly impacts the **`CitationValidator`**, which must be refactored to request parsed files from this new cache instead of calling the parser directly. The **`CLI Orchestrator`** (and its associated factory) is also impacted, as it will now be responsible for instantiating the new cache and injecting it into the validator. This change introduces a new public contract for the caching component itself. The input contract for the **`CitationValidator`** will change to accept the cache as a dependency, while the existing **`Parser Output Contract`** will remain completely unchanged.
-> _Relevant Architecture Principles_:
-> - [Dependency Abstraction](../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction): The `CitationValidator` will no longer depend on the concrete `MarkdownParser`. Instead, it will depend on an abstract caching interface to get its data.
-> - [Single Responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility): This change improves the design by giving the new cache a single, clear responsibility: managing efficient access to parsed file objects. This allows the `CitationValidator` to focus purely on validation logic
-> - [One Source of Truth](../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth): During a single command run, the cache becomes the single source of truth for a given file's parsed object. This prevents redundant work and ensures all components are working with the exact same parsed data.
+> [!success] **Technical Lead Feedback**: Caching Layer for Performance and Modularity ✅ IMPLEMENTED
+> _Resolution_: ParsedFileCache component successfully implemented with Map-based in-memory caching. CitationValidator refactored to use cache via constructor injection. Factory pattern integration complete. All acceptance criteria met with zero regressions.
+> _Resolution Date_: 2025-10-07
+> _Architecture Impact Realized_:
+> - **ParsedFileCache Component**: New caching component sits between CitationValidator and MarkdownParser, managing in-memory lifecycle of Parser Output Contract objects
+> - **CitationValidator Refactoring**: Refactored to accept ParsedFileCache dependency via constructor, uses cache for all file parsing operations (lines 107, 471)
+> - **CLI Orchestrator Updates**: Handles async validator methods, factory creates and injects cache into validator
+> - **Public Contracts**: ParsedFileCache provides `resolveParsedFile()` async method, CitationValidator constructor signature changed to accept cache dependency
+> _Architecture Principles Applied_:
+> - [Dependency Abstraction](../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction): CitationValidator depends on ParsedFileCache abstraction, not concrete MarkdownParser ✅
+> - [Single Responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility): ParsedFileCache has single responsibility for managing parsed file object lifecycle ✅
+> - [One Source of Truth](../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth): Cache is authoritative source for parsed data during command execution ✅
 ---
 
 ### Story 2.1: Enhance Parser to Handle Full-File and Section Links
@@ -199,11 +210,12 @@ _User Story Link:_ [To Be Populated]
 2. GIVEN the parser identifies multiple links to the same file, but at least one link includes a section anchor, THEN the system SHALL prioritize the section link(s) for extraction and issue a warning that the full file content will be ignored in favor of the more specific section(s). ^US2-1AC2
 3. GIVEN the parser identifies only links without section anchors to a specific file, THEN it SHALL designate the entire file for content extraction. ^US2-1AC3
 
-> [!warning] **Technical Lead Feedback**: Parser output data contract design required
-> _Architecture Impact_: The data contract for the parser's output must be designed to clearly communicate the type of link (full-file vs. section) and any associated metadata to downstream components.
+> [!note] **Technical Lead Feedback**: Parser output data contract - Base schema validated ✅
+> _Base Schema Status_: Parser Output Contract validated in [US1.5 Phase 1](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md#Phase%201%20Parser%20Output%20Contract%20Validation%20&%20Documentation). Current schema: `{ filePath, content, tokens, links, headings, anchors }` with LinkObject (`linkType`, `scope`, `anchorType`, `source`, `target`) and AnchorObject (`anchorType`, `id`, `rawText`) structures.
+> _Epic 2 Analysis Required_: Story 2.1 implementation should review existing LinkObject schema to determine if current `linkType`/`scope`/`anchorType` fields sufficiently distinguish full-file vs. section links, or if minor schema extensions are needed for content extraction metadata.
 > _Relevant Architecture Principles_: [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [primitive-first-design](../../../../../design-docs/Architecture%20Principles.md#^primitive-first-design), [illegal-states-unrepresentable](../../../../../design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable), [explicit-relationships](../../../../../design-docs/Architecture%20Principles.md#^explicit-relationships)
 
-_Depends On_: Story 1.4b Completion
+_Depends On_: [Story 1.5: Implement a Cache for Parsed File Objects](#Story%201.5%20Implement%20a%20Cache%20for%20Parsed%20File%20Objects)
 _Functional Requirements_: [[#^FR4|FR4]]
 
 ### Story 2.2: Implement Unified Content Extractor with Metadata

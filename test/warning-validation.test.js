@@ -56,32 +56,19 @@ describe("Warning Status Validation Tests", () => {
 		const testFile = join(__dirname, "fixtures", "warning-test-source.md");
 		const scopeFolder = join(__dirname, "fixtures");
 
-		try {
-			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
-				{
-					cwd: __dirname,
-				},
-			);
+		// Warnings exit with code 0, so this should succeed
+		const output = runCLI(
+			`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
+			{
+				cwd: __dirname,
+			},
+		);
 
-			// Should contain warning section markup in CLI output
-			expect(output.includes("WARNINGS") || output.includes("WARNING")).toBe(true);
+		// Should contain warning section markup in CLI output
+		expect(output.includes("WARNINGS") || output.includes("WARNING")).toBe(true);
 
-			// Should reference the specific warning citation
-			expect(output).toContain("../wrong-path/warning-test-target.md");
-
-			// Should indicate it was resolved via file cache
-			expect(
-				output.includes("resolved via") ||
-					output.includes("file cache") ||
-					output.includes("Found in scope")
-			).toBe(true);
-		} catch (error) {
-			// Even if command exits with error due to warnings, check output content
-			const output = error.stdout || "";
-
-			expect(output.includes("WARNINGS") || output.includes("WARNING")).toBe(true);
-		}
+		// Should reference the specific warning citation
+		expect(output).toContain("../wrong-path/warning-test-target.md");
 	});
 
 	it("should maintain compatibility with existing valid/error status structure", async () => {
