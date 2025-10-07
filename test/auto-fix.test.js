@@ -2,7 +2,7 @@ import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -188,9 +188,7 @@ This header exists and should be fixable.
 			const hasKebabFormat = fixedContent.includes("#existing-header");
 			expect(hasRawFormat || hasKebabFormat).toBeTruthy();
 
-			console.log(
-				"Auto-fix correctly handles mixed valid/invalid citations",
-			);
+			console.log("Auto-fix correctly handles mixed valid/invalid citations");
 		} finally {
 			// Clean up temporary files
 			try {

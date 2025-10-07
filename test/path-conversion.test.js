@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createCitationValidator } from "../src/factories/componentFactory.js";
 import { runCLI } from "./helpers/cli-runner.js";
 

@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
-import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,7 +65,9 @@ describe("Warning Status Validation Tests", () => {
 		);
 
 		// Should contain warning section markup in CLI output
-		expect(output.includes("WARNINGS") || output.includes("WARNING")).toBe(true);
+		expect(output.includes("WARNINGS") || output.includes("WARNING")).toBe(
+			true,
+		);
 
 		// Should reference the specific warning citation
 		expect(output).toContain("../wrong-path/warning-test-target.md");
@@ -99,9 +101,9 @@ describe("Warning Status Validation Tests", () => {
 			const allStatuses = result.results.map((r) => r.status);
 			const validStatuses = ["valid", "error", "warning"];
 
-			allStatuses.forEach((status) => {
+			for (const status of allStatuses) {
 				expect(validStatuses.includes(status)).toBe(true);
-			});
+			}
 		} catch (error) {
 			expect.fail(
 				`JSON structure compatibility check failed: ${error.stdout || error.message}`,
