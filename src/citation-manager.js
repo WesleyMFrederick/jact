@@ -1,5 +1,27 @@
 #!/usr/bin/env node
 
+/**
+ * Citation Manager CLI - Command-line tool for markdown citation validation
+ *
+ * Main CLI application providing citation validation, fixing, AST inspection,
+ * and base path extraction for markdown files. Integrates MarkdownParser,
+ * CitationValidator, FileCache, and ParsedFileCache components.
+ *
+ * Commands:
+ * - validate: Validate citations in markdown file (with optional --fix)
+ * - ast: Display parsed AST and extracted metadata
+ * - base-paths: Extract distinct base paths from citations
+ *
+ * Features:
+ * - File cache for smart filename resolution (--scope option)
+ * - Line range filtering (--lines option)
+ * - JSON and CLI output formats
+ * - Automatic path and anchor fixing (--fix flag)
+ * - Exit codes for CI/CD integration (0=success, 1=validation errors, 2=file not found)
+ *
+ * @module citation-manager
+ */
+
 import { Command } from "commander";
 import {
 	createCitationValidator,
@@ -8,7 +30,19 @@ import {
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
 
+/**
+ * Main application class for citation management operations
+ *
+ * Wires together all components and provides high-level operations for validation,
+ * fixing, AST inspection, and path extraction. Handles CLI output formatting and
+ * error reporting.
+ */
 class CitationManager {
+	/**
+	 * Initialize citation manager with all required components
+	 *
+	 * Creates and wires together parser, caches, and validator using factory functions.
+	 */
 	constructor() {
 		this.parser = createMarkdownParser();
 		this.parsedFileCache = createParsedFileCache(this.parser);
@@ -19,6 +53,19 @@ class CitationManager {
 		);
 	}
 
+	/**
+	 * Validate citations in markdown file
+	 *
+	 * Main validation entry point. Optionally builds file cache if scope provided.
+	 * Supports line range filtering and multiple output formats (CLI or JSON).
+	 *
+	 * @param {string} filePath - Path to markdown file to validate
+	 * @param {Object} [options={}] - Validation options
+	 * @param {string} [options.scope] - Scope folder for file cache
+	 * @param {string} [options.lines] - Line range to validate (e.g., "150-160" or "157")
+	 * @param {string} [options.format='cli'] - Output format ('cli' or 'json')
+	 * @returns {Promise<string>} Formatted validation report
+	 */
 	async validate(filePath, options = {}) {
 		try {
 			const startTime = Date.now();
@@ -76,6 +123,16 @@ class CitationManager {
 		}
 	}
 
+	/**
+	 * Filter validation results by line range
+	 *
+	 * Filters citation results to only include those within specified line range.
+	 * Recalculates summary statistics for filtered results.
+	 *
+	 * @param {Object} result - Full validation result object
+	 * @param {string} lineRange - Line range string (e.g., "150-160" or "157")
+	 * @returns {Object} Filtered result with updated summary and lineRange property
+	 */
 	filterResultsByLineRange(result, lineRange) {
 		const { startLine, endLine } = this.parseLineRange(lineRange);
 
@@ -98,6 +155,14 @@ class CitationManager {
 		};
 	}
 
+	/**
+	 * Parse line range string to start and end line numbers
+	 *
+	 * Supports single line ("157") or range ("150-160") formats.
+	 *
+	 * @param {string} lineRange - Line range string
+	 * @returns {Object} Parsed range with { startLine, endLine }
+	 */
 	parseLineRange(lineRange) {
 		if (lineRange.includes("-")) {
 			const [start, end] = lineRange
@@ -109,6 +174,15 @@ class CitationManager {
 		return { startLine: line, endLine: line };
 	}
 
+	/**
+	 * Format validation results for CLI output
+	 *
+	 * Generates human-readable tree-style output with sections for errors,
+	 * warnings, and valid citations. Includes summary statistics and validation time.
+	 *
+	 * @param {Object} result - Validation result object
+	 * @returns {string} Formatted CLI output
+	 */
 	formatForCLI(result) {
 		const lines = [];
 		lines.push("Citation Validation Report");
@@ -195,10 +269,26 @@ class CitationManager {
 		return lines.join("\n");
 	}
 
+	/**
+	 * Format validation results as JSON
+	 *
+	 * @param {Object} result - Validation result object
+	 * @returns {string} JSON string with 2-space indentation
+	 */
 	formatAsJSON(result) {
 		return JSON.stringify(result, null, 2);
 	}
 
+	/**
+	 * Extract distinct base paths from citations
+	 *
+	 * Parses file and extracts all unique target file paths from citations.
+	 * Converts relative paths to absolute paths for consistency.
+	 *
+	 * @param {string} filePath - Path to markdown file
+	 * @returns {Promise<Array<string>>} Sorted array of absolute paths
+	 * @throws {Error} If extraction fails
+	 */
 	async extractBasePaths(filePath) {
 		try {
 			const { resolve, dirname, isAbsolute } = await import("node:path");
@@ -240,6 +330,20 @@ class CitationManager {
 		}
 	}
 
+	/**
+	 * Automatically fix citations in markdown file
+	 *
+	 * Applies automatic fixes for:
+	 * - Path corrections (cross-directory warnings with pathConversion suggestions)
+	 * - Anchor corrections (kebab-case to raw header format, missing anchor fixes)
+	 *
+	 * Modifies file in-place. Builds file cache if scope provided.
+	 *
+	 * @param {string} filePath - Path to markdown file to fix
+	 * @param {Object} [options={}] - Fix options
+	 * @param {string} [options.scope] - Scope folder for file cache
+	 * @returns {Promise<string>} Fix report with changes made
+	 */
 	async fix(filePath, options = {}) {
 		try {
 			// Import fs for file operations
@@ -365,7 +469,13 @@ class CitationManager {
 		}
 	}
 
-	// Helper method for applying path conversions
+	/**
+	 * Apply path conversion suggestion to citation
+	 *
+	 * @param {string} citation - Original citation text
+	 * @param {Object} pathConversion - Conversion with { original, recommended }
+	 * @returns {string} Citation with corrected path
+	 */
 	applyPathConversion(citation, pathConversion) {
 		return citation.replace(
 			pathConversion.original,
@@ -373,7 +483,15 @@ class CitationManager {
 		);
 	}
 
-	// Parse "Available headers: \"Vision Statement\" → #Vision Statement, ..."
+	/**
+	 * Parse available headers from suggestion message
+	 *
+	 * Extracts header mappings from validator suggestion string.
+	 * Format: "Available headers: \"Vision Statement\" → #Vision Statement, ..."
+	 *
+	 * @param {string} suggestion - Suggestion message from validator
+	 * @returns {Array<Object>} Array of { text, anchor } header objects
+	 */
 	parseAvailableHeaders(suggestion) {
 		const headerRegex = /"([^"]+)"\s*→\s*#([^,]+)/g;
 		return [...suggestion.matchAll(headerRegex)].map((match) => ({
@@ -382,12 +500,28 @@ class CitationManager {
 		}));
 	}
 
-	// Convert "#kebab-case-format" to "kebab case format"
+	/**
+	 * Normalize anchor for fuzzy matching
+	 *
+	 * Converts "#kebab-case-format" to "kebab case format" for comparison.
+	 *
+	 * @param {string} anchor - Anchor string (may include # prefix)
+	 * @returns {string} Normalized lowercase string with spaces
+	 */
 	normalizeAnchorForMatching(anchor) {
 		return anchor.replace("#", "").replace(/-/g, " ").toLowerCase();
 	}
 
-	// Find best header match using fuzzy logic
+	/**
+	 * Find best header match using fuzzy logic
+	 *
+	 * Matches normalized broken anchor against available headers using exact
+	 * or punctuation-stripped comparison.
+	 *
+	 * @param {string} brokenAnchor - Anchor that wasn't found
+	 * @param {Array<Object>} availableHeaders - Available headers with { text, anchor }
+	 * @returns {Object|undefined} Best matching header or undefined
+	 */
 	findBestHeaderMatch(brokenAnchor, availableHeaders) {
 		const searchText = this.normalizeAnchorForMatching(brokenAnchor);
 		return availableHeaders.find(
@@ -398,12 +532,29 @@ class CitationManager {
 		);
 	}
 
-	// Apply URL encoding: "Vision Statement" → "Vision%20Statement"
+	/**
+	 * URL-encode anchor text for Obsidian compatibility
+	 *
+	 * Encodes spaces as %20 and periods as %2E for proper anchor linking.
+	 *
+	 * @param {string} headerText - Header text to encode
+	 * @returns {string} URL-encoded anchor text
+	 */
 	urlEncodeAnchor(headerText) {
 		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
 	}
 
-	// Helper method for applying anchor fixes (maintain existing logic)
+	/**
+	 * Apply anchor fix to citation
+	 *
+	 * Handles two fix types:
+	 * - Obsidian compatibility: kebab-case to raw header format
+	 * - Missing anchors: fuzzy match to available headers
+	 *
+	 * @param {string} citation - Original citation text
+	 * @param {Object} result - Validation result with suggestion
+	 * @returns {string} Citation with corrected anchor or original if no fix found
+	 */
 	applyAnchorFix(citation, result) {
 		const suggestionMatch = result.suggestion.match(
 			/Use raw header format for better Obsidian compatibility: #(.+)$/,

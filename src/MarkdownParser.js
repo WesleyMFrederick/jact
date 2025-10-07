@@ -1,7 +1,45 @@
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { marked } from "marked";
 
+/**
+ * Markdown parser with Obsidian-compatible link and anchor extraction
+ *
+ * Parses markdown files using marked.js tokenization and extracts structured metadata:
+ * - Links (markdown, wiki-style, citations, cross-document)
+ * - Headings (all levels with raw text)
+ * - Anchors (block references, header anchors, emphasis-marked)
+ *
+ * Supports multiple link formats:
+ * - Standard markdown: [text](file.md#anchor)
+ * - Wiki-style: [[file.md#anchor|text]] or [[#anchor|text]]
+ * - Citation format: [cite: path]
+ * - Caret references: ^anchor-id
+ *
+ * Anchor compatibility:
+ * - Obsidian block references: ^anchor-id at end of line
+ * - Standard header anchors with auto-generated IDs
+ * - Explicit header IDs: ## Heading {#custom-id}
+ * - Obsidian-style URL encoding (spaces to %20, drops colons)
+ * - Emphasis-marked anchors: ==**text**==
+ *
+ * Architecture decision: Uses marked.lexer() for tokenization (same engine as extraction methods)
+ * to ensure consistency between parsing and analysis. Token structure follows marked.js conventions
+ * with { type, depth, text, raw, tokens? } properties.
+ *
+ * @example
+ * const parser = new MarkdownParser(fs);
+ * const result = await parser.parseFile('/path/to/file.md');
+ * // Returns { filePath, content, tokens, links, headings, anchors }
+ */
 export class MarkdownParser {
+	/**
+	 * Initialize parser with file system dependency
+	 *
+	 * Sets up regex patterns for link and anchor detection. Patterns are pre-compiled
+	 * for performance during parsing operations.
+	 *
+	 * @param {Object} fileSystem - Node.js fs module (or mock for testing)
+	 */
 	constructor(fileSystem) {
 		this.fs = fileSystem;
 		this.currentSourcePath = null; // Store current file being parsed
@@ -20,6 +58,16 @@ export class MarkdownParser {
 		};
 	}
 
+	/**
+	 * Parse markdown file and extract all metadata
+	 *
+	 * Main entry point for file parsing. Reads file, tokenizes with marked.lexer(),
+	 * and extracts links, headings, and anchors. Stores source path for relative
+	 * link resolution during extraction.
+	 *
+	 * @param {string} filePath - Absolute or relative path to markdown file
+	 * @returns {Promise<Object>} Parser output contract with { filePath, content, tokens, links, headings, anchors }
+	 */
 	async parseFile(filePath) {
 		this.currentSourcePath = filePath; // Store for use in extractLinks()
 		const content = this.fs.readFileSync(filePath, "utf8");
@@ -35,6 +83,24 @@ export class MarkdownParser {
 		};
 	}
 
+	/**
+	 * Extract all link references from markdown content
+	 *
+	 * Detects and structures multiple link formats:
+	 * - Cross-document markdown: [text](file.md#anchor)
+	 * - Citation format: [cite: path]
+	 * - Relative paths without extension: [text](path/to/file)
+	 * - Wiki-style cross-document: [[file.md#anchor|text]]
+	 * - Wiki-style internal: [[#anchor|text]]
+	 * - Caret references: ^anchor-id
+	 *
+	 * For each link, resolves paths to absolute and relative forms using the
+	 * current source file as reference. Determines anchor type (header vs block)
+	 * and link scope (internal vs cross-document).
+	 *
+	 * @param {string} content - Full markdown file content
+	 * @returns {Array<Object>} Array of link objects with { linkType, scope, anchorType, source, target, text, fullMatch, line, column }
+	 */
 	extractLinks(content) {
 		const links = [];
 		const lines = content.split("\n");
@@ -290,7 +356,15 @@ export class MarkdownParser {
 		return links;
 	}
 
-	// Helper method to determine anchor type from anchor string
+	/**
+	 * Determine anchor type from anchor string
+	 *
+	 * Classifies anchors as either "block" (Obsidian block references starting with ^)
+	 * or "header" (standard heading anchors). Used for proper validation routing.
+	 *
+	 * @param {string} anchorString - Anchor text (may include ^ prefix)
+	 * @returns {string|null} "block", "header", or null if no anchor
+	 */
 	determineAnchorType(anchorString) {
 		if (!anchorString) return null;
 
@@ -306,7 +380,17 @@ export class MarkdownParser {
 		return "header";
 	}
 
-	// Helper method to resolve relative paths to absolute paths
+	/**
+	 * Resolve relative file paths to absolute paths
+	 *
+	 * Converts relative paths to absolute using source file's directory as base.
+	 * Returns null if path or source is missing. Handles already-absolute paths
+	 * by returning them unchanged.
+	 *
+	 * @param {string} rawPath - Raw path from link (relative or absolute)
+	 * @param {string} sourceAbsolutePath - Absolute path to source file
+	 * @returns {string|null} Absolute path or null
+	 */
 	resolvePath(rawPath, sourceAbsolutePath) {
 		if (!rawPath || !sourceAbsolutePath) return null;
 
@@ -318,6 +402,16 @@ export class MarkdownParser {
 		return resolve(sourceDir, rawPath);
 	}
 
+	/**
+	 * Extract heading metadata from token tree
+	 *
+	 * Recursively walks token tree (using walkTokens-like pattern) to find all
+	 * heading tokens. Preserves heading level, text, and raw markdown for later
+	 * section extraction or anchor validation.
+	 *
+	 * @param {Array} tokens - Token array from marked.lexer()
+	 * @returns {Array<Object>} Array of { level, text, raw } heading objects
+	 */
 	extractHeadings(tokens) {
 		const headings = [];
 
@@ -342,6 +436,24 @@ export class MarkdownParser {
 		return headings;
 	}
 
+	/**
+	 * Extract all anchor definitions from markdown content
+	 *
+	 * Detects multiple anchor types:
+	 * - Obsidian block references: ^anchor-id at end of line
+	 * - Caret syntax: ^anchor-id (legacy format, for compatibility)
+	 * - Emphasis-marked: ==**text**==
+	 * - Header anchors: Auto-generated from headings or explicit {#id}
+	 *
+	 * For headers, generates both:
+	 * - Raw text anchor (exact heading text)
+	 * - Obsidian-compatible anchor (URL-encoded with spaces as %20, colons removed)
+	 *
+	 * This dual anchor approach supports both standard markdown and Obsidian linking.
+	 *
+	 * @param {string} content - Full markdown file content
+	 * @returns {Array<Object>} Array of { anchorType, id, rawText, fullMatch, line, column } anchor objects
+	 */
 	extractAnchors(content) {
 		const anchors = [];
 		const lines = content.split("\n");
@@ -449,6 +561,16 @@ export class MarkdownParser {
 		return anchors;
 	}
 
+	/**
+	 * Check if text contains markdown formatting
+	 *
+	 * Detects common markdown patterns that affect anchor generation:
+	 * backticks, bold, italic, highlights, and links. Used to determine
+	 * if header text needs special handling for anchor creation.
+	 *
+	 * @param {string} text - Text to check for markdown syntax
+	 * @returns {boolean} True if markdown formatting detected
+	 */
 	containsMarkdown(text) {
 		// Check for common markdown patterns that would affect anchor generation
 		const markdownPatterns = [
@@ -462,6 +584,16 @@ export class MarkdownParser {
 		return markdownPatterns.some((pattern) => pattern.test(text));
 	}
 
+	/**
+	 * Convert text to kebab-case format
+	 *
+	 * Transforms text to lowercase with hyphens replacing spaces and special
+	 * characters removed. Used for auto-generating header anchors in GitHub/GitLab
+	 * markdown style.
+	 *
+	 * @param {string} text - Text to convert (e.g., "Project Architecture")
+	 * @returns {string} Kebab-case string (e.g., "project-architecture")
+	 */
 	toKebabCase(text) {
 		return text
 			.toLowerCase()
