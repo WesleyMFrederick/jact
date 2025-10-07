@@ -254,14 +254,14 @@ describe("Citation Manager Integration Tests", () => {
 			// 2. type="header-obsidian" with URL-encoded anchors
 			// Both are valid - we just verify that anchors are generated
 			backtickHeaders.forEach((header) => {
-				expect(header.anchor).toBeDefined();
-				expect(header.anchor.length).toBeGreaterThan(0);
+				expect(header.id).toBeDefined();
+				expect(header.id.length).toBeGreaterThan(0);
 			});
 
 			// Verify plain text headers also get anchors
 			const plainHeaders = ast.anchors.filter(
 				(anchor) =>
-					anchor.type === "header" &&
+					anchor.anchorType === "header" &&
 					anchor.rawText &&
 					!anchor.rawText.includes("`") &&
 					!anchor.rawText.includes("**") &&
@@ -272,7 +272,7 @@ describe("Citation Manager Integration Tests", () => {
 
 			// Plain headers should have anchors defined
 			plainHeaders.forEach((header) => {
-				expect(header.anchor).toBeDefined();
+				expect(header.id).toBeDefined();
 			});
 		} catch (error) {
 			expect.fail(

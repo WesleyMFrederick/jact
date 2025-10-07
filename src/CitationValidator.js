@@ -2,8 +2,8 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 export class CitationValidator {
-	constructor(parser, fileCache) {
-		this.parser = parser;
+	constructor(parsedFileCache, fileCache) {
+		this.parsedFileCache = parsedFileCache;
 		this.fileCache = fileCache;
 
 		// Pattern validation rules with precedence order
@@ -104,7 +104,7 @@ export class CitationValidator {
 			throw new Error(`File not found: ${filePath}`);
 		}
 
-		const parsed = await this.parser.parseFile(filePath);
+		const parsed = await this.parsedFileCache.resolveParsedFile(filePath);
 		const results = [];
 
 		// Validate each extracted link
@@ -153,18 +153,25 @@ export class CitationValidator {
 	classifyPattern(citation) {
 		// Pattern precedence: CARET > EMPHASIS > CROSS_DOCUMENT > WIKI_STYLE
 
-		if (citation.type === "caret-reference") {
+		// Caret references are now internal links with block anchorType
+		if (citation.scope === "internal" && citation.anchorType === "block") {
 			return "CARET_SYNTAX";
 		}
 
-		if (citation.type === "wiki-style") {
-			return "WIKI_STYLE";
+		// Wiki-style links
+		if (citation.linkType === "wiki") {
+			if (citation.scope === "internal") {
+				return "WIKI_STYLE";
+			}
+			// Wiki cross-document links
+			return "CROSS_DOCUMENT";
 		}
 
-		if (citation.type === "cross-document") {
+		// Cross-document links
+		if (citation.scope === "cross-document") {
 			if (
-				citation.anchor?.startsWith("==**") &&
-				citation.anchor.endsWith("**==")
+				citation.target.anchor?.startsWith("==**") &&
+				citation.target.anchor.endsWith("**==")
 			) {
 				return "EMPHASIS_MARKED";
 			}
@@ -175,22 +182,25 @@ export class CitationValidator {
 	}
 
 	validateCaretPattern(citation) {
-		const anchor = citation.anchor || citation.fullMatch.substring(1); // Remove ^
+		let anchor = citation.target.anchor || citation.fullMatch.substring(1); // Remove ^ from fullMatch
 
-		if (this.patterns.CARET_SYNTAX.regex.test(`^${anchor}`)) {
+		// If anchor already starts with ^, don't add another one
+		const anchorToTest = anchor.startsWith('^') ? anchor : `^${anchor}`;
+
+		if (this.patterns.CARET_SYNTAX.regex.test(anchorToTest)) {
 			return this.createValidationResult(citation, "valid");
 		} else {
 			return this.createValidationResult(
 				citation,
 				"error",
-				`Invalid caret pattern: ^${anchor}`,
+				`Invalid caret pattern: ${anchorToTest}`,
 				`Use format: ${this.patterns.CARET_SYNTAX.examples.join(", ")}`,
 			);
 		}
 	}
 
 	validateEmphasisPattern(citation) {
-		const anchor = citation.anchor;
+		const anchor = citation.target.anchor;
 
 		if (this.patterns.EMPHASIS_MARKED.regex.test(anchor)) {
 			return this.createValidationResult(citation, "valid");
@@ -225,39 +235,39 @@ export class CitationValidator {
 
 	async validateCrossDocumentLink(citation, sourceFile) {
 		// Calculate what the standard path resolution would give us
-		const decodedRelativePath = decodeURIComponent(citation.file);
+		const decodedRelativePath = decodeURIComponent(citation.target.path.raw);
 		const sourceDir = dirname(sourceFile);
 		const standardPath = resolve(sourceDir, decodedRelativePath);
 
-		const targetPath = this.resolveTargetPath(citation.file, sourceFile);
+		const targetPath = this.resolveTargetPath(citation.target.path.raw, sourceFile);
 
 		// Check if target file exists
 		if (!existsSync(targetPath)) {
 			// Enhanced error message with path resolution debugging
 			const debugInfo = this.generatePathResolutionDebugInfo(
-				citation.file,
+				citation.target.path.raw,
 				sourceFile,
 			);
 
 			// Provide enhanced error message when using file cache
 			if (this.fileCache) {
-				const filename = citation.file.split("/").pop();
+				const filename = citation.target.path.raw.split("/").pop();
 				const cacheResult = this.fileCache.resolveFile(filename);
 
 				if (cacheResult.found && cacheResult.fuzzyMatch) {
 					// Fuzzy match found - validate the corrected file exists and use it
 					if (existsSync(cacheResult.path)) {
 						// Continue with anchor validation using corrected file
-						if (citation.anchor) {
+						if (citation.target.anchor) {
 							const anchorExists = await this.validateAnchorExists(
-								citation.anchor,
+								citation.target.anchor,
 								cacheResult.path,
 							);
 							if (!anchorExists.valid) {
 								return this.createValidationResult(
 									citation,
 									"error",
-									`Anchor not found: #${citation.anchor}`,
+									`Anchor not found: #${citation.target.anchor}`,
 									`${anchorExists.suggestion} (Note: ${cacheResult.message})`,
 								);
 							}
@@ -273,36 +283,47 @@ export class CitationValidator {
 				} else if (cacheResult.found && !cacheResult.fuzzyMatch) {
 					// Exact match found in cache - validate the file and continue
 					if (existsSync(cacheResult.path)) {
-						if (citation.anchor) {
+						// Check if resolution crosses directory boundaries FIRST
+						const isDirectoryMatch = this.isDirectoryMatch(
+							sourceFile,
+							cacheResult.path,
+						);
+						const baseStatus = isDirectoryMatch ? "valid" : "warning";
+						const crossDirMessage = isDirectoryMatch
+							? null
+							: `Found via file cache in different directory: ${cacheResult.path}`;
+
+						// Then validate anchor if present
+						if (citation.target.anchor) {
 							const anchorExists = await this.validateAnchorExists(
-								citation.anchor,
+								citation.target.anchor,
 								cacheResult.path,
 							);
 							if (!anchorExists.valid) {
+								// Combine messages if cross-directory AND anchor issue
+								const anchorMessage = `Anchor not found: #${citation.target.anchor}`;
+								const combinedMessage = crossDirMessage
+									? `${crossDirMessage}. ${anchorMessage}`
+									: anchorMessage;
+
+								// For same-directory, use "error"; for cross-directory, use "warning"
+								const status = isDirectoryMatch ? "error" : "warning";
+
 								return this.createValidationResult(
 									citation,
-									"error",
-									`Anchor not found: #${citation.anchor}`,
+									status,
+									combinedMessage,
+									null,
 									anchorExists.suggestion,
 								);
 							}
 						}
 
-						// Check if resolution crosses directory boundaries
-						const isDirectoryMatch = this.isDirectoryMatch(
-							sourceFile,
-							cacheResult.path,
-						);
-						const status = isDirectoryMatch ? "valid" : "warning";
-						const message = isDirectoryMatch
-							? null
-							: `Found via file cache in different directory: ${cacheResult.path}`;
-
 						// Include path conversion suggestion for cross-directory warnings
 						if (!isDirectoryMatch) {
-							const originalCitation = citation.anchor
-								? `${citation.file}#${citation.anchor}`
-								: citation.file;
+							const originalCitation = citation.target.anchor
+								? `${citation.target.path.raw}#${citation.target.anchor}`
+								: citation.target.path.raw;
 							const suggestion = this.generatePathConversionSuggestion(
 								originalCitation,
 								sourceFile,
@@ -310,14 +331,14 @@ export class CitationValidator {
 							);
 							return this.createValidationResult(
 								citation,
-								status,
+								baseStatus,
 								null,
-								message,
+								crossDirMessage,
 								suggestion,
 							);
 						}
 
-						return this.createValidationResult(citation, status, null, message);
+						return this.createValidationResult(citation, baseStatus, null, crossDirMessage);
 					}
 				}
 
@@ -329,14 +350,14 @@ export class CitationValidator {
 					return this.createValidationResult(
 						citation,
 						"error",
-						`File not found: ${citation.file}`,
+						`File not found: ${citation.target.path.raw}`,
 						`${cacheResult.message}. ${debugInfo}`,
 					);
 				} else if (cacheResult.reason === "not_found") {
 					return this.createValidationResult(
 						citation,
 						"error",
-						`File not found: ${citation.file}`,
+						`File not found: ${citation.target.path.raw}`,
 						`File "${filename}" not found in scope folder. ${debugInfo}`,
 					);
 				}
@@ -345,35 +366,48 @@ export class CitationValidator {
 			return this.createValidationResult(
 				citation,
 				"error",
-				`File not found: ${citation.file}`,
+				`File not found: ${citation.target.path.raw}`,
 				`Check if file exists or fix path. ${debugInfo}`,
 			);
 		}
 
-		// If there's an anchor, validate it exists in target file
-		if (citation.anchor) {
+		// Check if file was resolved via file cache (paths differ) FIRST
+		const isCrossDirectory = standardPath !== targetPath;
+		const crossDirMessage = isCrossDirectory
+			? `Found via file cache in different directory: ${targetPath}`
+			: null;
+
+		// Then validate anchor if present
+		if (citation.target.anchor) {
 			const anchorExists = await this.validateAnchorExists(
-				citation.anchor,
+				citation.target.anchor,
 				targetPath,
 			);
 			if (!anchorExists.valid) {
+				// Combine messages if cross-directory AND anchor issue
+				const anchorMessage = `Anchor not found: #${citation.target.anchor}`;
+				const combinedMessage = crossDirMessage
+					? `${crossDirMessage}. ${anchorMessage}`
+					: anchorMessage;
+
+				// For same-directory, use "error"; for cross-directory, use "warning"
+				const status = isCrossDirectory ? "warning" : "error";
+
 				return this.createValidationResult(
 					citation,
-					"error",
-					`Anchor not found: #${citation.anchor}`,
+					status,
+					combinedMessage,
+					null,
 					anchorExists.suggestion,
 				);
 			}
 		}
 
-		// Check if file was resolved via file cache (paths differ)
-		if (standardPath !== targetPath) {
-			// Cross-directory resolution detected - return warning
-			const status = "warning";
-			const message = `Found via file cache in different directory: ${targetPath}`;
-			const originalCitation = citation.anchor
-				? `${citation.file}#${citation.anchor}`
-				: citation.file;
+		// Return warning with path conversion suggestion if cross-directory
+		if (isCrossDirectory) {
+			const originalCitation = citation.target.anchor
+				? `${citation.target.path.raw}#${citation.target.anchor}`
+				: citation.target.path.raw;
 			const suggestion = this.generatePathConversionSuggestion(
 				originalCitation,
 				sourceFile,
@@ -381,9 +415,9 @@ export class CitationValidator {
 			);
 			return this.createValidationResult(
 				citation,
-				status,
+				"warning",
 				null,
-				message,
+				crossDirMessage,
 				suggestion,
 			);
 		}
@@ -468,8 +502,8 @@ export class CitationValidator {
 
 	async validateAnchorExists(anchor, targetFile) {
 		try {
-			const parsed = await this.parser.parseFile(targetFile);
-			const availableAnchors = parsed.anchors.map((a) => a.anchor);
+			const parsed = await this.parsedFileCache.resolveParsedFile(targetFile);
+			const availableAnchors = parsed.anchors.map((a) => a.id);
 
 			// Direct match
 			if (availableAnchors.includes(anchor)) {
@@ -501,20 +535,11 @@ export class CitationValidator {
 
 				// Check if there's an Obsidian block reference with this name
 				const obsidianBlockRefs = parsed.anchors
-					.filter((a) => a.type === "obsidian-block-ref")
-					.map((a) => a.anchor);
+					.filter((a) => a.anchorType === "block")
+					.map((a) => a.id);
 
 				if (obsidianBlockRefs.includes(blockRefName)) {
-					return { valid: true, matchedAs: "obsidian-block-ref" };
-				}
-
-				// Also check legacy caret format for backward compatibility
-				const caretRefs = parsed.anchors
-					.filter((a) => a.type === "caret")
-					.map((a) => a.anchor);
-
-				if (caretRefs.includes(blockRefName)) {
-					return { valid: true, matchedAs: "caret-ref" };
+					return { valid: true, matchedAs: "block-ref" };
 				}
 			}
 
@@ -535,13 +560,13 @@ export class CitationValidator {
 
 			// Include Obsidian block references in available anchors list
 			const availableHeaders = parsed.anchors
-				.filter((a) => a.type === "header" || a.type === "header-explicit")
-				.map((a) => `"${a.rawText || a.text}" → #${a.anchor}`)
+				.filter((a) => a.anchorType === "header")
+				.map((a) => `"${a.rawText}" → #${a.id}`)
 				.slice(0, 5);
 
 			const availableBlockRefs = parsed.anchors
-				.filter((a) => a.type === "obsidian-block-ref" || a.type === "caret")
-				.map((a) => `^${a.anchor}`)
+				.filter((a) => a.anchorType === "block")
+				.map((a) => `^${a.id}`)
 				.slice(0, 5);
 
 			const allSuggestions = [];
@@ -581,8 +606,8 @@ export class CitationValidator {
 		const cleanSearchAnchor = decodeURIComponent(searchAnchor);
 
 		for (const anchorObj of availableAnchors) {
-			const anchorText = anchorObj.anchor;
-			const rawText = anchorObj.rawText || anchorObj.text;
+			const anchorText = anchorObj.id;
+			const rawText = anchorObj.rawText;
 
 			// 1. Exact match (already checked above, but included for completeness)
 			if (anchorText === cleanSearchAnchor) {
@@ -642,18 +667,18 @@ export class CitationValidator {
 		// Check if the used anchor is kebab-case and has a raw header equivalent
 		for (const anchorObj of availableAnchors) {
 			// Skip if this is the exact anchor being used
-			if (anchorObj.anchor === usedAnchor) {
-				// Check if there's a corresponding raw header (header-raw type)
+			if (anchorObj.id === usedAnchor) {
+				// Check if there's a corresponding raw header with same rawText
 				const rawHeaderEquivalent = availableAnchors.find(
 					(a) =>
-						a.type === "header-raw" &&
-						a.anchor === anchorObj.rawText &&
-						a.anchor !== usedAnchor,
+						a.anchorType === "header" &&
+						a.id === anchorObj.rawText &&
+						a.id !== usedAnchor,
 				);
 
 				if (rawHeaderEquivalent) {
 					// URL encode the raw header for proper anchor format
-					return encodeURIComponent(rawHeaderEquivalent.anchor).replace(
+					return encodeURIComponent(rawHeaderEquivalent.id).replace(
 						/'/g,
 						"%27",
 					);
@@ -734,7 +759,8 @@ export class CitationValidator {
 			line: citation.line,
 			citation: citation.fullMatch,
 			status,
-			type: citation.type,
+			linkType: citation.linkType,
+			scope: citation.scope,
 		};
 
 		if (error) {

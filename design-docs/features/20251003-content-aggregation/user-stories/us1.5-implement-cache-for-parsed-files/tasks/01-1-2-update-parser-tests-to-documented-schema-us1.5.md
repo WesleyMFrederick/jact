@@ -1,13 +1,13 @@
 ---
 story: "User Story 1.5: Implement a Cache for Parsed File Objects"
-epic: "Citation Manager Test Migration & Content Aggregation"
+epic: Citation Manager Test Migration & Content Aggregation
 phase: "Phase 1: Parser Output Contract Validation & Documentation"
 task-id: "1.2"
 task-anchor: ^US1-5T1-2
-wave: "1c"
-implementation-agent: "test-writer"
-evaluation-agent: "application-tech-lead"
-status: "ready"
+wave: 1c
+implementation-agent: test-writer
+evaluation-agent: application-tech-lead
+status: Done
 ---
 
 # Task 1.2: Update Parser Tests to Documented Schema (RED Phase)
@@ -379,22 +379,104 @@ Execute the task specification above. When complete, populate the Implementation
 > Populate this section during implementation execution.
 
 ### Agent Model Used
-[Record the specific AI agent model and version used]
+- Model: Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
+- Role: Test Writer Agent
+- Execution Date: 2025-10-07
 
 ### Debug Log References
-[Reference any debug logs or traces generated]
+No debug logs generated - implementation proceeded cleanly without errors.
 
 ### Completion Notes
-[Notes about completion and any issues encountered]
+Successfully updated `parser-output-contract.test.js` to validate the Implementation Guide schema as the source of truth. All tests now check for the documented LinkObject and AnchorObject schemas including:
+- LinkObject schema with linkType, scope, anchorType, source/target path structures
+- AnchorObject schema with anchorType, id, rawText properties
+- Nested path validation (source.path.absolute, target.path.raw/absolute/relative)
+- Enum constraint validation for linkType, scope, and anchorType
+
+Tests appropriately FAIL as expected, exposing the mismatch between current implementation (which uses `type`, `file`, `anchor`) and documented contract (which uses `linkType`, `scope`, `anchorType`, `source`, `target`, `id`).
 
 ### File List
-[List all files created, modified, or affected]
+**Modified**:
+- `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/parser-output-contract.test.js` (164 → 242 lines, 8 test cases)
+
+**Unchanged** (verified via git diff):
+- `tools/citation-manager/src/MarkdownParser.js` (no changes)
+- All other source files (no changes)
 
 ### Implementation Challenges
-[Document challenges encountered and resolutions]
+No significant challenges encountered. The task specification was clear and comprehensive. Implementation proceeded as follows:
+
+1. Replaced existing anchor test to validate `anchorType`, `id`, `rawText`, `fullMatch`, `line`, `column` properties per Implementation Guide
+2. Replaced existing link test to validate `linkType`, `scope`, `anchorType`, `source`, `target` with nested path structures
+3. Added new test for path variations (raw, absolute, relative) validation
+4. Added new test for enum constraint validation (linkType: markdown|wiki, scope: internal|cross-document, anchorType: header|block)
+5. All tests use BDD Given-When-Then comment structure consistently
 
 ### Validation Results
-[Results of running validation commands]
+
+**Git Status Check**:
+
+```bash
+M tools/citation-manager/test/parser-output-contract.test.js
+```
+
+✅ Only test file modified
+
+**MarkdownParser.js Unchanged**:
+
+```bash
+(empty output - no changes)
+```
+
+✅ Implementation file untouched
+
+**Test Case Count**:
+
+```bash
+8 test cases
+```
+
+✅ Increased from 6 to 8 test cases
+
+**File Size**:
+
+```bash
+242 lines
+```
+
+✅ Expanded from 164 to 242 lines
+
+**Test Execution Results**:
+
+```bash
+Test Files  1 failed (1)
+Tests  4 failed | 4 passed (8)
+```
+
+**Failed Tests (Expected)**:
+1. ✅ `should populate anchors array with documented AnchorObject schema`
+   - Error: `expected { type: 'header', …(5) } to have property "anchorType"`
+   - Shows current implementation uses `type` instead of `anchorType`
+
+2. ✅ `should populate links array with documented LinkObject schema`
+   - Error: `expected { type: 'cross-document', …(6) } to have property "linkType"`
+   - Shows current implementation uses `type` instead of `linkType`
+
+3. ✅ `should correctly populate path variations (raw, absolute, relative)`
+   - Error: `expected undefined to be defined` (looking for link.scope)
+   - Shows current implementation missing `scope` property entirely
+
+4. ✅ `should validate enum constraints for linkType, scope, anchorType`
+   - Error: `expected [ 'markdown', 'wiki' ] to include undefined`
+   - Shows current implementation missing `linkType` property
+
+**Passing Tests** (validating top-level contract structure):
+- ✅ `should return complete Parser Output Contract with all fields`
+- ✅ `should populate headings array with level, text, raw properties`
+- ✅ `should validate headings extracted from complex header fixture`
+- ✅ `should validate parser output matches documented contract schema`
+
+All test failures clearly demonstrate the schema mismatch between current implementation and documented contract, exactly as expected for the RED phase of TDD.
 
 ---
 
@@ -418,28 +500,111 @@ Populate the Evaluation Agent Notes section below with your findings.
 > Populate this section during validation execution.
 
 ### Validator Model Used
-[Record model name and version]
+- Model: Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)
+- Role: Application Technical Lead (Evaluation Agent)
+- Execution Date: 2025-10-07
 
 ### Task Specification Compliance
-[Compare implementation against exact task spec from story]
+
+The implementation fully complies with the task specification. All required changes were implemented exactly as specified in the "Required Changes by Component" section.
 
 **Validation Checklist**:
-- [ ] Files Modified: Only `parser-output-contract.test.js` updated?
-- [ ] Scope Adherence: No implementation changes, no other test file changes?
-- [ ] Objective Met: Tests validate Implementation Guide schema (LinkObject, AnchorObject)?
-- [ ] Schema Properties: Tests check linkType, scope, anchorType, source/target path structures?
-- [ ] Enum Validation: Tests validate linkType/scope/anchorType enum constraints?
-- [ ] Tests Appropriately Fail: Test suite fails showing schema mismatch?
-- [ ] BDD Structure: All tests use Given-When-Then comments?
+- [x] Files Modified: Only `parser-output-contract.test.js` updated? **YES** - Confirmed via `git status --short`
+- [x] Scope Adherence: No implementation changes, no other test file changes? **YES** - All source files unchanged
+- [x] Objective Met: Tests validate Implementation Guide schema (LinkObject, AnchorObject)? **YES** - All schema properties validated
+- [x] Schema Properties: Tests check linkType, scope, anchorType, source/target path structures? **YES** - Lines 107-135 validate all properties
+- [x] Enum Validation: Tests validate linkType/scope/anchorType enum constraints? **YES** - Dedicated test at lines 166-189
+- [x] Tests Appropriately Fail: Test suite fails showing schema mismatch? **YES** - 4 tests fail as expected (see details below)
+- [x] BDD Structure: All tests use Given-When-Then comments? **YES** - All 8 tests use BDD structure consistently
 
 **Scope Boundary Validation**:
-- [ ] MarkdownParser.js unchanged (git diff shows no changes)
-- [ ] No new test files created (only parser-output-contract.test.js modified)
-- [ ] No modifications to CitationValidator.js or other components
-- [ ] Test failures clearly show expected vs actual schema differences
+- [x] MarkdownParser.js unchanged (git diff shows no changes) **YES** - `git diff` returned empty output
+- [x] No new test files created (only parser-output-contract.test.js modified) **YES** - Only one modified file in test directory
+- [x] No modifications to CitationValidator.js or other components **YES** - `git status tools/citation-manager/src/` shows clean working tree
+- [x] Test failures clearly show expected vs actual schema differences **YES** - Error messages clearly show property mismatches
+
+### Test Execution Results
+
+**Test Suite Summary**:
+- Total Tests: 8 (increased from 6, as required)
+- Passed: 4 tests (top-level contract structure validation)
+- Failed: 4 tests (schema property validation - expected failures)
+- File Size: 242 lines (expanded from 164 lines, within expected range)
+
+**Expected Failures (RED Phase - TDD)**:
+
+1. **Anchor Schema Test** (Line 71):
+   - Error: `expected { type: 'header', …(5) } to have property "anchorType"`
+   - Shows current implementation uses `type` instead of `anchorType`
+   - Validates test correctly checks for Implementation Guide schema
+
+2. **Link Schema Test** (Line 107):
+   - Error: `expected { type: 'cross-document', …(6) } to have property "linkType"`
+   - Shows current implementation uses `type` instead of `linkType`
+   - Validates test correctly checks for Implementation Guide schema
+
+3. **Path Variations Test** (Line 149):
+   - Error: `expected undefined to be defined` (looking for `link.scope`)
+   - Shows current implementation missing `scope` property entirely
+   - Validates test correctly checks for nested path structures
+
+4. **Enum Constraints Test** (Line 179):
+   - Error: `expected [ 'markdown', 'wiki' ] to include undefined`
+   - Shows current implementation missing `linkType` property
+   - Validates test correctly enforces enum constraints
+
+All test failures demonstrate the exact schema mismatches the RED phase is designed to expose. The failures provide clear, actionable information for the GREEN phase (Task 1.3).
+
+### Validation Commands Executed
+
+```bash
+# Verify only test file modified
+git status --short
+# Result: M tools/citation-manager/test/parser-output-contract.test.js ✅
+
+# Verify MarkdownParser.js unchanged
+git diff tools/citation-manager/src/MarkdownParser.js
+# Result: (empty output - no changes) ✅
+
+# Verify source files unchanged
+git status tools/citation-manager/src/
+# Result: nothing to commit, working tree clean ✅
+
+# Count test cases
+grep -c "it('should" tools/citation-manager/test/parser-output-contract.test.js
+# Result: 8 (increased from 6) ✅
+
+# Verify file size
+wc -l tools/citation-manager/test/parser-output-contract.test.js
+# Result: 242 lines (expanded from 164) ✅
+
+# Run tests (expect failures)
+npm test -- parser-output-contract
+# Result: 4 failed | 4 passed (8 total) ✅
+
+# Verify BDD structure
+grep -n "// Given:\|// When:\|// Then:" tools/citation-manager/test/parser-output-contract.test.js
+# Result: All 8 tests use Given-When-Then structure ✅
+```
+
+### Success Criteria Verification
+
+All success criteria from the task specification are met:
+
+✅ **Test Updates Complete**: All link/anchor tests validate Implementation Guide schema
+✅ **Schema Properties Validated**: Tests check linkType, scope, anchorType, source.path, target.path structure (lines 107-135)
+✅ **Enum Constraints Tested**: Tests validate linkType (markdown|wiki), scope (internal|cross-document), anchorType (header|block) (lines 166-189)
+✅ **Path Variations Tested**: Tests validate target.path.raw, target.path.absolute, target.path.relative (lines 137-164)
+✅ **Tests Appropriately Fail**: Test suite fails with clear messages showing current implementation doesn't match documented schema
+✅ **Scope Adherence**: Only parser-output-contract.test.js modified (git status confirms)
+✅ **BDD Structure**: All tests use Given-When-Then comment structure
 
 ### Validation Outcome
-[PASS or FAIL with specific deviations if FAIL]
+
+**PASS** - Implementation fully complies with task specification.
+
+The implementation successfully achieves the RED phase objective of Test-Driven Development: tests now validate the Implementation Guide schema as the source of truth and appropriately fail, exposing the schema mismatch between current implementation and documented contract. The failures provide clear, actionable guidance for Task 1.3 (GREEN phase implementation).
 
 ### Remediation Required
-[Specific fixes needed if FAIL, empty if PASS]
+
+None. Implementation is complete and correct.

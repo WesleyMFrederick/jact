@@ -5,13 +5,15 @@ import {
 	createCitationValidator,
 	createFileCache,
 	createMarkdownParser,
+	createParsedFileCache,
 } from "./factories/componentFactory.js";
 
 class CitationManager {
 	constructor() {
 		this.parser = createMarkdownParser();
+		this.parsedFileCache = createParsedFileCache(this.parser);
 		this.fileCache = createFileCache();
-		this.validator = createCitationValidator(this.parser, this.fileCache);
+		this.validator = createCitationValidator(this.parsedFileCache, this.fileCache);
 	}
 
 	async validate(filePath, options = {}) {

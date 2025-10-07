@@ -54,31 +54,43 @@ describe('MarkdownParser Output Contract', () => {
 		expect(heading.level).toBeLessThanOrEqual(6);
 	});
 
-	it('should populate anchors array with type, anchor, text, line properties', async () => {
-		// Given: Parser with fixture containing caret anchors
+	it('should populate anchors array with documented AnchorObject schema', async () => {
+		// Given: Parser with fixture containing anchors
 		const parser = createMarkdownParser();
 		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
 
-		// Then: Anchors have required structure
+		// Then: Anchor objects match Implementation Guide schema
 		expect(result.anchors.length).toBeGreaterThan(0);
 
-		// Find a caret anchor (like ^FR1)
-		const caretAnchor = result.anchors.find(a => a.type === 'caret' || a.type === 'obsidian-block-ref');
-		expect(caretAnchor).toBeDefined();
-		expect(caretAnchor).toHaveProperty('type');
-		expect(caretAnchor).toHaveProperty('anchor');
-		expect(caretAnchor).toHaveProperty('line');
+		const anchor = result.anchors[0];
 
-		expect(typeof caretAnchor.type).toBe('string');
-		expect(typeof caretAnchor.anchor).toBe('string');
-		expect(typeof caretAnchor.line).toBe('number');
-		expect(caretAnchor.line).toBeGreaterThan(0);
+		// Validate required fields per Implementation Guide
+		expect(anchor).toHaveProperty('anchorType');
+		expect(anchor).toHaveProperty('id');
+		expect(anchor).toHaveProperty('rawText');
+		expect(anchor).toHaveProperty('fullMatch');
+		expect(anchor).toHaveProperty('line');
+		expect(anchor).toHaveProperty('column');
+
+		// Validate enum values
+		expect(['header', 'block']).toContain(anchor.anchorType);
+
+		// Validate types
+		expect(typeof anchor.id).toBe('string');
+		expect(typeof anchor.fullMatch).toBe('string');
+		expect(typeof anchor.line).toBe('number');
+		expect(typeof anchor.column).toBe('number');
+
+		// rawText can be null for block anchors
+		if (anchor.rawText !== null) {
+			expect(typeof anchor.rawText).toBe('string');
+		}
 	});
 
-	it('should populate links array with type, text, file, anchor, fullMatch, line properties', async () => {
+	it('should populate links array with documented LinkObject schema', async () => {
 		// Given: Parser with fixture containing cross-document links
 		const parser = createMarkdownParser();
 		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
@@ -86,28 +98,94 @@ describe('MarkdownParser Output Contract', () => {
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
 
-		// Then: Links have required structure
+		// Then: Link objects match Implementation Guide schema
 		expect(result.links.length).toBeGreaterThan(0);
 
 		const link = result.links[0];
-		expect(link).toHaveProperty('type');
+
+		// Validate top-level required fields per Implementation Guide
+		expect(link).toHaveProperty('linkType');
+		expect(link).toHaveProperty('scope');
+		expect(link).toHaveProperty('anchorType');
+		expect(link).toHaveProperty('source');
+		expect(link).toHaveProperty('target');
 		expect(link).toHaveProperty('text');
-		expect(link).toHaveProperty('file');
 		expect(link).toHaveProperty('fullMatch');
 		expect(link).toHaveProperty('line');
+		expect(link).toHaveProperty('column');
 
-		expect(typeof link.type).toBe('string');
-		expect(typeof link.fullMatch).toBe('string');
-		expect(typeof link.line).toBe('number');
-		expect(link.line).toBeGreaterThan(0);
+		// Validate enum values
+		expect(['markdown', 'wiki']).toContain(link.linkType);
+		expect(['internal', 'cross-document']).toContain(link.scope);
+		if (link.anchorType) {
+			expect(['header', 'block']).toContain(link.anchorType);
+		}
 
-		// text and file can be string or null depending on link type
-		if (link.text !== null) {
-			expect(typeof link.text).toBe('string');
+		// Validate source path structure
+		expect(link.source).toHaveProperty('path');
+		expect(link.source.path).toHaveProperty('absolute');
+		expect(typeof link.source.path.absolute).toBe('string');
+
+		// Validate target path structure
+		expect(link.target).toHaveProperty('path');
+		expect(link.target.path).toHaveProperty('raw');
+		expect(link.target.path).toHaveProperty('absolute');
+		expect(link.target.path).toHaveProperty('relative');
+		expect(link.target).toHaveProperty('anchor');
+	});
+
+	it('should correctly populate path variations (raw, absolute, relative)', async () => {
+		// Given: Parser with fixture containing cross-document links
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
+
+		// When: Parse file with links to other documents
+		const result = await parser.parseFile(testFile);
+
+		// Then: Verify raw (original), absolute (full path), relative (from source) all populated
+		expect(result.links.length).toBeGreaterThan(0);
+
+		const crossDocLink = result.links.find(link => link.scope === 'cross-document');
+		expect(crossDocLink).toBeDefined();
+
+		// Raw path should match the original link target
+		expect(typeof crossDocLink.target.path.raw).toBe('string');
+		expect(crossDocLink.target.path.raw.length).toBeGreaterThan(0);
+
+		// Absolute path should be full filesystem path (or null if unresolvable)
+		if (crossDocLink.target.path.absolute !== null) {
+			expect(typeof crossDocLink.target.path.absolute).toBe('string');
 		}
-		if (link.file !== null) {
-			expect(typeof link.file).toBe('string');
+
+		// Relative path should be path relative to source file (or null if unresolvable)
+		if (crossDocLink.target.path.relative !== null) {
+			expect(typeof crossDocLink.target.path.relative).toBe('string');
 		}
+	});
+
+	it('should validate enum constraints for linkType, scope, anchorType', async () => {
+		// Given: Parser with fixture containing various link types
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: All links comply with enum constraints
+		expect(result.links.length).toBeGreaterThan(0);
+
+		result.links.forEach(link => {
+			// linkType must be 'markdown' or 'wiki'
+			expect(['markdown', 'wiki']).toContain(link.linkType);
+
+			// scope must be 'internal' or 'cross-document'
+			expect(['internal', 'cross-document']).toContain(link.scope);
+
+			// anchorType must be 'header', 'block', or null
+			if (link.anchorType !== null) {
+				expect(['header', 'block']).toContain(link.anchorType);
+			}
+		});
 	});
 
 	it('should validate headings extracted from complex header fixture', async () => {

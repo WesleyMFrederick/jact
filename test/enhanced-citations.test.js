@@ -35,14 +35,14 @@ describe("Enhanced Citation Pattern Tests", () => {
 		// Should find cross-document links with anchors
 		const withAnchors = citations.filter(
 			(c) =>
-				c.type === "cross-document" && c.citation.includes("#auth-service"),
+				c.scope === "cross-document" && c.citation.includes("#auth-service"),
 		);
 		expect(withAnchors.length).toBeGreaterThan(0);
 
 		// Should find cross-document links without anchors
 		const withoutAnchors = citations.filter(
 			(c) =>
-				c.type === "cross-document" &&
+				c.scope === "cross-document" &&
 				(c.citation.includes("test-target.md)") ||
 					c.citation.includes("another-file.md)") ||
 					c.citation.includes("setup-guide.md)")) &&
@@ -55,7 +55,7 @@ describe("Enhanced Citation Pattern Tests", () => {
 		expect(citeFormat.length).toBeGreaterThanOrEqual(3);
 
 		// Should find caret references
-		const caretRefs = citations.filter((c) => c.type === "caret-reference");
+		const caretRefs = citations.filter((c) => c.scope === "internal" && c.linkType === "markdown");
 		expect(caretRefs.length).toBeGreaterThanOrEqual(2);
 	});
 
@@ -128,10 +128,10 @@ describe("Enhanced Citation Pattern Tests", () => {
 		// Should include both pattern types
 		const hasStandardLink = mixedLineCitations.some(
 			(c) =>
-				c.citation.includes("[Standard Link](") && c.type === "cross-document",
+				c.citation.includes("[Standard Link](") && c.scope === "cross-document",
 		);
 		const hasCiteFormat = mixedLineCitations.some(
-			(c) => c.citation.includes("[cite:") && c.type === "cross-document",
+			(c) => c.citation.includes("[cite:") && c.scope === "cross-document",
 		);
 
 		expect(hasStandardLink).toBe(true);
@@ -158,7 +158,7 @@ describe("Enhanced Citation Pattern Tests", () => {
 
 		// Should find wiki-style cross-document links
 		const wikiCrossDoc = result.results.filter(
-			(c) => c.type === "cross-document" && c.citation.startsWith("[["),
+			(c) => c.scope === "cross-document" && c.citation.startsWith("[["),
 		);
 		expect(wikiCrossDoc.length).toBeGreaterThan(0);
 
