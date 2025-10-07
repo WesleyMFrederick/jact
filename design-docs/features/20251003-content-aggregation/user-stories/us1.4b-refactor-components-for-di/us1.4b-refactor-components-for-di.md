@@ -1,11 +1,11 @@
 ---
 title: "User Story 1.4b: Refactor citation-manager Components for Dependency Injection"
-feature-title: "Citation Manager Content Aggregation"
+feature-title: Citation Manager Content Aggregation
 epic-number: 1
-epic-name: "Citation Manager Test Migration & Content Aggregation"
-epic-url: "../../content-aggregation-prd.md#Epic%20Citation%20Manager%20Test%20Migration%20&%20Content%20Aggregation"
+epic-name: Citation Manager Test Migration & Content Aggregation
+epic-url: ../../content-aggregation-prd.md#Epic%20Citation%20Manager%20Test%20Migration%20&%20Content%20Aggregation
 user-story-number: 1.4b
-status: Draft
+status: Done
 ---
 
 # Story 1.4b: Refactor citation-manager Components for Dependency Injection
@@ -408,7 +408,7 @@ All 50+ existing tests must continue to pass after DI refactoring to confirm zer
 
 ### Phase 5: Documentation & Validation
 
-- [ ] **5.1. Update Architecture Documentation** ^US1-4bT5-1
+- [x] **5.1. Update Architecture Documentation** ^US1-4bT5-1
   - **Agent**: application-tech-lead
   - **Objective**: Update content-aggregation-architecture.md to mark "Lack of Dependency Injection" technical debt as resolved
   - **Input**: content-aggregation-architecture.md with documented technical debt, completed DI refactoring from Phases 1-4

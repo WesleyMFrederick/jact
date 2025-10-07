@@ -27,7 +27,7 @@ export class FileCache {
 		// Log duplicates for debugging (should be much fewer now)
 		if (this.duplicates.size > 0) {
 			console.warn(
-				`⚠️  Found duplicate filenames in scope: ${Array.from(this.duplicates).join(", ")}`,
+				`WARNING: Found duplicate filenames in scope: ${Array.from(this.duplicates).join(", ")}`,
 			);
 		}
 

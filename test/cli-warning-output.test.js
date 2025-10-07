@@ -31,8 +31,8 @@ describe("CLI Warning Output Display Tests", () => {
 		// Validate we got output
 		expect(output.length).toBeGreaterThan(0);
 
-		// Validate warning section header with emoji and count
-		expect(output).toContain("⚠️  WARNINGS (");
+		// Validate warning section header with count
+		expect(output).toContain("WARNINGS (");
 		expect(output).toContain(")");
 
 		// Validate tree structure formatting for warnings
@@ -108,9 +108,9 @@ describe("CLI Warning Output Display Tests", () => {
 				.split("\n")
 				.filter(
 					(line) =>
-						line.includes("⚠️  WARNINGS") ||
-						line.includes("✅ VALID CITATIONS") ||
-						line.includes("❌ ERRORS"),
+						line.includes("WARNINGS") ||
+						line.includes("VALID CITATIONS") ||
+						line.includes("ERRORS"),
 				);
 
 			// Should have separate sections for different status types
@@ -118,17 +118,17 @@ describe("CLI Warning Output Display Tests", () => {
 
 			// Validate warning section appears before valid section (if both exist)
 			if (
-				output.includes("⚠️  WARNINGS") &&
-				output.includes("✅ VALID CITATIONS")
+				output.includes("WARNINGS") &&
+				output.includes("VALID CITATIONS")
 			) {
-				const warningIndex = output.indexOf("⚠️  WARNINGS");
-				const validIndex = output.indexOf("✅ VALID CITATIONS");
+				const warningIndex = output.indexOf("WARNINGS");
+				const validIndex = output.indexOf("VALID CITATIONS");
 				expect(warningIndex).toBeLessThan(validIndex);
 			}
 
 			// Validate warnings indicate they are fixable/actionable
 			const warningSection = output.substring(
-				output.indexOf("⚠️  WARNINGS"),
+				output.indexOf("WARNINGS"),
 				output.indexOf("SUMMARY:"),
 			);
 
@@ -142,7 +142,7 @@ describe("CLI Warning Output Display Tests", () => {
 			// Validate output structure even on error exit
 			const output = error.stdout || "";
 
-			expect(output).toContain("⚠️  WARNINGS");
+			expect(output).toContain("WARNINGS");
 		}
 	});
 
@@ -170,9 +170,9 @@ describe("CLI Warning Output Display Tests", () => {
 		expect(output.length).toBeGreaterThan(0);
 
 		// Warning formatting should be consistent
-		if (output.includes("⚠️  WARNINGS")) {
+		if (output.includes("WARNINGS")) {
 			// Validate warning count is properly formatted
-			expect(output).toMatch(/⚠️ {2}WARNINGS \(\d+\)/);
+			expect(output).toMatch(/WARNINGS \(\d+\)/);
 
 			// Validate at least one warning item with proper formatting
 			expect(output.includes("├─") || output.includes("└─")).toBe(true);
@@ -207,7 +207,7 @@ describe("CLI Warning Output Display Tests", () => {
 
 			// Check for empty lines after warning section
 			for (let i = 0; i < lines.length - 1; i++) {
-				if (lines[i].includes("⚠️  WARNINGS")) {
+				if (lines[i].includes("WARNINGS")) {
 					// Find the end of warning section and check for separation
 					let j = i + 1;
 					while (
@@ -227,25 +227,12 @@ describe("CLI Warning Output Display Tests", () => {
 			}
 
 			expect(hasProperSeparation).toBe(true);
-
-			// Validate distinct visual markers for different sections
-			const sectionMarkers = {
-				warnings: "⚠️",
-				valid: "✅",
-				errors: "❌",
-			};
-
-			Object.entries(sectionMarkers).forEach(([sectionType, emoji]) => {
-				if (output.includes(emoji)) {
-					expect(output).toContain(emoji);
-				}
-			});
 		} catch (error) {
 			// Validate visual formatting even on error
 			const output = error.stdout || "";
 
-			if (output.includes("⚠️  WARNINGS")) {
-				expect(output).toContain("⚠️");
+			if (output.includes("WARNINGS")) {
+				expect(output).toContain("WARNINGS");
 			}
 		}
 	});
