@@ -54,7 +54,7 @@ Content for another test header.
 			);
 
 			// Check that auto-fix was successful (updated to match actual CLI output format)
-			expect(output).toContain("✅ Fixed 2 citations");
+			expect(output).toContain("Fixed 2 citations");
 			expect(output).toContain("anchor corrections");
 			expect(output).toContain("sample-header");
 			expect(output).toContain("Sample%20Header");
@@ -68,7 +68,7 @@ Content for another test header.
 			expect(fixedContent).not.toContain("#sample-header");
 			expect(fixedContent).not.toContain("#another-test-header");
 
-			console.log("✅ Auto-fix functionality working correctly");
+			console.log("Auto-fix functionality working correctly");
 		} finally {
 			// Clean up temporary files
 			try {
@@ -130,7 +130,7 @@ Content for another test header.
 			expect(content).toContain("#Sample%20Header");
 			expect(content).toContain("#Another%20Test%20Header");
 
-			console.log("✅ Auto-fix correctly identifies when no fixes are needed");
+			console.log("Auto-fix correctly identifies when no fixes are needed");
 		} finally {
 			// Clean up temporary files
 			try {
@@ -189,7 +189,7 @@ This header exists and should be fixable.
 			expect(hasRawFormat || hasKebabFormat).toBeTruthy();
 
 			console.log(
-				"✅ Auto-fix correctly handles mixed valid/invalid citations",
+				"Auto-fix correctly handles mixed valid/invalid citations",
 			);
 		} finally {
 			// Clean up temporary files

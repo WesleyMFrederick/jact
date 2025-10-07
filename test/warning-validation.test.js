@@ -65,7 +65,7 @@ describe("Warning Status Validation Tests", () => {
 			);
 
 			// Should contain warning section markup in CLI output
-			expect(output.includes("⚠️  WARNINGS") || output.includes("WARNING")).toBe(true);
+			expect(output.includes("WARNINGS") || output.includes("WARNING")).toBe(true);
 
 			// Should reference the specific warning citation
 			expect(output).toContain("../wrong-path/warning-test-target.md");
@@ -80,7 +80,7 @@ describe("Warning Status Validation Tests", () => {
 			// Even if command exits with error due to warnings, check output content
 			const output = error.stdout || "";
 
-			expect(output.includes("⚠️  WARNINGS") || output.includes("WARNING")).toBe(true);
+			expect(output.includes("WARNINGS") || output.includes("WARNING")).toBe(true);
 		}
 	});
 

@@ -24,11 +24,11 @@ class CitationManager {
 				// Only show cache messages in non-JSON mode
 				if (options.format !== "json") {
 					console.log(
-						`📁 Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
+						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 					);
 					if (cacheStats.duplicates > 0) {
 						console.log(
-							`⚠️  Found ${cacheStats.duplicates} duplicate filenames`,
+							`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
 						);
 					}
 				}
@@ -69,7 +69,7 @@ class CitationManager {
 					2,
 				);
 			} else {
-				return `❌ ERROR: ${error.message}`;
+				return `ERROR: ${error.message}`;
 			}
 		}
 	}
@@ -121,7 +121,7 @@ class CitationManager {
 		lines.push("");
 
 		if (result.summary.errors > 0) {
-			lines.push(`❌ CRITICAL ERRORS (${result.summary.errors})`);
+			lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
 			result.results
 				.filter((r) => r.status === "error")
 				.forEach((error, index) => {
@@ -140,7 +140,7 @@ class CitationManager {
 		}
 
 		if (result.summary.warnings > 0) {
-			lines.push(`⚠️  WARNINGS (${result.summary.warnings})`);
+			lines.push(`WARNINGS (${result.summary.warnings})`);
 			result.results
 				.filter((r) => r.status === "warning")
 				.forEach((warning, index) => {
@@ -158,7 +158,7 @@ class CitationManager {
 		}
 
 		if (result.summary.valid > 0) {
-			lines.push(`✅ VALID CITATIONS (${result.summary.valid})`);
+			lines.push(`VALID CITATIONS (${result.summary.valid})`);
 			result.results
 				.filter((r) => r.status === "valid")
 				.forEach((valid, index) => {
@@ -166,7 +166,7 @@ class CitationManager {
 						index ===
 						result.results.filter((r) => r.status === "valid").length - 1;
 					const prefix = isLast ? "└─" : "├─";
-					lines.push(`${prefix} Line ${valid.line}: ${valid.citation} ✓`);
+					lines.push(`${prefix} Line ${valid.line}: ${valid.citation}`);
 				});
 			lines.push("");
 		}
@@ -181,14 +181,14 @@ class CitationManager {
 
 		if (result.summary.errors > 0) {
 			lines.push(
-				`❌ VALIDATION FAILED - Fix ${result.summary.errors} critical errors`,
+				`VALIDATION FAILED - Fix ${result.summary.errors} critical errors`,
 			);
 		} else if (result.summary.warnings > 0) {
 			lines.push(
-				`⚠️  VALIDATION PASSED WITH WARNINGS - ${result.summary.warnings} issues to review`,
+				`VALIDATION PASSED WITH WARNINGS - ${result.summary.warnings} issues to review`,
 			);
 		} else {
-			lines.push("✅ ALL CITATIONS VALID");
+			lines.push("ALL CITATIONS VALID");
 		}
 
 		return lines.join("\n");
@@ -248,10 +248,10 @@ class CitationManager {
 			if (options.scope) {
 				const cacheStats = this.fileCache.buildCache(options.scope);
 				console.log(
-					`📁 Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
+					`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 				);
 				if (cacheStats.duplicates > 0) {
-					console.log(`⚠️  Found ${cacheStats.duplicates} duplicate filenames`);
+					console.log(`WARNING: Found ${cacheStats.duplicates} duplicate filenames`);
 				}
 			}
 
@@ -269,7 +269,7 @@ class CitationManager {
 			);
 
 			if (fixableResults.length === 0) {
-				return `✅ No auto-fixable citations found in ${filePath}`;
+				return `No auto-fixable citations found in ${filePath}`;
 			}
 
 			// Read the file content
@@ -325,7 +325,7 @@ class CitationManager {
 
 				// Enhanced reporting with breakdown
 				const output = [
-					`✅ Fixed ${fixesApplied} citation${fixesApplied === 1 ? "" : "s"} in ${filePath}:`,
+					`Fixed ${fixesApplied} citation${fixesApplied === 1 ? "" : "s"} in ${filePath}:`,
 				];
 
 				if (pathFixesApplied > 0) {
@@ -350,10 +350,10 @@ class CitationManager {
 
 				return output.join("\n");
 			} else {
-				return `⚠️  Found ${fixableResults.length} fixable citations but could not apply fixes`;
+				return `WARNING: Found ${fixableResults.length} fixable citations but could not apply fixes`;
 			}
 		} catch (error) {
-			return `❌ ERROR: ${error.message}`;
+			return `ERROR: ${error.message}`;
 		}
 	}
 
@@ -473,7 +473,7 @@ program
 					process.exit(parsed.summary?.errors > 0 ? 1 : 0);
 				}
 			} else {
-				if (result.includes("❌ ERROR:")) {
+				if (result.includes("ERROR:")) {
 					process.exit(2); // File not found or other errors
 				} else {
 					process.exit(result.includes("VALIDATION FAILED") ? 1 : 0);
@@ -519,7 +519,7 @@ program
 				);
 			}
 		} catch (error) {
-			console.error(`❌ ERROR: ${error.message}`);
+			console.error(`ERROR: ${error.message}`);
 			process.exit(1);
 		}
 	});

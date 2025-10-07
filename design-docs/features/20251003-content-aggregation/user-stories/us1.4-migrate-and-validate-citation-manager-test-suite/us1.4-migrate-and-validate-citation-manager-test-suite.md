@@ -1,4 +1,4 @@
-# Story 1.4: Migrate and Validate `citation-manager` Test Suite
+# Story 1.4: Migrate and Validate `citation-manager` Test Suite - DONE
 
 > [!attention] **AI Story Shell Template Instructions**
 > **CRITICAL**: This template is for Phase 1 - Story creation without task information
@@ -24,18 +24,18 @@
 > Update this section as you complete each step of Phase 1 story creation.
 
 - [x] **Step 1**: **CRITICAL** Gather all required files
-	- [x] Requirements document that contains epics and user stories (cc-workflows-workspace-prd.md)
-	- [x] Requirements architecture document (cc-workflows-workspace-architecture.md)
-	- [x] Citation guidelines document (from claude-code-knowledgebase)
+ 	- [x] Requirements document that contains epics and user stories (cc-workflows-workspace-prd.md)
+ 	- [x] Requirements architecture document (cc-workflows-workspace-architecture.md)
+ 	- [x] Citation guidelines document (from claude-code-knowledgebase)
 - [x] **Step 2**: Extract story definition and acceptance criteria from PRD
 - [ ] **Step 3**: Populate architectural context (Dev Notes)
-	- [ ] Architectural Context (C4)
-	- [ ] Technical Details
-	- [ ] Design Principles Adherence
-	- [ ] Previous Story Insights
+ 	- [ ] Architectural Context (C4)
+ 	- [ ] Technical Details
+ 	- [ ] Design Principles Adherence
+ 	- [ ] Previous Story Insights
 - [ ] **Step 4**: Define testing requirements
-	- [ ] Test Framework and Strategy
-	- [ ] Required Test Implementation
+ 	- [ ] Test Framework and Strategy
+ 	- [ ] Required Test Implementation
 - [ ] **Step 5**: Validate all citations using citation manager
 
 ## Status

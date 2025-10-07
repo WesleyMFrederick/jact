@@ -71,6 +71,7 @@ This feature directly supports the CC Workflows vision by:
 ### Non-Functional Requirements
 - **NFR3: Reliability:** The citation-manager SHALL include unit tests that achieve at least 50% code coverage on new functionality. ^NFR3
 - **NFR4: Design Adherence:** Implementation SHALL adhere to the workspace's MVB design principles and testing strategy. ^NFR4
+- **NFR5: Performance:** The system SHALL parse each unique file at most once per command execution to minimize redundant I/O and processing time. ^NFR5
 
 ## Technical Considerations
 
@@ -151,12 +152,40 @@ _User Story Link:_ [us1.4a-migrate-test-suite-to-vitest](user-stories/us1.4a-mig
 5. The test suite SHALL include component integration tests that validate collaboration between CitationValidator, MarkdownParser, and FileCache using real file system operations per workspace "Real Systems, Fake Fixtures" principle. ^US1-4bAC5
 6. WHEN DI refactoring completes and all tests pass, THEN the technical debt "Lack of Dependency Injection" documented in content-aggregation-architecture.md SHALL be marked as resolved. ^US1-4bAC6
 
-_Depends On_: Story 1.4a
-_Enables_: Story 2.1 (Epic 2 feature work)
+_Depends On_: Story [Story 1.4a: Migrate citation-manager Test Suite to Vitest](#Story%201.4a%20Migrate%20citation-manager%20Test%20Suite%20to%20Vitest)
+_Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#Story%202.1%20Enhance%20Parser%20to%20Handle%20Full-File%20and%20Section%20Links)
 _Closes Technical Debt_: [Lack of Dependency Injection](content-aggregation-architecture.md#Lack%20of%20Dependency%20Injection)
 _Functional Requirements_: [[#^FR2|FR2]], [[#^FR8|FR8]]
 _User Story Link:_ [us1.4b-refactor-components-for-di](user-stories/us1.4b-refactor-components-for-di/us1.4b-refactor-components-for-di.md)
 
+---
+### Story 1.5: Implement a Cache for Parsed File Objects
+
+**As a** `citation-manager` tool,
+**I want** to implement a caching layer that stores parsed file objects (the `Parser Output Contract`) in memory during a single command run,
+**so that** I can eliminate redundant file read operations, improve performance, and provide an efficient foundation for new features like content extraction.
+
+#### Story 1.5 Acceptance Criteria
+
+1. GIVEN a file has already been parsed during a command's execution, WHEN a subsequent request is made for its parsed data, THEN the system SHALL return the `Parser Output Contract` object from the in-memory cache instead of re-reading the file from disk. ^US1-5AC1
+2. GIVEN a file has not yet been parsed, WHEN a request is made for its parsed data, THEN the system SHALL parse the file from disk, store the resulting `Parser Output Contract` object in the cache, and then return it. ^US1-5AC2
+3. The `CitationValidator` component SHALL be refactored to use this caching layer for all file parsing operations. ^US1-5AC3
+4. WHEN validating a document that contains multiple links to the same target file, THEN the target file SHALL only be read from disk and parsed once per command execution. ^US1-5AC4
+5. GIVEN the new caching layer is implemented, WHEN the full test suite is executed, THEN all existing tests SHALL pass, confirming zero functional regressions. ^US1-5AC5
+
+_Depends On_: [Story 1.4b: Refactor citation-manager Components for Dependency Injection](#Story%201.4b%20Refactor%20citation-manager%20Components%20for%20Dependency%20Injection)
+_Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#Story%202.1%20Enhance%20Parser%20to%20Handle%20Full-File%20and%20Section%20Links)
+_Closes Technical Debt_: [Redundant File Parsing During Validation](content-aggregation-architecture.md#Redundant%20File%20Parsing%20During%20Validation)
+_Functional Requirements_: [[#^FR8|FR8]]
+_Non-Functional Requirements_: [[#^NFR5|NFR5]]
+_User Story Link:_ [To Be Populated]
+
+> [!warning] **Technical Lead Feedback**: Caching Layer for Performance and Modularity
+> _Architecture Impact_: The primary architectural impact of `us1.5` is the introduction of a new **caching component** that will sit between the `CitationValidator` and the `MarkdownParser`. This directly impacts the **`CitationValidator`**, which must be refactored to request parsed files from this new cache instead of calling the parser directly. The **`CLI Orchestrator`** (and its associated factory) is also impacted, as it will now be responsible for instantiating the new cache and injecting it into the validator. This change introduces a new public contract for the caching component itself. The input contract for the **`CitationValidator`** will change to accept the cache as a dependency, while the existing **`Parser Output Contract`** will remain completely unchanged.
+> _Relevant Architecture Principles_:
+> - [Dependency Abstraction](../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction): The `CitationValidator` will no longer depend on the concrete `MarkdownParser`. Instead, it will depend on an abstract caching interface to get its data.
+> - [Single Responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility): This change improves the design by giving the new cache a single, clear responsibility: managing efficient access to parsed file objects. This allows the `CitationValidator` to focus purely on validation logic
+> - [One Source of Truth](../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth): During a single command run, the cache becomes the single source of truth for a given file's parsed object. This prevents redundant work and ensures all components are working with the exact same parsed data.
 ---
 
 ### Story 2.1: Enhance Parser to Handle Full-File and Section Links

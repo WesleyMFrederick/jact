@@ -20,7 +20,7 @@ describe("Citation Manager Integration Tests", () => {
 				},
 			);
 
-			expect(output).toContain("✅ ALL CITATIONS VALID");
+			expect(output).toContain("ALL CITATIONS VALID");
 			expect(output).toContain("Total citations:");
 			expect(output).toContain("Validation time:");
 		} catch (error) {
@@ -41,7 +41,7 @@ describe("Citation Manager Integration Tests", () => {
 			expect.fail("Should have failed validation for broken links");
 		} catch (error) {
 			const output = error.stdout || "";
-			expect(output).toContain("❌ VALIDATION FAILED");
+			expect(output).toContain("VALIDATION FAILED");
 			expect(output).toContain("CRITICAL ERRORS");
 			expect(output).toContain("File not found");
 		}
@@ -139,14 +139,14 @@ describe("Citation Manager Integration Tests", () => {
 				},
 			);
 
-			expect(output).toContain("📁 Scanned");
+			expect(output).toContain("Scanned");
 			expect(output).toContain("files in");
 			// The broken path ../missing/test-target.md should be resolved to test-target.md via cache
 			expect(output).toContain("test-target.md");
 		} catch (error) {
 			const output = error.stdout || "";
 			// Even if validation fails due to other issues, scope should work
-			expect(output).toContain("📁 Scanned");
+			expect(output).toContain("Scanned");
 		}
 	});
 
@@ -306,13 +306,12 @@ describe("Citation Manager Integration Tests", () => {
 			);
 
 			// Should validate the URL-encoded path successfully
-			expect(output).toContain("✅ VALID CITATIONS");
+			expect(output).toContain("VALID CITATIONS");
 			expect(output).toContain("test%20file%20with%20spaces.md");
 		} catch (error) {
 			// Even if some citations fail, URL decoding should work for the space-encoded file
 			const output = error.stdout || "";
 			expect(output).toContain("test%20file%20with%20spaces.md");
-			expect(output).toContain("✓");
 		} finally {
 			// Cleanup
 			try {
