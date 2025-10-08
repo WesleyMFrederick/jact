@@ -77,14 +77,7 @@ export class FileCache {
 		};
 	}
 
-	/**
-	 * Recursively scan directory for markdown files
-	 *
-	 * Handles permission errors gracefully by skipping unreadable directories.
-	 * Only caches files ending with .md extension.
-	 *
-	 * @param {string} dirPath - Absolute path to directory to scan
-	 */
+	// Recursively scan directory for markdown files
 	scanDirectory(dirPath) {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
@@ -109,15 +102,7 @@ export class FileCache {
 		}
 	}
 
-	/**
-	 * Add file to cache or mark as duplicate
-	 *
-	 * If filename already exists in cache, marks it as duplicate (will reject resolution).
-	 * This prevents ambiguous file references when multiple files share the same name.
-	 *
-	 * @param {string} filename - Filename (not full path)
-	 * @param {string} fullPath - Absolute path to file
-	 */
+	// Add file to cache or mark as duplicate if filename already exists
 	addToCache(filename, fullPath) {
 		if (this.cache.has(filename)) {
 			// Mark as duplicate
@@ -288,14 +273,7 @@ export class FileCache {
 		return null;
 	}
 
-	/**
-	 * Get all cached files with duplicate status
-	 *
-	 * Useful for debugging or displaying cache contents. Returns all files
-	 * in cache with their absolute paths and duplicate flags.
-	 *
-	 * @returns {Array<Object>} Array of { filename, path, isDuplicate } objects
-	 */
+	// Get all cached files with duplicate status
 	getAllFiles() {
 		return Array.from(this.cache.entries()).map(([filename, path]) => ({
 			filename,
@@ -304,14 +282,7 @@ export class FileCache {
 		}));
 	}
 
-	/**
-	 * Get cache statistics
-	 *
-	 * Returns summary of cache state including total file count and duplicate information.
-	 * Useful for validation reports and debugging cache behavior.
-	 *
-	 * @returns {Object} Statistics with { totalFiles, duplicateCount, duplicates: string[] }
-	 */
+	// Get cache statistics (total files, duplicates)
 	getCacheStats() {
 		return {
 			totalFiles: this.cache.size,

@@ -356,15 +356,7 @@ export class MarkdownParser {
 		return links;
 	}
 
-	/**
-	 * Determine anchor type from anchor string
-	 *
-	 * Classifies anchors as either "block" (Obsidian block references starting with ^)
-	 * or "header" (standard heading anchors). Used for proper validation routing.
-	 *
-	 * @param {string} anchorString - Anchor text (may include ^ prefix)
-	 * @returns {string|null} "block", "header", or null if no anchor
-	 */
+	// Classify anchor as "block" (^prefix) or "header"
 	determineAnchorType(anchorString) {
 		if (!anchorString) return null;
 
@@ -380,17 +372,7 @@ export class MarkdownParser {
 		return "header";
 	}
 
-	/**
-	 * Resolve relative file paths to absolute paths
-	 *
-	 * Converts relative paths to absolute using source file's directory as base.
-	 * Returns null if path or source is missing. Handles already-absolute paths
-	 * by returning them unchanged.
-	 *
-	 * @param {string} rawPath - Raw path from link (relative or absolute)
-	 * @param {string} sourceAbsolutePath - Absolute path to source file
-	 * @returns {string|null} Absolute path or null
-	 */
+	// Resolve relative paths to absolute using source file's directory
 	resolvePath(rawPath, sourceAbsolutePath) {
 		if (!rawPath || !sourceAbsolutePath) return null;
 
@@ -561,16 +543,7 @@ export class MarkdownParser {
 		return anchors;
 	}
 
-	/**
-	 * Check if text contains markdown formatting
-	 *
-	 * Detects common markdown patterns that affect anchor generation:
-	 * backticks, bold, italic, highlights, and links. Used to determine
-	 * if header text needs special handling for anchor creation.
-	 *
-	 * @param {string} text - Text to check for markdown syntax
-	 * @returns {boolean} True if markdown formatting detected
-	 */
+	// Check if text contains markdown formatting (backticks, bold, italic, etc.)
 	containsMarkdown(text) {
 		// Check for common markdown patterns that would affect anchor generation
 		const markdownPatterns = [
@@ -584,16 +557,7 @@ export class MarkdownParser {
 		return markdownPatterns.some((pattern) => pattern.test(text));
 	}
 
-	/**
-	 * Convert text to kebab-case format
-	 *
-	 * Transforms text to lowercase with hyphens replacing spaces and special
-	 * characters removed. Used for auto-generating header anchors in GitHub/GitLab
-	 * markdown style.
-	 *
-	 * @param {string} text - Text to convert (e.g., "Project Architecture")
-	 * @returns {string} Kebab-case string (e.g., "project-architecture")
-	 */
+	// Convert text to kebab-case (e.g., "Project Architecture" → "project-architecture")
 	toKebabCase(text) {
 		return text
 			.toLowerCase()

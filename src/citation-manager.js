@@ -155,14 +155,7 @@ class CitationManager {
 		};
 	}
 
-	/**
-	 * Parse line range string to start and end line numbers
-	 *
-	 * Supports single line ("157") or range ("150-160") formats.
-	 *
-	 * @param {string} lineRange - Line range string
-	 * @returns {Object} Parsed range with { startLine, endLine }
-	 */
+	// Parse line range string (e.g., "150-160" or "157")
 	parseLineRange(lineRange) {
 		if (lineRange.includes("-")) {
 			const [start, end] = lineRange
@@ -269,12 +262,7 @@ class CitationManager {
 		return lines.join("\n");
 	}
 
-	/**
-	 * Format validation results as JSON
-	 *
-	 * @param {Object} result - Validation result object
-	 * @returns {string} JSON string with 2-space indentation
-	 */
+	// Format validation results as JSON
 	formatAsJSON(result) {
 		return JSON.stringify(result, null, 2);
 	}
@@ -469,13 +457,7 @@ class CitationManager {
 		}
 	}
 
-	/**
-	 * Apply path conversion suggestion to citation
-	 *
-	 * @param {string} citation - Original citation text
-	 * @param {Object} pathConversion - Conversion with { original, recommended }
-	 * @returns {string} Citation with corrected path
-	 */
+	// Apply path conversion to citation
 	applyPathConversion(citation, pathConversion) {
 		return citation.replace(
 			pathConversion.original,
@@ -500,14 +482,7 @@ class CitationManager {
 		}));
 	}
 
-	/**
-	 * Normalize anchor for fuzzy matching
-	 *
-	 * Converts "#kebab-case-format" to "kebab case format" for comparison.
-	 *
-	 * @param {string} anchor - Anchor string (may include # prefix)
-	 * @returns {string} Normalized lowercase string with spaces
-	 */
+	// Normalize anchor for fuzzy matching (removes # and hyphens)
 	normalizeAnchorForMatching(anchor) {
 		return anchor.replace("#", "").replace(/-/g, " ").toLowerCase();
 	}
@@ -532,14 +507,7 @@ class CitationManager {
 		);
 	}
 
-	/**
-	 * URL-encode anchor text for Obsidian compatibility
-	 *
-	 * Encodes spaces as %20 and periods as %2E for proper anchor linking.
-	 *
-	 * @param {string} headerText - Header text to encode
-	 * @returns {string} URL-encoded anchor text
-	 */
+	// URL-encode anchor text (spaces to %20, periods to %2E)
 	urlEncodeAnchor(headerText) {
 		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
 	}

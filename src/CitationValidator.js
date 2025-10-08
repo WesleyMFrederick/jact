@@ -66,15 +66,7 @@ export class CitationValidator {
 		};
 	}
 
-	/**
-	 * Safely resolve symlinks to real paths
-	 *
-	 * Attempts to resolve symlinks using realpathSync. Returns original path
-	 * if resolution fails (e.g., path doesn't exist or permission denied).
-	 *
-	 * @param {string} path - Path to resolve (may be symlink)
-	 * @returns {string} Real path or original path if resolution fails
-	 */
+	// Safely resolve symlinks to real paths, returning original path if resolution fails
 	safeRealpathSync(path) {
 		try {
 			return realpathSync(path);
@@ -83,12 +75,7 @@ export class CitationValidator {
 		}
 	}
 
-	/**
-	 * Check if path exists and is a file
-	 *
-	 * @param {string} path - Path to check
-	 * @returns {boolean} True if path exists and is a file
-	 */
+	// Check if path exists and is a file
 	isFile(path) {
 		try {
 			return existsSync(path) && statSync(path).isFile();
@@ -97,16 +84,7 @@ export class CitationValidator {
 		}
 	}
 
-	/**
-	 * Detect Obsidian absolute path format
-	 *
-	 * Obsidian uses vault-relative paths that look like absolute paths but aren't
-	 * filesystem absolute (e.g., "0_SoftwareDevelopment/file.md"). These need
-	 * special handling to resolve correctly.
-	 *
-	 * @param {string} path - Path to check
-	 * @returns {boolean} True if path matches Obsidian absolute format
-	 */
+	// Detect Obsidian absolute path format (e.g., "0_SoftwareDevelopment/file.md")
 	isObsidianAbsolutePath(path) {
 		// Detect Obsidian absolute paths like "0_SoftwareDevelopment/..."
 		return /^[A-Za-z0-9_-]+\//.test(path) && !isAbsolute(path);
@@ -806,15 +784,7 @@ export class CitationValidator {
 		return { found: false };
 	}
 
-	/**
-	 * Clean markdown formatting for anchor comparison
-	 *
-	 * Removes markdown syntax (backticks, bold, italic, highlights, links) to enable
-	 * matching when header contains formatting that affects anchor generation.
-	 *
-	 * @param {string} text - Text with markdown formatting
-	 * @returns {string} Cleaned text without markdown syntax
-	 */
+	// Remove markdown syntax for anchor comparison
 	cleanMarkdownForComparison(text) {
 		if (!text) return "";
 		return text
@@ -886,13 +856,7 @@ export class CitationValidator {
 			.slice(0, 5);
 	}
 
-	/**
-	 * Check if the source file and target file are in the same directory.
-	 * Used to detect cross-directory resolutions that should trigger warnings.
-	 * @param {string} sourceFile - The source file path
-	 * @param {string} targetFile - The target file path
-	 * @returns {boolean} True if files are in the same directory, false otherwise
-	 */
+	// Check if source and target files are in the same directory
 	isDirectoryMatch(sourceFile, targetFile) {
 		const { dirname } = require("node:path");
 		const sourceDir = dirname(sourceFile);
@@ -900,12 +864,7 @@ export class CitationValidator {
 		return sourceDir === targetDir;
 	}
 
-	/**
-	 * Calculate relative path from source file to target file
-	 * @param {string} sourceFile - Path to the source file
-	 * @param {string} targetFile - Path to the target file
-	 * @returns {string} Relative path with normalized forward slashes
-	 */
+	// Calculate relative path from source to target file
 	calculateRelativePath(sourceFile, targetFile) {
 		const sourceDir = dirname(sourceFile);
 		const relativePath = relative(sourceDir, targetFile);
