@@ -6,7 +6,7 @@ This guide provides the Level 4 (Code) details for implementing the **`ParsedFil
 Components like the `CitationValidator` and the upcoming `ContentExtractor` need access to the parsed structure of multiple files during a single operation. Without a caching mechanism, the same file could be read from disk and parsed by the `MarkdownParser` repeatedly, leading to significant and unnecessary I/O and CPU overhead, creating a severe performance bottleneck.
 
 ## Solution
-The **`ParsedFileCache`** component acts as an in-memory, per-run singleton that serves as a broker for parsed file data. This component implements the **Read-Through Cache** pattern. It intercepts all requests for a [**`Parser Output Contract`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts), calling the `MarkdownParser` only on the first request for a given file and storing the result. Subsequent requests for the same file are served directly from the cache, ensuring that each file is parsed at most once per command execution. This drastically improves performance and reduces redundant work.
+The **`ParsedFileCache`** component acts as an in-memory, per-run singleton that serves as a broker for parsed file data. This component implements the **Read-Through Cache** pattern. It intercepts all requests for a [**`MarkdownParser.Output.DataContract`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts), calling the `MarkdownParser` only on the first request for a given file and storing the result. Subsequent requests for the same file are served directly from the cache, ensuring that each file is parsed at most once per command execution. This drastically improves performance and reduces redundant work.
 
 ### Caching Technology
 We'll use the native JavaScript **`Map`** object. A `Map` is a simple, high-performance, in-memory key-value store that's built into Node.js. It's perfectly suited for our needs and requires no external dependencies, which aligns with our [Simplicity First](../../../../design-docs/Architecture%20Principles.md#^simplicity-first) principle.
@@ -14,7 +14,7 @@ We'll use the native JavaScript **`Map`** object. A `Map` is a simple, high-perf
 ### Key-Value Structure
 The key-value structure for the cache will be:
 - **Key**: The **absolute, normalized file path** (string) of the document. This ensures that different relative paths pointing to the same file are treated as a single cache entry.
-- **Value**: The **`Promise`** that resolves with the **`Parser Output Contract`** for that file. We store the `Promise` itself—not the final object—to efficiently handle concurrent requests. If multiple parts of the application ask for the same file at the same time, they all receive the same pending `Promise`, ensuring the file is still only parsed once.
+- **Value**: The **`Promise`** that resolves with the **`MarkdownParser.Output.DataContract`** for that file. We store the `Promise` itself—not the final object—to efficiently handle concurrent requests. If multiple parts of the application ask for the same file at the same time, they all receive the same pending `Promise`, ensuring the file is still only parsed once.
 
 ## Memory Management
 No, we do not need to worry about manual memory cleanup. Because the cache is **ephemeral** (living only for the duration of a single command run), all memory it uses is part of the Node.js process. When the command finishes and the process exits, the operating system will automatically reclaim all of its memory. There's no risk of memory leaks between command executions.
@@ -41,7 +41,7 @@ classDiagram
     }
     
     class CitationValidator {
-        +validateFile(filePath: string): Promise~ValidationResult~
+        +validateFile(filePath: string): Promise~CitationValidator.ValidationResult.Output.DataContrac~
     }
 
     class ParsedFileCache {
@@ -67,8 +67,8 @@ classDiagram
 1. **`filePath`** (string): The absolute, normalized path to the markdown file to be retrieved.
 
 ### Output Contract
-The `resolveParsedFile()` method returns a `Promise` that resolves with the **[`Parser Output Contract`](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts)**
-- **Success Case**: The `Promise` resolves with the **[`Parser Output Contract`](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts)** object
+The `resolveParsedFile()` method returns a `Promise` that resolves with the **[`MarkdownParser.Output.DataContract`](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts)**
+- **Success Case**: The `Promise` resolves with the **[`MarkdownParser.Output.DataContract`](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts)** object
 - **Error Cases**: The `Promise` will reject with an appropriate error if the underlying call to `markdownParser.parseFile()` fails (e.g., due to a `FileNotFoundError` or a `ParsingError`).
 - **Cache Key**: The cache internally uses absolute, normalized file paths as keys to prevent ambiguity.
 - **Cache Lifecycle**: The cache is ephemeral and persists only for the duration of a single command execution. It is cleared when the process exits.

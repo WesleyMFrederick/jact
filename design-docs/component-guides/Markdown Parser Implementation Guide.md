@@ -8,7 +8,7 @@ Downstream components like the `CitationValidator` and `ContentExtractor` need a
 
 ## Solution
 
-The **`MarkdownParser`** component acts as a specialized transformer. It accepts a file path, reads the document, and applies a series of parsing strategies to produce a single, comprehensive **`Parser Output Contract`** object. This object contains two primary collections: a list of all outgoing **`Link Objects`** and a list of all available **`Anchor Objects`**. By centralizing this parsing logic, the `MarkdownParser` provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
+The **`MarkdownParser`** component acts as a specialized transformer. It accepts a file path, reads the document, and applies a series of parsing strategies to produce a single, comprehensive **`MarkdownParser.Output.DataContract`** object. This object contains two primary collections: a list of all outgoing **`Link Objects`** and a list of all available **`Anchor Objects`**. By centralizing this parsing logic, the `MarkdownParser` provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
 
 ## Structure
 
@@ -64,7 +64,7 @@ classDiagram
 1. [**ParserOutputContract**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
 2. [**Link Object**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing an outgoing link.
 3. [**Anchor Object**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing a potential link target.
-4. [**MarkdownParser**](Markdown%20Parser%20Implementation%20Guide.md): The class that orchestrates the parsing process.
+4. **MarkdownParser**: The class that orchestrates the parsing process. The guide you are reading. The guide you are reading.
 
 ## Public Contracts
 
@@ -75,7 +75,11 @@ The component's contract requires the following inputs for operation:
 2. An optional **`FileCache` interface**, provided at instantiation, to be used for short filename resolution.
 3. A **`filePath`** (string), provided to the public `parseFile()` method.
 ### Output Contract
-The `parseFile()` method returns a `Promise` that resolves with the **`Parser Output Contract`**. This object represents the full structural composition of the document and is the component's sole output. Its detailed schema is defined in the `Data Contracts` section below.
+1. The `parseFile()` method returns a `Promise` that resolves with the **`MarkdownParser.Output.DataContract`**. This object represents the full structural composition of the document and is the component's sole output. Its detailed schema is defined in the [`Data Contracts`](#Data%20Contracts) section below.
+## Files
+
+- **Source**: [`tools/citation-manager/src/MarkdownParser.js`](../../src/MarkdownParser.js)
+- **Tests**: [`tools/citation-manager/test/parser-output-contract.test.js`](../../test/parser-output-contract.test.js)
 
 ## Pseudocode
 This pseudocode follows the **MEDIUM-IMPLEMENTATION** abstraction level, showing the core logic and integration points required for implementation.
@@ -160,9 +164,12 @@ class MarkdownParser is
     foreach (line in lines with index) do
       // Pattern: Apply regex for header anchors: ## Header Text
       if (line matches headerPattern) then
+        // US1.6: Create single anchor with both raw and URL-encoded IDs
+        field urlEncodedId = line.text.replace(/:/g, "").replace(/\s+/g, "%20")
         anchors.add(new Anchor({
           anchorType: "header",
-          id: this.createHeaderId(line.text), // e.g., "Header%20Text"
+          id: line.text,              // Raw text: "Story 1.5: Implement Cache"
+          urlEncodedId: urlEncodedId, // Always populated: "Story%201.5%20Implement%20Cache"
           rawText: line.text,
           fullMatch: line.raw,
           // ... populate line, column ...
@@ -183,13 +190,16 @@ class MarkdownParser is
 
 ## Data Contracts
 
-The component's output is strictly defined by the **`Parser Output Contract`** JSON Schema. This is the definitive structure that all consuming components can rely on.
+The component's output is strictly defined by the **`MarkdownParser.Output.DataContract`** JSON Schema. This is the definitive structure that all consuming components can rely on.
+
+> [!danger] Technical Lead Note:
+> - The `.headings[]` array is not used by any other source code. It is referenced in test code. It could be used to create an AST of the document.
 
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc-workflows.com/parser-output.schema.json",
-  "title": "Parser Output Contract",
+  "title": "MarkdownParser.Output.DataContract",
   "description": "The complete output from the MarkdownParser's parseFile() method, containing all structural information about a markdown document.",
   "type": "object",
   "properties": {
@@ -212,7 +222,7 @@ The component's output is strictly defined by the **`Parser Output Contract`** J
       "items": { "$ref": "#/$defs/linkObject" }
     },
     "headings": {
-      "description": "An array of all headings extracted from the document structure.",
+      "description": "An array of all headings extracted from the document structure. Could later be used to generate an artifical AST.",
       "type": "array",
       "items": { "$ref": "#/$defs/headingObject" }
     },
@@ -253,16 +263,24 @@ The component's output is strictly defined by the **`Parser Output Contract`** J
     },
     "anchorObject": {
       "title": "Anchor Object",
+      "description": "Represents an anchor (link target) in the document. Header anchors include both raw and URL-encoded ID variants per US1.6. Block anchors omit urlEncodedId.",
       "type": "object",
       "properties": {
         "anchorType": { "type": "string", "enum": [ "header", "block" ] },
-        "id": { "type": "string" },
-        "rawText": { "type": ["string", "null"] },
+        "id": { "type": "string", "description": "Raw text format for headers (e.g., 'Story 1.5: Implement Cache'), or block ID for block anchors (e.g., 'FR1')" },
+        "urlEncodedId": { "type": "string", "description": "Obsidian-compatible URL-encoded format (e.g., 'Story%201.5%20Implement%20Cache'). Always populated for header anchors (even when identical to id), omitted for block anchors." },
+        "rawText": { "type": ["string", "null"], "description": "Original heading text for headers, null for block anchors" },
         "fullMatch": { "type": "string" },
         "line": { "type": "integer", "minimum": 1 },
         "column": { "type": "integer", "minimum": 1 }
       },
-      "required": [ "anchorType", "id", "rawText", "fullMatch", "line", "column" ]
+      "required": [ "anchorType", "id", "rawText", "fullMatch", "line", "column" ],
+      "allOf": [
+        {
+          "if": { "properties": { "anchorType": { "const": "header" } } },
+          "then": { "required": [ "urlEncodedId" ] }
+        }
+      ]
     }
   }
 }
@@ -348,7 +366,8 @@ The component's output is strictly defined by the **`Parser Output Contract`** J
   "anchors": [
     {
       "anchorType": "header",
-      "id": "Caret%20References",
+      "id": "Caret References",
+      "urlEncodedId": "Caret%20References",
       "rawText": "Caret References",
       "fullMatch": "## Caret References",
       "line": 26,
@@ -365,6 +384,7 @@ The component's output is strictly defined by the **`Parser Output Contract`** J
     {
       "anchorType": "header",
       "id": "auth-service",
+      "urlEncodedId": "auth-service",
       "rawText": "Auth Service",
       "fullMatch": "### Auth Service {#auth-service}",
       "line": 32,
@@ -376,7 +396,7 @@ The component's output is strictly defined by the **`Parser Output Contract`** J
 
 ## Testing Strategy
 
-Tests for the `MarkdownParser` should validate its ability to correctly transform markdown into the `Parser Output Contract`.
+Tests for the `MarkdownParser` should validate its ability to correctly transform markdown into the `MarkdownParser.Output.DataContract`.
 
 ```tsx
 // Test pattern: BDD-style behavioral validation.
@@ -417,3 +437,616 @@ class MarkdownParserTests is
    //
    // Validation: Create a test fixture for each scenario and assert the values of all four path fields in the resulting Link Object.
 ```
+
+---
+
+## Whiteboard
+
+### MarkdownParser.Output.DataContract: How Tokens, Links, and Anchors Are Populated
+
+**Key Question**: How does the MarkdownParser.Output.DataContract get its data? Which code is responsible for each array?
+
+**Answer**: MarkdownParser uses a **two-layer parsing approach** - standard markdown parsing via marked.js, plus custom regex extraction for Obsidian-specific syntax.
+
+#### Layer 1: Standard Markdown Parsing (marked.js)
+
+**Code Location**: `MarkdownParser.parseFile()` lines 23-36
+
+```javascript
+async parseFile(filePath) {
+  this.currentSourcePath = filePath;
+  const content = this.fs.readFileSync(filePath, "utf8");
+  const tokens = marked.lexer(content);  // ← marked.js creates tokens array
+
+  return {
+    filePath,
+    content,
+    tokens,        // ← From marked.js (standard markdown AST)
+    links: this.extractLinks(content),     // ← Custom extraction (see Layer 2)
+    headings: this.extractHeadings(tokens), // ← Walks tokens array
+    anchors: this.extractAnchors(content)  // ← Custom extraction (see Layer 2)
+  };
+}
+```
+
+**What `marked.lexer(content)` creates**:
+- Hierarchical token tree for standard markdown elements
+- Token types: `heading`, `paragraph`, `list`, `list_item`, `blockquote`, `code`, etc.
+- Each token has: `type`, `raw`, `text`, and often nested `tokens` array
+- **Does NOT parse** Obsidian-specific syntax like `^anchor-id` or `[[wikilinks]]`
+
+**Tokens used by**:
+- `extractHeadings()` - Walks tokens recursively to extract heading metadata
+- Epic 2 Section Extraction POC - Walks tokens to find section boundaries
+- Future ContentExtractor component
+
+#### Layer 2: Custom Regex Parsing (Obsidian Extensions)
+
+##### Links Array Population
+
+**Code Location**: `extractLinks(content)` lines 38-291
+
+**Method**: Line-by-line regex parsing on raw content string
+
+**Link patterns extracted**:
+1. **Cross-document markdown links**: `[text](file.md#anchor)` (line 45)
+2. **Citation format**: `[cite: path]` (line 87)
+3. **Relative path links**: `[text](path/to/file#anchor)` (line 128)
+4. **Wiki-style cross-document**: `[[file.md#anchor|text]]` (line 177)
+5. **Wiki-style internal**: `[[#anchor|text]]` (line 219)
+6. **Caret syntax references**: `^anchor-id` (line 255)
+
+**Output**: LinkObject schema with:
+
+```javascript
+{
+  linkType: "markdown" | "wiki",
+  scope: "cross-document" | "internal",
+  anchorType: "header" | "block" | null,
+  source: { path: { absolute } },
+  target: {
+    path: { raw, absolute, relative },
+    anchor: string | null
+  },
+  text: string,
+  fullMatch: string,
+  line: number,
+  column: number
+}
+```
+
+##### Anchors Array Population
+
+**Code Location**: `extractAnchors(content)` lines 345-450
+
+**Method**: Line-by-line regex parsing on raw content string
+
+**Anchor patterns extracted**:
+
+1. **Obsidian block references** (lines 350-363):
+   - Pattern: `^anchor-id` at END of line
+   - Example: `Some content ^my-anchor`
+   - Regex: `/\^([a-zA-Z0-9\-_]+)$/`
+
+2. **Caret syntax** (lines 365-382):
+   - Pattern: `^anchor-id` anywhere in line (legacy)
+   - Regex: `/\^([A-Za-z0-9-]+)/g`
+
+3. **Emphasis-marked anchors** (lines 384-397):
+   - Pattern: `==**text**==`
+   - Creates anchor with ID `==**text**==`
+   - Regex: `/==\*\*([^*]+)\*\*==/g`
+
+4. **Header anchors** (lines 399-446):
+   - Pattern: `# Heading` or `# Heading {#custom-id}`
+   - Uses raw heading text as anchor ID
+   - Also creates Obsidian-compatible anchor (removes colons, URL-encodes spaces)
+   - Regex: `/^(#+)\s+(.+)$/`
+
+**Output**: AnchorObject schema with:
+
+```javascript
+{
+  anchorType: "block" | "header",
+  id: string,           // Raw text format (e.g., "Story 1.5: Implement Cache")
+  urlEncodedId: string, // Obsidian-compatible format (e.g., "Story%201.5%20Implement%20Cache")
+                        // Always populated for headers, omitted for blocks (US1.6)
+  rawText: string | null, // Text content (for headers/emphasis)
+  fullMatch: string,    // Full matched pattern
+  line: number,         // 1-based line number
+  column: number        // 0-based column position
+}
+```
+
+#### Why Two Layers?
+
+**marked.js handles**:
+- ✅ Standard markdown syntax (CommonMark spec)
+- ✅ Hierarchical token tree structure
+- ✅ Performance-optimized parsing
+
+**Custom regex handles**:
+- ✅ Obsidian-specific extensions (`^anchor-id`, `[[wikilinks]]`)
+- ✅ Citation manager custom syntax (`[cite: path]`)
+- ✅ Line/column position metadata for error reporting
+- ✅ Path resolution (absolute/relative) via filesystem
+
+#### Epic 2 Content Extraction: Which Layer?
+
+**Section Extraction** (headings):
+- Uses **Layer 1** (tokens array)
+- Algorithm: Walk tokens to find heading, collect tokens until next same-or-higher level
+- POC: `tools/citation-manager/test/poc-section-extraction.test.js`
+
+**Block Extraction** (`^anchor-id`):
+- Uses **Layer 2** (anchors array)
+- Algorithm: Find anchor by ID, use `line` number to extract content from raw string
+- POC: `tools/citation-manager/test/poc-block-extraction.test.js`
+
+**Full File Extraction**:
+- Uses **both layers** (content string + metadata from tokens/anchors)
+- Algorithm: Return entire `content` field with metadata from parser output
+
+#### Viewing MarkdownParser.Output.DataContract
+
+To see the complete JSON structure for any file:
+
+```bash
+npm run citation:ast <file-path> 2>/dev/null | npx @biomejs/biome format --stdin-file-path=output.json
+```
+
+Example output saved at: `tools/citation-manager/design-docs/features/20251003-content-aggregation/prd-parser-output-contract.json`
+
+**Structure**:
+
+```json
+{
+  "filePath": "/absolute/path/to/file.md",
+  "content": "# Full markdown content as string...",
+  "tokens": [
+    {
+      "type": "heading",
+      "depth": 1,
+      "text": "Citation Manager",
+      "raw": "# Citation Manager\n\n",
+      "tokens": [...]
+    },
+    // ... more tokens
+  ],
+  "links": [
+    {
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "anchorType": "header",
+      "source": { "path": { "absolute": "..." } },
+      "target": {
+        "path": { "raw": "guide.md", "absolute": "...", "relative": "..." },
+        "anchor": "Installation"
+      },
+      // ... more fields
+    }
+    // ... more links
+  ],
+  "headings": [
+    { "level": 1, "text": "Citation Manager", "raw": "# Citation Manager\n\n" }
+    // ... more headings
+  ],
+  "anchors": [
+    {
+      "anchorType": "block",
+      "id": "FR2",
+      "rawText": null,
+      "fullMatch": "^FR2",
+      "line": 64,
+      "column": 103
+    },
+    {
+      "anchorType": "header",
+      "id": "Requirements",
+      "rawText": "Requirements",
+      "fullMatch": "## Requirements",
+      "line": 61,
+      "column": 0
+    }
+    // ... more anchors
+  ]
+}
+```
+
+**Research Date**: 2025-10-07
+**POC Validation**: Section extraction (7/7 tests) + Block extraction (9/9 tests) = 100% success rate
+**Epic 2 Readiness**: ContentExtractor implementation can proceed with validated data contracts
+
+## Technical Debt
+
+### Issue 1: Duplicate Parsing - Parse Twice, Use Once
+
+**Current Problem** (extractLinks() lines 104-357):
+- `marked.lexer()` creates tokens with `type: "link"` objects containing `href`, `text`, `raw`
+- Code **ignores** these link tokens and re-parses entire content line-by-line with 6 different regex patterns
+- Result: Parse twice, O(n×patterns) complexity instead of O(n)
+
+**Evidence**:
+
+```javascript
+// Test proves marked.js extracts links:
+const tokens = marked.lexer('[Link text](file.md#anchor)');
+// Returns: { type: "link", href: "file.md#anchor", text: "Link text", raw: "..." }
+```
+
+**Markdownlint Pattern** (verified in /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/markdownlint/lib/md051.mjs):
+
+```javascript
+// Line 113: Filter tokens by type, no regex
+const links = filterByTypesCached([ "link" ])
+  .filter(link => !((link.parent?.type === "atxHeadingText")));
+```
+
+### Issue 2: Header Anchor Redundancy
+
+> [!note] **US1.6 Resolution (2025-10-09)**
+> US1.6 resolved the **duplicate anchor entries** issue - each header now generates a single AnchorObject with both `id` (raw text) and `urlEncodedId` (Obsidian-compatible) properties. See [Story 1.6](../../features/20251003-content-aggregation/content-aggregation-prd.md#Story%201.6%20Refactor%20MarkdownParser.Output.DataContract%20-%20Eliminate%20Duplicate%20Anchor%20Entries).
+>
+> The optimization opportunity below is a **separate issue** about re-parsing headings.
+
+**Remaining Optimization Opportunity** (extractAnchors() lines 494-540):
+- Re-scans content with regex `/^(#+)\s+(.+)$/` to find headings
+- But `extractHeadings(tokens)` already walked tokens and extracted headings at line 81
+- Could derive header anchors from existing `headings` array instead of re-parsing
+
+**Justified Regex** (extractAnchors() lines 446-491):
+- Block anchors (`^block-id`, `==**text**==`) correctly use regex
+- These are Obsidian-specific, not in CommonMark/GFM
+- Neither marked.js nor micromark parse these patterns
+
+### Issue 3: Link Pattern Duplication
+
+**Current Problem** (extractLinks() lines 109-353):
+- 6 link patterns each construct nearly identical link objects (127+ lines each)
+- Massive code duplication for: path resolution, link classification, object construction
+- Only differences: regex pattern and 2-3 classification fields
+
+**Solution**: Link pattern registry with shared factory function
+
+Recommendation: Refine the Hybrid
+
+  The current implementation could be more strategic about which layer handles what:
+
+  | Pattern                             | Current      | Better Approach    | Reasoning                           |
+  |-------------------------------------|--------------|--------------------|-------------------------------------|
+  | Standard markdown links \[text\](url) | Regex        | walkTokens         | Already in AST as type: "link"      |
+  | Headings ## Title                   | walkTokens ✅ | walkTokens ✅       | Structural element                  |
+  | Header anchors                      | Regex        | walkTokens         | Derive from heading tokens          |
+  | Wiki links \[\[page\]\]                 | Regex        | Regex OR extension | Not standard markdown               |
+  | Block refs ^id                      | Regex ✅      | Regex ✅            | Line-specific, EOL position matters |
+  | Citation syntax                     | Regex        | Extension          | Could be formalized                 |
+
+  Concrete Improvement
+
+  Current code extracts standard markdown links with regex:
+  // extractLinks() line 45
+  const markdownLinkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+  But marked.js already parsed these!
+
+  // More efficient: extract from existing tokens
+  function extractLinksFromTokens(tokens) {
+    const links = [];
+    marked.walkTokens(tokens, (token) => {
+      if (token.type === 'link') {
+        links.push({
+          linkType: 'markdown',
+          target: { path: { raw: token.href }, anchor: extractAnchor(token.href) },
+          text: token.text,
+          // ... but line/column are harder to get
+        });
+      }
+    });
+    return links;
+  }
+
+  The line/column problem is the real challenge with pure walkTokens.
+
+  My Recommendation
+
+  Keep the hybrid, but refactor to this principle:
+
+  If marked.js naturally parses it AND you don't need precise line/column → use walkTokensIf it's Obsidian-specific OR needs line/column positions → use regex
+
+---
+
+## Legacy Technical Debt Documentation
+
+### Performance: Double-Parse Anti-Pattern
+
+**Problem**: Current implementation parses content twice with wasted effort.
+
+**Evidence**:
+1. Line 74: `marked.lexer(content)` creates full token tree with structured link tokens
+2. Lines 104-357: `extractLinks()` ignores tokens, re-scans entire content with regex
+3. Lines 439-543: `extractAnchors()` ignores heading tokens, re-scans content with regex
+
+**Proof that marked.js provides link tokens** (validated 2025-10-09):
+
+```javascript
+marked.lexer('[Link text](file.md#anchor)') produces:
+{
+  type: "link",
+  href: "file.md#anchor",    // ← Full path + anchor already parsed
+  text: "Link text",          // ← Display text
+  raw: "[Link text](file.md#anchor)"
+}
+```
+
+**Current cost**:
+- Parse markdown: O(n) via marked.lexer
+- Re-parse with 6 regex patterns: O(n×6) line-by-line scans
+- Total: ~7× parsing overhead for standard markdown links
+
+**Industry pattern (markdownlint MD051)**:
+
+```javascript
+// Extract links by filtering tokens, not regex
+const links = filterByTypesCached(["link"])
+for (const link of links) {
+  const href = filterByTypes(link.children, ["resourceDestinationString"])
+  // Line/column already in token: link.startLine, link.startColumn
+}
+```
+
+**Recommendation**: Refactor to token-first extraction:
+- Extract standard markdown links from `marked.lexer()` tokens (eliminates 4/6 regex patterns)
+- Keep regex ONLY for Obsidian-specific syntax (`^anchor`, `[[wikilinks]]`) not in CommonMark
+- Header anchors should derive from existing heading tokens, not re-parse
+
+### Code Duplication: Link Object Construction
+
+**Problem**: Six regex patterns (lines 111-353) construct nearly identical link objects with 127-38 lines each.
+
+**Duplication**:
+- Path resolution logic: Repeated 6 times
+- Link object structure: Repeated 6 times
+- Only differences: regex pattern + 2-3 classification fields (`linkType`, `scope`, `anchorType`)
+
+**Recommendation**: Extract to pattern registry + factory:
+
+```javascript
+const linkPatterns = [
+  { regex: /\[([^\]]+)\]\(([^)#]+\.md)(#([^)]+))?\)/g,
+    classify: (match) => ({ linkType: "markdown", scope: "cross-document", ... }) },
+  // ... other patterns
+];
+
+function createLinkObject(match, classification, sourcePath) {
+  // Single implementation of path resolution + object construction
+}
+```
+
+### Unused Infrastructure: headings Array
+
+**Problem**: `headings` array extracted from tokens but never consumed by production code.
+
+**Evidence**:
+- Only referenced in test files (`parser-output-contract.test.js`, `parsed-file-cache.test.js`)
+- CLI `ast` command dumps it but doesn't use it
+- Documentation claims "available for future content aggregation" - speculative infrastructure
+
+**Cost**: Extra token tree walk on every parse for unused data.
+
+**Recommendation**: Remove from output contract or document concrete planned consumer.
+
+### Issue 4: Missing Standard Markdown Internal Link Extraction
+
+**Problem**: Parser extracts wiki-style internal links but NOT standard markdown internal links, creating gaps in validation coverage.
+
+**Current Behavior** (extractLinks() lines 88-299):
+
+```javascript
+// ✅ EXTRACTED: Wiki-style internal links
+[[#anchor|text]]           // Regex: /\[\[#([^|]+)\|([^\]]+)\]\]/g (line 269)
+
+// ✅ EXTRACTED: Cross-document markdown links
+[text](file.md#anchor)     // Regex: /\[([^\]]+)\]\(([^)#]+\.md)(#([^)]+))?\)/g (line 95)
+
+// ❌ NOT EXTRACTED: Standard markdown internal links
+[text](#anchor)            // No pattern exists for this format
+```
+
+**Discovery Context**: Identified during US1.6 Task 1.2 implementation (2025-10-09).
+
+**Impact**:
+
+1. **Test Specification Deviation**: Task 1.2 spec required testing validator with internal links `[text](#anchor)`, but implementation had to use cross-document links `[text](file.md#anchor)` instead
+2. **Validation Coverage Gap**: CitationValidator cannot validate standard markdown internal anchor references within a document
+3. **Inconsistent Link Support**: Parser supports Obsidian-specific wiki internal links but not standard markdown internal links
+4. **User Experience**: Authors using standard markdown syntax for internal references won't get validation feedback
+
+**Evidence from US1.6 Task 1.2**:
+
+Task specification (tasks/01-1-2-write-validator-anchor-matching-tests-us1.6.md:139-141):
+
+```markdown
+**File**: `tools/citation-manager/test/fixtures/anchor-matching.md` (CREATE)
+- Add link using raw format: `[Link 1](#Story 1.5: Implement Cache)`
+- Add link using encoded format: `[Link 2](#Story%201.5%20Implement%20Cache)`
+```
+
+Actual implementation deviated:
+
+```markdown
+# File: anchor-matching-source.md
+[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)
+[Link using URL-encoded format](anchor-matching.md#Story%201.5%20Implement%20Cache)
+```
+
+Test-writer agent justification (Implementation Agent Notes:260-266):
+> "Used cross-document links (not internal links) because **MarkdownParser.extractLinks() currently only extracts cross-document references**. Created separate source and target fixture files to enable cross-document link testing."
+
+**Architecture Decision**: Evaluation agent (Application Tech Lead) approved deviation for US1.6's narrow scope (anchor schema refactoring) but flagged for architectural review.
+
+**Why This Matters**:
+
+- **Parser Architecture Gap**: marked.js DOES parse internal links as `type: "link"` tokens with `href: "#anchor"`, but our extraction layer filters them out by requiring `.md` extension
+- **Validation Completeness**: CitationValidator should validate ALL anchor references (wiki-style, standard markdown, and cross-document) for complete link checking
+- **CommonMark Compliance**: Standard markdown internal links are part of CommonMark spec, while wiki-style links are Obsidian-specific
+
+**Root Cause**: Line 95 regex requires `.md` file extension:
+
+```javascript
+const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(#([^)]+))?\)/g;
+//                                       ^^^^ Requires .md extension
+```
+
+**Recommendation**: Add support for standard markdown internal links:
+
+**Option A: Add new regex pattern** (low effort, consistent with current architecture):
+
+```javascript
+// Add after line 134 in extractLinks()
+// Standard markdown internal links: [text](#anchor)
+const internalLinkPattern = /\[([^\]]+)\]\(#([^)]+)\)/g;
+match = internalLinkPattern.exec(line);
+while (match !== null) {
+  const text = match[1];
+  const anchor = match[2];
+
+  links.push({
+    linkType: "markdown",
+    scope: "internal",
+    anchorType: this.determineAnchorType(anchor),
+    source: { path: { absolute: sourceAbsolutePath } },
+    target: {
+      path: { raw: null, absolute: null, relative: null },
+      anchor: anchor
+    },
+    text: text,
+    fullMatch: match[0],
+    line: index + 1,
+    column: match.index
+  });
+  match = internalLinkPattern.exec(line);
+}
+```
+
+**Option B: Extract from marked.js tokens** (better performance, requires refactoring):
+
+```javascript
+// Use walkTokens to extract links from AST
+marked.walkTokens(tokens, (token) => {
+  if (token.type === 'link' && token.href.startsWith('#')) {
+    // Internal link found in AST
+  }
+});
+```
+
+**Follow-up Story Required**: Create user story for adding standard markdown internal link support to enable complete validation coverage. Priority: Medium (blocks complete CommonMark validation support).
+
+**Related Technical Debt**: See Issue 1 (Double-Parse Anti-Pattern) - extracting from tokens would address both issues simultaneously.
+
+**Documentation Date**: 2025-10-09
+**Discovered During**: US1.6 Task 1.2 (CitationValidator Anchor Matching Integration Tests)
+**Related Files**:
+- `tools/citation-manager/src/MarkdownParser.js:88-299` (extractLinks method)
+- `tools/citation-manager/test/integration/citation-validator-anchor-matching.test.js` (uses cross-doc workaround)
+- `tools/citation-manager/design-docs/features/20251003-content-aggregation/user-stories/us1.6-refactor-anchor-schema/tasks/01-1-2-write-validator-anchor-matching-tests-us1.6.md` (specification that couldn't be followed)
+
+---
+
+## Markdownlint Approach
+
+Markdownlint does not primarily rely on whole-file regex or naive line-by-line scans; it parses Markdown once into a structured token stream and a lines array, then runs rules over those structures. Regex is used selectively for small, local checks, while most logic is token-based and linear-time over the parsed representation.
+
+### Parsing model
+- The core parse is done once per file/string and produces a micromark token stream plus an array of raw lines, which are then shared with every rule.
+- Built-in rules operate on micromark tokens; custom rules can choose micromark, markdown-it, or a text-only mode if they really want to work directly on lines.
+- Front matter is stripped via a start-of-file match and HTML comments are interpreted for inline enable/disable, reducing the effective content that rules must consider.
+
+### How rules match
+- A rule’s function receives both tokens and the original lines and typically iterates tokens to identify semantic structures like headings, lists, links, and code fences.
+- For formatting checks that are inherently textual (for example trailing spaces or line length), rules iterate the lines array and may apply small, targeted regex on a single line or substring.
+- Violations are reported via a callback with precise line/column and optional fix info, so rules avoid global regex sweeps and focus only on the minimal spans they need.
+
+### Regex vs tokens
+- Token-driven checks dominate because they’re resilient to Markdown edge cases and avoid brittle, backtracking-heavy regex across the whole document.
+- Regex is used as a tactical tool for localized patterns (e.g., trimming whitespace, counting spaces, or validating a fragment) rather than as the primary parsing mechanism.
+- This hybrid keeps rules simple and fast: structure from tokens, micro-patterns from small regex where appropriate.
+
+### Large content handling
+- The single-parse-per-file design means the Markdown is parsed once and reused, preventing N× reparsing as the number of rules grows.
+- Most built-in rules are O(n) in the size of the token stream or the number of lines, and many short-circuit early within a line or token subtree to minimize work.
+- Inline configuration and front matter exclusion reduce the effective scan area, and costly rules (like line-length over code/table regions) can be tuned or disabled to cap worst-case work.
+
+### Practical implications
+- For big documents and repos, parsing once and sharing tokens keeps total runtime closer to linear in input size, even with many rules.
+- Prefer writing custom rules against tokens to avoid reinventing Markdown parsing and to keep checks robust across edge cases.
+- Use line-based or small regex only where semantics aren’t needed, keeping scans local to a line or token’s text to preserve performance.
+
+1. [https://github.com/markdown-it/markdown-it/issues/68](https://github.com/markdown-it/markdown-it/issues/68)
+2. [https://markdown-it-py.readthedocs.io/en/latest/api/markdown_it.token.html](https://markdown-it-py.readthedocs.io/en/latest/api/markdown_it.token.html)
+3. [https://markdown-it.github.io/markdown-it/](https://markdown-it.github.io/markdown-it/)
+4. [https://markdown-it-py.readthedocs.io/en/latest/using.html](https://markdown-it-py.readthedocs.io/en/latest/using.html)
+5. [https://stackoverflow.com/questions/68934462/customize-markdown-parsing-in-markdown-it](https://stackoverflow.com/questions/68934462/customize-markdown-parsing-in-markdown-it)
+6. [https://dlaa.me/blog/post/markdownlintfixinfo](https://dlaa.me/blog/post/markdownlintfixinfo)
+7. [https://classic.yarnpkg.com/en/package/markdownlint-rule-helpers](https://classic.yarnpkg.com/en/package/markdownlint-rule-helpers)
+8. [https://stackoverflow.com/questions/63989663/render-tokens-in-markdown-it](https://stackoverflow.com/questions/63989663/render-tokens-in-markdown-it)
+9. [https://app.renovatebot.com/package-diff?name=markdownlint&from=0.31.0&to=0.31.1](https://app.renovatebot.com/package-diff?name=markdownlint&from=0.31.0&to=0.31.1)
+10. [https://www.varac.net/docs/markup/markdown/linting-formatting.html](https://www.varac.net/docs/markup/markdown/linting-formatting.html)
+11. [https://community.openai.com/t/markdown-is-15-more-token-efficient-than-json/841742](https://community.openai.com/t/markdown-is-15-more-token-efficient-than-json/841742)
+12. [https://jackdewinter.github.io/2020/05/11/markdown-linter-rules-the-first-three/](https://jackdewinter.github.io/2020/05/11/markdown-linter-rules-the-first-three/)
+13. [https://qmacro.org/blog/posts/2021/05/13/notes-on-markdown-linting-part-1/](https://qmacro.org/blog/posts/2021/05/13/notes-on-markdown-linting-part-1/)
+14. [https://discourse.joplinapp.org/t/help-with-markdown-it-link-rendering/8143](https://discourse.joplinapp.org/t/help-with-markdown-it-link-rendering/8143)
+15. [https://git.theoludwig.fr/theoludwig/markdownlint-rule-relative-links/compare/v2.3.0...v2.3.2?style=unified&whitespace=ignore-all&show-outdated=](https://git.theoludwig.fr/theoludwig/markdownlint-rule-relative-links/compare/v2.3.0...v2.3.2?style=unified&whitespace=ignore-all&show-outdated=)
+16. [https://archlinux.org/packages/extra/any/markdownlint-cli2/files/](https://archlinux.org/packages/extra/any/markdownlint-cli2/files/)
+17. [https://jackdewinter.github.io/2021/07/26/markdown-linter-getting-back-to-new-rules/](https://jackdewinter.github.io/2021/07/26/markdown-linter-getting-back-to-new-rules/)
+18. [https://github.com/DavidAnson/markdownlint/issues/762](https://github.com/DavidAnson/markdownlint/issues/762)
+19. [http://xiangxing98.github.io/Markdownlint_Rules.html](http://xiangxing98.github.io/Markdownlint_Rules.html)
+20. [https://pypi.org/project/pymarkdownlnt/](https://pypi.org/project/pymarkdownlnt/)
+
+---
+## Micromark 3rd Party Obsidian Extensions
+Yes—micromark has third‑party extensions that implement Obsidian‑flavored Markdown features such as wikilinks, embeds, tags, and callouts, though they are community packages rather than official Obsidian modules. Examples include the @moritzrs “OFM” family (ofm, ofm‑wikilink, ofm‑tag, ofm‑callout) and a general wiki‑link extension that can be adapted for Obsidian‑style links.[npmjs+3](https://www.npmjs.com/package/@moritzrs%2Fmicromark-extension-ofm-wikilink)
+
+### Available extensions
+
+- @moritzrs/micromark-extension-ofm-wikilink adds Obsidian‑style [[wikilinks]] and media embeds, with corresponding HTML serialization helpers.[npmjs](https://www.npmjs.com/package/@moritzrs%2Fmicromark-extension-ofm-wikilink)
+
+- @moritzrs/micromark-extension-ofm-callout implements Obsidian‑style callouts so blocks beginning with [!type] parse as callouts in micromark flows.[packages.ecosyste](https://packages.ecosyste.ms/registries/npmjs.org/keywords/micromark-extension)
+
+- Bundled “OFM” packages and other Obsidian‑focused extension sets exist, such as @moritzrs/micromark-extension-ofm and @goonco/micromark-extension-ofm, to cover broader Obsidian syntax in one place.[libraries+1](https://libraries.io/npm/@goonco%2Fmicromark-extension-ofm)
+
+### What they cover
+
+- Obsidian callouts use a [!type] marker at the start of a blockquote (for example, [!info]) and these extensions aim to parse that syntax so it can be transformed or rendered outside Obsidian.[obsidian+1](https://help.obsidian.md/callouts)
+
+- There is also a general micromark wiki‑link extension for [[Wiki Links]] that can be configured (alias divider, permalink resolution) and used where pure Obsidian semantics aren’t required.[github](https://github.com/landakram/micromark-extension-wiki-link)
+
+- Some remark plugins add Obsidian‑style callouts by registering micromark syntax under the hood, demonstrating the typical integration path in unified/remark ecosystems.[github](https://github.com/rk-terence/gz-remark-callout)
+
+### Integration tips
+
+- These packages expose micromark syntax and HTML extensions that are passed via the micromark options (extensions/htmlExtensions) during parsing and serialization.[github+1](https://github.com/landakram/micromark-extension-wiki-link)
+
+- For AST work, pair micromark syntax with matching mdast utilities like @moritzrs/mdast-util-ofm-wikilink (via mdast‑util‑from‑markdown) or use higher‑level wrappers such as “remark‑ofm” referenced by the OFM packages.[npmjs+1](https://www.npmjs.com/package/@moritzrs%2Fmdast-util-ofm-wikilink)
+
+- When targeting full Obsidian coverage, prefer the curated OFM bundles and selectively enable features needed for wikilinks, tags, callouts, and related behaviors to match Obsidian’s documented syntax.[packages.ecosyste+1](https://packages.ecosyste.ms/registries/npmjs.org/keywords/micromark-extension)
+
+1. [https://www.npmjs.com/package/@moritzrs%2Fmicromark-extension-ofm-wikilink](https://www.npmjs.com/package/@moritzrs%2Fmicromark-extension-ofm-wikilink)
+2. [https://packages.ecosyste.ms/registries/npmjs.org/keywords/micromark-extension](https://packages.ecosyste.ms/registries/npmjs.org/keywords/micromark-extension)
+3. [https://github.com/landakram/micromark-extension-wiki-link](https://github.com/landakram/micromark-extension-wiki-link)
+4. [https://libraries.io/npm/@goonco%2Fmicromark-extension-ofm](https://libraries.io/npm/@goonco%2Fmicromark-extension-ofm)
+5. [https://help.obsidian.md/callouts](https://help.obsidian.md/callouts)
+6. [https://github.com/rk-terence/gz-remark-callout](https://github.com/rk-terence/gz-remark-callout)
+7. [https://www.npmjs.com/package/@moritzrs%2Fmdast-util-ofm-wikilink](https://www.npmjs.com/package/@moritzrs%2Fmdast-util-ofm-wikilink)
+8. [https://www.npmjs.com/package/@moritzrs%2Fmicromark-extension-ofm-tag](https://www.npmjs.com/package/@moritzrs%2Fmicromark-extension-ofm-tag)
+9. [https://jsr.io/@jooooock/obsidian-markdown-parser](https://jsr.io/@jooooock/obsidian-markdown-parser)
+10. [https://libraries.io/npm/@moritzrs%2Fmicromark-extension-ofm-wikilink](https://libraries.io/npm/@moritzrs%2Fmicromark-extension-ofm-wikilink)
+11. [https://codesandbox.io/examples/package/micromark-extension-wiki-link](https://codesandbox.io/examples/package/micromark-extension-wiki-link)
+12. [https://pdworkman.com/obsidian-callouts/](https://pdworkman.com/obsidian-callouts/)
+13. [https://www.moritzjung.dev/obsidian-stats/plugins/qatt/](https://www.moritzjung.dev/obsidian-stats/plugins/qatt/)
+14. [https://unifiedjs.com/explore/package/remark-wiki-link/](https://unifiedjs.com/explore/package/remark-wiki-link/)
+15. [https://www.youtube.com/watch?v=tSSc42tCVto](https://www.youtube.com/watch?v=tSSc42tCVto)
+16. [https://www.moritzjung.dev/obsidian-stats/plugins/md-image-caption/](https://www.moritzjung.dev/obsidian-stats/plugins/md-image-caption/)
+17. [https://cdn.jsdelivr.net/npm/micromark-extension-wiki-link@0.0.4/dist/](https://cdn.jsdelivr.net/npm/micromark-extension-wiki-link@0.0.4/dist/)
+18. [https://forum.inkdrop.app/t/backlinks-roam-obsidian/1928](https://forum.inkdrop.app/t/backlinks-roam-obsidian/1928)
+19. [https://www.youtube.com/watch?v=sdVNiSQcMv0](https://www.youtube.com/watch?v=sdVNiSQcMv0)
+20. [https://forum.inkdrop.app/t/different-checkbox-types/3237](https://forum.inkdrop.app/t/different-checkbox-types/3237)

@@ -411,12 +411,12 @@ class CitationValidator is
     field citations = this.extractAllCitations(content)
 
     // Pattern: Parallel validation with error aggregation strategy
-    field validationResults = new ValidationResults()
+    field CitationValidator.ValidationResult.Output.DataContracs = new CitationValidator.ValidationResult.Output.DataContracs()
     foreach (citation in citations) do
       field result = this.validateSingleCitation(citation, filePath)
-      validationResults.aggregate(result)
+      CitationValidator.ValidationResult.Output.DataContracs.aggregate(result)
 
-    return this.generateReport(validationResults)
+    return this.generateReport(CitationValidator.ValidationResult.Output.DataContracs)
 
   // Citation pattern classification with validation strategy
   private method validateSingleCitation(citation: Citation, contextFile: FilePath): CitationResult is
@@ -467,7 +467,7 @@ class CrossDocumentValidator is
 
   // Cross-document link validation with path resolution strategy
   public method validateCrossDocumentLink(citation: Citation,
-                                         sourceFile: FilePath): ValidationResult is
+                                         sourceFile: FilePath): CitationValidator.ValidationResult.Output.DataContrac is
     // Pattern: Two-phase validation (file existence, then anchor existence)
     field targetPath = this.resolveTargetPath(citation.filePath, sourceFile)
 
@@ -496,7 +496,7 @@ class CrossDocumentValidator is
     return resolvedPath
 
   // Anchor existence validation with multiple anchor type support
-  private method validateAnchorExists(anchor: string, targetFile: FilePath): ValidationResult is
+  private method validateAnchorExists(anchor: string, targetFile: FilePath): CitationValidator.ValidationResult.Output.DataContrac is
     // Integration: AST parser for structured anchor extraction
     // Pattern: Multiple anchor format support (caret, emphasis, heading)
     field targetContent = this.fileSystem.readFile(targetFile)
@@ -526,9 +526,9 @@ class ValidationReporter is
     ...
 
   // Primary reporting boundary with error aggregation strategy
-  public method generateReport(validationResults: ValidationResults): ValidationReport is
+  public method generateReport(CitationValidator.ValidationResult.Output.DataContracs: CitationValidator.ValidationResult.Output.DataContracs): ValidationReport is
     // Pattern: Error classification and severity assignment
-    field categorizedErrors = this.categorizeErrors(validationResults.getAllErrors())
+    field categorizedErrors = this.categorizeErrors(CitationValidator.ValidationResult.Output.DataContracs.getAllErrors())
     field suggestions = this.generateActionableSuggestions(categorizedErrors)
 
     // Decision: Report format based on error severity and count

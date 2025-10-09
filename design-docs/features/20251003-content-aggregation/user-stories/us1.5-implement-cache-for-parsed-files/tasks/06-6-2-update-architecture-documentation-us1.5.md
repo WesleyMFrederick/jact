@@ -77,7 +77,7 @@ Update content-aggregation-architecture.md to mark "Redundant File Parsing Durin
 **Resolution Date**: 2025-10-07
 
 **Implementation Summary**:
-- Created `ParsedFileCache` component providing in-memory cache of Parser Output Contract objects
+- Created `ParsedFileCache` component providing in-memory cache of MarkdownParser.Output.DataContract objects
 - Refactored `CitationValidator` to use `ParsedFileCache` instead of direct `MarkdownParser` calls
 - Integrated cache into factory pattern for production deployment
 - Ensured files are parsed at most once per command execution
@@ -105,7 +105,7 @@ Update content-aggregation-architecture.md to mark "Redundant File Parsing Durin
 #### Citation Manager.ParsedFileCache
 - **Path(s):** `tools/citation-manager/src/ParsedFileCache.js`
 - **Technology Status:** Implemented
-- **Description:** Maintains an in-memory cache of parsed file objects (`Parser Output Contract`) for the duration of a single command run. Ensures each file is read from disk and parsed by the `MarkdownParser` at most once.
+- **Description:** Maintains an in-memory cache of parsed file objects (`MarkdownParser.Output.DataContract`) for the duration of a single command run. Ensures each file is read from disk and parsed by the `MarkdownParser` at most once.
 ```
 
 ### Problems

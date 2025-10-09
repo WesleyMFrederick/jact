@@ -32,7 +32,7 @@ From Task 2.1 warning implementation:
 
 2. **Study existing warning validation logic:**
    - Read `src/CitationValidator.js` warning detection implementation from Task 2.1
-   - Understand `createValidationResult()` method and result structure
+   - Understand `createCitationValidator.ValidationResult.Output.DataContrac()` method and result structure
    - Review existing path utilities and Node.js path module usage
 
 3. **Analyze current warning result structure:**
@@ -91,7 +91,7 @@ if (cacheResult.found && !cacheResult.fuzzyMatch) {
     const isDirectoryMatch = this.isDirectoryMatch(sourceFile, cacheResult.path);
     if (!isDirectoryMatch) {
         const suggestion = this.generatePathConversionSuggestion(citation, sourceFile, cacheResult.path);
-        return this.createValidationResult(citation, "warning", null, message, suggestion);
+        return this.createCitationValidator.ValidationResult.Output.DataContrac(citation, "warning", null, message, suggestion);
     }
 }
 ```
@@ -100,13 +100,13 @@ if (cacheResult.found && !cacheResult.fuzzyMatch) {
 - Maintain all existing warning validation logic - only add conversion suggestion functionality
 - Preserve anchor fragments when generating conversion suggestions
 - Use Node.js `path` module for cross-platform compatibility
-- Extend `createValidationResult()` method to accept optional suggestion parameter
+- Extend `createCitationValidator.ValidationResult.Output.DataContrac()` method to accept optional suggestion parameter
 - Ensure JSON serialization compatibility for suggestion objects
 
 ## Key Implementation Elements
 
 1. **Primary Change**: Add `calculateRelativePath()` and `generatePathConversionSuggestion()` methods to CitationValidator
-2. **Integration Points**: Modify warning result creation logic to include suggestions, extend `createValidationResult()` method signature
+2. **Integration Points**: Modify warning result creation logic to include suggestions, extend `createCitationValidator.ValidationResult.Output.DataContrac()` method signature
 3. **Validation Strategy**: TDD tests from Task 5.1 validate implementation meets all path conversion requirements
 
 ## Expected Outcome
@@ -140,7 +140,7 @@ This implementation provides the core path conversion functionality that enables
   - Added `relative` import from Node.js path module
   - Added `calculateRelativePath()` method for cross-platform path calculation
   - Added `generatePathConversionSuggestion()` method with anchor preservation
-  - Enhanced `createValidationResult()` method signature to support path conversion suggestions
+  - Enhanced `createCitationValidator.ValidationResult.Output.DataContrac()` method signature to support path conversion suggestions
   - Integrated conversion suggestions into warning validation logic for cross-directory citations
 
 **Quality Gates**:

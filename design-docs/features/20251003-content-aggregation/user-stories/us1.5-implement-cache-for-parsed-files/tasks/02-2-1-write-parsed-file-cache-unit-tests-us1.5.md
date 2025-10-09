@@ -67,7 +67,7 @@ describe('ParsedFileCache', () => {
     // When: First request for file
     const result = await cache.resolveParsedFile(testFile);
 
-    // Then: Parser Output Contract returned
+    // Then: MarkdownParser.Output.DataContract returned
     expect(result).toHaveProperty('filePath');
     expect(result).toHaveProperty('content');
     expect(result).toHaveProperty('tokens');
@@ -126,7 +126,7 @@ describe('ParsedFileCache', () => {
 
 Create comprehensive unit test suite with 6 test cases:
 
-1. **Cache Miss Test**: Verify first request parses file and stores Parser Output Contract in cache
+1. **Cache Miss Test**: Verify first request parses file and stores MarkdownParser.Output.DataContract in cache
 2. **Cache Hit Test**: Verify second request returns cached object without re-parsing (validate parser called only once using spy/mock)
 3. **Concurrent Request Test**: Verify multiple simultaneous requests trigger only one parse operation and all resolve to same result
 4. **Error Propagation Test**: Verify parser errors are propagated correctly and failed promises removed from cache

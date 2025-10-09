@@ -5,7 +5,7 @@ epic-number: 1
 epic-name: Citation Manager Test Migration & Content Aggregation
 epic-url: ../../content-aggregation-prd.md#Epic%20Citation%20Manager%20Test%20Migration%20&%20Content%20Aggregation
 user-story-number: 1.5
-status: Needs Evaluation
+status: Done
 ---
 
 # Story 1.5: Implement a Cache for Parsed File Objects
@@ -17,15 +17,15 @@ When first reading this file, you MUST IMMEDIATELY run citation manager to extra
 ## Story
 
 **As a** `citation-manager` tool,
-**I want** to implement a caching layer that stores parsed file objects (the `Parser Output Contract`) in memory during a single command run,
+**I want** to implement a caching layer that stores parsed file objects (the `MarkdownParser.Output.DataContract`) in memory during a single command run,
 **so that** I can eliminate redundant file read operations, improve performance, and provide an efficient foundation for new features like content extraction.
 
 _Source: [Story 1.5: Implement a Cache for Parsed File Objects](../../content-aggregation-prd.md#Story%201.5%20Implement%20a%20Cache%20for%20Parsed%20File%20Objects)_
 
 ## Acceptance Criteria
 
-1. GIVEN a file has already been parsed during a command's execution, WHEN a subsequent request is made for its parsed data, THEN the system SHALL return the `Parser Output Contract` object from the in-memory cache instead of re-reading the file from disk. ^US1-5AC1
-2. GIVEN a file has not yet been parsed, WHEN a request is made for its parsed data, THEN the system SHALL parse the file from disk, store the resulting `Parser Output Contract` object in the cache, and then return it. ^US1-5AC2
+1. GIVEN a file has already been parsed during a command's execution, WHEN a subsequent request is made for its parsed data, THEN the system SHALL return the `MarkdownParser.Output.DataContract` object from the in-memory cache instead of re-reading the file from disk. ^US1-5AC1
+2. GIVEN a file has not yet been parsed, WHEN a request is made for its parsed data, THEN the system SHALL parse the file from disk, store the resulting `MarkdownParser.Output.DataContract` object in the cache, and then return it. ^US1-5AC2
 3. The `CitationValidator` component SHALL be refactored to use this caching layer for all file parsing operations. ^US1-5AC3
 4. WHEN validating a document that contains multiple links to the same target file, THEN the target file SHALL only be read from disk and parsed once per command execution. ^US1-5AC4
 5. GIVEN the new caching layer is implemented, WHEN the full test suite is executed, THEN all existing tests SHALL pass, confirming zero functional regressions. ^US1-5AC5
@@ -35,7 +35,7 @@ _Source: [Story 1.5 Acceptance Criteria](../../content-aggregation-prd.md#Story%
 ## Technical Debt Resolution
 
 **Closes Technical Debt**:
-- [Redundant File Parsing During Validation](../../content-aggregation-architecture.md#Redundant%20File%20Parsing%20During%20Validation): Eliminates redundant I/O and CPU overhead by caching Parser Output Contract objects
+- [Redundant File Parsing During Validation](../../content-aggregation-architecture.md#Redundant%20File%20Parsing%20During%20Validation): Eliminates redundant I/O and CPU overhead by caching MarkdownParser.Output.DataContract objects
 
 ## Dev Notes
 
@@ -44,7 +44,7 @@ _Source: [Story 1.5 Acceptance Criteria](../../content-aggregation-prd.md#Story%
 This story implements an in-memory caching layer that eliminates redundant file parsing operations during a single command execution, directly addressing a critical performance bottleneck that would severely impact Epic 2 Content Aggregation feature.
 
 - **Components Affected**:
-  - [ParsedFileCache](../../content-aggregation-architecture.md#Citation%20Manager.ParsedFileCache) (NEW) - In-memory cache component managing Parser Output Contract object lifecycle
+  - [ParsedFileCache](../../content-aggregation-architecture.md#Citation%20Manager.ParsedFileCache) (NEW) - In-memory cache component managing MarkdownParser.Output.DataContract object lifecycle
   - [CitationValidator](../../content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator) (MODIFIED) - Refactored to request parsed data from cache instead of calling parser directly
   - [MarkdownParser](../../content-aggregation-architecture.md#Citation%20Manager.Markdown%20Parser) (INTEGRATION) - Injected into cache as dependency for cache-miss scenarios
   - [CLI Orchestrator](../../content-aggregation-architecture.md#Citation%20Manager.CLI%20Orchestrator) (INTEGRATION) - Uses factory to instantiate cache-enabled validator
@@ -52,11 +52,11 @@ This story implements an in-memory caching layer that eliminates redundant file 
 - **Implementation Guides**:
   - [ParsedFileCache Implementation Guide](../../../../component-guides/ParsedFileCache%20Implementation%20Guide.md) - Component structure, pseudocode, data contracts, and testing strategy for new cache component
   - [CitationValidator Implementation Guide](../../../../component-guides/CitationValidator%20Implementation%20Guide.md) - Updated public contracts and refactoring guidance for cache integration
-  - [MarkdownParser Implementation Guide](../../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md) - Parser Output Contract schema required for cache operations
+  - [MarkdownParser Implementation Guide](../../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md) - MarkdownParser.Output.DataContract schema required for cache operations
 
 ### Files Impacted
 
-- `tools/citation-manager/src/ParsedFileCache.js` (CREATE) - New cache component with Map-based in-memory storage, manages Parser Output Contract lifecycle
+- `tools/citation-manager/src/ParsedFileCache.js` (CREATE) - New cache component with Map-based in-memory storage, manages MarkdownParser.Output.DataContract lifecycle
 - `tools/citation-manager/src/CitationValidator.js` (MODIFY) - Refactor to use ParsedFileCache instead of direct MarkdownParser calls, convert validation methods to async
 - `tools/citation-manager/src/factories/componentFactory.js` (MODIFY) - Add `createParsedFileCache()` factory function, wire into `createCitationValidator()`
 - `tools/citation-manager/src/citation-manager.js` (MODIFY) - Update CLI orchestrator to handle async validator methods (if needed)
@@ -107,7 +107,7 @@ The new ParsedFileCache component sits between CitationValidator and MarkdownPar
 class ParsedFileCache {
   constructor(markdownParser) {
     this.parser = markdownParser;  // MarkdownParser injected via DI
-    this.cache = new Map();        // Key: absolute path, Value: Parser Output Contract
+    this.cache = new Map();        // Key: absolute path, Value: MarkdownParser.Output.DataContract
   }
 
   async get(filePath) {
@@ -173,7 +173,7 @@ class CitationValidator {
 **Cache Lifecycle**:
 - **Scope**: In-memory only, lifetime = single command execution
 - **Cache Key**: Absolute file path (string)
-- **Cache Value**: Complete Parser Output Contract object
+- **Cache Value**: Complete MarkdownParser.Output.DataContract object
 - **Threading**: Single-threaded Node.js, no concurrency concerns
 
 ### Dependencies
@@ -383,13 +383,13 @@ await expect(p2).resolves.toBe(mockData);
 
 ## Tasks / Subtasks
 
-### Phase 1: Parser Output Contract Validation & Documentation
+### Phase 1: MarkdownParser.Output.DataContract Validation & Documentation
 
-- [x] **1.1. Validate and Document Parser Output Contract** ^US1-5T1-1
+- [x] **1.1. Validate and Document MarkdownParser.Output.DataContract** ^US1-5T1-1
   - **Agent**: test-writer
-  - **Objective**: Validate MarkdownParser returns complete Parser Output Contract including all fields (filePath, content, tokens, links, headings, anchors) and update Implementation Guide to reflect actual schema
+  - **Objective**: Validate MarkdownParser returns complete MarkdownParser.Output.DataContract including all fields (filePath, content, tokens, links, headings, anchors) and update Implementation Guide to reflect actual schema
   - **Input**: Existing MarkdownParser implementation, Implementation Guide specification
-  - **Output**: Tests validating complete Parser Output Contract, updated Implementation Guide documentation
+  - **Output**: Tests validating complete MarkdownParser.Output.DataContract, updated Implementation Guide documentation
   - **Files**:
     - `tools/citation-manager/test/parser-output-contract.test.js` (create)
     - `tools/citation-manager/design-docs/component-guides/Markdown Parser Implementation Guide.md` (modify)
@@ -399,9 +399,9 @@ await expect(p2).resolves.toBe(mockData);
     - Validate `headings` array structure (level, text, raw properties)
     - Validate `anchors` array structure (type, anchor, text, line properties)
     - Validate `links` array structure (type, text, file, anchor, fullMatch, line properties)
-    - Update Implementation Guide to include `headings` field in Parser Output Contract JSON schema
+    - Update Implementation Guide to include `headings` field in MarkdownParser.Output.DataContract JSON schema
     - Document rationale for `headings` field presence (used by CLI ast command, available for future features)
-  - **Test**: Parser Output Contract tests pass, MarkdownParser returns all documented fields, Implementation Guide accurately reflects actual schema
+  - **Test**: MarkdownParser.Output.DataContract tests pass, MarkdownParser returns all documented fields, Implementation Guide accurately reflects actual schema
   - **Commands**: `npm test -- parser-output-contract`
   - _Requirements_: [[#^US1-5AC2|AC2]] (foundation for cache storage)
   - _Leverage_: Existing MarkdownParser implementation, Implementation Guide template structure
@@ -453,13 +453,13 @@ await expect(p2).resolves.toBe(mockData);
 - [x] **2.1. Write ParsedFileCache Unit Tests** ^US1-5T2-1
   - **Agent**: test-writer
   - **Objective**: Write comprehensive failing unit tests for ParsedFileCache component covering cache hit/miss, concurrent requests, error propagation, and path normalization
-  - **Input**: ParsedFileCache Implementation Guide specification, Parser Output Contract schema from Phase 1
+  - **Input**: ParsedFileCache Implementation Guide specification, MarkdownParser.Output.DataContract schema from Phase 1
   - **Output**: Complete unit test suite for ParsedFileCache (failing until implementation)
   - **Files**:
     - `tools/citation-manager/test/parsed-file-cache.test.js` (create)
   - **Scope**:
     - Test cache miss: first request parses file and stores result in cache
-    - Test cache hit: second request returns cached Parser Output Contract without re-parsing
+    - Test cache hit: second request returns cached MarkdownParser.Output.DataContract without re-parsing
     - Test concurrent requests: multiple simultaneous requests for same file trigger only one parse
     - Test error propagation: parser errors are propagated and failed promises removed from cache
     - Test path normalization: relative paths, `./` prefixes, redundant separators normalized to consistent cache keys
@@ -474,7 +474,7 @@ await expect(p2).resolves.toBe(mockData);
 
 - [x] **2.2. Implement ParsedFileCache Component** ^US1-5T2-2
   - **Agent**: code-developer-agent
-  - **Objective**: Implement ParsedFileCache component with Map-based in-memory cache storing Parser Output Contract objects
+  - **Objective**: Implement ParsedFileCache component with Map-based in-memory cache storing MarkdownParser.Output.DataContract objects
   - **Input**: ParsedFileCache Implementation Guide, failing unit tests from Task 2.1
   - **Output**: ParsedFileCache.js implementation passing all unit tests
   - **Files**:
@@ -485,8 +485,8 @@ await expect(p2).resolves.toBe(mockData);
     - Normalize file paths to absolute paths for consistent cache keys
     - Handle concurrent requests by storing Promises immediately (prevents duplicate parses for same file)
     - Clean up cache on parse errors to prevent caching failed promises
-    - Preserve Parser Output Contract interface unchanged
-  - **Test**: All unit tests from Task 2.1 pass, cache correctly stores and retrieves Parser Output Contract objects
+    - Preserve MarkdownParser.Output.DataContract interface unchanged
+  - **Test**: All unit tests from Task 2.1 pass, cache correctly stores and retrieves MarkdownParser.Output.DataContract objects
   - **Commands**: `npm test -- parsed-file-cache`
   - _Requirements_: [[#^US1-5AC1|AC1]], [[#^US1-5AC2|AC2]]
   - _Leverage_: ParsedFileCache Implementation Guide pseudocode, existing MarkdownParser interface
@@ -666,11 +666,11 @@ await expect(p2).resolves.toBe(mockData);
 
 **AC1 Coverage** ([[#^US1-5AC1|AC1]] - Cache returns cached object on subsequent requests):
 - Task 2.1: Unit test for cache hit behavior
-- Task 2.2: Implementation returning cached Parser Output Contract
+- Task 2.2: Implementation returning cached MarkdownParser.Output.DataContract
 - Task 5.2: E2E validation of cache hit in production workflow
 
 **AC2 Coverage** ([[#^US1-5AC2|AC2]] - Cache parses and stores on first request):
-- Task 1.1: Validate Parser Output Contract schema
+- Task 1.1: Validate MarkdownParser.Output.DataContract schema
 - Task 2.1: Unit test for cache miss behavior
 - Task 2.2: Implementation parsing and caching on miss
 - Task 4.1: Factory creates cache with parser dependency
@@ -700,7 +700,7 @@ await expect(p2).resolves.toBe(mockData);
 #### Sequential Dependencies
 
 **Phase 1 → Phase 2**: Task [[#^US1-5T1-1|1.1]] must complete before Tasks [[#^US1-5T2-1|2.1]]-[[#^US1-5T2-2|2.2]]
-- Dependency Rationale: ParsedFileCache implementation requires validated Parser Output Contract schema
+- Dependency Rationale: ParsedFileCache implementation requires validated MarkdownParser.Output.DataContract schema
 
 **Task 2.1 → Task 2.2**: Task [[#^US1-5T2-1|2.1]] must complete before Task [[#^US1-5T2-2|2.2]]
 - Dependency Rationale: TDD approach requires failing tests before implementation
@@ -736,9 +736,9 @@ await expect(p2).resolves.toBe(mockData);
 **Handoff 1: test-writer → code-developer-agent** (After Task 1.1)
 - Outgoing Agent: test-writer
 - Incoming Agent: code-developer-agent
-- Deliverable: Validated Parser Output Contract schema, documentation updated
+- Deliverable: Validated MarkdownParser.Output.DataContract schema, documentation updated
 - Validation Gate:
-  - Parser Output Contract tests pass validating all fields present
+  - MarkdownParser.Output.DataContract tests pass validating all fields present
   - Implementation Guide updated with `headings` field
   - Schema documented as: `{ filePath, content, tokens, links, headings, anchors }`
   - Manual verification: `npm test -- parser-output-contract` passes
@@ -760,7 +760,7 @@ await expect(p2).resolves.toBe(mockData);
 - Validation Gate:
   - ParsedFileCache.js created with Map-based cache
   - All unit tests pass
-  - Cache correctly stores/retrieves Parser Output Contract objects
+  - Cache correctly stores/retrieves MarkdownParser.Output.DataContract objects
   - Manual verification: `npm test -- parsed-file-cache` passes
 
 **Handoff 4: test-writer → code-developer-agent** (After Task 3.1)
@@ -856,7 +856,7 @@ Each implementation task triggers an application-tech-lead validation checkpoint
 **Wave 1a - Execute Contract Validation** (Estimated: 30-40 min):
 - Execute: Task [[#^US1-5T1-1|1.1]]
 - Agent: test-writer
-- Deliverable: Parser Output Contract tests, updated Implementation Guide
+- Deliverable: MarkdownParser.Output.DataContract tests, updated Implementation Guide
 
 **Wave 1b - Validate Contract Validation** (Estimated: 10-15 min):
 - Validate: Task [[#^US1-5T1-1|1.1]]

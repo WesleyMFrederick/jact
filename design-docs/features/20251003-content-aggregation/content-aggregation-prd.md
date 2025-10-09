@@ -103,21 +103,6 @@ This feature encompasses two critical phases:
 
 ---
 
-### Story 1.4: Migrate and Validate `citation-manager` Test Suite [SUPERSEDED]
-
-> **⚠️ Story Split per ADR-001**: This story has been decomposed into US1.4a (Test Migration) and US1.4b (DI Refactoring) to separate test framework conversion from architectural refactoring work.
->
-> **Original AC Mapping**:
-> - US1-4AC1 (file relocation) → US1-4aAC1
-> - US1-4AC2 (Vitest execution) → US1-4aAC3
-> - US1-4AC3 (tests pass) → US1-4aAC5
-> - US1-4AC4 (legacy removal) → US1-4aAC6
-> - US1-4bAC1-6: New requirements for DI refactoring (not in original scope)
->
-> See [ADR-001: Phased Test Migration Strategy](content-aggregation-architecture.md#ADR-001%20Phased%20Test%20Migration%20Strategy) for decomposition rationale.
-
----
-
 ### Story 1.4a: Migrate citation-manager Test Suite to Vitest
 
 **As a** developer,
@@ -137,7 +122,8 @@ This feature encompasses two critical phases:
 
 _Depends On_: [US1.3: Make Migrated citation-manager Executable](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/user-stories/us1.3-make-migrated-citation-manager-executable/us1.3-make-migrated-citation-manager-executable.md)
 _Functional Requirements_: [[#^FR2|FR2]], [[#^FR9|FR9]]
-_User Story Link:_ [us1.4a-migrate-test-suite-to-vitest](user-stories/us1.4a-migrate-test-suite-to-vitest/us1.4a-migrate-test-suite-to-vitest.md)
+_User Story Link:_ [us1.4a-migrate-test-suite-to-vitest](user-stories/us1.4a-migrate-test-suite-to-vitest/us1.4a-migrate-test-suite-to-vitest.md)%%stop-extract-link%%
+_Status_: ✅ COMPLETE (2025-10-07)claudeclaude
 
 ---
 
@@ -160,7 +146,8 @@ _Depends On_: Story [Story 1.4a: Migrate citation-manager Test Suite to Vitest](
 _Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#Story%202.1%20Enhance%20Parser%20to%20Handle%20Full-File%20and%20Section%20Links)
 _Closes Technical Debt_: [Lack of Dependency Injection](content-aggregation-architecture.md#Lack%20of%20Dependency%20Injection)
 _Functional Requirements_: [[#^FR2|FR2]], [[#^FR8|FR8]]
-_User Story Link:_ [us1.4b-refactor-components-for-di](user-stories/us1.4b-refactor-components-for-di/us1.4b-refactor-components-for-di.md)
+_User Story Link:_ [us1.4b-refactor-components-for-di](user-stories/us1.4b-refactor-components-for-di/us1.4b-refactor-components-for-di.md)%%stop-extract-link%%
+_Status_: ✅ COMPLETE (2025-10-07)
 
 ---
 ### Story 1.5: Implement a Cache for Parsed File Objects
@@ -182,7 +169,7 @@ _Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#St
 _Closes Technical Debt_: [Redundant File Parsing During Validation](content-aggregation-architecture.md#Redundant%20File%20Parsing%20During%20Validation)
 _Functional Requirements_: [[#^FR8|FR8]]
 _Non-Functional Requirements_: [[#^NFR5|NFR5]]
-_User Story Link:_ [us1.5-implement-cache-for-parsed-files](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md)
+_User Story Link:_ [us1.5-implement-cache-for-parsed-files](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md)%%stop-extract-link%%
 _Status_: ✅ COMPLETE (2025-10-07)
 
 > [!success] **Technical Lead Feedback**: Caching Layer for Performance and Modularity ✅ IMPLEMENTED
@@ -199,6 +186,87 @@ _Status_: ✅ COMPLETE (2025-10-07)
 > - [One Source of Truth](../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth): Cache is authoritative source for parsed data during command execution ✅
 ---
 
+### Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries
+
+As a developer working on content extraction features,
+I want the MarkdownParser.Output.DataContract to represent each anchor once with both raw and URL-encoded ID variants as properties,
+so that anchor data is normalized, memory-efficient, and easier to work with in downstream components.
+
+#### Story 1.6 Acceptance Criteria
+1. GIVEN a markdown header is parsed, WHEN the `MarkdownParser.Output.DataContract` is generated, THEN each header anchor SHALL be represented by a single AnchorObject containing both `id` (raw text format) and `urlEncodedId` (Obsidian-compatible format) properties, eliminating duplicate anchor entries. ^US1-6AC1
+2. The AnchorObject schema SHALL include: `{ anchorType: "header"|"block", id: string, urlEncodedId: string|null, rawText: string|null, fullMatch: string, line: number, column: number }`, where `urlEncodedId` is populated only when it differs from `id`. ^US1-6AC2
+3. The `CitationValidator.validateAnchorExists()` method SHALL check both `id` and `urlEncodedId` fields when matching anchors, maintaining backward compatibility with existing anchor validation logic. ^US1-6AC3
+4. GIVEN a header containing colons and spaces (e.g., "Story 1.5: Implement Cache"), WHEN parsed, THEN the system SHALL generate one anchor with `id: "Story 1.5: Implement Cache"` and `urlEncodedId: "Story%201.5%20Implement%20Cache"`, not two separate anchor objects. ^US1-6AC4
+5. GIVEN the refactored anchor schema is implemented, WHEN the full test suite executes, THEN all existing tests SHALL pass with zero functional regressions, and the `MarkdownParser.Output.DataContract` validation test SHALL confirm no duplicate anchor entries. ^US1-6AC5
+6. The `MarkdownParser.Output.DataContract` JSON schema documentation SHALL be updated to reflect the new single-anchor-per-header structure with dual ID properties. ^US1-6AC6
+
+_Depends On_: [Story 1.5: Implement a Cache for Parsed File Objects](#Story%201.5%20Implement%20a%20Cache%20for%20Parsed%20File%20Objects)
+_Enables_: [Story 1.7: Implement ParsedDocument Facade](#Story%201.7%20Implement%20ParsedDocument%20Facade)
+_Closes Technical Debt_: [Duplicate Anchor Entries in MarkdownParser.Output.DataContract](content-aggregation-architecture.md#Duplicate%20Anchor%20Entries%20in%20MarkdownParser.Output.DataContract)
+_Functional Requirements_: [[#^FR8|FR8]]
+_User Story Link_: [us1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](user-stories/us1.6-refactor-anchor-schema/us1.6-refactor-anchor-schema.md)
+_Status_:  ✅ COMPLETE (2025-10-09)
+
+---
+
+### Story 1.7: Implement ParsedDocument Facade
+
+As a developer,
+I want a ParsedDocument wrapper class that encapsulates parser output navigation,
+so that consumers (CitationValidator, ContentExtractor) depend on stable interfaces instead of internal data structures.
+
+#### Story 1.7 Acceptance Criteria
+1. The `ParsedDocument` class SHALL wrap the `MarkdownParser.Output.DataContract` and expose a public interface with query methods, encapsulating direct data structure access. ^US1-7AC1
+2. The `ParsedDocument` class SHALL provide anchor query methods: `getAnchorIds()`, `hasAnchor(anchorId)`, `getBlockAnchors()`, `getHeaderAnchors()`, and `findSimilarAnchors(anchorId)` for `CitationValidator` use cases. ^US1-7AC2
+3. The `ParsedDocument` class SHALL provide content extraction methods: `extractSection(headingText)`, `extractBlock(anchorId)`, and `extractFullContent()` for `ContentExtractor` use cases (Epic 2). ^US1-7AC3
+4. The `ParsedDocument` class SHALL provide link query methods: `getLinks()` and `getCrossDocumentLinks()` for `CitationValidator` use cases. ^US1-7AC4
+5. `CitationValidator` SHALL be refactored to use `ParsedDocument` methods instead of direct data structure access (e.g., replace `parsed.anchors.map(a => a.id)` with `parsedDoc.getAnchorIds()`). ^US1-7AC5
+6. `ParsedFileCache` SHALL be updated to return `ParsedDocument` instances instead of raw parser output objects. ^US1-7AC6
+7. GIVEN the `ParsedDocument` facade is implemented and `CitationValidator` refactored, WHEN the full test suite executes, THEN all existing tests SHALL pass with zero behavioral changes. ^US1-7AC7
+8. The component SHALL include unit tests validating each query method's correct transformation of internal data structures into expected return values. ^US1-7AC8
+
+_Depends On_: [Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](#Story%201.6%20Refactor%20MarkdownParser.Output.DataContract%20-%20Eliminate%20Duplicate%20Anchor%20Entries)
+_Enables_: [Story 1.8: Refactor Anchor Validation to Use Strategy Pattern](#Story%201.8%20Refactor%20Anchor%20Validation%20to%20Use%20Strategy%20Pattern)
+_Closes Technical Debt_: Tight coupling to parser internals, duplicate navigation logic across consumers
+_Functional Requirements_: [[#^FR8|FR8]] (Architecture principle: interface stability)
+_Status_: 📋 PENDING
+
+> [!warning] Technical Lead Feedback: ParsedDocument Facade Required
+>
+> Architectural Decision: Introduce ParsedDocument wrapper class before implementing ContentExtractor to prevent tight coupling to parser internals. With two consumers (CitationValidator and ContentExtractor), the facade pays for itself immediately.
+>
+> Benefits: Interface stability, refactoring safety, encapsulation of complexity (especially token navigation), and parser independence (can swap marked.js for micromark without breaking consumers).
+
+---
+
+### Story 1.8: Refactor Anchor Validation to Use Strategy Pattern
+
+As a developer,
+I want to refactor the CitationValidator to use a Strategy pattern for anchor validation,
+so that the system can be easily extended to support different markdown flavors (e.g., GitHub-style anchors) without modifying core validation logic.
+
+#### Story 1.8 Acceptance Criteria
+
+1. An `AnchorValidationStrategy` interface SHALL be created at `src/strategies/AnchorValidationStrategy.js`, defining a `validate()` method contract. ^US1-8AC1
+2. A default `ObsidianAnchorStrategy` SHALL be implemented, encapsulating the existing logic for validating Obsidian-style URL-escaped anchors. ^US1-8AC2
+3. The `CitationValidator` constructor SHALL be refactored to accept an `AnchorValidationStrategy` dependency, and its validation logic SHALL delegate to the injected strategy. ^US1-8AC3
+4. The `componentFactory` SHALL be updated to instantiate and inject the default `ObsidianAnchorStrategy` into the `CitationValidator`. ^US1-8AC4
+5. GIVEN the refactoring is complete, WHEN the full test suite is executed, THEN all existing tests SHALL pass, confirming zero functional regressions. ^US1-8AC5
+6. The component architecture documentation SHALL be updated to reflect the new Strategy pattern for anchor validation. ^US1-8AC6
+
+_Depends On_: [Story 1.7: Implement ParsedDocument Facade](#Story%201.7%20Implement%20ParsedDocument%20Facade)
+_Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#Story%202.1%20Enhance%20Parser%20to%20Handle%20Full-File%20and%20Section%20Links)
+_Closes Technical Debt_: Prevents future debt by decoupling validation logic and enabling extension over modification.
+_Functional Requirements_: [[#^FR8|FR8]]
+_Status_: 📋 PENDING
+
+> [!note] Technical Lead Feedback: Establishes Core Architectural Pattern
+>
+> Architectural Impact: This story establishes the Strategy Pattern as a core pattern for the application. By implementing it on an existing, well-tested feature (anchor validation), we prove its viability before reusing it for the more complex new feature (extraction eligibility) in Epic 2.
+>
+> Relevant Architecture Principles: [extension-over-modification](../../../../../design-docs/Architecture%20Principles.md#^extension-over-modification), [dependency-abstraction](../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction), [single-responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility).
+
+---
 ### Story 2.1: Enhance Parser to Handle Full-File and Section Links
 
 **As a** developer,
@@ -272,3 +340,40 @@ The feature will be validated through:
 - [Content Aggregation Architecture](content-aggregation-architecture.md) - Feature-specific architectural enhancements
 - [Workspace PRD](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-prd.md) - Parent workspace requirements
 - [Workspace Architecture](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md) - Workspace architectural context
+
+---
+## Whiteboard
+
+You've hit on the most important strategic questions we need to answer before starting Epic 2. You're right to be confused about the sequence; let's clarify it.
+
+The proposed sequence of US 1.6, 1.7, and 1.8 is the correct, low-risk path forward. Regarding the parser's technical debt, I recommend we **defer** that refactoring until after Epic 2. Here’s the rationale.
+
+---
+
+### Clarifying the Sequence and Rationale
+
+The current plan is a classic, incremental approach: fix the data, create a clean interface, prove the new pattern, and then build the new feature. US 1.8 does not "re-do" US 1.6; it builds upon it.
+
+Here is the logical flow:
+
+1. **US 1.6 (Refactor Anchor Schema): Fix the Data Model.** We first normalize the `AnchorObject` data model to be efficient and correct. This is a prerequisite for any new logic that consumes anchors.
+
+2. **US 1.7 (Implement ParsedDocument Facade): Create the Interface.** We then introduce the `ParsedDocument` facade to encapsulate the parser's raw output. This provides a stable, method-based API (`hasAnchor()`, `getLinks()`, etc.) for all consumers and is the most critical step for enabling future refactoring.
+
+3. **US 1.8 (Refactor Anchor Validation): Prove the New Pattern.** We introduce the **Strategy and Factory patterns** here by refactoring the _existing_ anchor validation logic. This allows us to validate the new architectural pattern on a known, testable feature before using it to build something new.
+
+4. **US 2.1 (Implement Extraction Eligibility): Build the New Feature.** As the first story of Epic 2, we apply the now-proven Strategy pattern to the _new_ content extraction eligibility logic.
+
+---
+
+### Parser Refactoring (Regex vs. Tokens)
+
+You are absolutely right to point out the parser's technical debt regarding its heavy use of regex instead of the generated tokens. However, I strongly recommend we **defer this specific refactoring** until after Epic 2 is complete.
+
+Here’s why:
+
+- **The Facade is the Safety Net:** The most important thing is to implement **US 1.7 (ParsedDocument Facade)**. Once the facade is in place, it completely decouples the `CitationValidator` and the future `ContentExtractor` from the parser's internal logic.
+
+- **Decoupling Enables Safe Refactoring:** After the facade exists, we can gut and rewrite the `MarkdownParser`'s internals—switching entirely to a token-based approach—and as long as it still produces the same `MarkdownParser.Output.DataContract` for the facade to consume, **no downstream components will break**.
+
+- **Focus on Delivery:** Refactoring the parser now is a significant task that would delay the start of Epic 2. By implementing the facade first, we can deliver the high-value content extraction feature and then safely circle back to optimize the parser's performance and code quality later.

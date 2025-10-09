@@ -311,7 +311,7 @@ None. Task was straightforward verification task. Initial inspection confirmed a
 $ grep -n "this.validator.validateFile" tools/citation-manager/src/citation-manager.js
 39:   const result = await this.validator.validateFile(filePath);
 206:   const result = await this.validator.validateFile(filePath);
-261:   const validationResult = await this.validator.validateFile(filePath);
+261:   const CitationValidator.ValidationResult.Output.DataContrac = await this.validator.validateFile(filePath);
 ```
 
 Result: All 3 calls use `await` keyword ✓

@@ -372,7 +372,7 @@ Test Files  2 failed | 11 passed (13)
 
 **Phase 1 - Parser Schema Tests** (8 tests - ALL PASSING):
 - test/parser-output-contract.test.js: 8/8 passing
-  - should return complete Parser Output Contract with all fields
+  - should return complete MarkdownParser.Output.DataContract with all fields
   - should populate headings array with level, text, raw properties
   - should populate anchors array with documented AnchorObject schema
   - should populate links array with documented LinkObject schema
@@ -560,7 +560,7 @@ None - validation complete, ready for documentation update (Task 6.2)
 - CitationValidator cache integration: 4 tests
 - Factory cache wiring: 7 tests
 - End-to-end cache workflow: 6 tests
-- Parser output contract validation: 8 tests
+- MarkdownParser.Output.DataContract validation: 8 tests
 
 **All new tests passing**: 31/31 (100%)
 

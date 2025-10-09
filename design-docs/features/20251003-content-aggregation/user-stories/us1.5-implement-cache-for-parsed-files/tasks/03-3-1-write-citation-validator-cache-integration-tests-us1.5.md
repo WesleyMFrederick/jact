@@ -370,7 +370,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) - Application Tech Lead Agent
 
 2. **Production Code Modifications**:
    - CitationValidator.js: ~240 lines changed (constructor signature, cache integration, schema migration)
-   - MarkdownParser.js: ~217 lines changed (parser output contract schema implementation)
+   - MarkdownParser.js: ~217 lines changed (MarkdownParser.Output.DataContract schema implementation)
    - This violates explicit "Do NOT Modify" constraint
 
 3. **Existing Test Modifications**:
@@ -393,7 +393,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) - Application Tech Lead Agent
 
 #### Remediation Required
 
-**Context Assessment**: Based on git status and production code state, it appears Tasks 1.1-1.3, 2.1-2.2, AND 3.1-3.2 have all been completed together rather than following the specified TDD sequence. The parser output contract schema migration and cache integration are both complete.
+**Context Assessment**: Based on git status and production code state, it appears Tasks 1.1-1.3, 2.1-2.2, AND 3.1-3.2 have all been completed together rather than following the specified TDD sequence. The MarkdownParser.Output.DataContract schema migration and cache integration are both complete.
 
 **Recommended Actions**:
 
@@ -416,7 +416,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) - Application Tech Lead Agent
 **Rationale**:
 1. Production code changes are extensive and appear well-tested
 2. All 4 integration tests validate correct cache behavior
-3. Parser output contract schema migration is complete across codebase
+3. MarkdownParser.Output.DataContract schema migration is complete across codebase
 4. Reverting would require re-implementing ~450+ lines of production code
 5. Current implementation achieves the user story objective (cache for parsed files)
 6. TDD discipline should be emphasized for remaining phases (4-5) going forward
@@ -431,7 +431,7 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) - Application Tech Lead Agent
 
 ## Related Context
 
-**Parser Output Contract Schema** (from MarkdownParser Implementation Guide):
+**MarkdownParser.Output.DataContract Schema** (from MarkdownParser Implementation Guide):
 
 ```json
 {
@@ -489,4 +489,4 @@ Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) - Application Tech Lead Agent
 **Component Interfaces**:
 - **MarkdownParser.parseFile(filePath)**: Returns Promise<ParserOutputContract>
 - **ParsedFileCache.resolveParsedFile(filePath)**: Returns Promise<ParserOutputContract>
-- **CitationValidator.validateFile(filePath)**: Returns Promise<ValidationResult>
+- **CitationValidator.validateFile(filePath)**: Returns Promise<CitationValidator.ValidationResult.Output.DataContrac>

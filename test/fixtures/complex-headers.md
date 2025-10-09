@@ -10,7 +10,7 @@
 
 ## Header with **bold** text
 
-## Header with *italic* text
+## Header with _italic_ text
 
 ## Header with ==highlighted== text
 
@@ -31,6 +31,12 @@
 ## Unicode 📁 Characters
 
 ### ADR-006: Module System Selection (CommonJS vs ES6)
+
+## Story 1.5: Implement Cache
+
+## Introduction
+
+Test block anchor: ^test-block
 
 Test citations:
 - [Standard](complex-headers.md#standard-header)

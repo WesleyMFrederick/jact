@@ -1,7 +1,7 @@
 ---
 story: "User Story 1.5: Implement a Cache for Parsed File Objects"
 epic: Citation Manager Test Migration & Content Aggregation
-phase: "Phase 1: Parser Output Contract Validation & Documentation"
+phase: "Phase 1: MarkdownParser.Output.DataContract Validation & Documentation"
 task-id: "1.2"
 task-anchor: ^US1-5T1-2
 wave: 1c
@@ -145,7 +145,7 @@ it('should populate anchors array with type, anchor, line properties', async () 
 
 ```javascript
 // Tests validate DOCUMENTED schema from Implementation Guide
-describe('MarkdownParser Output Contract - Link Schema', () => {
+describe('MarkdownMarkdownParser.Output.DataContract - Link Schema', () => {
   it('should populate links array with documented LinkObject schema', async () => {
     // Given: Parser with fixture containing cross-document links
     const parser = createMarkdownParser();
@@ -198,7 +198,7 @@ describe('MarkdownParser Output Contract - Link Schema', () => {
   });
 });
 
-describe('MarkdownParser Output Contract - Anchor Schema', () => {
+describe('MarkdownMarkdownParser.Output.DataContract - Anchor Schema', () => {
   it('should populate anchors array with documented AnchorObject schema', async () => {
     // Given: Parser with fixture containing anchors
     const parser = createMarkdownParser();
@@ -337,13 +337,13 @@ grep -c "it('should" tools/citation-manager/test/parser-output-contract.test.js
 npm test -- parser-output-contract
 
 # Sample expected output:
-✗ MarkdownParser Output Contract - Link Schema
+✗ MarkdownMarkdownParser.Output.DataContract - Link Schema
   ✗ should populate links array with documented LinkObject schema
     AssertionError: Expected link to have property 'linkType'
     Expected: { linkType: string, scope: string, ... }
     Received: { type: 'cross-document', text: '...', file: '...', ... }
 
-✗ MarkdownParser Output Contract - Anchor Schema
+✗ MarkdownMarkdownParser.Output.DataContract - Anchor Schema
   ✗ should populate anchors array with documented AnchorObject schema
     AssertionError: Expected anchor to have property 'anchorType'
     Expected: { anchorType: string, id: string, ... }
@@ -471,7 +471,7 @@ Tests  4 failed | 4 passed (8)
    - Shows current implementation missing `linkType` property
 
 **Passing Tests** (validating top-level contract structure):
-- ✅ `should return complete Parser Output Contract with all fields`
+- ✅ `should return complete MarkdownParser.Output.DataContract with all fields`
 - ✅ `should populate headings array with level, text, raw properties`
 - ✅ `should validate headings extracted from complex header fixture`
 - ✅ `should validate parser output matches documented contract schema`

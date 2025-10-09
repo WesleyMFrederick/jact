@@ -42,7 +42,7 @@ describe("Component Factory - ParsedFileCache Creation", () => {
 		// When: Cache resolves parsed file
 		const result = await cache.resolveParsedFile(fixtureFile);
 
-		// Then: Returns valid Parser Output Contract
+		// Then: Returns valid MarkdownParser.Output.DataContract
 		expect(result).toHaveProperty("filePath");
 		expect(result).toHaveProperty("content");
 		expect(result).toHaveProperty("links");

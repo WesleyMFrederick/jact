@@ -23,7 +23,7 @@ describe("ParsedFileCache", () => {
 		// When: First request for file
 		const result = await cache.resolveParsedFile(testFile);
 
-		// Then: Parser Output Contract returned with all required fields
+		// Then: MarkdownParser.Output.DataContract returned with all required fields
 		expect(result).toHaveProperty("filePath");
 		expect(result).toHaveProperty("content");
 		expect(result).toHaveProperty("tokens");
@@ -87,7 +87,7 @@ describe("ParsedFileCache", () => {
 		expect(result2).toBe(result1);
 		expect(result3).toBe(result1);
 
-		// All results have complete Parser Output Contract
+		// All results have complete MarkdownParser.Output.DataContract
 		expect(result1).toHaveProperty("filePath");
 		expect(result1).toHaveProperty("content");
 		expect(result1).toHaveProperty("tokens");

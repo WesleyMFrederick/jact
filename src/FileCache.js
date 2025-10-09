@@ -1,4 +1,32 @@
+/**
+ * Filename-based cache for smart file resolution
+ *
+ * Enables filename-only link resolution by building an in-memory index of all markdown files
+ * within a scope folder. Supports fuzzy matching for common typos, double extensions, and
+ * architecture file variants. Handles symlinks by resolving to real paths before scanning.
+ *
+ * Use case: Allow citations like [text](file.md) to resolve correctly even when the file
+ * is in a different directory, as long as there's only one file with that name in scope.
+ *
+ * Architecture decisions:
+ * - Scans only the symlink-resolved directory to avoid duplicate entries
+ * - Tracks duplicate filenames to prevent ambiguous resolutions
+ * - Provides fuzzy matching as fallback (typo corrections, double extensions)
+ * - Warns about duplicates to help users fix ambiguous references
+ *
+ * @example
+ * const cache = new FileCache(fs, path);
+ * cache.buildCache('/project/docs');
+ * const result = cache.resolveFile('architecture.md');
+ * // Returns { found: true, path: '/project/docs/design/architecture.md' }
+ */
 export class FileCache {
+	/**
+	 * Initialize cache with file system and path dependencies
+	 *
+	 * @param {Object} fileSystem - Node.js fs module (or mock for testing)
+	 * @param {Object} pathModule - Node.js path module (or mock for testing)
+	 */
 	constructor(fileSystem, pathModule) {
 		this.fs = fileSystem;
 		this.path = pathModule;
@@ -6,6 +34,16 @@ export class FileCache {
 		this.duplicates = new Set(); // filenames that appear multiple times
 	}
 
+	/**
+	 * Build cache by recursively scanning scope folder
+	 *
+	 * Resolves symlinks before scanning to prevent duplicate entries from symlink artifacts.
+	 * Scans all subdirectories for .md files and indexes by filename. Warns if duplicate
+	 * filenames are detected (these will require relative path disambiguation).
+	 *
+	 * @param {string} scopeFolder - Root folder to scan (can be symlink, will be resolved)
+	 * @returns {Object} Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
+	 */
 	buildCache(scopeFolder) {
 		this.cache.clear();
 		this.duplicates.clear();
@@ -39,6 +77,7 @@ export class FileCache {
 		};
 	}
 
+	// Recursively scan directory for markdown files
 	scanDirectory(dirPath) {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
@@ -63,6 +102,7 @@ export class FileCache {
 		}
 	}
 
+	// Add file to cache or mark as duplicate if filename already exists
 	addToCache(filename, fullPath) {
 		if (this.cache.has(filename)) {
 			// Mark as duplicate
@@ -72,6 +112,19 @@ export class FileCache {
 		}
 	}
 
+	/**
+	 * Resolve filename to absolute path with fuzzy matching fallback
+	 *
+	 * Resolution strategy:
+	 * 1. Exact filename match (fastest)
+	 * 2. Try without/with .md extension
+	 * 3. Fuzzy matching for typos and common issues
+	 *
+	 * Returns error if filename is ambiguous (multiple files with same name).
+	 *
+	 * @param {string} filename - Filename to resolve (with or without .md extension)
+	 * @returns {Object} Result object with { found, path?, reason?, message?, fuzzyMatch?, correctedFilename? }
+	 */
 	resolveFile(filename) {
 		// Check for exact filename match first
 		if (this.cache.has(filename)) {
@@ -119,6 +172,20 @@ export class FileCache {
 		};
 	}
 
+	/**
+	 * Find fuzzy matches for common filename issues
+	 *
+	 * Applies intelligent corrections for:
+	 * - Double extensions (file.md.md → file.md)
+	 * - Common typos (verson → version, architeture → architecture, managment → management)
+	 * - Partial architecture file matching (arch- prefixes)
+	 *
+	 * Returns null if no fuzzy match found. Returns duplicate error if corrected filename
+	 * has multiple matches.
+	 *
+	 * @param {string} filename - Original filename that failed exact match
+	 * @returns {Object|null} Fuzzy match result with { found, path, fuzzyMatch: true, correctedFilename, message } or null
+	 */
 	findFuzzyMatch(filename) {
 		const allFiles = Array.from(this.cache.keys());
 
@@ -206,6 +273,7 @@ export class FileCache {
 		return null;
 	}
 
+	// Get all cached files with duplicate status
 	getAllFiles() {
 		return Array.from(this.cache.entries()).map(([filename, path]) => ({
 			filename,
@@ -214,6 +282,7 @@ export class FileCache {
 		}));
 	}
 
+	// Get cache statistics (total files, duplicates)
 	getCacheStats() {
 		return {
 			totalFiles: this.cache.size,
