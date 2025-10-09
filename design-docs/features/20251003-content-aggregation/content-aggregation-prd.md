@@ -122,7 +122,7 @@ This feature encompasses two critical phases:
 
 _Depends On_: [US1.3: Make Migrated citation-manager Executable](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/user-stories/us1.3-make-migrated-citation-manager-executable/us1.3-make-migrated-citation-manager-executable.md)
 _Functional Requirements_: [[#^FR2|FR2]], [[#^FR9|FR9]]
-_User Story Link:_ [us1.4a-migrate-test-suite-to-vitest](user-stories/us1.4a-migrate-test-suite-to-vitest/us1.4a-migrate-test-suite-to-vitest.md)
+_User Story Link:_ [us1.4a-migrate-test-suite-to-vitest](user-stories/us1.4a-migrate-test-suite-to-vitest/us1.4a-migrate-test-suite-to-vitest.md)%%stop-extract-link%%
 _Status_: ✅ COMPLETE (2025-10-07)claudeclaude
 
 ---
@@ -146,7 +146,7 @@ _Depends On_: Story [Story 1.4a: Migrate citation-manager Test Suite to Vitest](
 _Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#Story%202.1%20Enhance%20Parser%20to%20Handle%20Full-File%20and%20Section%20Links)
 _Closes Technical Debt_: [Lack of Dependency Injection](content-aggregation-architecture.md#Lack%20of%20Dependency%20Injection)
 _Functional Requirements_: [[#^FR2|FR2]], [[#^FR8|FR8]]
-_User Story Link:_ [us1.4b-refactor-components-for-di](user-stories/us1.4b-refactor-components-for-di/us1.4b-refactor-components-for-di.md)
+_User Story Link:_ [us1.4b-refactor-components-for-di](user-stories/us1.4b-refactor-components-for-di/us1.4b-refactor-components-for-di.md)%%stop-extract-link%%
 _Status_: ✅ COMPLETE (2025-10-07)
 
 ---
@@ -169,7 +169,7 @@ _Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#St
 _Closes Technical Debt_: [Redundant File Parsing During Validation](content-aggregation-architecture.md#Redundant%20File%20Parsing%20During%20Validation)
 _Functional Requirements_: [[#^FR8|FR8]]
 _Non-Functional Requirements_: [[#^NFR5|NFR5]]
-_User Story Link:_ [us1.5-implement-cache-for-parsed-files](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md)
+_User Story Link:_ [us1.5-implement-cache-for-parsed-files](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md)%%stop-extract-link%%
 _Status_: ✅ COMPLETE (2025-10-07)
 
 > [!success] **Technical Lead Feedback**: Caching Layer for Performance and Modularity ✅ IMPLEMENTED
@@ -204,7 +204,7 @@ _Depends On_: [Story 1.5: Implement a Cache for Parsed File Objects](#Story%201.
 _Enables_: [Story 1.7: Implement ParsedDocument Facade](#Story%201.7%20Implement%20ParsedDocument%20Facade)
 _Closes Technical Debt_: [Duplicate Anchor Entries in MarkdownParser.Output.DataContract](content-aggregation-architecture.md#Duplicate%20Anchor%20Entries%20in%20MarkdownParser.Output.DataContract)
 _Functional Requirements_: [[#^FR8|FR8]]
-_User Story Link_: user-stories/us1.6-refactor-anchor-schema/us1.6-refactor-anchor-schema.md
+_User Story Link_: [us1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](user-stories/us1.6-refactor-anchor-schema/us1.6-refactor-anchor-schema.md)
 _Status_:  ✅ COMPLETE (2025-10-09)
 
 ---
