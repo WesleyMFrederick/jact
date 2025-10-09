@@ -70,7 +70,7 @@ async fix(filePath, options = {}) {
     // ... existing validation logic ...
 
     // Process anchor fixes only
-    for (const result of validationResults.results.filter(r => r.status === 'error' && r.type === 'anchor')) {
+    for (const result of CitationValidator.ValidationResult.Output.DataContracs.results.filter(r => r.status === 'error' && r.type === 'anchor')) {
         // Apply kebab-case anchor fixes
     }
 }
@@ -84,7 +84,7 @@ async fix(filePath, options = {}) {
     let anchorFixesApplied = 0;
 
     // Process all fixable issues: warnings (path) and errors (anchors)
-    const fixableResults = validationResults.results.filter(r =>
+    const fixableResults = CitationValidator.ValidationResult.Output.DataContracs.results.filter(r =>
         (r.status === 'warning' && r.pathConversion) ||
         (r.status === 'error' && r.type === 'anchor')
     );

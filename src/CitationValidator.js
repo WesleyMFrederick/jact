@@ -1,44 +1,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-/**
- * Citation validator with multi-strategy path resolution
- *
- * Validates markdown citations (links and anchors) with intelligent path resolution
- * and anchor verification. Supports multiple link formats, symlink resolution, and
- * file cache-based smart matching.
- *
- * Validation features:
- * - Pattern validation (caret syntax, emphasis-marked, cross-document)
- * - File existence checking with multiple resolution strategies
- * - Anchor existence verification in target files
- * - Flexible anchor matching (handles markdown in headers, URL encoding)
- * - Cross-directory detection with path correction suggestions
- *
- * Path resolution strategies (in order):
- * 1. Standard relative path resolution
- * 2. Obsidian absolute path format (e.g., "0_SoftwareDevelopment/...")
- * 3. Symlink-resolved path resolution
- * 4. File cache smart filename matching
- *
- * Architecture decisions:
- * - Uses ParsedFileCache for anchor validation to avoid re-parsing target files
- * - Uses FileCache for smart filename resolution when relative paths fail
- * - Distinguishes between errors (broken links) and warnings (cross-directory resolutions)
- * - Provides path conversion suggestions for cross-directory warnings
- *
- * @example
- * const validator = new CitationValidator(parsedFileCache, fileCache);
- * const result = await validator.validateFile('/path/to/file.md');
- * // Returns { file, summary: { total, valid, errors, warnings }, results: [...] }
- */
 export class CitationValidator {
-	/**
-	 * Initialize validator with cache dependencies
-	 *
-	 * @param {ParsedFileCache} parsedFileCache - Cache for parsed file data (anchor validation)
-	 * @param {FileCache} fileCache - Cache for smart filename resolution
-	 */
 	constructor(parsedFileCache, fileCache) {
 		this.parsedFileCache = parsedFileCache;
 		this.fileCache = fileCache;
@@ -47,9 +10,19 @@ export class CitationValidator {
 		this.patterns = {
 			CARET_SYNTAX: {
 				regex:
-					/^\^([A-Za-z]{2,3}\d+(?:-\d+[a-z]?(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Za-z]+\d+|MVP-P\d+)$/,
-				examples: ["^FR1", "^US1-1AC1", "^US1-4bT1-1", "^NFR2", "^MVP-P1"],
-				description: "Caret syntax for requirements and criteria",
+					/^\^([A-Za-z]{2,3}\d+(?:-\d+[a-z]?(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Za-z]+\d+|MVP-P\d+|[a-z][a-z0-9-]+[a-z0-9])$/,
+				examples: [
+				"^FR1",
+				"^US1-1AC1",
+				"^US1-4bT1-1",
+				"^NFR2",
+				"^MVP-P1",
+				"^black-box-interfaces",
+				"^first-section-intro",
+				"^deep-heading",
+			],
+				description:
+				"Caret syntax for requirements/criteria (numbered) and Obsidian block references (text-based)",
 			},
 			EMPHASIS_MARKED: {
 				regex: /^==\*\*[^*]+\*\*==$/,
@@ -66,7 +39,7 @@ export class CitationValidator {
 		};
 	}
 
-	// Safely resolve symlinks to real paths, returning original path if resolution fails
+	// Symlink resolution utilities
 	safeRealpathSync(path) {
 		try {
 			return realpathSync(path);
@@ -75,7 +48,6 @@ export class CitationValidator {
 		}
 	}
 
-	// Check if path exists and is a file
 	isFile(path) {
 		try {
 			return existsSync(path) && statSync(path).isFile();
@@ -84,22 +56,11 @@ export class CitationValidator {
 		}
 	}
 
-	// Detect Obsidian absolute path format (e.g., "0_SoftwareDevelopment/file.md")
 	isObsidianAbsolutePath(path) {
 		// Detect Obsidian absolute paths like "0_SoftwareDevelopment/..."
 		return /^[A-Za-z0-9_-]+\//.test(path) && !isAbsolute(path);
 	}
 
-	/**
-	 * Convert Obsidian absolute path to filesystem path
-	 *
-	 * Walks up directory tree from source file looking for project root where
-	 * the Obsidian path exists. Returns null if path cannot be resolved.
-	 *
-	 * @param {string} obsidianPath - Obsidian vault-relative path
-	 * @param {string} sourceFile - Source file path (used to find project root)
-	 * @returns {string|null} Resolved filesystem path or null
-	 */
 	convertObsidianToFilesystemPath(obsidianPath, sourceFile) {
 		// Try to find the project root by walking up from source file
 		let currentDir = dirname(sourceFile);
@@ -116,17 +77,6 @@ export class CitationValidator {
 		return null;
 	}
 
-	/**
-	 * Generate debug information for path resolution failures
-	 *
-	 * Provides detailed diagnostic information about why a path couldn't be resolved,
-	 * including attempted resolution strategies and symlink information. Used in error
-	 * messages to help users fix broken links.
-	 *
-	 * @param {string} relativePath - Relative path that failed to resolve
-	 * @param {string} sourceFile - Source file path
-	 * @returns {string} Debug information string
-	 */
 	generatePathResolutionDebugInfo(relativePath, sourceFile) {
 		const sourceDir = dirname(sourceFile);
 		const realSourceFile = this.safeRealpathSync(sourceFile);
@@ -158,16 +108,6 @@ export class CitationValidator {
 		return debugParts.join("; ");
 	}
 
-	/**
-	 * Validate all citations in a markdown file
-	 *
-	 * Parses file and validates each extracted link. Generates summary with counts
-	 * of valid, error, and warning citations. Throws error if file doesn't exist.
-	 *
-	 * @param {string} filePath - Path to markdown file to validate
-	 * @returns {Promise<Object>} Validation result with { file, summary: { total, valid, errors, warnings }, results: [...] }
-	 * @throws {Error} If file not found
-	 */
 	async validateFile(filePath) {
 		if (!existsSync(filePath)) {
 			throw new Error(`File not found: ${filePath}`);
@@ -197,16 +137,6 @@ export class CitationValidator {
 		};
 	}
 
-	/**
-	 * Validate a single citation
-	 *
-	 * Routes citation to appropriate validator based on pattern classification.
-	 * Supports caret syntax, emphasis-marked, cross-document, and wiki-style links.
-	 *
-	 * @param {Object} citation - Citation object from parser with { linkType, scope, anchorType, target, ... }
-	 * @param {string} contextFile - Source file path (for relative path resolution)
-	 * @returns {Promise<Object>} Validation result with { status, line, citation, error?, suggestion?, pathConversion? }
-	 */
 	async validateSingleCitation(citation, contextFile) {
 		const patternType = this.classifyPattern(citation);
 
@@ -517,21 +447,6 @@ export class CitationValidator {
 		return this.createValidationResult(citation, "valid");
 	}
 
-	/**
-	 * Resolve target file path using multi-strategy approach
-	 *
-	 * Attempts path resolution in order:
-	 * 1. Standard relative path resolution (with URL decoding)
-	 * 2. Obsidian absolute path format conversion
-	 * 3. Symlink-resolved path resolution
-	 * 4. File cache smart filename matching
-	 *
-	 * Returns standard path as fallback (will be caught as "file not found" by caller).
-	 *
-	 * @param {string} relativePath - Relative path from citation
-	 * @param {string} sourceFile - Source file path
-	 * @returns {string} Resolved absolute path (may not exist)
-	 */
 	resolveTargetPath(relativePath, sourceFile) {
 		// Decode URL encoding in paths (e.g., %20 becomes space)
 		const decodedRelativePath = decodeURIComponent(relativePath);
@@ -601,22 +516,6 @@ export class CitationValidator {
 		return standardPath;
 	}
 
-	/**
-	 * Validate anchor exists in target file with flexible matching
-	 *
-	 * Checks if anchor exists in target file using multiple matching strategies:
-	 * - Direct anchor ID match
-	 * - URL-decoded match (for emphasis-marked anchors with %20)
-	 * - Obsidian block reference match (^anchor-id)
-	 * - Flexible markdown matching (handles backticks, bold, etc. in headers)
-	 *
-	 * Returns suggestions for similar anchors if not found. Validates that kebab-case
-	 * anchors use raw header format for better Obsidian compatibility.
-	 *
-	 * @param {string} anchor - Anchor ID to find
-	 * @param {string} targetFile - Target file path
-	 * @returns {Promise<Object>} Result with { valid: boolean, suggestion?, matchedAs? }
-	 */
 	async validateAnchorExists(anchor, targetFile) {
 		try {
 			const parsed = await this.parsedFileCache.resolveParsedFile(targetFile);
@@ -718,21 +617,6 @@ export class CitationValidator {
 		}
 	}
 
-	/**
-	 * Find flexible anchor match handling markdown in headers
-	 *
-	 * Attempts multiple matching strategies for anchors with markdown formatting:
-	 * - Exact match (ID or raw text)
-	 * - Backtick-wrapped/unwrapped variations
-	 * - Markdown-cleaned comparison (removes backticks, bold, italic, etc.)
-	 *
-	 * This handles cases where headers contain markdown like `code`, **bold**, or ==highlights==
-	 * that affect anchor generation.
-	 *
-	 * @param {string} searchAnchor - Anchor to find (may be URL-encoded)
-	 * @param {Array<Object>} availableAnchors - Anchors from target file with { id, rawText, anchorType }
-	 * @returns {Object} Result with { found: boolean, matchType?: string }
-	 */
 	findFlexibleAnchorMatch(searchAnchor, availableAnchors) {
 		// Remove URL encoding for comparison
 		const cleanSearchAnchor = decodeURIComponent(searchAnchor);
@@ -784,7 +668,6 @@ export class CitationValidator {
 		return { found: false };
 	}
 
-	// Remove markdown syntax for anchor comparison
 	cleanMarkdownForComparison(text) {
 		if (!text) return "";
 		return text
@@ -796,17 +679,6 @@ export class CitationValidator {
 			.trim();
 	}
 
-	/**
-	 * Suggest better Obsidian-compatible anchor format
-	 *
-	 * Checks if a kebab-case anchor has a raw header equivalent and suggests using
-	 * the raw format for better Obsidian compatibility. Obsidian prefers raw header
-	 * text with URL encoding over auto-generated kebab-case.
-	 *
-	 * @param {string} usedAnchor - Anchor currently being used (may be kebab-case)
-	 * @param {Array<Object>} availableAnchors - Available anchors from target file
-	 * @returns {string|null} Suggested better anchor format or null
-	 */
 	suggestObsidianBetterFormat(usedAnchor, availableAnchors) {
 		// Check if the used anchor is kebab-case and has a raw header equivalent
 		for (const anchorObj of availableAnchors) {
@@ -833,17 +705,6 @@ export class CitationValidator {
 		return null;
 	}
 
-	/**
-	 * Generate anchor suggestions based on similarity
-	 *
-	 * Simple similarity matching using substring comparison. Returns anchors that
-	 * contain the search term or vice versa. Could be enhanced with fuzzy matching
-	 * algorithms like Levenshtein distance.
-	 *
-	 * @param {string} anchor - Anchor that wasn't found
-	 * @param {Array<string>} availableAnchors - Available anchor IDs from target file
-	 * @returns {Array<string>} Up to 5 similar anchor suggestions
-	 */
 	generateAnchorSuggestions(anchor, availableAnchors) {
 		// Simple similarity matching - could be enhanced with fuzzy matching
 		const searchTerm = anchor.toLowerCase();
@@ -856,7 +717,13 @@ export class CitationValidator {
 			.slice(0, 5);
 	}
 
-	// Check if source and target files are in the same directory
+	/**
+	 * Check if the source file and target file are in the same directory.
+	 * Used to detect cross-directory resolutions that should trigger warnings.
+	 * @param {string} sourceFile - The source file path
+	 * @param {string} targetFile - The target file path
+	 * @returns {boolean} True if files are in the same directory, false otherwise
+	 */
 	isDirectoryMatch(sourceFile, targetFile) {
 		const { dirname } = require("node:path");
 		const sourceDir = dirname(sourceFile);
@@ -864,7 +731,12 @@ export class CitationValidator {
 		return sourceDir === targetDir;
 	}
 
-	// Calculate relative path from source to target file
+	/**
+	 * Calculate relative path from source file to target file
+	 * @param {string} sourceFile - Path to the source file
+	 * @param {string} targetFile - Path to the target file
+	 * @returns {string} Relative path with normalized forward slashes
+	 */
 	calculateRelativePath(sourceFile, targetFile) {
 		const sourceDir = dirname(sourceFile);
 		const relativePath = relative(sourceDir, targetFile);
@@ -892,6 +764,15 @@ export class CitationValidator {
 		};
 	}
 
+	/**
+	 * Create a validation result object
+	 * @param {object} citation - Citation object
+	 * @param {string} status - Validation status
+	 * @param {string|null} error - Error message if any
+	 * @param {string|null} message - Additional message if any
+	 * @param {object|null} suggestion - Suggestion object if any
+	 * @returns {object} Validation result
+	 */
 	createValidationResult(
 		citation,
 		status,

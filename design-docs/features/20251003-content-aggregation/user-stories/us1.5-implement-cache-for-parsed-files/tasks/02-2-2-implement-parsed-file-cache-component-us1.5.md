@@ -14,7 +14,7 @@ status: "Done"
 
 ## Objective
 
-Implement ParsedFileCache component with Map-based in-memory cache storing Parser Output Contract objects, making all unit tests from Task 2.1 pass.
+Implement ParsedFileCache component with Map-based in-memory cache storing MarkdownParser.Output.DataContract objects, making all unit tests from Task 2.1 pass.
 
 _Source: [US1.5 Task 2.2](../us1.5-implement-cache-for-parsed-files.md#^US1-5T2-2)_
 
@@ -102,10 +102,10 @@ Implement ParsedFileCache class with:
   - Check cache: If key exists, return cached Promise immediately (cache hit)
   - If missing: Call `this.parser.parseFile(cacheKey)`, store Promise in cache, return Promise (cache miss)
   - Handle errors: Add `.catch()` to remove failed promises from cache
-  - Return Promise that resolves to Parser Output Contract
+  - Return Promise that resolves to MarkdownParser.Output.DataContract
 
 Implementation must satisfy:
-- AC1: Cache hit returns cached Parser Output Contract without re-parsing
+- AC1: Cache hit returns cached MarkdownParser.Output.DataContract without re-parsing
 - AC2: Cache miss parses file and stores result before returning
 - Concurrent requests: Storing Promise immediately prevents duplicate parses
 - Error recovery: Failed promises removed from cache allow retry on next request

@@ -6,8 +6,8 @@ import { createMarkdownParser } from "../src/factories/componentFactory.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-describe("MarkdownParser Output Contract", () => {
-	it("should return complete Parser Output Contract with all fields", async () => {
+describe("MarkdownMarkdownParser.Output.DataContract", () => {
+	it("should return complete MarkdownParser.Output.DataContract with all fields", async () => {
 		// Given: Factory-created parser with test fixture
 		const parser = createMarkdownParser();
 		const testFile = join(__dirname, "fixtures", "valid-citations.md");
@@ -224,7 +224,7 @@ describe("MarkdownParser Output Contract", () => {
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
 
-		// Then: Output matches the documented Parser Output Contract
+		// Then: Output matches the documented MarkdownParser.Output.DataContract
 		// Required top-level fields per contract
 		const requiredFields = [
 			"filePath",

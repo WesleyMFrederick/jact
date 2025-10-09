@@ -136,7 +136,7 @@ The component's primary responsibility is to delegate core business logic (e.g.,
 - _provides_ structured AST data to `CLI Orchestrator` and `Citation Validator` (synchronous)
 
 ##### Boundaries
-The component is exclusively responsible for transforming a raw markdown string into the structured **Parser Output Contract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** responsible for:
+The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** responsible for:
 - Validating the existence or accessibility of file paths.
 - Verifying the semantic correctness of links or anchors.
 - Interpreting or executing any code within the document.
@@ -169,7 +169,7 @@ The component's primary output is from the `resolveFile()` method, which returns
   - `Node.js` class
   - ESM modules
 - **Technology Status:** Production
-- **Description:** Validates `Link Objects` by consuming `Parser Output Contract` objects to check for target and anchor existence. It classifies citation patterns (caret syntax,cross-document, wiki-style), resolves file paths using multiple strategies (relative paths, symlinks, Obsidian absolute paths, cache lookup), generates validation results with actionable suggestions.
+- **Description:** Validates `Link Objects` by consuming `MarkdownParser.Output.DataContract` objects to check for target and anchor existence. It classifies citation patterns (caret syntax,cross-document, wiki-style), resolves file paths using multiple strategies (relative paths, symlinks, Obsidian absolute paths, cache lookup), generates validation results with actionable suggestions.
 - **Implementation Guide**: [CitationValidator Implementation Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md) for public contracts and data objects
 
 ##### Interactions
@@ -189,7 +189,7 @@ The component's primary output is from the `resolveFile()` method, which returns
   - `Node.js` class
   - ESM modules
 - **Technology Status:** Implemented
-- **Description:** Maintains an in-memory cache of parsed file objects (`Parser Output Contract`) for the duration of a single command run. Ensures each file is read from disk and parsed by the `MarkdownParser` at most once.
+- **Description:** Maintains an in-memory cache of parsed file objects (`MarkdownParser.Output.DataContract`) for the duration of a single command run. Ensures each file is read from disk and parsed by the `MarkdownParser` at most once.
 - **Implementation Guide**: [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md) for public contracts and data objects
 
 ##### Interactions
@@ -198,7 +198,7 @@ The component's primary output is from the `resolveFile()` method, which returns
 - _is instantiated by_ the `CLI Orchestrator` (via its factory) (synchronous).
 
 ##### Boundaries
-- The component's sole responsibility is to manage the in-memory lifecycle of parsed file objects. It acts as a key-value store mapping file paths to `Parser Output Contract` objects.
+- The component's sole responsibility is to manage the in-memory lifecycle of parsed file objects. It acts as a key-value store mapping file paths to `MarkdownParser.Output.DataContract` objects.
 - It is **not** responsible for the parsing logic itself (which is delegated) or for any direct file system operations.
 
 ##### Error Handling & Cache Correctness
@@ -216,10 +216,10 @@ The component's primary output is from the `resolveFile()` method, which returns
 
 ##### ==Interactions==
 - ==_is consumed by_ the `CLI Orchestrator` to perform content aggregation (asynchronous).==
-- ==_uses_ the `ParsedFileCache` to retrieve the `Parser Output Contract` (which includes the content and tokens) for target documents (asynchronous).==
+- ==_uses_ the `ParsedFileCache` to retrieve the `MarkdownParser.Output.DataContract` (which includes the content and tokens) for target documents (asynchronous).==
 
 ##### ==Boundaries==
-- ==The component's sole responsibility is to extract a string of content from a `Parser Output Contract` based on a given `Link Object`.==
+- ==The component's sole responsibility is to extract a string of content from a `MarkdownParser.Output.DataContract` based on a given `Link Object`.==
 - ==It is **not** responsible for parsing markdown or reading files from disk; it operates on the already-parsed data provided by the cache.==
 
 ##### ==Input Public Contract==
@@ -266,12 +266,12 @@ sequenceDiagram
 
             note over Parser: Tokenizes content using marked library and extracts links, anchors, headings.
 
-            Parser-->>-ParsedCache: Return Parser Output Contract (Promise)
+            Parser-->>-ParsedCache: Return MarkdownParser.Output.DataContract (Promise)
         else On a Cache Hit
             note over ParsedCache: Returns cached Promise directly from memory.
         end
 
-        ParsedCache-->>-Validator: Return Parser Output Contract (Promise)
+        ParsedCache-->>-Validator: Return MarkdownParser.Output.DataContract (Promise)
     end
 
     note over Validator: Validator now has all parsed data and performs its validation logic in memory.
@@ -309,7 +309,7 @@ sequenceDiagram
 
     note over Validator, ParsedCache: Async validation workflow (see diagram above)
     Validator->>ParsedCache: resolveParsedFile() for source and targets
-    ParsedCache-->>Validator: Return Parser Output Contracts
+    ParsedCache-->>Validator: Return MarkdownParser.Output.DataContracts
 
     Validator-->>-CLI: Return validation results with suggestions (Promise)
 
@@ -389,7 +389,7 @@ tools/citation-manager/
 ├── src/
 │   ├── citation-manager.js          # CLI entry point (async workflow)
 │   ├── CitationValidator.js         # Validation logic (async, cache-integrated)
-│   ├── MarkdownParser.js            # Parser (Parser Output Contract)
+│   ├── MarkdownParser.js            # Parser (MarkdownParser.Output.DataContract)
 │   ├── FileCache.js                 # Filename-to-path resolution cache
 │   ├── ParsedFileCache.js           # Parsed file object cache (US1.5)
 │   └── factories/
@@ -501,7 +501,7 @@ tools/citation-manager/test/
 ### Test Categories
 
 **Contract Validation Tests** (8 tests - US1.5):
-- Validate Parser Output Contract schema compliance
+- Validate MarkdownParser.Output.DataContract schema compliance
 - Test LinkObject structure (`linkType`, `scope`, `anchorType`, `source`, `target`)
 - Test AnchorObject structure (`anchorType`, `id`, `rawText`)
 - Verify enum constraints and required fields
@@ -645,7 +645,7 @@ This tool follows workspace design principles defined in [Architecture Principle
 **Resolution Date**: 2025-10-07
 
 **Implementation Summary**:
-- Created `ParsedFileCache` component providing in-memory cache of Parser Output Contract objects
+- Created `ParsedFileCache` component providing in-memory cache of MarkdownParser.Output.DataContract objects
 - Refactored `CitationValidator` to use `ParsedFileCache` instead of direct `MarkdownParser` calls
 - Integrated cache into factory pattern for production deployment
 - Ensured files are parsed at most once per command execution
@@ -659,6 +659,50 @@ This tool follows workspace design principles defined in [Architecture Principle
 - End-to-end tests verify complete workflow with cache integration
 
 **Status**: ✅ RESOLVED (2025-10-07)
+
+### Duplicate Anchor Entries in MarkdownParser.Output.DataContract
+
+**Risk Category**: Data Model / Performance / Maintainability
+
+**Description**: The `MarkdownParser.extractAnchors()` method currently generates duplicate AnchorObject entries for each header - one with the raw text as the `id` and another with the URL-encoded (Obsidian-compatible) format as the `id`. For example, a header "Story 1.5: Implement Cache" produces two anchor objects:
+- `{ anchorType: "header", id: "Story 1.5: Implement Cache", rawText: "Story 1.5: Implement Cache", ... }`
+- `{ anchorType: "header", id: "Story%201.5%20Implement%20Cache", rawText: "Story 1.5: Implement Cache", ... }`
+
+This duplication violates the **One Source of Truth** and **Illegal States Unrepresentable** architecture principles.
+
+**Root Cause**: The current implementation at `MarkdownParser.js:513-538` creates two separate anchor objects to support both standard markdown linking (raw text) and Obsidian-style linking (URL-encoded). This was a pragmatic solution but creates data redundancy.
+
+**Impact**:
+- **Medium**: Increases memory footprint of MarkdownParser.Output.DataContract (2x anchor objects for each header)
+- **Medium**: Complicates downstream consumer logic (CitationValidator, future ContentExtractor)
+- **Low**: Creates confusing contract for developers working with anchor arrays
+- **Scope**: Affects all files with headers containing special characters (colons, spaces, etc.)
+
+**Better Design**: Each header should produce a single AnchorObject with both ID variants as separate properties:
+
+```javascript
+{
+  anchorType: "header",
+  id: "Story 1.5: Implement Cache",           // Raw text format
+  urlEncodedId: "Story%201.5%20Implement%20Cache", // Obsidian format (only when differs from id)
+  rawText: "Story 1.5: Implement Cache",
+  fullMatch: "### Story 1.5: Implement Cache",
+  line: 166,
+  column: 0
+}
+```
+
+**Migration Requirements**:
+- Refactor `MarkdownParser.extractAnchors()` to generate single anchor with dual ID properties
+- Update `CitationValidator.validateAnchorExists()` to check both `id` and `urlEncodedId` fields
+- Update MarkdownParser.Output.DataContract test fixtures and validation schema
+- Update MarkdownParser.Output.DataContract JSON schema documentation
+
+**Resolution**: Scheduled for [Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](content-aggregation-prd.md#Story%201.6%20Refactor%20Parser%20Output%20Contract%20-%20Eliminate%20Duplicate%20Anchor%20Entries)
+
+**Timeline**: Complete before Epic 2 Story 2.1 implementation, as ContentExtractor will depend on anchor structure.
+
+**Status**: Documented technical debt, scheduled for resolution.
 
 ### Scattered File I/O Operations
 
@@ -684,7 +728,7 @@ This tool follows workspace design principles defined in [Architecture Principle
 ### ParsedFileCache Memory Characteristics
 
 **Risk Category**: Performance / Resource Management
-**Description**: The `ParsedFileCache` stores complete `Parser Output Contract` objects in memory, including the full file content string. For large architectural documents or multi-file validation runs, this creates measurable memory overhead.
+**Description**: The `ParsedFileCache` stores complete `MarkdownParser.Output.DataContract` objects in memory, including the full file content string. For large architectural documents or multi-file validation runs, this creates measurable memory overhead.
 
 **Memory Profile**:
 - **Typical Document**: 50KB per cached file
@@ -708,6 +752,60 @@ This tool follows workspace design principles defined in [Architecture Principle
 
 **Timeline**: Monitor during Epic 2 implementation; optimize only if empirical evidence demonstrates need.
 **Status**: Documented architectural characteristic, acceptable trade-off for MVP scope.
+
+### Deferred: Configuration File Layer
+
+**Risk Category**: Feature Completeness / User Experience
+**Description**: The MVP implements 3-layer configuration (defaults → CLI flags → per-link markers) but does not include file-based configuration support (`citation-manager.config.json`). This means users cannot save project-specific or user-specific extraction preferences, requiring repetitive CLI flag usage.
+
+**Missing Layer**: File-based configuration that would slot between defaults and CLI flags in the precedence hierarchy.
+
+**Current Implementation**:
+1. Defaults (section=extract, full-file=skip)
+2. CLI flags (`--full-files`)
+3. Per-link markers (`%%extract-link%%`, `%%stop-extract-link%%`)
+
+**Reference Implementation**: [Repomix hierarchical config pattern](https://github.com/yamadashy/repomix/blob/main/src/config/configLoad.ts)
+- Layered precedence: defaults → file → CLI → (markers - our addition)
+- Zod schema validation for type safety
+- Config file discovery strategy (project root → user home)
+
+**Technical Requirements (Future Story)**:
+1. **Config File Discovery**: Search project root, then user home directory
+2. **Schema Validation**: Zod schema for extraction rules, fail fast on invalid config
+3. **Merge Logic**: Preserve precedence hierarchy when combining config layers
+4. **Path-Based Rules**: Glob patterns for include/exclude (e.g., `"design-docs/**": { "fullFiles": true }`)
+
+**Design Considerations**:
+- **Schema Design**: Define extraction rules schema (global defaults + path-specific overrides)
+- **File Format**: JSON (simplicity) vs YAML (human-friendly) vs JS (programmable)
+- **Merge Strategy**: Deep merge vs shallow merge for nested objects
+- **Validation UX**: Clear error messages for invalid config
+
+**Migration Path**:
+- Backward compatible: New layer slots between defaults and CLI
+- Existing CLI + marker behavior unchanged
+- Users can migrate gradually: CLI → file config → markers as needed
+
+**ROI Analysis**:
+- **Value**: Reduces repetitive CLI flags for projects with consistent extraction patterns
+- **Cost**: Config discovery, validation, testing complexity (~8-16 hours implementation)
+- **Decision**: Defer until user demand validated (can achieve similar results with shell aliases)
+
+**Impact**:
+- **Low**: MVP delivers 80% of value with CLI + markers alone
+- **Scope**: File config adds complexity without proportional user value for initial release
+- **Workaround**: Users can create shell scripts/aliases wrapping CLI commands
+
+**Rationale for Deferring**: Following [simplicity-first](../../../../../design-docs/Architecture%20Principles.md#^simplicity-first) principle - don't build features until user demand demonstrates necessity. The current 3-layer system provides sufficient control for MVP validation.
+
+**Resolution Criteria**:
+- User feedback indicates repetitive CLI flag usage is a pain point
+- Multiple users request project-level configuration capabilities
+- Implementation includes full schema validation and comprehensive test coverage
+
+**Timeline**: Revisit after MVP validation shows repetitive CLI usage patterns across projects.
+**Status**: Backlog (deferred from Epic 2 MVP scope).
 
 ### Test Suite Edge Cases (CLI Display and URL Encoding)
 

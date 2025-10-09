@@ -35,27 +35,11 @@ export class MarkdownParser {
 	/**
 	 * Initialize parser with file system dependency
 	 *
-	 * Sets up regex patterns for link and anchor detection. Patterns are pre-compiled
-	 * for performance during parsing operations.
-	 *
 	 * @param {Object} fileSystem - Node.js fs module (or mock for testing)
 	 */
 	constructor(fileSystem) {
 		this.fs = fileSystem;
 		this.currentSourcePath = null; // Store current file being parsed
-		this.anchorPatterns = {
-			CARET: /\^([A-Za-z0-9-]+)/g,
-			OBSIDIAN_BLOCK_REF: /\^([a-zA-Z0-9\-_]+)$/g, // End-of-line block references
-			EMPHASIS_MARKED: /==\*\*([^*]+)\*\*==/g,
-			STANDARD_HEADER: /^#+\s+(.+)$/gm,
-			WIKI_STYLE: /\[\[#([^|]+)\|([^\]]+)\]\]/g,
-		};
-
-		this.linkPatterns = {
-			CROSS_DOCUMENT: /\[([^\]]+)\]\(([^)]+\.md)(#[^)]+)?\)/g,
-			EMPHASIS_COMPONENT: /#==\*\*[^*]+\*\*==/g,
-			URL_ENCODED: /%20|%5B|%5D/g,
-		};
 	}
 
 	/**
@@ -66,7 +50,7 @@ export class MarkdownParser {
 	 * link resolution during extraction.
 	 *
 	 * @param {string} filePath - Absolute or relative path to markdown file
-	 * @returns {Promise<Object>} Parser output contract with { filePath, content, tokens, links, headings, anchors }
+	 * @returns {Promise<Object>} MarkdownParser.Output.DataContract with { filePath, content, tokens, links, headings, anchors }
 	 */
 	async parseFile(filePath) {
 		this.currentSourcePath = filePath; // Store for use in extractLinks()

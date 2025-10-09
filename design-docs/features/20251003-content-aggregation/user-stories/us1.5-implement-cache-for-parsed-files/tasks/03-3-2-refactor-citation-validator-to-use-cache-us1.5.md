@@ -410,7 +410,7 @@ The core cache integration objective was successfully achieved:
 
 **Validation Checklist**:
 - [X] Files Modified: Only CitationValidator.js modified (no other files)? **FAIL - See scope boundary issues below**
-- [X] Scope Adherence: No scope creep into validation logic changes? **FAIL - Parser Output Contract schema changes present**
+- [X] Scope Adherence: No scope creep into validation logic changes? **FAIL - MarkdownParser.Output.DataContract schema changes present**
 - [X] Objective Met: Constructor and 2 methods refactored to use cache? **PASS**
 - [X] Critical Rules: Zero `this.parser.parseFile` references remain? **PASS**
 - [X] Integration Points: Cache calls use correct method signature? **PASS**
@@ -427,7 +427,7 @@ The core cache integration objective was successfully achieved:
 - [X] Property assignment: `this.parsedFileCache = parsedFileCache` **PASS**
 - [X] validateFile: Uses `this.parsedFileCache.resolveParsedFile(filePath)` **PASS**
 - [X] validateAnchorExists: Uses `this.parsedFileCache.resolveParsedFile(targetFile)` **PASS**
-- [ ] All validation logic preserved unchanged **FAIL - Parser Output Contract schema migration present**
+- [ ] All validation logic preserved unchanged **FAIL - MarkdownParser.Output.DataContract schema migration present**
 - [X] Integration tests from Task 3.1 pass **PASS (4/4)**
 - [ ] Existing validation tests pass (zero regression) **PARTIAL (13/17 pass, 4 pre-existing failures)**
 
@@ -456,11 +456,11 @@ The core cache integration objective was successfully achieved:
    - Justification: CLI broken without factory update
    - Evaluation: ACCEPTABLE - Necessary consequence of factory integration
 
-3. **Parser Output Contract Schema Migration** (Out of Scope - Should be Task 1.3 Only)
+3. **MarkdownParser.Output.DataContract Schema Migration** (Out of Scope - Should be Task 1.3 Only)
    - Modified: Extensive changes to `CitationValidator.js` validation logic
    - Changes: 126 lines changed (64 insertions, 62 deletions) across 16 hunks
    - Evidence: Changes to `classifyPattern()`, property access patterns (`citation.target.path.raw` vs `citation.file`), anchor property access (`a.id` vs `a.anchor`)
-   - Justification: Task 1.3 refactored Parser Output Contract schema; CitationValidator must consume new schema
+   - Justification: Task 1.3 refactored MarkdownParser.Output.DataContract schema; CitationValidator must consume new schema
    - Evaluation: ACCEPTABLE - Legitimate dependency on Phase 1 completion, though creates confusing task scope
 
 4. **Integration Test Setup Update** (Out of Scope per Task Spec)
@@ -474,9 +474,9 @@ The core cache integration objective was successfully achieved:
 The task specification explicitly excluded factory, CLI, and test modifications from scope, marking them as separate phases. However, implementation agent correctly identified that:
 1. Factory integration is prerequisite for system functionality
 2. No Phase 4 task documents exist yet
-3. Parser Output Contract migration from Task 1.3 requires corresponding CitationValidator changes
+3. MarkdownParser.Output.DataContract migration from Task 1.3 requires corresponding CitationValidator changes
 
-The extensive validation logic changes (126 lines) are NOT related to cache integration but rather to consuming the new Parser Output Contract schema from Task 1.3. This creates task scope ambiguity but does not represent scope creep.
+The extensive validation logic changes (126 lines) are NOT related to cache integration but rather to consuming the new MarkdownParser.Output.DataContract schema from Task 1.3. This creates task scope ambiguity but does not represent scope creep.
 
 **Regression Analysis**:
 
@@ -492,7 +492,7 @@ These failures existed before this task and are NOT regressions from cache integ
 
 **Recommended Documentation Improvements**:
 
-1. **Task Scope Clarification**: Update task specification to acknowledge Parser Output Contract schema migration dependency on Task 1.3
+1. **Task Scope Clarification**: Update task specification to acknowledge MarkdownParser.Output.DataContract schema migration dependency on Task 1.3
 
 2. **Factory Integration**: Update task spec to include factory/CLI integration as in-scope (since no separate Phase 4 tasks exist)
 
@@ -502,7 +502,7 @@ These failures existed before this task and are NOT regressions from cache integ
 
 1. Update task status to "Done" (cache integration objective fully met)
 2. Address pre-existing test failures in separate bug-fix tasks
-3. Consider splitting Parser Output Contract schema migration into explicit task if similar migrations occur in future
+3. Consider splitting MarkdownParser.Output.DataContract schema migration into explicit task if similar migrations occur in future
 
 ---
 
@@ -515,12 +515,12 @@ class ParsedFileCache {
   constructor(markdownParser: MarkdownParserInterface)
 
   async resolveParsedFile(filePath: string): Promise<ParserOutputContract>
-  // Returns: Parser Output Contract object from cache or fresh parse
+  // Returns: MarkdownParser.Output.DataContract object from cache or fresh parse
   // Throws: ParsingError if file cannot be parsed
 }
 ```
 
-**Parser Output Contract Schema** (returned by cache):
+**MarkdownParser.Output.DataContract Schema** (returned by cache):
 
 ```json
 {

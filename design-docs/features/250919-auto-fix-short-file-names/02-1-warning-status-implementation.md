@@ -30,7 +30,7 @@ The enhancement requires detecting when file cache resolution crosses directory 
    - Note the test expects "warning" status and warning section in CLI output
 
 2. **Study existing validation result creation:**
-   - Read `src/CitationValidator.js` `createValidationResult()` method to understand result structure
+   - Read `src/CitationValidator.js` `createCitationValidator.ValidationResult.Output.DataContrac()` method to understand result structure
    - Examine existing "valid" and "error" status assignments throughout the file
 
 3. **Analyze file cache integration points:**
@@ -65,7 +65,7 @@ if (cacheResult.found && !cacheResult.fuzzyMatch) {
     // Exact match found in cache - validate the file and continue
     if (existsSync(cacheResult.path)) {
         // ... anchor validation ...
-        return this.createValidationResult(citation, "valid");
+        return this.createCitationValidator.ValidationResult.Output.DataContrac(citation, "valid");
     }
 }
 
@@ -80,12 +80,12 @@ if (cacheResult.found && !cacheResult.fuzzyMatch) {
         const status = isDirectoryMatch ? "valid" : "warning";
         const message = isDirectoryMatch ? null : `Found via file cache in different directory: ${cacheResult.path}`;
 
-        return this.createValidationResult(citation, status, null, message);
+        return this.createCitationValidator.ValidationResult.Output.DataContrac(citation, status, null, message);
     }
 }
 // Integration: Extends existing file cache resolution without breaking anchor validation
 // Validation: Warning validation test from Task 1.1 transitions from failing to passing
-// Boundary: Maintains existing createValidationResult() interface and status enum extension
+// Boundary: Maintains existing createCitationValidator.ValidationResult.Output.DataContrac() interface and status enum extension
 ```
 
 ### Critical Rules
@@ -96,7 +96,7 @@ if (cacheResult.found && !cacheResult.fuzzyMatch) {
 ## Key Implementation Elements
 
 1. **Primary Change**: Add `isDirectoryMatch()` helper method and modify file cache exact match logic to return "warning" for cross-directory resolutions
-2. **Integration Points**: Extends existing `validateCrossDocumentLink()` file cache resolution logic (lines 263-282), integrates with `createValidationResult()` method
+2. **Integration Points**: Extends existing `validateCrossDocumentLink()` file cache resolution logic (lines 263-282), integrates with `createCitationValidator.ValidationResult.Output.DataContrac()` method
 3. **Validation Strategy**: Warning validation test from Task 1.1 validates warning status assignment for cross-directory citations
 
 ## Expected Outcome

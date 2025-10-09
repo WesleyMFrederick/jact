@@ -351,10 +351,10 @@ class CitationManager {
 			}
 
 			// First, validate to find fixable issues
-			const validationResult = await this.validator.validateFile(filePath);
+			const validationResults = await this.validator.validateFile(filePath);
 
 			// Find all fixable issues: warnings (path conversion) and errors (anchor fixes)
-			const fixableResults = validationResult.results.filter(
+			const fixableResults = validationResults.results.filter(
 				(result) =>
 					(result.status === "warning" && result.pathConversion) ||
 					(result.status === "error" &&

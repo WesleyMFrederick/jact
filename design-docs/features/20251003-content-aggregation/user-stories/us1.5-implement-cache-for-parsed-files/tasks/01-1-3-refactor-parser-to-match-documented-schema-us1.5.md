@@ -1,7 +1,7 @@
 ---
 story: "User Story 1.5: Implement a Cache for Parsed File Objects"
 epic: Citation Manager Test Migration & Content Aggregation
-phase: "Phase 1: Parser Output Contract Validation & Documentation"
+phase: "Phase 1: MarkdownParser.Output.DataContract Validation & Documentation"
 task-id: "1.3"
 task-anchor: ^US1-5T1-3
 wave: 1e
@@ -536,10 +536,10 @@ node -e "
 npm test -- parser-output-contract
 
 # Sample expected output:
-✓ MarkdownParser Output Contract - Link Schema
+✓ MarkdownMarkdownParser.Output.DataContract - Link Schema
   ✓ should populate links array with documented LinkObject schema
   ✓ should correctly populate path variations (raw, absolute, relative)
-✓ MarkdownParser Output Contract - Anchor Schema
+✓ MarkdownMarkdownParser.Output.DataContract - Anchor Schema
   ✓ should populate anchors array with documented AnchorObject schema
 
 Test Files  1 passed (1)
@@ -607,7 +607,7 @@ Task 1.3 implementation completed successfully. Refactored MarkdownParser and Ci
 
 ```text
 ✓ test/parser-output-contract.test.js (8/8 tests PASS)
-  ✓ should return complete Parser Output Contract with all fields
+  ✓ should return complete MarkdownParser.Output.DataContract with all fields
   ✓ should populate headings array with level, text, raw properties
   ✓ should populate anchors array with documented AnchorObject schema
   ✓ should populate links array with documented LinkObject schema
@@ -622,7 +622,7 @@ Task 1.3 implementation completed successfully. Refactored MarkdownParser and Ci
 - Tests: 43 passed, 7 failed (50 total)
 
 **Passing Test Categories:**
-- Parser output contract validation (8/8) ✅
+- MarkdownParser.Output.DataContract validation (8/8) ✅
 - Path conversion logic (5/5) ✅
 - Auto-fix functionality (3/3) ✅
 - CLI warning output (3/6) - Some edge cases failing

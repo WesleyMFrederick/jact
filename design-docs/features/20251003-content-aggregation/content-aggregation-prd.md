@@ -103,21 +103,6 @@ This feature encompasses two critical phases:
 
 ---
 
-### Story 1.4: Migrate and Validate `citation-manager` Test Suite [SUPERSEDED]
-
-> **⚠️ Story Split per ADR-001**: This story has been decomposed into US1.4a (Test Migration) and US1.4b (DI Refactoring) to separate test framework conversion from architectural refactoring work.
->
-> **Original AC Mapping**:
-> - US1-4AC1 (file relocation) → US1-4aAC1
-> - US1-4AC2 (Vitest execution) → US1-4aAC3
-> - US1-4AC3 (tests pass) → US1-4aAC5
-> - US1-4AC4 (legacy removal) → US1-4aAC6
-> - US1-4bAC1-6: New requirements for DI refactoring (not in original scope)
->
-> See [ADR-001: Phased Test Migration Strategy](content-aggregation-architecture.md#ADR-001%20Phased%20Test%20Migration%20Strategy) for decomposition rationale.
-
----
-
 ### Story 1.4a: Migrate citation-manager Test Suite to Vitest
 
 **As a** developer,
@@ -138,6 +123,7 @@ This feature encompasses two critical phases:
 _Depends On_: [US1.3: Make Migrated citation-manager Executable](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/user-stories/us1.3-make-migrated-citation-manager-executable/us1.3-make-migrated-citation-manager-executable.md)
 _Functional Requirements_: [[#^FR2|FR2]], [[#^FR9|FR9]]
 _User Story Link:_ [us1.4a-migrate-test-suite-to-vitest](user-stories/us1.4a-migrate-test-suite-to-vitest/us1.4a-migrate-test-suite-to-vitest.md)
+_Status_: ✅ COMPLETE (2025-10-07)claudeclaude
 
 ---
 
@@ -161,6 +147,7 @@ _Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#St
 _Closes Technical Debt_: [Lack of Dependency Injection](content-aggregation-architecture.md#Lack%20of%20Dependency%20Injection)
 _Functional Requirements_: [[#^FR2|FR2]], [[#^FR8|FR8]]
 _User Story Link:_ [us1.4b-refactor-components-for-di](user-stories/us1.4b-refactor-components-for-di/us1.4b-refactor-components-for-di.md)
+_Status_: ✅ COMPLETE (2025-10-07)
 
 ---
 ### Story 1.5: Implement a Cache for Parsed File Objects
@@ -199,6 +186,95 @@ _Status_: ✅ COMPLETE (2025-10-07)
 > - [One Source of Truth](../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth): Cache is authoritative source for parsed data during command execution ✅
 ---
 
+### Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries
+
+As a developer working on content extraction features,
+I want the MarkdownParser.Output.DataContract to represent each anchor once with both raw and URL-encoded ID variants as properties,
+so that anchor data is normalized, memory-efficient, and easier to work with in downstream components.
+
+#### Story 1.6 Acceptance Criteria
+1. GIVEN a markdown header is parsed, WHEN the `MarkdownParser.Output.DataContract` is generated, THEN each header anchor SHALL be represented by a single AnchorObject containing both `id` (raw text format) and `urlEncodedId` (Obsidian-compatible format) properties, eliminating duplicate anchor entries. ^US1-6AC1
+2. The AnchorObject schema SHALL include: `{ anchorType: "header"|"block", id: string, urlEncodedId: string|null, rawText: string|null, fullMatch: string, line: number, column: number }`, where `urlEncodedId` is populated only when it differs from `id`. ^US1-6AC2
+3. The `CitationValidator.validateAnchorExists()` method SHALL check both `id` and `urlEncodedId` fields when matching anchors, maintaining backward compatibility with existing anchor validation logic. ^US1-6AC3
+4. GIVEN a header containing colons and spaces (e.g., "Story 1.5: Implement Cache"), WHEN parsed, THEN the system SHALL generate one anchor with `id: "Story 1.5: Implement Cache"` and `urlEncodedId: "Story%201.5%20Implement%20Cache"`, not two separate anchor objects. ^US1-6AC4
+5. GIVEN the refactored anchor schema is implemented, WHEN the full test suite executes, THEN all existing tests SHALL pass with zero functional regressions, and the `MarkdownParser.Output.DataContract` validation test SHALL confirm no duplicate anchor entries. ^US1-6AC5
+6. The `MarkdownParser.Output.DataContract` JSON schema documentation SHALL be updated to reflect the new single-anchor-per-header structure with dual ID properties. ^US1-6AC6
+
+_Depends On_: [Story 1.5: Implement a Cache for Parsed File Objects](#Story%201.5%20Implement%20a%20Cache%20for%20Parsed%20File%20Objects)
+_Enables_: [Story 1.7: Implement ParsedDocument Facade](#Story%201.7%20Implement%20ParsedDocument%20Facade)
+_Closes Technical Debt_: [Duplicate Anchor Entries in MarkdownParser.Output.DataContract](content-aggregation-architecture.md#Duplicate%20Anchor%20Entries%20in%20MarkdownParser.Output.DataContract)
+_Functional Requirements_: [[#^FR8|FR8]]
+_User Story Link_: user-stories/us1.6-refactor-anchor-schema/us1.6-refactor-anchor-schema.md
+_Status_: 📋 PENDING
+
+> [!warning] Technical Lead Feedback: Data model change impacts downstream consumers
+>
+> Architecture Impact: This refactoring modifies the MarkdownParser.Output.DataContract's AnchorObject schema, which is consumed by CitationValidator and will be consumed by the future ContentExtractor (Epic 2).
+>
+> Migration Strategy: Update CitationValidator anchor matching logic to check both id and urlEncodedId fields. Update MarkdownParser.Output.DataContract test fixtures and validation schema.
+>
+> Relevant Architecture Principles: [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [illegal-states-unrepresentable](../../../../../design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable)
+
+---
+
+### Story 1.7: Implement ParsedDocument Facade
+
+As a developer,
+I want a ParsedDocument wrapper class that encapsulates parser output navigation,
+so that consumers (CitationValidator, ContentExtractor) depend on stable interfaces instead of internal data structures.
+
+#### Story 1.7 Acceptance Criteria
+1. The `ParsedDocument` class SHALL wrap the `MarkdownParser.Output.DataContract` and expose a public interface with query methods, encapsulating direct data structure access. ^US1-7AC1
+2. The `ParsedDocument` class SHALL provide anchor query methods: `getAnchorIds()`, `hasAnchor(anchorId)`, `getBlockAnchors()`, `getHeaderAnchors()`, and `findSimilarAnchors(anchorId)` for `CitationValidator` use cases. ^US1-7AC2
+3. The `ParsedDocument` class SHALL provide content extraction methods: `extractSection(headingText)`, `extractBlock(anchorId)`, and `extractFullContent()` for `ContentExtractor` use cases (Epic 2). ^US1-7AC3
+4. The `ParsedDocument` class SHALL provide link query methods: `getLinks()` and `getCrossDocumentLinks()` for `CitationValidator` use cases. ^US1-7AC4
+5. `CitationValidator` SHALL be refactored to use `ParsedDocument` methods instead of direct data structure access (e.g., replace `parsed.anchors.map(a => a.id)` with `parsedDoc.getAnchorIds()`). ^US1-7AC5
+6. `ParsedFileCache` SHALL be updated to return `ParsedDocument` instances instead of raw parser output objects. ^US1-7AC6
+7. GIVEN the `ParsedDocument` facade is implemented and `CitationValidator` refactored, WHEN the full test suite executes, THEN all existing tests SHALL pass with zero behavioral changes. ^US1-7AC7
+8. The component SHALL include unit tests validating each query method's correct transformation of internal data structures into expected return values. ^US1-7AC8
+
+_Depends On_: [Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](#Story%201.6%20Refactor%20MarkdownParser.Output.DataContract%20-%20Eliminate%20Duplicate%20Anchor%20Entries)
+_Enables_: [Story 1.8: Refactor Anchor Validation to Use Strategy Pattern](#Story%201.8%20Refactor%20Anchor%20Validation%20to%20Use%20Strategy%20Pattern)
+_Closes Technical Debt_: Tight coupling to parser internals, duplicate navigation logic across consumers
+_Functional Requirements_: [[#^FR8|FR8]] (Architecture principle: interface stability)
+_Status_: 📋 PENDING
+
+> [!warning] Technical Lead Feedback: ParsedDocument Facade Required
+>
+> Architectural Decision: Introduce ParsedDocument wrapper class before implementing ContentExtractor to prevent tight coupling to parser internals. With two consumers (CitationValidator and ContentExtractor), the facade pays for itself immediately.
+>
+> Benefits: Interface stability, refactoring safety, encapsulation of complexity (especially token navigation), and parser independence (can swap marked.js for micromark without breaking consumers).
+
+---
+
+### Story 1.8: Refactor Anchor Validation to Use Strategy Pattern
+
+As a developer,
+I want to refactor the CitationValidator to use a Strategy pattern for anchor validation,
+so that the system can be easily extended to support different markdown flavors (e.g., GitHub-style anchors) without modifying core validation logic.
+
+#### Story 1.8 Acceptance Criteria
+
+1. An `AnchorValidationStrategy` interface SHALL be created at `src/strategies/AnchorValidationStrategy.js`, defining a `validate()` method contract. ^US1-8AC1
+2. A default `ObsidianAnchorStrategy` SHALL be implemented, encapsulating the existing logic for validating Obsidian-style URL-escaped anchors. ^US1-8AC2
+3. The `CitationValidator` constructor SHALL be refactored to accept an `AnchorValidationStrategy` dependency, and its validation logic SHALL delegate to the injected strategy. ^US1-8AC3
+4. The `componentFactory` SHALL be updated to instantiate and inject the default `ObsidianAnchorStrategy` into the `CitationValidator`. ^US1-8AC4
+5. GIVEN the refactoring is complete, WHEN the full test suite is executed, THEN all existing tests SHALL pass, confirming zero functional regressions. ^US1-8AC5
+6. The component architecture documentation SHALL be updated to reflect the new Strategy pattern for anchor validation. ^US1-8AC6
+
+_Depends On_: [Story 1.7: Implement ParsedDocument Facade](#Story%201.7%20Implement%20ParsedDocument%20Facade)
+_Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#Story%202.1%20Enhance%20Parser%20to%20Handle%20Full-File%20and%20Section%20Links)
+_Closes Technical Debt_: Prevents future debt by decoupling validation logic and enabling extension over modification.
+_Functional Requirements_: [[#^FR8|FR8]]
+_Status_: 📋 PENDING
+
+> [!note] Technical Lead Feedback: Establishes Core Architectural Pattern
+>
+> Architectural Impact: This story establishes the Strategy Pattern as a core pattern for the application. By implementing it on an existing, well-tested feature (anchor validation), we prove its viability before reusing it for the more complex new feature (extraction eligibility) in Epic 2.
+>
+> Relevant Architecture Principles: [extension-over-modification](../../../../../design-docs/Architecture%20Principles.md#^extension-over-modification), [dependency-abstraction](../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction), [single-responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility).
+
+---
 ### Story 2.1: Enhance Parser to Handle Full-File and Section Links
 
 **As a** developer,
@@ -214,21 +290,6 @@ _Status_: ✅ COMPLETE (2025-10-07)
 > _Base Schema Status_: Parser Output Contract validated in [US1.5 Phase 1](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md#Phase%201%20Parser%20Output%20Contract%20Validation%20&%20Documentation). Current schema: `{ filePath, content, tokens, links, headings, anchors }` with LinkObject (`linkType`, `scope`, `anchorType`, `source`, `target`) and AnchorObject (`anchorType`, `id`, `rawText`) structures.
 > _Epic 2 Analysis Required_: Story 2.1 implementation should review existing LinkObject schema to determine if current `linkType`/`scope`/`anchorType` fields sufficiently distinguish full-file vs. section links, or if minor schema extensions are needed for content extraction metadata.
 > _Relevant Architecture Principles_: [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [primitive-first-design](../../../../../design-docs/Architecture%20Principles.md#^primitive-first-design), [illegal-states-unrepresentable](../../../../../design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable), [explicit-relationships](../../../../../design-docs/Architecture%20Principles.md#^explicit-relationships)
-<!-- -->
-> [!success] **Technical Lead Research**: Section extraction POC validated ✅ (2025-10-07)
-> _Research Objective_: Prove we can walk marked.js tokens to extract section content by heading level
-> _POC Location_: `tools/citation-manager/test/poc-section-extraction.test.js`
-> _Key Findings_:
-> - ✅ **Token walking works**: marked.js tokens provide complete AST for section boundary detection
-> - ✅ **Boundary detection validated**: Algorithm correctly stops at next same-or-higher level heading
-> - ✅ **Content reconstruction proven**: Concatenating `token.raw` properties rebuilds original markdown
-> - ✅ **Nested sections handled**: H3/H4 subsections correctly included under parent H2
-> _Implementation Pattern_: Use `walkTokens`-like traversal (mirrors `MarkdownParser.extractHeadings()` pattern at lines 321-343)
-> _API Validated_: `extractSection(tokens, headingText, headingLevel)` → `{ heading: { level, text, raw }, tokens: [...], content: string }`
-> _Context7 Research_: marked.js `walkTokens` API provides idiomatic pattern for token traversal (child tokens processed before siblings)
-> _Production Integration Path_: Create `ContentExtractor` component accepting `ParsedFileCache` dependency, leverage existing token structure from Parser Output Contract
-> _Test Coverage_: 7/7 POC tests passing (100% success rate)
-> _Next Step_: Story 2.2 ContentExtractor implementation can use validated algorithm and API contract
 
 _Depends On_: [Story 1.5: Implement a Cache for Parsed File Objects](#Story%201.5%20Implement%20a%20Cache%20for%20Parsed%20File%20Objects)
 _Functional Requirements_: [[#^FR4|FR4]]
@@ -248,50 +309,6 @@ _Functional Requirements_: [[#^FR4|FR4]]
 > [!warning] **Technical Lead Feedback**: Parser-extractor interaction model design required
 > _Architecture Impact_: The interaction model between the parser and this new extractor component needs to be designed, including the specific data structures they will use to communicate.
 > _Relevant Architecture Principles_: [black-box-interfaces](../../../../../design-docs/Architecture%20Principles.md#^black-box-interfaces), [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [single-responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility)
-<!-- -->
-> [!success] **Technical Lead Research**: Parser-extractor data contract validated ✅ (2025-10-07)
-> _Research Finding_: POC confirms ContentExtractor can consume Parser Output Contract directly without schema changes
-> _Data Flow Validated_:
-> 1. `ParsedFileCache.resolveParsedFile(filePath)` → Parser Output Contract (`{ tokens, headings, content, ... }`)
-> 2. `ContentExtractor.extractSection(tokens, headingText, headingLevel)` → Section data (`{ heading, tokens, content }`)
-> 3. No parser modifications needed - existing token structure sufficient
-> _Interaction Model_: ContentExtractor accepts `ParsedFileCache` as constructor dependency (DI pattern from US1.4b/US1.5)
-> _Interface Contract_:
->
-> ```javascript
-> class ContentExtractor {
->   constructor(parsedFileCache) { ... }
->   async extractSection(filePath, headingText, headingLevel) {
->     const parsed = await this.parsedFileCache.resolveParsedFile(filePath);
->     return this.extractSectionFromTokens(parsed.tokens, headingText, headingLevel);
->   }
->   async extractFullFile(filePath) {
->     const parsed = await this.parsedFileCache.resolveParsedFile(filePath);
->     return { content: parsed.content, tokens: parsed.tokens, metadata: {...} };
->   }
-> }
-> ```
->
-> _Metadata Structure_: `{ sourceFile: string, section: string|null, heading: object|null, lineRange: {start, end} }`
-> _POC Reference_: See `tools/citation-manager/test/poc-section-extraction.test.js` for validated extraction algorithm
-<!-- -->
-> [!success] **Technical Lead Research**: Block anchor extraction POC validated ✅ (2025-10-07)
-> _Research Objective_: Prove we can extract single block content by `^anchor-id` references
-> _POC Location_: `tools/citation-manager/test/poc-block-extraction.test.js`
-> _Key Findings_:
-> - ✅ **Anchor detection works**: `MarkdownParser.extractAnchors()` correctly identifies all `^anchor-id` patterns at line endings
-> - ✅ **Line-based extraction validated**: Can extract single line/paragraph using anchor's `line` number from Parser Output Contract
-> - ✅ **Anchor metadata accurate**: Line numbers, column positions, and IDs correctly populated in `anchors` array
-> - ✅ **Multiple block types handled**: Works for paragraphs, headings, list items across different sections
-> _Block Anchor Formats Supported_:
-> 1. Obsidian block references: `Some content ^anchor-id` (end of line)
-> 2. Caret syntax: `^anchor-id` anywhere in line (legacy)
-> 3. Emphasis-marked: `==**text**==` (creates implicit anchor)
-> _API Validated_: `extractBlock(content, anchors, blockId)` → `{ anchor: { anchorType, id, line, column }, content: string, lineNumber: number }`
-> _Key Difference from Sections_: Blocks extract ONLY single line/paragraph (not multi-line), uses line number lookup (not token walking)
-> _Production Integration Path_: ContentExtractor needs both `extractSection()` and `extractBlock()` methods to handle header vs block anchors
-> _Test Coverage_: 9/9 POC tests passing (100% success rate)
-> _Implementation Note_: Current POC extracts single line; production may need paragraph boundary detection for multi-line blocks
 
 _Depends On_: Story 2.1
 _Functional Requirements_: [[#^FR5|FR5]]
@@ -315,6 +332,7 @@ _Depends On_: Story 2.2
 _Functional Requirements_: [[#^FR6|FR6]], [[#^FR7|FR7]]
 
 ---
+
 ## Feature Validation Approach
 
 The feature will be validated through:
@@ -324,6 +342,7 @@ The feature will be validated through:
 - **Quality Standards**: New functionality meets the 50% code coverage requirement with integration tests using real file operations
 
 ---
+
 ## Related Documentation
 
 - [Content Aggregation Architecture](content-aggregation-architecture.md) - Feature-specific architectural enhancements
@@ -333,368 +352,36 @@ The feature will be validated through:
 ---
 ## Whiteboard
 
-Epic 2 Evaluation: Content Aggregation Enhancement
-
-  Application Tech Lead Assessment
-
-  Let me analyze Epic 2's current state and readiness for implementation.
-
-  ---
-  1. Relevance Assessment ✅ STILL HIGHLY RELEVANT
-
-  Business Value Validation:
-- Problem: Manual context assembly for LLM prompts is time-consuming and error-prone
-- Solution: Automated content extraction and aggregation from markdown citations
-- Impact: US1.5 cache implementation validates this need - the cache was built specifically to support Epic 2's content extraction operations efficiently
-
-  Strategic Alignment:
-- ✅ Leverages workspace framework (Epic 1 complete)
-- ✅ Builds on validated DI patterns (US1.4b complete)
-- ✅ Uses performance foundation (US1.5 cache complete)
-- ✅ Aligns with "Refined, Repeatable, Robust" vision
-
-  Verdict: Epic 2 remains strategically critical. The preparatory work (Epic 1) validates the architecture can support this feature.
-
-  ---
-  1. Gap Analysis 🔴 SIGNIFICANT GAPS IDENTIFIED
-
-  2.1 Technical Design Gaps (Active Feedback Items)
-
-  Gap 1: Parser-Extractor Interaction Model (PRD line 84-87)
-  Status: Active - Required before Story 2.2 implementation
-  Impact: Architecture Impact - data structures between parser and extractor undefined
-
-  Analysis:
-- ParsedFileCache now returns Parser Output Contract with known schema
-- ContentExtractor needs to consume this contract for content extraction
-- Missing: Detailed interaction pattern between ContentExtractor and ParsedFileCache
-- Risk: Without clear contract, Story 2.2 implementation will be ad-hoc
-
-  Recommendation: Create ContentExtractor Implementation Guide BEFORE Story 2.1 starts, defining:
-- Input contract: LinkObject structure (from parser)
-- Output contract: ContentBlock structure (metadata + extracted content)
-- Cache interaction: How ContentExtractor requests parsed data via ParsedFileCache
-
-  ---
-  Gap 2: CLI Interface Design (PRD line 89-92)
-  Status: Active - Required before Story 2.3 implementation
-  Decision: --extract-context flag on validate command vs new extract command?
-
-  Analysis:
-- Current: validate command for citation checking
-- Proposed: Add --extract-context <output_file> flag to validate command
-- Concern: Command overloading - validate + extract are distinct operations
-- Alternative: New extract command with own options/flags
-
-  Recommendation: Research CLI patterns (yargs, commander examples) and make explicit design decision before Story 2.3:
-- Option A: citation:validate --extract-context out.md (flag approach)
-- Option B: citation:extract <source.md> --output out.md (command approach)
-- Decision criteria: Extensibility, user intuitiveness, maintenance burden
-
-  ---
-  2.2 Story-Level Gaps
-
-  Gap 3: Story 2.1 Parser Schema Validation (PRD line 213-216)
-  Note: Parser Output Contract validated in US1.5 Phase 1
-  Remaining: Verify LinkObject schema sufficient for content extraction
-
-  Analysis:
-- US1.5 Task 1.1-1.3 validated Parser Output Contract base schema
-- LinkObject structure: { linkType, scope, anchorType, source, target }
-- Question: Does current schema distinguish full-file vs section links adequately?
-- Current scope enum: internal | cross-document - does this suffice?
-- Current anchorType enum: caret | heading | block - clear for extraction?
-
-  Recommendation: Story 2.1 should start with schema gap analysis:
-  1. Review LinkObject schema against Story 2.1 AC requirements
-  2. Determine if existing linkType/scope/anchorType fields sufficient
-  3. Identify any missing fields needed for content extraction metadata
-  4. Document decision in Story 2.1 dev notes BEFORE implementation
-
-  ---
-  Gap 4: Content Extractor Public Contract (Architecture doc line 227-230)
-  Input: LinkObject (from parser)
-  Output: ContentBlock object { content, metadata }
-  Missing: Detailed ContentBlock schema
-
-  Analysis:
-- ContentBlock structure undefined
-- Metadata fields unspecified (source path? anchor? line range?)
-- No pseudocode for extraction logic
-
-  Recommendation: Create ContentExtractor Implementation Guide.md with:
-- Detailed ContentBlock schema (JSON structure)
-- Pseudocode for extractContent(linkObject) method
-- Edge case handling (missing anchors, invalid ranges, etc.)
-- Follow pattern from ParsedFileCache Implementation Guide
-
-  ---
-  1. Risk Identification 🟡 MODERATE TO HIGH RISKS
-
-  3.1 Technical Risks
-
-  Risk 1: Section Boundary Detection Complexity ⚠️ HIGH
-- Challenge: Determining where a section ends is non-trivial
-- Current Parser: Extracts headings but doesn't compute section boundaries
-- Story 2.2 AC2: "Extract text between heading and next heading of equal/higher level"
-- Complexity:
-  - Nested heading levels (## vs ###)
-  - Ambiguous markdown (missing blank lines)
-  - Edge case: Last section in file (no "next heading")
-
-  Mitigation Strategy:
-  // Pseudocode concept for Story 2.2 planning
-  function getSectionBoundary(headings, targetHeading) {
-    const startIndex = findHeadingIndex(targetHeading);
-    const startLevel = headings[startIndex].level;
-
-    // Find next heading of equal or higher level
-    for (let i = startIndex + 1; i < headings.length; i++) {
-      if (headings[i].level <= startLevel) {
-        return { start: headings[startIndex].line, end: headings[i].line - 1 };
-      }
-    }
-
-    // Last section: extends to EOF
-    return { start: headings[startIndex].line, end: contentEndLine };
-  }
-
-  Action Required: Story 2.2 Implementation Guide must include explicit algorithm for section boundary detection with test cases.
-
-  ---
-  Risk 2: Parser Output Contract Sufficiency ⚠️ MEDIUM
-- Challenge: Current schema validated for validation use case, not extraction
-- Gap: Story 2.1 may discover parser schema insufficient for content extraction metadata
-- Impact: Could require parser schema refactoring mid-Epic 2
-
-  Mitigation Strategy:
-  1. Story 2.1 Phase 1: Schema gap analysis BEFORE implementation
-  2. If gaps found: Add Task 2.1-X to extend schema (mini-refactoring)
-  3. Update Parser Implementation Guide with schema extensions
-  4. Validate schema changes don't break US1.5 cache integration
-
-  Action Required: Story 2.1 must include explicit "Schema Validation" phase before content extractor implementation begins.
-
-  ---
-  Risk 3: Async Error Propagation Through New Components ⚠️ MEDIUM
-- Context: US1.5 made CitationValidator async
-- Challenge: ContentExtractor will also be async (uses ParsedFileCache)
-- Complexity: Error handling chain: CLI → Validator → Cache → Parser → ContentExtractor
-- Risk: Promise rejection handling gaps could cause silent failures
-
-  Mitigation Strategy:
-  // Ensure proper error propagation pattern
-  async validateFile(filePath) {
-    try {
-      const parsed = await this.cache.resolveParsedFile(filePath);
-      // ... validation logic ...
-    } catch (error) {
-      // Re-throw with context for CLI to handle
-      throw new ValidationError(`Failed to parse ${filePath}`, { cause: error });
-    }
-  }
-
-  Action Required: Story 2.2 Implementation Guide must document error handling contract and test error propagation paths.
-
-  ---
-  3.2 Integration Risks
-
-  Risk 4: CLI Command Overloading ⚠️ MEDIUM
-- Challenge: Adding --extract-context to validate command mixes concerns
-- Impact: validate becomes dual-purpose (check citations OR extract content)
-- User Confusion: What if both validation fails AND extraction requested?
-- Maintenance: Single command with branching logic vs separate commands
-
-  Mitigation Options:
-- Option A (Flag approach): validate --extract-context
-  - Pro: Fewer commands, extraction implies validation
-  - Con: Command does two things, harder to extend
-- Option B (Command approach): New extract command
-  - Pro: Clear separation of concerns, extensible
-  - Con: More commands, some functionality duplication
-
-  Action Required: Story 2.3 MUST start with explicit CLI design decision documented as ADR.
-
-  ---
-  Risk 5: Cache Memory Pressure Under Extraction Workload ⚠️ LOW TO MEDIUM
-- Context: ParsedFileCache stores full file content in memory
-- Challenge: Content extraction may load MORE files than validation alone
-- Example: Document with 50 citation links = 50 files in cache simultaneously
-- Impact: Memory usage could spike on large documentation sets
-
-  Current Mitigation (from US1.5):
-- Ephemeral per-command cache (memory released after execution)
-- Documented as acceptable for MVP scope
-- Architecture doc notes monitoring strategy for Epic 2
-
-  Action Required: Story 2.2 or 2.3 should include performance test validating cache behavior with large document sets (50+ linked files).
-
-  ---
-  1. Implementation Challenges 🔴 SIGNIFICANT CHALLENGES
-
-  4.1 ContentExtractor Component Design
-
-  Challenge 1: Token-Based vs Line-Based Extraction
-- Parser provides: Token stream from marked library
-- Challenge: Extract content between section boundaries
-- Options:
-    a. Line-based: Use heading line numbers, extract via string slicing
-    b. Token-based: Walk token tree, extract tokens between boundaries
-
-  Recommendation: Line-based approach for MVP
-- Rationale: Simpler, leverages existing content and headings[].line fields
-- ParsedFileCache already stores full content string
-- Can optimize to token-based in future if needed
-
-  Implementation Guidance (for Story 2.2 guide):
-  // Pseudocode: Line-based section extraction
-  function extractSection(parsedData, targetAnchor) {
-    const { content, headings } = parsedData;
-    const lines = content.split('\n');
-
-    // Find target heading
-    const targetHeading = headings.find(h => h.id === targetAnchor);
-    if (!targetHeading) return null;
-
-    // Find section boundary (next heading of equal/higher level)
-    const boundary = getSectionBoundary(headings, targetHeading);
-
-    // Extract lines between boundaries
-    return lines.slice(boundary.start, boundary.end + 1).join('\n');
-  }
-
-  ---
-  Challenge 2: Metadata Structure for Aggregation
-- Question: What metadata does ContentExtractor return?
-- Story 2.2 AC1: "Structured object containing extracted content and metadata"
-- Undefined: What fields in metadata object?
-
-  Recommendation: Define ContentBlock schema explicitly:
-  // Proposed ContentBlock schema for Story 2.2
-  {
-    content: string,           // Extracted markdown content
-    metadata: {
-      sourceFile: string,      // Absolute path to source file
-      anchor: string | null,   // Section anchor if applicable
-      linkType: string,        // "full-file" | "section"
-      lineRange: {             // Source line range
-        start: number,
-        end: number
-      },
-      extractedAt: string      // ISO timestamp
-    }
-  }
-
-  Action Required: Story 2.2 Implementation Guide must define exact ContentBlock schema BEFORE implementation starts.
-
-  ---
-  4.2 Aggregation Logic (Story 2.3)
-
-  Challenge 3: Output File Structure
-- Story 2.3 AC2: "Content delineated by markdown header indicating origin"
-- Challenge: How to format aggregated output?
-- Questions:
-  - Header format: ## File: path/to/source.md or # [path/to/source.md]?
-  - Section headers: ## File: source.md#Section or ## Section (from source.md)?
-  - Preserve original markdown structure or flatten?
-  - Handle duplicate content from multiple links?
-
-  Recommendation: Define explicit output format in Story 2.3 spec:
-## Aggregated Content
-
-## Source: design-docs/architecture.md
-
-  [Full file content here...]
-
-## Source: design-docs/prd.md#Requirements
-
-  [Section content here...]
-
-## Source: design-docs/prd.md#Goals
-
-  [Another section content here...]
-
-  Action Required: Story 2.3 should include output format specification and test fixtures showing expected format.
-
-  ---
-  Challenge 4: Circular Reference Handling
-- Scenario: Document A links to Document B, Document B links to Document A
-- Risk: Infinite extraction loop
-- Story 2.1-2.3: No acceptance criteria addressing circular references
-
-  Recommendation: Add circular reference detection:
-  // Pseudocode: Circular reference detection
-  function extractContext(sourceFile, visitedFiles = new Set()) {
-    if (visitedFiles.has(sourceFile)) {
-      throw new Error(`Circular reference detected: ${sourceFile}`);
-    }
-
-    visitedFiles.add(sourceFile);
-
-    // Extract content from links...
-    for (const link of links) {
-      extractContext(link.target, visitedFiles);
-    }
-  }
-
-  Action Required: Add acceptance criteria to Story 2.3: "WHEN circular reference detected, THEN system SHALL fail gracefully with descriptive error."
-
-  ---
-  1. Recommendations & Action Items
-
-  Immediate Actions (Before Starting Story 2.1)
-
-  1. Create ContentExtractor Implementation Guide 📝 HIGH PRIORITY
-  - Define ContentBlock schema
-  - Document pseudocode for section extraction
-  - Specify cache interaction pattern
-  - Include error handling contract
-  1. Story 2.1 Phase 0: Schema Gap Analysis 🔍 HIGH PRIORITY
-  - Review LinkObject schema against Story 2.1 requirements
-  - Identify any missing fields for content extraction
-  - Document schema validation results
-  - Update Parser Implementation Guide if gaps found
-  1. CLI Design Decision (ADR-002) 🎯 MEDIUM PRIORITY
-  - Research CLI patterns (commander best practices)
-  - Evaluate flag vs command approach
-  - Document decision with rationale
-  - Update Story 2.3 scope based on decision
-
-  Story-Level Actions
-
-  Story 2.1 Enhancements:
-- Add Phase 0: Schema gap analysis
-- Add AC addressing circular reference detection
-- Specify full-file vs section link distinction criteria
-
-  Story 2.2 Enhancements:
-- Define ContentBlock schema explicitly
-- Add section boundary detection algorithm to guide
-- Include performance test for large content extraction
-- Specify error handling for missing/invalid anchors
-
-  Story 2.3 Enhancements:
-- Define explicit output file format specification
-- Add circular reference AC
-- Include CLI integration tests for new command/flag
-- Specify behavior when validation fails + extraction requested
-
-  ---
-  1. Overall Verdict
-
-  Epic 2 Status: ✅ RELEVANT but 🟡 NOT READY FOR IMPLEMENTATION
-
-  Blocking Issues:
-  7. ContentExtractor component design incomplete (no implementation guide)
-  8. CLI interface decision unmade (flag vs command)
-  9. Missing explicit schemas (ContentBlock, output format)
-  10. No circular reference handling strategy
-
-  Estimated Preparation Work: 8-12 hours
-- ContentExtractor Implementation Guide: 4-6 hours
-- CLI Design ADR: 2-3 hours
-- Story spec enhancements: 2-3 hours
-
-  Recommendation: PAUSE Epic 2 implementation until preparation complete. The architectural foundation (US1.5 cache) is excellent, but jumping into Story 2.1 without clear component contracts will result in rework and technical debt.
-
-  Next Step: Assign product-manager or application-tech-lead agent to complete preparation work before developer implementation begins.
+You've hit on the most important strategic questions we need to answer before starting Epic 2. You're right to be confused about the sequence; let's clarify it.
+
+The proposed sequence of US 1.6, 1.7, and 1.8 is the correct, low-risk path forward. Regarding the parser's technical debt, I recommend we **defer** that refactoring until after Epic 2. Here’s the rationale.
+
+---
+
+### Clarifying the Sequence and Rationale
+
+The current plan is a classic, incremental approach: fix the data, create a clean interface, prove the new pattern, and then build the new feature. US 1.8 does not "re-do" US 1.6; it builds upon it.
+
+Here is the logical flow:
+
+1. **US 1.6 (Refactor Anchor Schema): Fix the Data Model.** We first normalize the `AnchorObject` data model to be efficient and correct. This is a prerequisite for any new logic that consumes anchors.
+
+2. **US 1.7 (Implement ParsedDocument Facade): Create the Interface.** We then introduce the `ParsedDocument` facade to encapsulate the parser's raw output. This provides a stable, method-based API (`hasAnchor()`, `getLinks()`, etc.) for all consumers and is the most critical step for enabling future refactoring.
+
+3. **US 1.8 (Refactor Anchor Validation): Prove the New Pattern.** We introduce the **Strategy and Factory patterns** here by refactoring the _existing_ anchor validation logic. This allows us to validate the new architectural pattern on a known, testable feature before using it to build something new.
+
+4. **US 2.1 (Implement Extraction Eligibility): Build the New Feature.** As the first story of Epic 2, we apply the now-proven Strategy pattern to the _new_ content extraction eligibility logic.
+
+---
+
+### Parser Refactoring (Regex vs. Tokens)
+
+You are absolutely right to point out the parser's technical debt regarding its heavy use of regex instead of the generated tokens. However, I strongly recommend we **defer this specific refactoring** until after Epic 2 is complete.
+
+Here’s why:
+
+- **The Facade is the Safety Net:** The most important thing is to implement **US 1.7 (ParsedDocument Facade)**. Once the facade is in place, it completely decouples the `CitationValidator` and the future `ContentExtractor` from the parser's internal logic.
+
+- **Decoupling Enables Safe Refactoring:** After the facade exists, we can gut and rewrite the `MarkdownParser`'s internals—switching entirely to a token-based approach—and as long as it still produces the same `MarkdownParser.Output.DataContract` for the facade to consume, **no downstream components will break**.
+
+- **Focus on Delivery:** Refactoring the parser now is a significant task that would delay the start of Epic 2. By implementing the facade first, we can deliver the high-value content extraction feature and then safely circle back to optimize the parser's performance and code quality later.

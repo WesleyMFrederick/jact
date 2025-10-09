@@ -37,7 +37,7 @@ _Source: [Story 1.4b Acceptance Criteria](../../content-aggregation-prd.md#Story
 
 **Closes Technical Debt**:
 - [Lack of Dependency Injection](../../content-aggregation-architecture.md#Lack%20of%20Dependency%20Injection): Replaces direct import with DI
-- [Constructor-Based DI Wiring Overhead](../../../../../../../design-docs/Architecture%20-%20Basline.md#Constructor-Based%20DI%20Wiring%20Overhead): Replaces manual dependency wiring at every component instantiation with a factory pattern that must explicitly import and pass all dependencies.
+- [Constructor-Based DI Wiring Overhead](<../../../../../../../design-docs/Architecture - Baseline.md#Constructor-Based DI Wiring Overhead>): Replaces manual dependency wiring at every component instantiation with a factory pattern that must explicitly import and pass all dependencies.
 
 ## Dev Notes
 

@@ -13,7 +13,7 @@ const __dirname = dirname(__filename);
  * from the existing MarkdownParser, leveraging:
  * - marked.lexer() tokenization (already used in MarkdownParser.parseFile)
  * - extractHeadings() pattern for recursive token walking
- * - Parser Output Contract's tokens array
+ * - MarkdownParser.Output.DataContract's tokens array
  *
  * Expected API:
  * extractSection(tokens, headingText, headingLevel) => {
