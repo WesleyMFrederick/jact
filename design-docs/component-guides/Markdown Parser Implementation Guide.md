@@ -164,9 +164,12 @@ class MarkdownParser is
     foreach (line in lines with index) do
       // Pattern: Apply regex for header anchors: ## Header Text
       if (line matches headerPattern) then
+        // US1.6: Create single anchor with both raw and URL-encoded IDs
+        field urlEncodedId = line.text.replace(/:/g, "").replace(/\s+/g, "%20")
         anchors.add(new Anchor({
           anchorType: "header",
-          id: this.createHeaderId(line.text), // e.g., "Header%20Text"
+          id: line.text,              // Raw text: "Story 1.5: Implement Cache"
+          urlEncodedId: urlEncodedId, // Always populated: "Story%201.5%20Implement%20Cache"
           rawText: line.text,
           fullMatch: line.raw,
           // ... populate line, column ...
@@ -260,16 +263,24 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
     },
     "anchorObject": {
       "title": "Anchor Object",
+      "description": "Represents an anchor (link target) in the document. Header anchors include both raw and URL-encoded ID variants per US1.6. Block anchors omit urlEncodedId.",
       "type": "object",
       "properties": {
         "anchorType": { "type": "string", "enum": [ "header", "block" ] },
-        "id": { "type": "string" },
-        "rawText": { "type": ["string", "null"] },
+        "id": { "type": "string", "description": "Raw text format for headers (e.g., 'Story 1.5: Implement Cache'), or block ID for block anchors (e.g., 'FR1')" },
+        "urlEncodedId": { "type": "string", "description": "Obsidian-compatible URL-encoded format (e.g., 'Story%201.5%20Implement%20Cache'). Always populated for header anchors (even when identical to id), omitted for block anchors." },
+        "rawText": { "type": ["string", "null"], "description": "Original heading text for headers, null for block anchors" },
         "fullMatch": { "type": "string" },
         "line": { "type": "integer", "minimum": 1 },
         "column": { "type": "integer", "minimum": 1 }
       },
-      "required": [ "anchorType", "id", "rawText", "fullMatch", "line", "column" ]
+      "required": [ "anchorType", "id", "rawText", "fullMatch", "line", "column" ],
+      "allOf": [
+        {
+          "if": { "properties": { "anchorType": { "const": "header" } } },
+          "then": { "required": [ "urlEncodedId" ] }
+        }
+      ]
     }
   }
 }
@@ -355,7 +366,8 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
   "anchors": [
     {
       "anchorType": "header",
-      "id": "Caret%20References",
+      "id": "Caret References",
+      "urlEncodedId": "Caret%20References",
       "rawText": "Caret References",
       "fullMatch": "## Caret References",
       "line": 26,
@@ -372,6 +384,7 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
     {
       "anchorType": "header",
       "id": "auth-service",
+      "urlEncodedId": "auth-service",
       "rawText": "Auth Service",
       "fullMatch": "### Auth Service {#auth-service}",
       "line": 32,
@@ -535,7 +548,9 @@ async parseFile(filePath) {
 ```javascript
 {
   anchorType: "block" | "header",
-  id: string,           // The anchor identifier
+  id: string,           // Raw text format (e.g., "Story 1.5: Implement Cache")
+  urlEncodedId: string, // Obsidian-compatible format (e.g., "Story%201.5%20Implement%20Cache")
+                        // Always populated for headers, omitted for blocks (US1.6)
   rawText: string | null, // Text content (for headers/emphasis)
   fullMatch: string,    // Full matched pattern
   line: number,         // 1-based line number
@@ -669,7 +684,12 @@ const links = filterByTypesCached([ "link" ])
 
 ### Issue 2: Header Anchor Redundancy
 
-**Current Problem** (extractAnchors() lines 494-540):
+> [!note] **US1.6 Resolution (2025-10-09)**
+> US1.6 resolved the **duplicate anchor entries** issue - each header now generates a single AnchorObject with both `id` (raw text) and `urlEncodedId` (Obsidian-compatible) properties. See [Story 1.6](../../features/20251003-content-aggregation/content-aggregation-prd.md#Story%201.6%20Refactor%20MarkdownParser.Output.DataContract%20-%20Eliminate%20Duplicate%20Anchor%20Entries).
+>
+> The optimization opportunity below is a **separate issue** about re-parsing headings.
+
+**Remaining Optimization Opportunity** (extractAnchors() lines 494-540):
 - Re-scans content with regex `/^(#+)\s+(.+)$/` to find headings
 - But `extractHeadings(tokens)` already walked tokens and extracted headings at line 81
 - Could derive header anchors from existing `headings` array instead of re-parsing
@@ -814,6 +834,121 @@ function createLinkObject(match, classification, sourcePath) {
 **Cost**: Extra token tree walk on every parse for unused data.
 
 **Recommendation**: Remove from output contract or document concrete planned consumer.
+
+### Issue 4: Missing Standard Markdown Internal Link Extraction
+
+**Problem**: Parser extracts wiki-style internal links but NOT standard markdown internal links, creating gaps in validation coverage.
+
+**Current Behavior** (extractLinks() lines 88-299):
+
+```javascript
+// ✅ EXTRACTED: Wiki-style internal links
+[[#anchor|text]]           // Regex: /\[\[#([^|]+)\|([^\]]+)\]\]/g (line 269)
+
+// ✅ EXTRACTED: Cross-document markdown links
+[text](file.md#anchor)     // Regex: /\[([^\]]+)\]\(([^)#]+\.md)(#([^)]+))?\)/g (line 95)
+
+// ❌ NOT EXTRACTED: Standard markdown internal links
+[text](#anchor)            // No pattern exists for this format
+```
+
+**Discovery Context**: Identified during US1.6 Task 1.2 implementation (2025-10-09).
+
+**Impact**:
+
+1. **Test Specification Deviation**: Task 1.2 spec required testing validator with internal links `[text](#anchor)`, but implementation had to use cross-document links `[text](file.md#anchor)` instead
+2. **Validation Coverage Gap**: CitationValidator cannot validate standard markdown internal anchor references within a document
+3. **Inconsistent Link Support**: Parser supports Obsidian-specific wiki internal links but not standard markdown internal links
+4. **User Experience**: Authors using standard markdown syntax for internal references won't get validation feedback
+
+**Evidence from US1.6 Task 1.2**:
+
+Task specification (tasks/01-1-2-write-validator-anchor-matching-tests-us1.6.md:139-141):
+
+```markdown
+**File**: `tools/citation-manager/test/fixtures/anchor-matching.md` (CREATE)
+- Add link using raw format: `[Link 1](#Story 1.5: Implement Cache)`
+- Add link using encoded format: `[Link 2](#Story%201.5%20Implement%20Cache)`
+```
+
+Actual implementation deviated:
+
+```markdown
+# File: anchor-matching-source.md
+[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)
+[Link using URL-encoded format](anchor-matching.md#Story%201.5%20Implement%20Cache)
+```
+
+Test-writer agent justification (Implementation Agent Notes:260-266):
+> "Used cross-document links (not internal links) because **MarkdownParser.extractLinks() currently only extracts cross-document references**. Created separate source and target fixture files to enable cross-document link testing."
+
+**Architecture Decision**: Evaluation agent (Application Tech Lead) approved deviation for US1.6's narrow scope (anchor schema refactoring) but flagged for architectural review.
+
+**Why This Matters**:
+
+- **Parser Architecture Gap**: marked.js DOES parse internal links as `type: "link"` tokens with `href: "#anchor"`, but our extraction layer filters them out by requiring `.md` extension
+- **Validation Completeness**: CitationValidator should validate ALL anchor references (wiki-style, standard markdown, and cross-document) for complete link checking
+- **CommonMark Compliance**: Standard markdown internal links are part of CommonMark spec, while wiki-style links are Obsidian-specific
+
+**Root Cause**: Line 95 regex requires `.md` file extension:
+
+```javascript
+const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(#([^)]+))?\)/g;
+//                                       ^^^^ Requires .md extension
+```
+
+**Recommendation**: Add support for standard markdown internal links:
+
+**Option A: Add new regex pattern** (low effort, consistent with current architecture):
+
+```javascript
+// Add after line 134 in extractLinks()
+// Standard markdown internal links: [text](#anchor)
+const internalLinkPattern = /\[([^\]]+)\]\(#([^)]+)\)/g;
+match = internalLinkPattern.exec(line);
+while (match !== null) {
+  const text = match[1];
+  const anchor = match[2];
+
+  links.push({
+    linkType: "markdown",
+    scope: "internal",
+    anchorType: this.determineAnchorType(anchor),
+    source: { path: { absolute: sourceAbsolutePath } },
+    target: {
+      path: { raw: null, absolute: null, relative: null },
+      anchor: anchor
+    },
+    text: text,
+    fullMatch: match[0],
+    line: index + 1,
+    column: match.index
+  });
+  match = internalLinkPattern.exec(line);
+}
+```
+
+**Option B: Extract from marked.js tokens** (better performance, requires refactoring):
+
+```javascript
+// Use walkTokens to extract links from AST
+marked.walkTokens(tokens, (token) => {
+  if (token.type === 'link' && token.href.startsWith('#')) {
+    // Internal link found in AST
+  }
+});
+```
+
+**Follow-up Story Required**: Create user story for adding standard markdown internal link support to enable complete validation coverage. Priority: Medium (blocks complete CommonMark validation support).
+
+**Related Technical Debt**: See Issue 1 (Double-Parse Anti-Pattern) - extracting from tokens would address both issues simultaneously.
+
+**Documentation Date**: 2025-10-09
+**Discovered During**: US1.6 Task 1.2 (CitationValidator Anchor Matching Integration Tests)
+**Related Files**:
+- `tools/citation-manager/src/MarkdownParser.js:88-299` (extractLinks method)
+- `tools/citation-manager/test/integration/citation-validator-anchor-matching.test.js` (uses cross-doc workaround)
+- `tools/citation-manager/design-docs/features/20251003-content-aggregation/user-stories/us1.6-refactor-anchor-schema/tasks/01-1-2-write-validator-anchor-matching-tests-us1.6.md` (specification that couldn't be followed)
 
 ---
 

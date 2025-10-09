@@ -519,10 +519,14 @@ export class CitationValidator {
 	async validateAnchorExists(anchor, targetFile) {
 		try {
 			const parsed = await this.parsedFileCache.resolveParsedFile(targetFile);
-			const availableAnchors = parsed.anchors.map((a) => a.id);
 
-			// Direct match
-			if (availableAnchors.includes(anchor)) {
+			// Direct match - check both id and urlEncodedId fields
+			const anchorExists = parsed.anchors.some(
+				(anchorObj) =>
+					anchorObj.id === anchor || anchorObj.urlEncodedId === anchor,
+			);
+
+			if (anchorExists) {
 				// Check if this is a kebab-case anchor that has a raw header equivalent
 				const obsidianBetterSuggestion = this.suggestObsidianBetterFormat(
 					anchor,
@@ -540,7 +544,11 @@ export class CitationValidator {
 			// For emphasis-marked anchors, try URL-decoded version
 			if (anchor.includes("%20")) {
 				const decoded = decodeURIComponent(anchor);
-				if (availableAnchors.includes(decoded)) {
+				const decodedExists = parsed.anchors.some(
+					(anchorObj) =>
+						anchorObj.id === decoded || anchorObj.urlEncodedId === decoded,
+				);
+				if (decodedExists) {
 					return { valid: true };
 				}
 			}
@@ -568,10 +576,14 @@ export class CitationValidator {
 				return { valid: true, matchedAs: flexibleMatch.matchType };
 			}
 
-			// Generate suggestions for similar anchors
+			// Generate suggestions for similar anchors - include both ID variants
+			const availableAnchorIds = parsed.anchors.flatMap((a) => [
+				a.id,
+				a.urlEncodedId,
+			]);
 			const suggestions = this.generateAnchorSuggestions(
 				anchor,
-				availableAnchors,
+				availableAnchorIds,
 			);
 
 			// Include Obsidian block references in available anchors list

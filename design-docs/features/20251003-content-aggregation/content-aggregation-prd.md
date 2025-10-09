@@ -205,15 +205,7 @@ _Enables_: [Story 1.7: Implement ParsedDocument Facade](#Story%201.7%20Implement
 _Closes Technical Debt_: [Duplicate Anchor Entries in MarkdownParser.Output.DataContract](content-aggregation-architecture.md#Duplicate%20Anchor%20Entries%20in%20MarkdownParser.Output.DataContract)
 _Functional Requirements_: [[#^FR8|FR8]]
 _User Story Link_: user-stories/us1.6-refactor-anchor-schema/us1.6-refactor-anchor-schema.md
-_Status_: 📋 PENDING
-
-> [!warning] Technical Lead Feedback: Data model change impacts downstream consumers
->
-> Architecture Impact: This refactoring modifies the MarkdownParser.Output.DataContract's AnchorObject schema, which is consumed by CitationValidator and will be consumed by the future ContentExtractor (Epic 2).
->
-> Migration Strategy: Update CitationValidator anchor matching logic to check both id and urlEncodedId fields. Update MarkdownParser.Output.DataContract test fixtures and validation schema.
->
-> Relevant Architecture Principles: [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [illegal-states-unrepresentable](../../../../../design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable)
+_Status_:  ✅ COMPLETE (2025-10-09)
 
 ---
 

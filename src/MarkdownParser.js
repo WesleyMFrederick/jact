@@ -495,31 +495,21 @@ export class MarkdownParser {
 						column: 0,
 					});
 				} else {
-					// Always use raw text as anchor for all headers
+					// Generate URL-encoded ID (Obsidian-compatible format)
+					const urlEncodedId = headerText
+						.replace(/:/g, "") // Remove colons
+						.replace(/\s+/g, "%20"); // URL-encode spaces
+
+					// Create single anchor with both ID variants
 					anchors.push({
 						anchorType: "header",
-						id: headerText,
+						id: headerText, // Raw text format
+						urlEncodedId: urlEncodedId, // Always populated (even when identical to id)
 						rawText: headerText,
 						fullMatch: headerMatch[0],
 						line: index + 1,
 						column: 0,
 					});
-
-					// Also add Obsidian-compatible anchor (drops colons, URL-encodes spaces)
-					const obsidianAnchor = headerText
-						.replace(/:/g, "") // Remove colons
-						.replace(/\s+/g, "%20"); // URL-encode spaces
-
-					if (obsidianAnchor !== headerText) {
-						anchors.push({
-							anchorType: "header",
-							id: obsidianAnchor,
-							rawText: headerText,
-							fullMatch: headerMatch[0],
-							line: index + 1,
-							column: 0,
-						});
-					}
 				}
 			}
 		});

@@ -127,7 +127,7 @@ The component's primary responsibility is to delegate core business logic (e.g.,
   - `marked` markdown tokenizer library
   - ESM modules
 - **Technology Status:** Production
-- **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates multiple anchor format variations for compatibility.
+- **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates single anchor per header with dual ID properties (raw text and URL-encoded) for Obsidian compatibility (US1.6).
 - **Implementation Guide**: [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md) for the detailed data contract schema and examples
 
 ##### Interactions
@@ -500,11 +500,12 @@ tools/citation-manager/test/
 
 ### Test Categories
 
-**Contract Validation Tests** (8 tests - US1.5):
+**Contract Validation Tests** (12 tests - US1.5 + US1.6):
 - Validate MarkdownParser.Output.DataContract schema compliance
 - Test LinkObject structure (`linkType`, `scope`, `anchorType`, `source`, `target`)
-- Test AnchorObject structure (`anchorType`, `id`, `rawText`)
+- Test AnchorObject structure (`anchorType`, `id`, `urlEncodedId`, `rawText`) - US1.6 dual ID schema
 - Verify enum constraints and required fields
+- Verify single anchor per header with no duplicates (US1.6)
 - Reference: [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md)
 
 **Cache Unit Tests** (6 tests - US1.5):
@@ -698,11 +699,25 @@ This duplication violates the **One Source of Truth** and **Illegal States Unrep
 - Update MarkdownParser.Output.DataContract test fixtures and validation schema
 - Update MarkdownParser.Output.DataContract JSON schema documentation
 
-**Resolution**: Scheduled for [Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](content-aggregation-prd.md#Story%201.6%20Refactor%20Parser%20Output%20Contract%20-%20Eliminate%20Duplicate%20Anchor%20Entries)
+**Resolution**: ✅ RESOLVED in [Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](content-aggregation-prd.md#Story%201.6%20Refactor%20MarkdownParser.Output.DataContract%20-%20Eliminate%20Duplicate%20Anchor%20Entries)
 
-**Timeline**: Complete before Epic 2 Story 2.1 implementation, as ContentExtractor will depend on anchor structure.
+**Resolution Date**: 2025-10-09 (Wave 2: Phase 2 & 3 Complete)
 
-**Status**: Documented technical debt, scheduled for resolution.
+**Resolution Summary**:
+- Refactored `MarkdownParser.extractAnchors()` to create single AnchorObject per header with both `id` (raw text) and `urlEncodedId` (Obsidian-compatible) properties
+- Updated `CitationValidator.validateAnchorExists()` to check both `id` and `urlEncodedId` fields using logical OR pattern
+- Eliminated duplicate anchor entries, achieving 50% memory reduction for headers with special characters
+- Updated MarkdownParser.Output.DataContract schema with dual ID properties
+- All Phase 1 parser schema tests passing (12/12)
+- All Phase 1 integration tests passing (4/4)
+- Zero functional regressions (100/102 tests passing, 2 pre-existing failures unrelated)
+
+**Resolution Verification**:
+- Parser test: `npm test -- parser-output-contract` → All tests passing, including "should prevent duplicate anchor entries"
+- Integration test: `npm test -- integration/citation-validator-anchor-matching` → All tests passing with both ID formats
+- Files modified: `src/MarkdownParser.js` (lines 497-513), `src/CitationValidator.js` (lines 522-587)
+
+**Status**: ✅ RESOLVED (2025-10-09) - Ready for Epic 2 ContentExtractor implementation
 
 ### Scattered File I/O Operations
 

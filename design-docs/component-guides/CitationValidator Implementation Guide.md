@@ -136,7 +136,10 @@ class CitationValidator is
       field targetFileContract = await this.parsedFileCache.resolveParsedFile(link.target.path.absolute)
       
       // Check if the target anchor ID exists in the target file's list of anchors.
-      field anchorExists = targetFileContract.anchors.some(anchor => anchor.id == link.target.anchor)
+      // US1.6: Checks both id (raw text) and urlEncodedId (Obsidian format) fields.
+      field anchorExists = targetFileContract.anchors.some(anchor =>
+        anchor.id == link.target.anchor || anchor.urlEncodedId == link.target.anchor
+      )
 
       if (anchorExists) then
         return { status: "valid", ... }

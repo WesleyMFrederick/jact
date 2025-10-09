@@ -248,4 +248,85 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 		// Verify content is non-empty string
 		expect(result.content.length).toBeGreaterThan(0);
 	});
+
+	it("should populate anchors array with single anchor per header", async () => {
+		// Given: Parser with fixture containing headers with special characters
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: Each header generates SINGLE anchor (not two)
+		// 1. Find header with special characters (e.g., "Story 1.5: Implement Cache")
+		const targetHeader = "Story 1.5: Implement Cache";
+		const headerAnchors = result.anchors.filter(
+			(anchor) => anchor.rawText === targetHeader,
+		);
+
+		// 2. Assert only ONE anchor exists for this header
+		expect(headerAnchors.length).toBe(1);
+
+		// 3. Assert anchor has BOTH id and urlEncodedId properties
+		const anchor = headerAnchors[0];
+		expect(anchor.id).toBe(targetHeader);
+		expect(anchor.urlEncodedId).toBe("Story%201.5%20Implement%20Cache");
+	});
+
+	it("should populate urlEncodedId for all header anchors", async () => {
+		// Given: Parser with headers (both simple and complex)
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: ALL header anchors have urlEncodedId populated
+		const headerAnchors = result.anchors.filter(
+			(anchor) => anchor.anchorType === "header",
+		);
+
+		for (const anchor of headerAnchors) {
+			// urlEncodedId ALWAYS present for headers (even when identical to id)
+			expect(anchor).toHaveProperty("urlEncodedId");
+			expect(typeof anchor.urlEncodedId).toBe("string");
+		}
+	});
+
+	it("should omit urlEncodedId for block anchors", async () => {
+		// Given: Parser with block anchors
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: Block anchors do NOT have urlEncodedId
+		const blockAnchors = result.anchors.filter(
+			(anchor) => anchor.anchorType === "block",
+		);
+
+		for (const anchor of blockAnchors) {
+			expect(anchor).not.toHaveProperty("urlEncodedId");
+		}
+	});
+
+	it("should prevent duplicate anchor entries for headers with special characters", async () => {
+		// Given: Header "## Story 1.5: Implement Cache"
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: Exactly ONE anchor created (not two)
+		const targetHeader = "Story 1.5: Implement Cache";
+		const matchingAnchors = result.anchors.filter(
+			(anchor) => anchor.rawText === targetHeader,
+		);
+
+		expect(matchingAnchors.length).toBe(1);
+		expect(matchingAnchors[0].id).toBe(targetHeader);
+		expect(matchingAnchors[0].urlEncodedId).toBe("Story%201.5%20Implement%20Cache");
+	});
 });
