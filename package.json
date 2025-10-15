@@ -5,6 +5,9 @@
 	"type": "module",
 	"private": true,
 	"main": "src/citation-manager.js",
+	"bin": {
+		"citation-manager": "./src/citation-manager.js"
+	},
 	"scripts": {
 		"test": "vitest",
 		"start": "node src/citation-manager.js"

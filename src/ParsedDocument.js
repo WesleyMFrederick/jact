@@ -1,0 +1,222 @@
+/**
+ * Facade providing stable query interface over MarkdownParser.Output.DataContract
+ *
+ * Encapsulates parser output complexity and provides high-level query methods
+ * for anchor validation, fuzzy matching, and content extraction. Isolates
+ * consumers from internal schema changes through lazy-loaded caches and
+ * stable public interface.
+ *
+ * @class ParsedDocument
+ */
+class ParsedDocument {
+	/**
+	 * Create a ParsedDocument facade wrapping parser output
+	 * @param {Object} parserOutput - MarkdownParser.Output.DataContract with { filePath, content, tokens, links, headings, anchors }
+	 */
+	constructor(parserOutput) {
+		// Store parser output privately for encapsulation
+		this._data = parserOutput;
+
+		// Initialize lazy-load caches for performance
+		this._cachedAnchorIds = null;
+		this._cachedBlockAnchors = null;
+		this._cachedHeaderAnchors = null;
+	}
+
+	// === PUBLIC QUERY METHODS ===
+
+	/**
+	 * Check if anchor exists in document
+	 *
+	 * Checks both id and urlEncodedId properties to handle all anchor formats.
+	 *
+	 * @param {string} anchorId - Anchor ID to check (either id or urlEncodedId format)
+	 * @returns {boolean} True if anchor exists in document
+	 */
+	hasAnchor(anchorId) {
+		// Check both id and urlEncodedId for match
+		return this._data.anchors.some(a =>
+			a.id === anchorId || a.urlEncodedId === anchorId
+		);
+	}
+
+	/**
+	 * Find anchors similar to given anchor ID
+	 *
+	 * Uses fuzzy matching (Levenshtein distance) to find similar anchor IDs
+	 * for suggestion generation. Returns top 5 matches sorted by similarity score.
+	 *
+	 * @param {string} anchorId - Anchor ID to find similar matches for
+	 * @returns {string[]} Array of similar anchor IDs sorted by similarity score (max 5)
+	 */
+	findSimilarAnchors(anchorId) {
+		// Get all anchor IDs (lazy-loaded from cache)
+		const allIds = this._getAnchorIds();
+
+		// Perform fuzzy matching and return top 5 results
+		return this._fuzzyMatch(anchorId, allIds);
+	}
+
+	/**
+	 * Get all links in the document
+	 * @returns {Array<Object>} Array of all link objects from parser output
+	 */
+	getLinks() {
+		// Return links array from parser output
+		return this._data.links;
+	}
+
+	/**
+	 * Extract full file content
+	 * @returns {string} Full content of parsed file
+	 */
+	extractFullContent() {
+		// Return content string from parser output
+		return this._data.content;
+	}
+
+	/**
+	 * Extract section content by heading text
+	 *
+	 * STUB: Content extraction deferred to Epic 2
+	 *
+	 * @param {string} headingText - Heading text to extract section for
+	 * @returns {string|null} Section content or null if not found
+	 * @throws {Error} Not implemented - deferred to Epic 2
+	 */
+	extractSection(headingText) {
+		// Stub implementation for Epic 2
+		throw new Error("Not implemented - Epic 2");
+	}
+
+	/**
+	 * Extract block content by anchor ID
+	 *
+	 * STUB: Content extraction deferred to Epic 2
+	 *
+	 * @param {string} anchorId - Block anchor ID
+	 * @returns {string|null} Block content or null if not found
+	 * @throws {Error} Not implemented - deferred to Epic 2
+	 */
+	extractBlock(anchorId) {
+		// Stub implementation for Epic 2
+		throw new Error("Not implemented - Epic 2");
+	}
+
+	// === PRIVATE HELPER METHODS ===
+
+	/**
+	 * Get all anchor IDs (both id and urlEncodedId variants)
+	 *
+	 * Lazy-loaded and cached for performance. Extracts both id and urlEncodedId
+	 * from all anchors, ensuring unique values only.
+	 *
+	 * @private
+	 * @returns {string[]} Array of all anchor IDs
+	 */
+	_getAnchorIds() {
+		// Check if cache exists
+		if (this._cachedAnchorIds === null) {
+			// Build Set of unique IDs
+			const ids = new Set();
+			for (const anchor of this._data.anchors) {
+				ids.add(anchor.id);
+
+				// Add urlEncodedId if different from id
+				if (anchor.urlEncodedId && anchor.urlEncodedId !== anchor.id) {
+					ids.add(anchor.urlEncodedId);
+				}
+			}
+
+			// Cache the result
+			this._cachedAnchorIds = Array.from(ids);
+		}
+
+		// Return cached value
+		return this._cachedAnchorIds;
+	}
+
+	/**
+	 * Fuzzy matching implementation to find similar strings
+	 *
+	 * Uses Levenshtein distance to calculate similarity scores, filters by
+	 * threshold (0.6), and returns top 5 matches sorted by score descending.
+	 *
+	 * @private
+	 * @param {string} target - Target string to match
+	 * @param {string[]} candidates - Array of candidate strings
+	 * @returns {string[]} Array of similar strings sorted by similarity (max 5)
+	 */
+	_fuzzyMatch(target, candidates) {
+		// Calculate similarity scores for all candidates
+		const matches = [];
+		for (const candidate of candidates) {
+			const similarity = this._calculateSimilarity(target, candidate);
+
+			// Filter by threshold (0.3 for fuzzy matching)
+			if (similarity > 0.3) {
+				matches.push({ candidate, score: similarity });
+			}
+		}
+
+		// Sort by score descending
+		matches.sort((a, b) => b.score - a.score);
+
+		// Return top 5 candidate strings
+		return matches.map(m => m.candidate).slice(0, 5);
+	}
+
+	/**
+	 * Calculate string similarity using Levenshtein distance
+	 *
+	 * Implements dynamic programming algorithm to calculate edit distance,
+	 * then normalizes to 0-1 range based on maximum string length.
+	 *
+	 * @private
+	 * @param {string} str1 - First string
+	 * @param {string} str2 - Second string
+	 * @returns {number} Similarity score between 0 and 1 (1 = identical)
+	 */
+	_calculateSimilarity(str1, str2) {
+		// Handle edge cases
+		if (str1 === str2) return 1.0;
+		if (str1.length === 0 || str2.length === 0) return 0.0;
+
+		// Convert to lowercase for case-insensitive comparison
+		const a = str1.toLowerCase();
+		const b = str2.toLowerCase();
+
+		// Initialize matrix for dynamic programming
+		const matrix = [];
+		for (let i = 0; i <= b.length; i++) {
+			matrix[i] = [i];
+		}
+		for (let j = 0; j <= a.length; j++) {
+			matrix[0][j] = j;
+		}
+
+		// Fill matrix with Levenshtein distance calculation
+		for (let i = 1; i <= b.length; i++) {
+			for (let j = 1; j <= a.length; j++) {
+				if (b.charAt(i - 1) === a.charAt(j - 1)) {
+					matrix[i][j] = matrix[i - 1][j - 1];
+				} else {
+					matrix[i][j] = Math.min(
+						matrix[i - 1][j - 1] + 1, // substitution
+						matrix[i][j - 1] + 1,     // insertion
+						matrix[i - 1][j] + 1      // deletion
+					);
+				}
+			}
+		}
+
+		// Get final distance
+		const distance = matrix[b.length][a.length];
+
+		// Normalize to 0-1 range (1 = identical, 0 = completely different)
+		const maxLength = Math.max(a.length, b.length);
+		return 1 - (distance / maxLength);
+	}
+}
+
+export default ParsedDocument;

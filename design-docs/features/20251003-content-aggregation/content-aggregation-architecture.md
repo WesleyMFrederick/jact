@@ -81,15 +81,7 @@ graph TB
 %%
 ### Component Level: Impact Analysis
 
-The primary impact is the addition of **Content Extractor** (Epic 2), enabling content aggregation from linked markdown sections. Existing components remain functionally unchanged during migration, with path updates only.
-
-**Current Architecture**: 4 source files with 1:1 component mapping (CitationManager, MarkdownParser, FileCache, CitationValidator). Each file contains a single class representing one component.
-
-#### New Components (Epic 2)
-- **ContentExtractor**: Extracts and aggregates content from linked files/sections for AI context management (new standalone file)
-
-%%
-
+The main architectural impact of the recent refactoring work (US 1.5-1.7) is the introduction of ==three== new components: the **`ParsedFileCache`**, the **`ParsedDocument`** facade, and the future **`ContentExtractor`**. The `ParsedFileCache` ensures each file is parsed only once per run, resolving a major performance bottleneck. ==The new `ParsedDocument` facade provides a stable query interface that decouples consumers like the `CitationValidator` from the parser's internal data structure, which is a critical prerequisite for Epic 2.== %%
 ### Citation Manager Components
 
 #### Citation Manager.CLI Orchestrator
@@ -100,9 +92,11 @@ The primary impact is the addition of **Content Extractor** (Epic 2), enabling c
 - **Description:** CLI entry point orchestrating all citation management operations. Parses commands (validate, ast, base-paths, fix), coordinates workflow execution, formats output for CLI/JSON display, and implements auto-fix logic for broken citations and paths.
 
 ##### Interactions
-- _creates and coordinates_ `Markdown Parser`, `File Cache`, `ParsedFileCache`, `Citation Validator`, ==and `ContentExtractor`== components (synchronous).
+- _creates and coordinates_ `Markdown Parser`, `File Cache`, `ParsedFileCache`, ==`ParsedDocument`,== `Citation Validator`, ==and `ContentExtractor`== components (synchronous).
 - _injects_ dependencies such as the `FileCache` and `ParsedFileCache` into components like the `CitationValidator` at instantiation (synchronous).
+- ==_delegates factory creation_ of `ParsedDocument` instances to `ParsedFileCache` via constructor injection (synchronous).==
 - _delegates to_ the `MarkdownParser` for the `ast` command (asynchronous).
+- ==_ast command_ continues to access raw `MarkdownParser.Output.DataContract` directly for debugging purposes, bypassing `ParsedDocument` facade.==
 - _delegates to_ the `CitationValidator` for the `validate` command (asynchronous).
 - ==_delegates to_ the `ContentExtractor` to aggregate document content (asynchronous).==
 - _reads and writes_ markdown files directly for the `--fix` operation (synchronous).
@@ -127,7 +121,7 @@ The component's primary responsibility is to delegate core business logic (e.g.,
   - `marked` markdown tokenizer library
   - ESM modules
 - **Technology Status:** Production
-- **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates single anchor per header with dual ID properties (raw text and URL-encoded) for Obsidian compatibility (US1.6).
+- **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates single anchor per header with dual ID properties (raw text and URL-encoded) for Obsidian compatibility (US1.6). ==This component's output (`MarkdownParser.Output.DataContract`) is encapsulated by the `ParsedDocument` facade before being consumed by other components.==
 - **Implementation Guide**: [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md) for the detailed data contract schema and examples
 
 ##### Interactions
@@ -136,7 +130,7 @@ The component's primary responsibility is to delegate core business logic (e.g.,
 - _provides_ structured AST data to `CLI Orchestrator` and `Citation Validator` (synchronous)
 
 ##### Boundaries
-The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** responsible for:
+The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. ==The component is **not** aware of the `ParsedDocument` facade that wraps its output.== The component is **not** responsible for:
 - Validating the existence or accessibility of file paths.
 - Verifying the semantic correctness of links or anchors.
 - Interpreting or executing any code within the document.
@@ -169,18 +163,20 @@ The component's primary output is from the `resolveFile()` method, which returns
   - `Node.js` class
   - ESM modules
 - **Technology Status:** Production
-- **Description:** Validates `Link Objects` by consuming `MarkdownParser.Output.DataContract` objects to check for target and anchor existence. It classifies citation patterns (caret syntax,cross-document, wiki-style), resolves file paths using multiple strategies (relative paths, symlinks, Obsidian absolute paths, cache lookup), generates validation results with actionable suggestions.
+- **Description:** Validates `Link Objects` ==by consuming `ParsedDocument` facade instances from the `ParsedFileCache`==. It classifies citation patterns (caret syntax, cross-document, wiki-style), resolves file paths using multiple strategies (relative paths, symlinks, Obsidian absolute paths, cache lookup), ==uses `ParsedDocument` query methods to check for target and anchor existence==, generates validation results with actionable suggestions.
 - **Implementation Guide**: [CitationValidator Implementation Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md) for public contracts and data objects
 
 ##### Interactions
-- _uses_ the `ParsedFileCache` to retrieve parsed data for target files (asynchronous).
+- _uses_ the `ParsedFileCache` to retrieve ==`ParsedDocument` instances== for target files (asynchronous).
+- ==_uses_ `ParsedDocument` query methods (`hasAnchor()`, `getAnchorIds()`, `findSimilarAnchors()`) instead of direct data structure access (synchronous).==
 - _uses_ the `FileCache` for filename resolution when a scope is provided (synchronous, optional dependency).
 - _validates_ file existence directly via the file system as a fallback (synchronous).
 - _returns_ validation results with status and suggestions to the `CLI Orchestrator` (asynchronous).
 
 ##### Boundaries
 - The component is exclusively responsible for the semantic validation of `Link Objects` (e.g., "does this link point to a real target?").
-- It is **not** responsible for parsing markdown (delegated to `MarkdownParser` via the cache) or for managing the efficiency of parsing operations (delegated to `ParsedFileCache`).
+- ==It is **not** responsible for parsing markdown (delegated to `MarkdownParser` via the cache) or navigating parser output structures (delegated to `ParsedDocument` facade).==
+- It is **not** responsible for managing the efficiency of parsing operations (delegated to `ParsedFileCache`).
 - It does **not** perform file modifications; it only generates suggestions.
 
 #### Citation Manager.ParsedFileCache
@@ -189,16 +185,17 @@ The component's primary output is from the `resolveFile()` method, which returns
   - `Node.js` class
   - ESM modules
 - **Technology Status:** Implemented
-- **Description:** Maintains an in-memory cache of parsed file objects (`MarkdownParser.Output.DataContract`) for the duration of a single command run. Ensures each file is read from disk and parsed by the `MarkdownParser` at most once.
+- **Description:** Maintains an in-memory cache of ==`ParsedDocument` facade instances== for the duration of a single command run. ==Wraps `MarkdownParser.Output.DataContract` objects in the `ParsedDocument` facade before returning them==, ensuring each file is read from disk and parsed by the `MarkdownParser` at most once.
 - **Implementation Guide**: [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md) for public contracts and data objects
 
 ##### Interactions
-- _is consumed by_ the `CitationValidator` and ==`ContentExtractor`== to retrieve parsed file data (asynchronous).
+- _is consumed by_ the `CitationValidator` and ==`ContentExtractor`== to retrieve ==`ParsedDocument` instances== (asynchronous).
 - _delegates to_ the `MarkdownParser` to parse files that are not yet in the cache (asynchronous).
+- ==_creates_ `ParsedDocument` facade instances by wrapping `MarkdownParser.Output.DataContract` before returning (synchronous).==
 - _is instantiated by_ the `CLI Orchestrator` (via its factory) (synchronous).
 
 ##### Boundaries
-- The component's sole responsibility is to manage the in-memory lifecycle of parsed file objects. It acts as a key-value store mapping file paths to `MarkdownParser.Output.DataContract` objects.
+- The component's sole responsibility is to manage the in-memory lifecycle of ==`ParsedDocument` facade instances==. It acts as a key-value store mapping file paths to ==`ParsedDocument` instances==.
 - It is **not** responsible for the parsing logic itself (which is delegated) or for any direct file system operations.
 
 ##### Error Handling & Cache Correctness
@@ -206,21 +203,55 @@ The component's primary output is from the `resolveFile()` method, which returns
 - **Retry Support**: Removing failed promises from cache enables retry on transient errors (temporary permission issues, network drive timeouts).
 - **Implementation Critical**: The `.catch()` handler must execute `cache.delete(key)` synchronously to prevent race conditions between error handling and new requests.
 
+#### Citation Manager.ParsedDocument
+
+- **Path(s):** `tools/citation-manager/src/ParsedDocument.js` (Implemented - [Story 1.7](user-stories/us1.7-implement-parsed-document-facade/us1.7-implement-parsed-document-facade.md))
+- **Technology:**
+  - `Node.js` class
+  - ESM modules
+- **Technology Status:** Implemented (US1.7)
+- **Description:** Facade providing a stable, method-based query interface over `MarkdownParser.Output.DataContract`. Encapsulates internal data structure access and navigation complexity, decoupling consumers from parser internals. Implements anchor query methods (`hasAnchor()`, `findSimilarAnchors()`), link query methods (`getLinks()`), and content extraction methods (`extractFullContent()`). Methods `extractSection()` and `extractBlock()` stubbed for Epic 2. Note: `getBlockAnchors()` and `getHeaderAnchors()` cache fields exist but methods not implemented (Epic 2 placeholders).
+- **Implementation Guide**: [ParsedDocument Implementation Guide](../../component-guides/ParsedDocument%20Implementation%20Guide.md)
+
+##### Interactions
+- _is created by_ the `ParsedFileCache` when wrapping `MarkdownParser.Output.DataContract` (synchronous).
+- _wraps_ the `MarkdownParser.Output.DataContract` to provide stable interface (synchronous).
+- _is consumed by_ the `CitationValidator` for anchor and link queries (synchronous).
+- _is consumed by_ the future `ContentExtractor` for content extraction operations (synchronous).
+
+##### Boundaries
+- The component is exclusively responsible for providing a stable query interface over parser output. It encapsulates all direct access to `MarkdownParser.Output.DataContract` internal structures.
+- It is **not** responsible for parsing markdown (delegated to `MarkdownParser`) or caching parsed results (delegated to `ParsedFileCache`).
+- It is **not** responsible for validation logic (delegated to `CitationValidator`) or content aggregation logic (delegated to `ContentExtractor`).
+- **Known Limitation**: CitationValidator helper methods still access `_data.anchors` directly for type filtering and rawText operations (lines 528, 560, 570-578). Full encapsulation deferred to Epic 2.
+
+##### Input Public Contract
+1. A **`MarkdownParser.Output.DataContract`** object, provided to the constructor.
+
+##### Output Public Contract
+The facade exposes query methods that return transformed/filtered data from the wrapped contract:
+- **Anchor Queries**: `hasAnchor(anchorId)`, `findSimilarAnchors(anchorId)` - Implemented in US1.7
+- **Link Queries**: `getLinks()` - Implemented in US1.7
+- **Content Extraction**: `extractFullContent()` - Implemented in US1.7; `extractSection(headingText)`, `extractBlock(anchorId)` - Stubbed for Epic 2
+- **Note**: `getBlockAnchors()`, `getHeaderAnchors()` not implemented - Epic 2 placeholders only
+
 #### ==Citation Manager.Content Extractor==
 - ==**Path(s):** `tools/citation-manager/src/ContentExtractor.js` (_PROPOSED - [Epic 2](https://www.google.com/search?q=content-aggregation-prd.md%23Feature%2520Epics))_==
 - ==**Technology:**==
   - ==`Node.js` class==
   - ==ESM modules==
 - ==**Technology Status:** To Be Implemented==
-- ==**Description:** Extracts full content from linked documents or specific sections within them. It uses the pre-parsed token stream to reliably identify section boundaries for accurate content aggregation.==
+- ==**Description:** Extracts full content from linked documents or specific sections within them. It consumes `ParsedDocument` facade instances from the `ParsedFileCache` to perform content extraction using the facade's `extractSection()`, `extractBlock()`, and `extractFullContent()` methods.==
 
 ##### ==Interactions==
 - ==_is consumed by_ the `CLI Orchestrator` to perform content aggregation (asynchronous).==
-- ==_uses_ the `ParsedFileCache` to retrieve the `MarkdownParser.Output.DataContract` (which includes the content and tokens) for target documents (asynchronous).==
+- ==_uses_ the `ParsedFileCache` to retrieve `ParsedDocument` instances for target documents (asynchronous).==
+- ==_uses_ `ParsedDocument` content extraction methods (`extractSection()`, `extractBlock()`, `extractFullContent()`) to retrieve content (synchronous).==
 
 ##### ==Boundaries==
-- ==The component's sole responsibility is to extract a string of content from a `MarkdownParser.Output.DataContract` based on a given `Link Object`.==
-- ==It is **not** responsible for parsing markdown or reading files from disk; it operates on the already-parsed data provided by the cache.==
+- ==The component's sole responsibility is to extract content strings based on `Link Objects` by orchestrating calls to `ParsedDocument` facade methods.==
+- ==It is **not** responsible for parsing markdown (delegated to `MarkdownParser`) or navigating parser output structures (delegated to `ParsedDocument` facade).==
+- ==It is **not** responsible for reading files from disk (delegated to `ParsedFileCache`).==
 
 ##### ==Input Public Contract==
 1. ==A **`ParsedFileCache` interface**, provided at instantiation.==
@@ -229,7 +260,7 @@ The component's primary output is from the `resolveFile()` method, which returns
 ##### ==Output Public Contract==
 ==The `extract()` method returns a `Promise` that resolves with a **Content Block object**. This object contains the extracted `content` (string) and `metadata` about its source (e.g., the source file path and anchor).==
 
-### Component Interaction Diagram After US1.5
+### Component Interaction Diagram After US1.7
 
 ```mermaid
 sequenceDiagram
@@ -237,6 +268,7 @@ sequenceDiagram
     participant CLI as CLI Orchestrator
     participant FileCache
     participant ParsedCache as ParsedFileCache
+    participant ParsedDoc as ParsedDocument
     participant Validator as Citation Validator
     participant Parser as MarkdownParser
     participant FS as File System
@@ -244,7 +276,7 @@ sequenceDiagram
     User->>+CLI: validate <file> --scope <dir>
 
     note right of CLI: Instantiates all components and injects dependencies.
-    
+
     alt FLAG "--scope <dir>"
         CLI->>+FileCache: buildCache(scopeDir)
         FileCache->>FS: Scan directories recursively
@@ -267,11 +299,19 @@ sequenceDiagram
             note over Parser: Tokenizes content using marked library and extracts links, anchors, headings.
 
             Parser-->>-ParsedCache: Return MarkdownParser.Output.DataContract (Promise)
+
+            note over ParsedCache, ParsedDoc: Cache wraps raw contract in ParsedDocument facade
+            ParsedCache->>+ParsedDoc: new ParsedDocument(contract)
+            ParsedDoc-->>-ParsedCache: ParsedDocument instance
         else On a Cache Hit
-            note over ParsedCache: Returns cached Promise directly from memory.
+            note over ParsedCache: Returns cached ParsedDocument instance directly from memory.
         end
 
-        ParsedCache-->>-Validator: Return MarkdownParser.Output.DataContract (Promise)
+        ParsedCache-->>-Validator: Return ParsedDocument instance (Promise)
+
+        note over Validator, ParsedDoc: Validator uses facade query methods
+        Validator->>+ParsedDoc: hasAnchor(anchorId) / getAnchorIds()
+        ParsedDoc-->>-Validator: Query results
     end
 
     note over Validator: Validator now has all parsed data and performs its validation logic in memory.
@@ -280,11 +320,13 @@ sequenceDiagram
     CLI-->>-User: Display report
 ```
 
-**Workflow Characteristics (Post-`us1.5`)**
+### Workflow Characteristics (Post-US1.7)
 - **Component Creation**: The `CLI Orchestrator` (via its factory) creates instances of all components at runtime.
 - **Dependency Injection**: Dependencies are injected at instantiation (`fileSystem` into `Parser`, `ParsedFileCache` into `Validator`), decoupling components.
-- **Dual Caching Strategy**: The workflow uses two distinct caches: `FileCache` for mapping short filenames to absolute paths, and `ParsedFileCache` to store in-memory parsed file objects.
-- **Layered Data Retrieval**: The `CitationValidator` is decoupled from the `MarkdownParser`; it requests all parsed data from the `ParsedFileCache`, which delegates to the `Parser` on cache misses.
+- **Dual Caching Strategy**: The workflow uses two distinct caches: `FileCache` for mapping short filenames to absolute paths, and `ParsedFileCache` to store in-memory ==`ParsedDocument` facade instances==.
+- ==**Facade Pattern**: `ParsedFileCache` wraps `MarkdownParser.Output.DataContract` in `ParsedDocument` facade before returning, providing stable query interface.==
+- **Layered Data Retrieval**: The `CitationValidator` is decoupled from the `MarkdownParser`; it requests ==`ParsedDocument` instances== from the `ParsedFileCache`, which delegates to the `Parser` on cache misses.
+- ==**Query-Based Access**: Consumers use `ParsedDocument` query methods (`hasAnchor()`, `getLinks()`) instead of direct data structure access, decoupling from parser internals.==
 - **Asynchronous Data Flow**: Core validation operations are **asynchronous** (`Promise`-based). `ParsedFileCache.resolveParsedFile()` and `CitationValidator.validateFile()` both return Promises.
 - **File System Access**: `FileCache` scans directories, `MarkdownParser` reads file content synchronously (`readFileSync`), and `CLI Orchestrator` writes file modifications for the `--fix` operation.
 - **Fix Logic Location**: The `fix` logic remains within the `CLI Orchestrator`, operating on the final validation results.
@@ -631,6 +673,7 @@ This tool follows workspace design principles defined in [Architecture Principle
 
 ## Known Risks and Technical Debt
 
+%%
 ### Redundant File Parsing During Validation
 
 **Risk Category**: Performance / Architecture
@@ -718,6 +761,7 @@ This duplication violates the **One Source of Truth** and **Illegal States Unrep
 - Files modified: `src/MarkdownParser.js` (lines 497-513), `src/CitationValidator.js` (lines 522-587)
 
 **Status**: ✅ RESOLVED (2025-10-09) - Ready for Epic 2 ContentExtractor implementation
+%%
 
 ### Scattered File I/O Operations
 
@@ -739,6 +783,47 @@ This duplication violates the **One Source of Truth** and **Illegal States Unrep
   
 **Timeline**: Address after Epic 2 is complete. This is a valuable refactoring for long-term maintainability but does not block the current feature roadmap.
 **Status**: Documented technical debt, medium priority.
+
+### Incomplete Facade Encapsulation for Advanced Queries
+
+**Risk Category**: Architecture / Maintainability
+
+**Status**: Created (2025-10-15) - Technical debt created by US1.7
+
+**Description**: CitationValidator helper methods partially bypass ParsedDocument facade for advanced anchor queries, directly accessing `_data.anchors` for type filtering and rawText access (CitationValidator.js lines 528, 560, 570-578). While core validation uses facade methods (`hasAnchor()`, `findSimilarAnchors()`), error reporting and advanced matching still couple to internal anchor schema.
+
+**Impact**:
+- **Maintainability Risk**: Error message generation breaks if anchor schema changes
+- **Facade Violation**: ParsedDocument's encapsulation promise partially bypassed
+- **Missing Abstractions**: Type-specific queries (header vs block) not exposed by facade
+- **Scope**: Limited to error reporting and advanced matching - doesn't affect validation correctness
+
+**Root Cause**:
+ParsedDocument facade (US1.7) initially designed for core validation queries. Advanced use cases discovered during integration:
+- Type filtering for error messages (`anchorType === "header"` vs `"block"`)
+- RawText access for human-readable anchor suggestions
+- Full anchor object metadata for flexible matching algorithms
+
+**Code Locations**:
+- Line 528: `suggestObsidianBetterFormat()` needs anchor objects with `anchorType`, `rawText` properties
+- Line 560: `findFlexibleAnchorMatch()` needs anchor objects with `rawText` for markdown-aware matching
+- Lines 570-578: Suggestion generation needs anchor objects filtered by type
+
+**Resolution Strategy**:
+Extend ParsedDocument facade with additional public methods:
+- `getAnchorsByType(anchorType)` - Returns filtered anchor metadata
+- `getAllAnchorsWithMetadata()` - Returns all anchors with id, rawText, anchorType, urlEncodedId
+
+Refactor CitationValidator helper methods (`suggestObsidianBetterFormat()`, `findFlexibleAnchorMatch()`) to consume facade methods instead of `_data` access.
+
+**Priority**: Low
+- Isolated to error reporting code paths
+- Zero impact on validation correctness
+- No test failures or functional regressions
+- Can be addressed incrementally without breaking changes
+
+**Timeline**: Address in Epic 2 or dedicated refactoring story
+**Status**: Documented technical debt (2025-10-15), low priority
 
 ### ParsedFileCache Memory Characteristics
 

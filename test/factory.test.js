@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { CitationValidator } from "../src/CitationValidator.js";
 import { MarkdownParser } from "../src/MarkdownParser.js";
 import { ParsedFileCache } from "../src/ParsedFileCache.js";
+import ParsedDocument from "../src/ParsedDocument.js";
 import {
 	createCitationValidator,
 	createParsedFileCache,
@@ -42,11 +43,16 @@ describe("Component Factory - ParsedFileCache Creation", () => {
 		// When: Cache resolves parsed file
 		const result = await cache.resolveParsedFile(fixtureFile);
 
-		// Then: Returns valid MarkdownParser.Output.DataContract
-		expect(result).toHaveProperty("filePath");
-		expect(result).toHaveProperty("content");
-		expect(result).toHaveProperty("links");
-		expect(result).toHaveProperty("anchors");
+		// Then: Returns valid ParsedDocument facade instance
+		expect(result).toBeInstanceOf(ParsedDocument);
+
+		// Verify facade methods available
+		expect(typeof result.getLinks).toBe("function");
+		expect(typeof result.extractFullContent).toBe("function");
+
+		// Verify facade provides access to parsed data
+		const links = result.getLinks();
+		expect(Array.isArray(links)).toBe(true);
 	});
 });
 

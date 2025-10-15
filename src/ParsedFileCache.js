@@ -1,4 +1,5 @@
 import { normalize, resolve } from "node:path";
+import ParsedDocument from "./ParsedDocument.js";
 
 /**
  * Promise-based cache for parsed markdown files
@@ -11,9 +12,11 @@ import { normalize, resolve } from "node:path";
  * requests during the parsing phase. This prevents duplicate parser.parseFile() calls when multiple
  * validators check the same target file simultaneously.
  *
+ * Wraps parser output in ParsedDocument facade before caching to provide stable query interface.
+ *
  * @example
  * const cache = new ParsedFileCache(parser);
- * // First call triggers parsing, second call awaits the same Promise
+ * // First call triggers parsing and facade wrapping, second call awaits the same Promise
  * const result1 = await cache.resolveParsedFile('/path/to/file.md');
  * const result2 = await cache.resolveParsedFile('/path/to/file.md'); // Uses cached Promise
  */
@@ -32,13 +35,13 @@ export class ParsedFileCache {
 	 * Resolve parsed file data with automatic concurrent request deduplication
 	 *
 	 * Returns cached Promise if file is currently being parsed or already parsed.
-	 * If cache miss, creates new parse operation and caches the Promise immediately
-	 * before awaiting (prevents duplicate parses for concurrent requests).
+	 * If cache miss, creates new parse operation, wraps result in ParsedDocument facade,
+	 * and caches the Promise immediately before awaiting (prevents duplicate parses for concurrent requests).
 	 *
 	 * Failed parse operations are automatically removed from cache to allow retry.
 	 *
 	 * @param {string} filePath - Path to markdown file (relative or absolute, will be normalized)
-	 * @returns {Promise<Object>} Parser output with { filePath, content, tokens, links, headings, anchors }
+	 * @returns {Promise<ParsedDocument>} ParsedDocument facade instance wrapping parser output
 	 */
 	async resolveParsedFile(filePath) {
 		// 1. Normalize path to absolute for consistent cache keys
@@ -46,21 +49,26 @@ export class ParsedFileCache {
 
 		// 2. Decision point: Check cache for existing Promise
 		if (this.cache.has(cacheKey)) {
-			// Cache hit: Return existing Promise (handles concurrent requests)
+			// Cache hit: Return existing ParsedDocument Promise
 			return this.cache.get(cacheKey);
 		}
 
 		// 3. Cache miss: Create parse operation
 		const parsePromise = this.parser.parseFile(cacheKey);
 
-		// 4. Store Promise IMMEDIATELY (prevents duplicate parses for concurrent requests)
-		this.cache.set(cacheKey, parsePromise);
+		// 4. Wrap parser output in ParsedDocument facade before caching
+		const parsedDocPromise = parsePromise.then(contract =>
+			new ParsedDocument(contract)
+		);
 
-		// 5. Error handling: Cleanup failed promises from cache
-		parsePromise.catch(() => {
+		// 5. Store ParsedDocument Promise IMMEDIATELY (prevents duplicate parses)
+		this.cache.set(cacheKey, parsedDocPromise);
+
+		// 6. Error handling: Cleanup failed promises from cache
+		parsedDocPromise.catch(() => {
 			this.cache.delete(cacheKey);
 		});
 
-		return parsePromise;
+		return parsedDocPromise;
 	}
 }

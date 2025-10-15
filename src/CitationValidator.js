@@ -113,11 +113,11 @@ export class CitationValidator {
 			throw new Error(`File not found: ${filePath}`);
 		}
 
-		const parsed = await this.parsedFileCache.resolveParsedFile(filePath);
+		const sourceParsedDoc = await this.parsedFileCache.resolveParsedFile(filePath);
 		const results = [];
 
 		// Validate each extracted link
-		for (const link of parsed.links) {
+		for (const link of sourceParsedDoc.getLinks()) {
 			const result = await this.validateSingleCitation(link, filePath);
 			results.push(result);
 		}
@@ -518,19 +518,14 @@ export class CitationValidator {
 
 	async validateAnchorExists(anchor, targetFile) {
 		try {
-			const parsed = await this.parsedFileCache.resolveParsedFile(targetFile);
+			const targetParsedDoc = await this.parsedFileCache.resolveParsedFile(targetFile);
 
-			// Direct match - check both id and urlEncodedId fields
-			const anchorExists = parsed.anchors.some(
-				(anchorObj) =>
-					anchorObj.id === anchor || anchorObj.urlEncodedId === anchor,
-			);
-
-			if (anchorExists) {
+			// Direct match - use facade method
+			if (targetParsedDoc.hasAnchor(anchor)) {
 				// Check if this is a kebab-case anchor that has a raw header equivalent
 				const obsidianBetterSuggestion = this.suggestObsidianBetterFormat(
 					anchor,
-					parsed.anchors,
+					targetParsedDoc._data.anchors,
 				);
 				if (obsidianBetterSuggestion) {
 					return {
@@ -544,11 +539,7 @@ export class CitationValidator {
 			// For emphasis-marked anchors, try URL-decoded version
 			if (anchor.includes("%20")) {
 				const decoded = decodeURIComponent(anchor);
-				const decodedExists = parsed.anchors.some(
-					(anchorObj) =>
-						anchorObj.id === decoded || anchorObj.urlEncodedId === decoded,
-				);
-				if (decodedExists) {
+				if (targetParsedDoc.hasAnchor(decoded)) {
 					return { valid: true };
 				}
 			}
@@ -558,11 +549,7 @@ export class CitationValidator {
 				const blockRefName = anchor.substring(1); // Remove the ^ prefix
 
 				// Check if there's an Obsidian block reference with this name
-				const obsidianBlockRefs = parsed.anchors
-					.filter((a) => a.anchorType === "block")
-					.map((a) => a.id);
-
-				if (obsidianBlockRefs.includes(blockRefName)) {
+				if (targetParsedDoc.hasAnchor(blockRefName)) {
 					return { valid: true, matchedAs: "block-ref" };
 				}
 			}
@@ -570,29 +557,22 @@ export class CitationValidator {
 			// Enhanced flexible matching for complex markdown in headers
 			const flexibleMatch = this.findFlexibleAnchorMatch(
 				anchor,
-				parsed.anchors,
+				targetParsedDoc._data.anchors,
 			);
 			if (flexibleMatch.found) {
 				return { valid: true, matchedAs: flexibleMatch.matchType };
 			}
 
-			// Generate suggestions for similar anchors - include both ID variants
-			const availableAnchorIds = parsed.anchors.flatMap((a) => [
-				a.id,
-				a.urlEncodedId,
-			]);
-			const suggestions = this.generateAnchorSuggestions(
-				anchor,
-				availableAnchorIds,
-			);
+			// Generate suggestions for similar anchors using facade method
+			const suggestions = targetParsedDoc.findSimilarAnchors(anchor);
 
 			// Include Obsidian block references in available anchors list
-			const availableHeaders = parsed.anchors
+			const availableHeaders = targetParsedDoc._data.anchors
 				.filter((a) => a.anchorType === "header")
 				.map((a) => `"${a.rawText}" → #${a.id}`)
 				.slice(0, 5);
 
-			const availableBlockRefs = parsed.anchors
+			const availableBlockRefs = targetParsedDoc._data.anchors
 				.filter((a) => a.anchorType === "block")
 				.map((a) => `^${a.id}`)
 				.slice(0, 5);

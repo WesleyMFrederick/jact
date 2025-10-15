@@ -2,6 +2,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ParsedFileCache } from "../src/ParsedFileCache.js";
+import ParsedDocument from "../src/ParsedDocument.js";
 import { createMarkdownParser } from "../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -23,23 +24,19 @@ describe("ParsedFileCache", () => {
 		// When: First request for file
 		const result = await cache.resolveParsedFile(testFile);
 
-		// Then: MarkdownParser.Output.DataContract returned with all required fields
-		expect(result).toHaveProperty("filePath");
-		expect(result).toHaveProperty("content");
-		expect(result).toHaveProperty("tokens");
-		expect(result).toHaveProperty("links");
-		expect(result).toHaveProperty("headings");
-		expect(result).toHaveProperty("anchors");
+		// Then: ParsedDocument instance returned with facade methods
+		expect(result).toBeInstanceOf(ParsedDocument);
+		expect(typeof result.extractFullContent).toBe("function");
+		expect(typeof result.getLinks).toBe("function");
+		expect(typeof result.hasAnchor).toBe("function");
 
-		expect(typeof result.filePath).toBe("string");
-		expect(typeof result.content).toBe("string");
-		expect(Array.isArray(result.tokens)).toBe(true);
-		expect(Array.isArray(result.links)).toBe(true);
-		expect(Array.isArray(result.headings)).toBe(true);
-		expect(Array.isArray(result.anchors)).toBe(true);
+		// Verify facade methods return correct parsed data (not metadata)
+		const content = result.extractFullContent();
+		const links = result.getLinks();
 
-		// Verify filePath is absolute path to test file
-		expect(result.filePath).toContain("valid-citations.md");
+		expect(typeof content).toBe("string");
+		expect(content.length).toBeGreaterThan(0);  // Has actual content
+		expect(Array.isArray(links)).toBe(true);    // Has links array
 	});
 
 	it("should return cached result on cache hit without re-parsing", async () => {
@@ -87,10 +84,15 @@ describe("ParsedFileCache", () => {
 		expect(result2).toBe(result1);
 		expect(result3).toBe(result1);
 
-		// All results have complete MarkdownParser.Output.DataContract
-		expect(result1).toHaveProperty("filePath");
-		expect(result1).toHaveProperty("content");
-		expect(result1).toHaveProperty("tokens");
+		// All results are ParsedDocument instances with facade methods
+		expect(result1).toBeInstanceOf(ParsedDocument);
+
+		// Verify facade provides access to parsed data
+		const content1 = result1.extractFullContent();
+		const links1 = result1.getLinks();
+
+		expect(typeof content1).toBe("string");
+		expect(Array.isArray(links1)).toBe(true);
 	});
 
 	it("should propagate parser errors and remove from cache", async () => {
@@ -166,10 +168,15 @@ describe("ParsedFileCache", () => {
 		expect(result3).not.toBe(result1);
 		expect(result3).not.toBe(result2);
 
-		// Each result has correct filePath
-		expect(result1.filePath).toContain("valid-citations.md");
-		expect(result2.filePath).toContain("test-target.md");
-		expect(result3.filePath).toContain("complex-headers.md");
+		// Verify each result contains correct parsed data (not metadata)
+		const content1 = result1.extractFullContent();
+		const content2 = result2.extractFullContent();
+		const content3 = result3.extractFullContent();
+
+		// Each file has unique content
+		expect(content1).not.toBe(content2);
+		expect(content1).not.toBe(content3);
+		expect(content2).not.toBe(content3);
 
 		// Verify cache hits work independently (second request for file1 doesn't re-parse)
 		const result1Again = await cache.resolveParsedFile(file1);

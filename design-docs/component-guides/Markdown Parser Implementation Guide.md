@@ -8,7 +8,7 @@ Downstream components like the `CitationValidator` and `ContentExtractor` need a
 
 ## Solution
 
-The **`MarkdownParser`** component acts as a specialized transformer. It accepts a file path, reads the document, and applies a series of parsing strategies to produce a single, comprehensive **`MarkdownParser.Output.DataContract`** object. This object contains two primary collections: a list of all outgoing **`Link Objects`** and a list of all available **`Anchor Objects`**. By centralizing this parsing logic, the `MarkdownParser` provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
+The **`MarkdownParser`** component acts as a specialized transformer. It accepts a file path, reads the document, and applies a series of parsing strategies to produce a single, comprehensive **`MarkdownParser.Output.DataContract`** object. ==This object is wrapped by the `ParsedDocument` facade before being consumed by other components, providing a stable interface that decouples them from the parser's internal data structure.== This object contains two primary collections: a list of all outgoing **`Link Objects`** and a list of all available **`Anchor Objects`**. By centralizing this parsing logic, the `MarkdownParser` provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
 
 ## Structure
 
