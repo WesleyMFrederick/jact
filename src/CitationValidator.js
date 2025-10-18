@@ -1,6 +1,52 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
+/**
+ * @typedef {Object} ValidValidation
+ * @property {"valid"} status
+ */
+
+/**
+ * @typedef {Object} ErrorValidation
+ * @property {"error"} status
+ * @property {string} error - Error message describing the validation failure
+ * @property {string} [suggestion] - Optional suggestion for fixing the error
+ * @property {Object} [pathConversion] - Optional path conversion information
+ */
+
+/**
+ * @typedef {Object} WarningValidation
+ * @property {"warning"} status
+ * @property {string} error - Warning message
+ * @property {string} [suggestion] - Optional suggestion for addressing the warning
+ * @property {Object} [pathConversion] - Optional path conversion information
+ */
+
+/**
+ * @typedef {ValidValidation|ErrorValidation|WarningValidation} ValidationMetadata
+ */
+
+/**
+ * @typedef {Object} EnrichedLinkObject
+ * @property {string} linkType - "markdown" or "wiki"
+ * @property {string} scope - "cross-document" or "internal"
+ * @property {Object} target - Link target with path and anchor
+ * @property {number} line - Line number in source file
+ * @property {number} column - Column number in source file
+ * @property {string} fullMatch - Full matched link text
+ * @property {ValidationMetadata} [validation] - Validation metadata (added after validation)
+ */
+
+/**
+ * @typedef {Object} ValidationResult
+ * @property {Object} summary - Aggregate validation counts
+ * @property {number} summary.total - Total number of links validated
+ * @property {number} summary.valid - Number of valid links
+ * @property {number} summary.warnings - Number of warnings
+ * @property {number} summary.errors - Number of errors
+ * @property {EnrichedLinkObject[]} links - Array of enriched LinkObjects
+ */
+
 export class CitationValidator {
 	constructor(parsedFileCache, fileCache) {
 		this.parsedFileCache = parsedFileCache;
@@ -108,6 +154,11 @@ export class CitationValidator {
 		return debugParts.join("; ");
 	}
 
+	/**
+	 * Validate all citations in a markdown file
+	 * @param {string} filePath - Absolute path to markdown file
+	 * @returns {Promise<ValidationResult>} Validation result with summary and enriched links
+	 */
 	async validateFile(filePath) {
 		// 1. Validate file exists
 		if (!existsSync(filePath)) {
@@ -784,12 +835,12 @@ export class CitationValidator {
 
 	/**
 	 * Create a validation result object
-	 * @param {object} citation - Citation object
-	 * @param {string} status - Validation status
-	 * @param {string|null} error - Error message if any
-	 * @param {string|null} message - Additional message if any
-	 * @param {object|null} suggestion - Suggestion object if any
-	 * @returns {object} Validation result
+	 * @param {Object} citation - Citation object from parser
+	 * @param {string} status - Validation status: "valid", "warning", or "error"
+	 * @param {string|null} [error=null] - Error message if any
+	 * @param {string|null} [message=null] - Additional message if any
+	 * @param {Object|null} [suggestion=null] - Suggestion object if any
+	 * @returns {Object} Validation result object
 	 */
 	createValidationResult(
 		citation,
