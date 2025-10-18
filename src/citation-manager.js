@@ -136,20 +136,20 @@ class CitationManager {
 	filterResultsByLineRange(result, lineRange) {
 		const { startLine, endLine } = this.parseLineRange(lineRange);
 
-		const filteredResults = result.results.filter((citation) => {
-			return citation.line >= startLine && citation.line <= endLine;
+		const filteredLinks = result.links.filter((link) => {
+			return link.line >= startLine && link.line <= endLine;
 		});
 
 		const filteredSummary = {
-			total: filteredResults.length,
-			valid: filteredResults.filter((r) => r.status === "valid").length,
-			errors: filteredResults.filter((r) => r.status === "error").length,
-			warnings: filteredResults.filter((r) => r.status === "warning").length,
+			total: filteredLinks.length,
+			valid: filteredLinks.filter((link) => link.validation.status === "valid").length,
+			errors: filteredLinks.filter((link) => link.validation.status === "error").length,
+			warnings: filteredLinks.filter((link) => link.validation.status === "warning").length,
 		};
 
 		return {
 			...result,
-			results: filteredResults,
+			links: filteredLinks,
 			summary: filteredSummary,
 			lineRange: `${startLine}-${endLine}`,
 		};
@@ -190,17 +190,17 @@ class CitationManager {
 
 		if (result.summary.errors > 0) {
 			lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
-			result.results
-				.filter((r) => r.status === "error")
-				.forEach((error, index) => {
+			result.links
+				.filter((link) => link.validation.status === "error")
+				.forEach((link, index) => {
 					const isLast =
 						index ===
-						result.results.filter((r) => r.status === "error").length - 1;
+						result.links.filter((link) => link.validation.status === "error").length - 1;
 					const prefix = isLast ? "└─" : "├─";
-					lines.push(`${prefix} Line ${error.line}: ${error.citation}`);
-					lines.push(`│  └─ ${error.error}`);
-					if (error.suggestion) {
-						lines.push(`│  └─ Suggestion: ${error.suggestion}`);
+					lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
+					lines.push(`│  └─ ${link.validation.error}`);
+					if (link.validation.suggestion) {
+						lines.push(`│  └─ Suggestion: ${link.validation.suggestion}`);
 					}
 					if (!isLast) lines.push("│");
 				});
@@ -209,16 +209,16 @@ class CitationManager {
 
 		if (result.summary.warnings > 0) {
 			lines.push(`WARNINGS (${result.summary.warnings})`);
-			result.results
-				.filter((r) => r.status === "warning")
-				.forEach((warning, index) => {
+			result.links
+				.filter((link) => link.validation.status === "warning")
+				.forEach((link, index) => {
 					const isLast =
 						index ===
-						result.results.filter((r) => r.status === "warning").length - 1;
+						result.links.filter((link) => link.validation.status === "warning").length - 1;
 					const prefix = isLast ? "└─" : "├─";
-					lines.push(`${prefix} Line ${warning.line}: ${warning.citation}`);
-					if (warning.suggestion) {
-						lines.push(`│  └─ ${warning.suggestion}`);
+					lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
+					if (link.validation.suggestion) {
+						lines.push(`│  └─ ${link.validation.suggestion}`);
 					}
 					if (!isLast) lines.push("│");
 				});
@@ -227,14 +227,14 @@ class CitationManager {
 
 		if (result.summary.valid > 0) {
 			lines.push(`VALID CITATIONS (${result.summary.valid})`);
-			result.results
-				.filter((r) => r.status === "valid")
-				.forEach((valid, index) => {
+			result.links
+				.filter((link) => link.validation.status === "valid")
+				.forEach((link, index) => {
 					const isLast =
 						index ===
-						result.results.filter((r) => r.status === "valid").length - 1;
+						result.links.filter((link) => link.validation.status === "valid").length - 1;
 					const prefix = isLast ? "└─" : "├─";
-					lines.push(`${prefix} Line ${valid.line}: ${valid.citation}`);
+					lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
 				});
 			lines.push("");
 		}
@@ -285,12 +285,19 @@ class CitationManager {
 			const basePaths = new Set();
 			const sourceDir = dirname(filePath);
 
-			for (const citation of result.results) {
-				// Extract path from citation link - handle multiple patterns
+			for (const link of result.links) {
+				// Extract path from link - prefer target.path.absolute if available
 				let path = null;
 
+				if (link.target && link.target.path && link.target.path.absolute) {
+					// Use pre-resolved absolute path from link object
+					basePaths.add(link.target.path.absolute);
+					continue;
+				}
+
+				// Fallback: extract path from fullMatch for patterns not captured in target
 				// Standard markdown link pattern: [text](path) or [text](path#anchor)
-				const standardMatch = citation.citation.match(
+				const standardMatch = link.fullMatch.match(
 					/\[([^\]]+)\]\(([^)#]+)(?:#[^)]+)?\)/,
 				);
 				if (standardMatch) {
@@ -298,7 +305,7 @@ class CitationManager {
 				}
 
 				// Citation pattern: [cite: path]
-				const citeMatch = citation.citation.match(/\[cite:\s*([^\]]+)\]/);
+				const citeMatch = link.fullMatch.match(/\[cite:\s*([^\]]+)\]/);
 				if (citeMatch) {
 					path = citeMatch[1].trim();
 				}
@@ -354,19 +361,19 @@ class CitationManager {
 			const validationResults = await this.validator.validateFile(filePath);
 
 			// Find all fixable issues: warnings (path conversion) and errors (anchor fixes)
-			const fixableResults = validationResults.results.filter(
-				(result) =>
-					(result.status === "warning" && result.pathConversion) ||
-					(result.status === "error" &&
-						result.suggestion &&
-						(result.suggestion.includes(
+			const fixableLinks = validationResults.links.filter(
+				(link) =>
+					(link.validation.status === "warning" && link.validation.pathConversion) ||
+					(link.validation.status === "error" &&
+						link.validation.suggestion &&
+						(link.validation.suggestion.includes(
 							"Use raw header format for better Obsidian compatibility",
 						) ||
-							(result.error.startsWith("Anchor not found") &&
-								result.suggestion.includes("Available headers:")))),
+							(link.validation.error.startsWith("Anchor not found") &&
+								link.validation.suggestion.includes("Available headers:")))),
 			);
 
-			if (fixableResults.length === 0) {
+			if (fixableLinks.length === 0) {
 				return `No auto-fixable citations found in ${filePath}`;
 			}
 
@@ -378,16 +385,16 @@ class CitationManager {
 			let anchorFixesApplied = 0;
 			const fixes = [];
 
-			// Process all fixable results
-			for (const result of fixableResults) {
-				let newCitation = result.citation;
+			// Process all fixable links
+			for (const link of fixableLinks) {
+				let newCitation = link.fullMatch;
 				let fixType = "";
 
 				// Apply path conversion if available
-				if (result.pathConversion) {
+				if (link.validation.pathConversion) {
 					newCitation = this.applyPathConversion(
 						newCitation,
-						result.pathConversion,
+						link.validation.pathConversion,
 					);
 					pathFixesApplied++;
 					fixType = "path";
@@ -395,25 +402,25 @@ class CitationManager {
 
 				// Apply anchor fix if needed (expanded logic for all anchor errors)
 				if (
-					result.status === "error" &&
-					result.suggestion &&
-					(result.suggestion.includes(
+					link.validation.status === "error" &&
+					link.validation.suggestion &&
+					(link.validation.suggestion.includes(
 						"Use raw header format for better Obsidian compatibility",
 					) ||
-						(result.error.startsWith("Anchor not found") &&
-							result.suggestion.includes("Available headers:")))
+						(link.validation.error.startsWith("Anchor not found") &&
+							link.validation.suggestion.includes("Available headers:")))
 				) {
-					newCitation = this.applyAnchorFix(newCitation, result);
+					newCitation = this.applyAnchorFix(newCitation, link);
 					anchorFixesApplied++;
 					fixType = fixType ? "path+anchor" : "anchor";
 				}
 
 				// Replace citation in file content
-				fileContent = fileContent.replace(result.citation, newCitation);
+				fileContent = fileContent.replace(link.fullMatch, newCitation);
 
 				fixes.push({
-					line: result.line,
-					old: result.citation,
+					line: link.line,
+					old: link.fullMatch,
 					new: newCitation,
 					type: fixType,
 				});
@@ -520,11 +527,11 @@ class CitationManager {
 	 * - Missing anchors: fuzzy match to available headers
 	 *
 	 * @param {string} citation - Original citation text
-	 * @param {Object} result - Validation result with suggestion
+	 * @param {Object} link - Enriched link object with validation metadata
 	 * @returns {string} Citation with corrected anchor or original if no fix found
 	 */
-	applyAnchorFix(citation, result) {
-		const suggestionMatch = result.suggestion.match(
+	applyAnchorFix(citation, link) {
+		const suggestionMatch = link.validation.suggestion.match(
 			/Use raw header format for better Obsidian compatibility: #(.+)$/,
 		);
 		if (suggestionMatch) {
@@ -538,10 +545,10 @@ class CitationManager {
 
 		// Handle anchor not found errors
 		if (
-			result.error.startsWith("Anchor not found") &&
-			result.suggestion.includes("Available headers:")
+			link.validation.error.startsWith("Anchor not found") &&
+			link.validation.suggestion.includes("Available headers:")
 		) {
-			const availableHeaders = this.parseAvailableHeaders(result.suggestion);
+			const availableHeaders = this.parseAvailableHeaders(link.validation.suggestion);
 			const citationMatch = citation.match(/\[([^\]]+)\]\(([^)]+)#([^)]+)\)/);
 
 			if (citationMatch && availableHeaders.length > 0) {
