@@ -18,11 +18,11 @@ The Strategy pattern is now the clear winner because it's designed for exactly t
 
 -----
 
-## Example Implementation in Project Context
+### Example Implementation in Project Context
 
 Here’s a pragmatic, evidence-based approach to implementing the Strategy pattern for our `ExtractionEligibility` component.
 
-### 1\. Define the Strategy Interface
+#### 1\. Define the Strategy Interface
 
 First, we define a simple contract that every extraction rule must follow. This aligns with our **"Clear Contracts"** principle.
 
@@ -46,7 +46,7 @@ export class ExtractionStrategy {
 }
 ```
 
-### 2\. Implement Concrete Strategies
+#### 2\. Implement Concrete Strategies
 
 Next, we implement each rule from FR4 as its own small, testable class. Each class has a **single responsibility**.
 
@@ -85,7 +85,7 @@ export class SectionLinkStrategy extends ExtractionStrategy {
 
 *(...and so on for `ForceMarkerStrategy`, `CliFlagStrategy`, etc.)*
 
-### 3\. Create the Eligibility Analyzer (The "Context")
+#### 3\. Create the Eligibility Analyzer (The "Context")
 
 Finally, we create the component that uses these strategies. It will hold a prioritized list of strategy objects and execute them in order until one returns a decision. This replaces the brittle `if/else` chain or the simple table processor.
 
@@ -154,7 +154,7 @@ This approach keeps our Strategy classes clean and highly reusable. Here's the s
 
 -----
 
-### Step 1: Define Flavors as Data
+#### Step 1: Define Flavors as Data
 
 First, we represent the different syntax flavors as a simple configuration object. This aligns with our **"Behavior as Data"** principle and makes it easy to add new flavors in the future without changing the core logic.
 
@@ -177,7 +177,7 @@ const MARKER_SYNTAX = {
 
 -----
 
-### Step 2: Update the Strategy to Accept the Syntax
+#### Step 2: Update the Strategy to Accept the Syntax
 
 Next, we modify our Strategy classes to accept the specific syntax pattern in their constructor. The strategy no longer hard-codes the marker it's looking for; it just uses the one it's given. This is a clean use of **Dependency Injection**.
 
@@ -208,7 +208,7 @@ export class StopMarkerStrategy extends ExtractionStrategy {
 
 -----
 
-### Step 3: Use a Factory to Assemble the Correct Strategies
+#### Step 3: Use a Factory to Assemble the Correct Strategies
 
 Finally, a factory becomes responsible for building the correct set of strategies based on a chosen flavor. It looks up the syntax from our configuration object and injects it into the strategy instances.
 
@@ -250,11 +250,11 @@ This keeps our architecture consistent. The `CitationValidator` doesn't need to 
 
 -----
 
-### How the Strategy Pattern Applies to Validation
+## How the Strategy Pattern Applies to Validation
 
 We'll create different "anchor validation" strategies for each markdown flavor. A factory will then choose the correct strategy to inject into the `CitationValidator` at runtime.
 
-#### 1\. Define the `AnchorValidationStrategy` Interface
+### 1\. Define the `AnchorValidationStrategy` Interface
 
 We start with a clear contract for what any anchor validation strategy must do.
 
@@ -278,7 +278,7 @@ export class AnchorValidationStrategy {
 
 -----
 
-#### 2\. Implement Flavor-Specific Strategies
+### 2\. Implement Flavor-Specific Strategies
 
 Next, we create a concrete class for each flavor, implementing its unique anchor logic.
 
@@ -335,7 +335,7 @@ export class GitHubAnchorStrategy extends AnchorValidationStrategy {
 
 -----
 
-#### 3\. Update `CitationValidator` to Use the Strategy
+### 3\. Update `CitationValidator` to Use the Strategy
 
 We refactor the `CitationValidator` to accept the strategy via its constructor. The complex anchor-checking logic inside `validateAnchorExists` is now replaced by a single call to the injected strategy.
 
@@ -368,7 +368,7 @@ export class CitationValidator {
 
 -----
 
-#### 4\. Update the Factory
+### 4\. Update the Factory
 
 Finally, our `componentFactory` becomes responsible for creating and injecting the correct strategy based on configuration.
 
@@ -409,25 +409,25 @@ Here is the recommended implementation sequence.
 
 ---
 
-### Phase 1: Implement US 1.6 (Refactor the Anchor Schema)
+## Phase 1: Implement US 1.6 (Refactor the Anchor Schema)
 
 We'll use a Test-Driven Development (TDD) approach to safely refactor the anchor representation.
 
-#### **Step 1 (RED): Update Tests to Expect the New Schema**
+### **Step 1 (RED): Update Tests to Expect the New Schema**
 
 First, we'll modify our tests to reflect the desired state. These tests will fail, confirming our current implementation is out of date.
 
 * **Action**: In `parser-output-contract.test.js`, update the anchor schema validation test to expect a single `AnchorObject` with both `id` (raw text) and `urlEncodedId` properties, per `US1-6AC1` and `US1-6AC2`.
 * **Action**: Update the `citation-validator.test.js` and `integration/citation-validator-cache.test.js` tests to assert that validation succeeds when a link's anchor matches *either* the `id` or `urlEncodedId` of an anchor in the target file.
 
-#### **Step 2 (GREEN): Refactor `MarkdownParser`**
+### **Step 2 (GREEN): Refactor `MarkdownParser`**
 
 Next, we'll modify the parser to produce the new schema, making the updated parser tests pass.
 
 * **Action**: In `MarkdownParser.extractAnchors()`, change the logic to create only one `AnchorObject` per header. This object will contain both the `id` (raw text) and `urlEncodedId` (Obsidian-compatible format) properties.
 * **Validation**: The `parser-output-contract.test.js` suite should now pass.
 
-#### **Step 3 (GREEN): Refactor `CitationValidator`**
+### **Step 3 (GREEN): Refactor `CitationValidator`**
 
 Finally, we'll update the validator to consume the new schema, making the validator tests pass.
 
@@ -436,23 +436,23 @@ Finally, we'll update the validator to consume the new schema, making the valida
 
 ---
 
-### Phase 2: Implement the Strategy & Factory Patterns (After US 1.6)
+## Phase 2: Implement the Strategy & Factory Patterns (After US 1.6)
 
 With the data model now stable and correct, we can cleanly implement the Strategy pattern for handling different markdown flavors.
 
-#### **Step 4: Implement the `AnchorValidationStrategy` Pattern**
+### **Step 4: Implement the `AnchorValidationStrategy` Pattern**
 
 Now we introduce the new architectural pattern, building it on top of our newly refactored data model.
 
 * **Action**: Create the `AnchorValidationStrategy` interface and the concrete `ObsidianAnchorStrategy` as detailed previously. The `ObsidianAnchorStrategy`'s `validate()` method will be written from the start to check against the `id` and `urlEncodedId` fields of the new `AnchorObject` schema.
 
-#### **Step 5: Refactor `CitationValidator` to Use the Strategy**
+### **Step 5: Refactor `CitationValidator` to Use the Strategy**
 
 This is now a very simple and clean refactoring.
 
 * **Action**: Replace the internal anchor-matching logic inside `CitationValidator.validateAnchorExists()` with a single, clean delegation to the injected strategy object: `return this.anchorValidationStrategy.validate(searchAnchor, parsed.anchors);`.
 
-#### **Step 6: Update the Factory**
+### **Step 6: Update the Factory**
 
 We'll wire everything together in the factory.
 
@@ -481,7 +481,7 @@ The acceptance criteria for US 2.1 are now entirely focused on implementing the 
 
 ---
 
-### Implementation Sequence
+## Implementation Sequence
 
 To ensure we build on a stable foundation and minimize rework, we'll execute these stories in the following order:
 
@@ -505,7 +505,7 @@ Yes, that's exactly the pattern I recommended. The "Priority Chain" or "Ordered 
 
 ---
 
-### How Your Description Maps to Our Plan
+## How Your Description Maps to Our Plan
 
 The characteristics you outlined are precisely what our design achieves:
 
@@ -525,18 +525,18 @@ Here is the sequence of component interactions, including the proposed data mode
 
 -----
 
-### Step-by-Step Component Workflow for `citation:extract`
+## Step-by-Step Component Workflow for `citation:extract`
 
 The process is a clear pipeline where data is generated, analyzed, and then acted upon. We'll skip the caching layer as requested to focus on the core logic.
 
-#### **1. CLI Orchestrator (`citation-manager.js`)**
+### **1. CLI Orchestrator (`citation-manager.js`)**
 
 The user runs `npm run citation:extract <file> [--full-files]`. The orchestrator is the entry point and manages the entire workflow.
 
   * **Internal Call 1 (Validation)**: First, it instantiates and calls the `CitationValidator` to validate all links in the source file. This is a new requirement from **FR7** and acts as a quality gate before any content is extracted.
   * **Internal Call 2 (Parsing)**: It requests the parsed data for the source file from the `MarkdownParser`.
 
-#### **2. MarkdownParser (`MarkdownParser.js`)**
+### **2. MarkdownParser (`MarkdownParser.js`)**
 
 The parser's role is to analyze the raw markdown and produce a structured object. To support the new requirements, its responsibilities are now enhanced.
 
@@ -544,7 +544,7 @@ The parser's role is to analyze the raw markdown and produce a structured object
   * **Action (Anchor Enhancement)**: For block anchors (`^...`), the parser will now capture the **entire line of raw text** where the anchor is found and store it in the `AnchorObject`.
   * **Output**: It returns the refined `Parser Output Contract`.
 
-#### **3. ExtractionEligibility Analyzer (`ExtractionEligibility.js`)**
+### **3. ExtractionEligibility Analyzer (`ExtractionEligibility.js`)**
 
 This is the "brain" of the operation. It's a new, stateless component that implements the **Priority Chain (Strategy)** pattern we discussed.
 
@@ -552,7 +552,7 @@ This is the "brain" of the operation. It's a new, stateless component that imple
   * **Internal Call**: It iterates through its prioritized list of strategies (e.g., `StopMarkerStrategy`, `SectionLinkStrategy`). For each link, it finds the first strategy that applies and gets a decision.
   * **Output**: It produces a list of **Extraction Jobs**. Each job contains the original link, a decision (`eligible: true/false`), and the **reason** for that decision, fulfilling **FR5**.
 
-#### **4. ContentExtractor (`ContentExtractor.js`)**
+### **4. ContentExtractor (`ContentExtractor.js`)**
 
 This component is the "worker" that performs the mechanical task of extraction.
 
@@ -561,7 +561,7 @@ This component is the "worker" that performs the mechanical task of extraction.
   * **Action**: It uses the logic from our validated POCs to extract the content—either the entire file or a specific section/block.
   * **Output**: It returns a `ContentBlock` object containing the extracted text and the necessary metadata for attribution, satisfying `US2-2AC5`.
 
-#### **5. Aggregator (within `citation-manager.js`)**
+### **5. Aggregator (within `citation-manager.js`)**
 
 The final step is performed by the orchestrator.
 
@@ -569,11 +569,11 @@ The final step is performed by the orchestrator.
 
 -----
 
-### Refining the Data Contracts
+## Refining the Data Contracts
 
 Your observations are correct. We need to refine our data models to be more efficient and capture all necessary information.
 
-#### **`LinkObject` Enhancement**
+### **`LinkObject` Enhancement**
 
 To handle the new line-level markers, we'll add a property to the `LinkObject` schema.
 
@@ -598,7 +598,7 @@ To handle the new line-level markers, we'll add a property to the `LinkObject` s
 
 This new `extractionMarker` property (with values like `'stop-extract'`, `'force-extract'`, or `null`) provides the necessary input for the `ExtractionEligibility` analyzer.
 
-#### **`AnchorObject` Enhancement**
+### **`AnchorObject` Enhancement**
 
 To address your point about block anchors, we will enrich the `AnchorObject` schema.
 

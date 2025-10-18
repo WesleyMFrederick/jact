@@ -171,7 +171,7 @@ async validateAnchorExists(anchor, targetFile) {
 - **Data integrity**: One source of truth for each anchor
 - **Epic 2 foundation**: Enables Strategy Pattern for markdown flavor support
 
-_Source: [Content Aggregation Architecture Whiteboard](../../content-aggregation-architecture-whiteboard.md)_
+_Source: [Content Aggregation Architecture Whiteboard](../../research/content-aggregation-architecture-whiteboard.md)_
 
 ### Dependencies
 
@@ -179,7 +179,7 @@ _Source: [Content Aggregation Architecture Whiteboard](../../content-aggregation
 - **Enables**: [Story 1.7](../../content-aggregation-prd.md#Story%201.7%20Implement%20ParsedDocument%20Facade) - ParsedDocument facade can consume normalized anchor data
 - **Strategic Position**: Data model refactoring before Strategy Pattern implementation (US1.8) per [Data Model First](../../../../../../../design-docs/Architecture%20Principles.md#^data-model-first) principle
 
-_Source: [Content Aggregation Architecture Whiteboard - Phase 1](../../content-aggregation-architecture-whiteboard.md#Phase%201%20Implement%20US%201.6%20(Refactor%20the%20Anchor%20Schema))_
+_Source: [Content Aggregation Architecture Whiteboard - Phase 1](../../research/content-aggregation-architecture-whiteboard.md#Phase%201%20Implement%20US%201.6%20(Refactor%20the%20Anchor%20Schema))_
 
 ### Design Principles Adherence
 
@@ -520,6 +520,6 @@ _Source: [Content Aggregation PRD - Technical Lead Feedback](../../content-aggre
 
 - [Content Aggregation PRD](../../content-aggregation-prd.md) - Parent feature PRD with story definition and acceptance criteria
 - [Content Aggregation Architecture](../../content-aggregation-architecture.md) - Tool architecture with technical debt documentation
-- [Content Aggregation Architecture Whiteboard](../../content-aggregation-architecture-whiteboard.md) - Strategy Pattern design decisions and sequencing rationale
+- [Content Aggregation Architecture Whiteboard](../../research/content-aggregation-architecture-whiteboard.md) - Strategy Pattern design decisions and sequencing rationale
 - [MarkdownParser Implementation Guide](../../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md) - Component pseudocode and data contracts
 - [CitationValidator Implementation Guide](../../../../component-guides/CitationValidator%20Implementation%20Guide.md) - Validation logic and integration patterns

@@ -12,17 +12,17 @@ export class CitationValidator {
 				regex:
 					/^\^([A-Za-z]{2,3}\d+(?:-\d+[a-z]?(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Za-z]+\d+|MVP-P\d+|[a-z][a-z0-9-]+[a-z0-9])$/,
 				examples: [
-				"^FR1",
-				"^US1-1AC1",
-				"^US1-4bT1-1",
-				"^NFR2",
-				"^MVP-P1",
-				"^black-box-interfaces",
-				"^first-section-intro",
-				"^deep-heading",
-			],
+					"^FR1",
+					"^US1-1AC1",
+					"^US1-4bT1-1",
+					"^NFR2",
+					"^MVP-P1",
+					"^black-box-interfaces",
+					"^first-section-intro",
+					"^deep-heading",
+				],
 				description:
-				"Caret syntax for requirements/criteria (numbered) and Obsidian block references (text-based)",
+					"Caret syntax for requirements/criteria (numbered) and Obsidian block references (text-based)",
 			},
 			EMPHASIS_MARKED: {
 				regex: /^==\*\*[^*]+\*\*==$/,
@@ -109,31 +109,57 @@ export class CitationValidator {
 	}
 
 	async validateFile(filePath) {
+		// 1. Validate file exists
 		if (!existsSync(filePath)) {
 			throw new Error(`File not found: ${filePath}`);
 		}
 
-		const sourceParsedDoc = await this.parsedFileCache.resolveParsedFile(filePath);
-		const results = [];
+		// 2. Get parsed document with LinkObjects
+		const sourceParsedDoc =
+			await this.parsedFileCache.resolveParsedFile(filePath);
+		const links = sourceParsedDoc.getLinks();
 
-		// Validate each extracted link
-		for (const link of sourceParsedDoc.getLinks()) {
-			const result = await this.validateSingleCitation(link, filePath);
-			results.push(result);
-		}
+		// 3. Enrich each link with validation metadata (parallel execution)
+		await Promise.all(
+			links.map(async (link) => {
+				const result = await this.validateSingleCitation(link, filePath);
 
-		// Generate summary
+				// Extract validation metadata from result
+				const validation = {
+					status: result.status,
+				};
+
+				if (result.error) {
+					validation.error = result.error;
+				}
+
+				if (result.suggestion) {
+					validation.suggestion = result.suggestion;
+				}
+
+				if (result.pathConversion) {
+					validation.pathConversion = result.pathConversion;
+				}
+
+				// Add validation property to link object
+				link.validation = validation;
+			}),
+		);
+
+		// 4. Generate summary from enriched links
 		const summary = {
-			total: results.length,
-			valid: results.filter((r) => r.status === "valid").length,
-			errors: results.filter((r) => r.status === "error").length,
-			warnings: results.filter((r) => r.status === "warning").length,
+			total: links.length,
+			valid: links.filter((link) => link.validation.status === "valid").length,
+			warnings: links.filter((link) => link.validation.status === "warning")
+				.length,
+			errors: links.filter((link) => link.validation.status === "error").length,
 		};
 
+		// 5. Return enriched links + summary (no separate results array)
 		return {
 			file: filePath,
 			summary,
-			results,
+			links,
 		};
 	}
 
@@ -518,7 +544,8 @@ export class CitationValidator {
 
 	async validateAnchorExists(anchor, targetFile) {
 		try {
-			const targetParsedDoc = await this.parsedFileCache.resolveParsedFile(targetFile);
+			const targetParsedDoc =
+				await this.parsedFileCache.resolveParsedFile(targetFile);
 
 			// Direct match - use facade method
 			if (targetParsedDoc.hasAnchor(anchor)) {

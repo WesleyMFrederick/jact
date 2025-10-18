@@ -1,14 +1,12 @@
 # Markdown Parser Implementation Guide
 
-This guide provides the Level 4 (Code) details for implementing the **`MarkdownParser`** component. It includes the component's structure, pseudocode for its core logic, the formal data contracts for its output, and a strategy for testing.
-
 ## Problem
 
 Downstream components like the `CitationValidator` and `ContentExtractor` need a structured, queryable representation of a markdown document's links and anchors. Parsing raw markdown text with regular expressions in each component would be repetitive, brittle, and inefficient. The system needs a single, reliable component to transform a raw markdown file into a consistent and explicit data model.
 
 ## Solution
 
-The **`MarkdownParser`** component acts as a specialized transformer. It accepts a file path, reads the document, and applies a series of parsing strategies to produce a single, comprehensive **`MarkdownParser.Output.DataContract`** object. ==This object is wrapped by the `ParsedDocument` facade before being consumed by other components, providing a stable interface that decouples them from the parser's internal data structure.== This object contains two primary collections: a list of all outgoing **`Link Objects`** and a list of all available **`Anchor Objects`**. By centralizing this parsing logic, the `MarkdownParser` provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
+The **`MarkdownParser`** component acts as a specialized transformer. It accepts a file path, reads the document, and applies a series of parsing strategies to produce a single, comprehensive **`MarkdownParser.Output.DataContract`** object. This object is wrapped by the `ParsedDocument` facade before being consumed by other components, providing a stable interface that decouples them from the parser's internal data structure. This object contains two primary collections: a list of all outgoing **`Link Objects`** and a list of all available **`Anchor Objects`**. By centralizing this parsing logic, the `MarkdownParser` provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
 
 ## Structure
 
@@ -61,10 +59,10 @@ classDiagram
     ParserOutputContract o-- Anchor
 ```
 
-1. [**ParserOutputContract**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
-2. [**Link Object**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing an outgoing link.
-3. [**Anchor Object**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing a potential link target.
-4. **MarkdownParser**: The class that orchestrates the parsing process. The guide you are reading. The guide you are reading.
+1. [ParserOutputContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
+2. [Link Object](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing an outgoing link.
+3. [Anchor Object](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing a potential link target.
+4. [Markdown Parser](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Markdown%20Parser): The class that orchestrates the parsing process. The guide you are reading.
 
 ## Public Contracts
 
@@ -74,12 +72,39 @@ The component's contract requires the following inputs for operation:
 1. Interfaces for the **`FileSystem`** and **`Path Module`**, provided at instantiation.
 2. An optional **`FileCache` interface**, provided at instantiation, to be used for short filename resolution.
 3. A **`filePath`** (string), provided to the public `parseFile()` method.
+
 ### Output Contract
 1. The `parseFile()` method returns a `Promise` that resolves with the **`MarkdownParser.Output.DataContract`**. This object represents the full structural composition of the document and is the component's sole output. Its detailed schema is defined in the [`Data Contracts`](#Data%20Contracts) section below.
-## Files
 
-- **Source**: [`tools/citation-manager/src/MarkdownParser.js`](../../src/MarkdownParser.js)
-- **Tests**: [`tools/citation-manager/test/parser-output-contract.test.js`](../../test/parser-output-contract.test.js)
+## File Structure
+
+**Current Structure** (Monolithic Implementation):
+
+```text
+tools/citation-manager/
+├── src/
+│   └── MarkdownParser.js                              // 543-line monolithic file
+│       ├── constructor()                              // DI setup
+│       ├── parseFile()                                // Main orchestrator
+│       ├── extractLinks()                             // ~255 lines - link extraction
+│       ├── extractAnchors()                           // ~97 lines - anchor extraction
+│       ├── extractHeadings()                          // ~40 lines - heading extraction
+│       └── helpers/                                   // Inline helper methods
+│           ├── determineAnchorType()                  // Anchor type classification
+│           ├── resolvePath()                          // Path resolution
+│           ├── containsMarkdown()                     // Markdown detection
+│           └── toKebabCase()                          // String formatting
+│
+├── test/
+│   └── parser-output-contract.test.js                 // Contract validation (12 tests)
+│
+└── factories/
+    └── componentFactory.js                            // Factory would instantiate MarkdownParser with DI
+```
+
+**Technical Debt**: The current monolithic structure violates the project's [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns). See [Issue 5: Monolithic File Structure](#Issue%205%20Monolithic%20File%20Structure%20Violates%20File%20Naming%20Patterns) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Structure).
+
+_Source_: [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns)
 
 ## Pseudocode
 This pseudocode follows the **MEDIUM-IMPLEMENTATION** abstraction level, showing the core logic and integration points required for implementation.
@@ -236,17 +261,64 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
   "$defs": {
     "linkObject": {
       "title": "Link Object",
+      "description": "Represents an outgoing link parsed from the document. The base properties are created by MarkdownParser. The optional 'validation' property is added post-parse by CitationValidator (US1.8 Validation Enrichment Pattern).",
       "type": "object",
       "properties": {
-        "linkType": { "type": "string", "enum": [ "markdown", "wiki" ] },
-        "scope": { "type": "string", "enum": [ "internal", "cross-document" ] },
-        "anchorType": { "type": ["string", "null"], "enum": [ "header", "block", null ] },
-        "source": { "type": "object", "properties": { "path": { "type": "object", "properties": { "absolute": { "type": "string" } }, "required": ["absolute"] } }, "required": ["path"] },
-        "target": { "type": "object", "properties": { "path": { "type": "object", "properties": { "raw": { "type": ["string", "null"] }, "absolute": { "type": ["string", "null"] }, "relative": { "type": ["string", "null"] } }, "required": ["raw", "absolute", "relative"] }, "anchor": { "type": ["string", "null"] } }, "required": ["path", "anchor"] },
-        "text": { "type": ["string", "null"] },
-        "fullMatch": { "type": "string" },
-        "line": { "type": "integer", "minimum": 1 },
-        "column": { "type": "integer", "minimum": 1 }
+        "linkType": { "type": "string", "enum": [ "markdown", "wiki" ], "description": "Parser-created: Link syntax type" },
+        "scope": { "type": "string", "enum": [ "internal", "cross-document" ], "description": "Parser-created: Link scope (same-document vs cross-document)" },
+        "anchorType": { "type": ["string", "null"], "enum": [ "header", "block", null ], "description": "Parser-created: Type of anchor target (null for full-file links)" },
+        "source": {
+     "title": "Source Link",
+     "description": "Parser-created: Source file information",
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "object",
+       "properties": {
+        "absolute": { "type": "string" }
+       },
+       "required": ["absolute"]
+      }
+     },
+     "required": ["path"]
+        },
+        "target": { 
+     "title": "Outgoing Target Link",
+     "description": "Parser-created: Target file path and anchor" },
+     "type": "object", 
+     "properties": { 
+      "path": { 
+       "type": "object", 
+       "properties": { 
+        "raw": { "type": ["string", "null"] }, 
+        "absolute": { "type": ["string", "null"] }, 
+        "relative": { "type": ["string", "null"] } 
+       }, 
+       "required": ["raw", "absolute", "relative"] }, 
+      "anchor": { "type": ["string", "null"] } 
+       }, 
+       "required": ["path", "anchor"], 
+    "text": { "type": ["string", "null"], "description": "Parser-created: Link display text" },
+    "fullMatch": { "type": "string", "description": "Parser-created: Full matched link text" },
+    "line": { "type": "integer", "minimum": 1, "description": "Parser-created: Line number in source file" },
+    "column": { "type": "integer", "minimum": 1, "description": "Parser-created: Column number in source file" },
+        "validation": {
+          "type": "object",
+          "description": "ADDED POST-PARSE by CitationValidator (US1.8): Validation metadata enrichment. This property does NOT exist when MarkdownParser returns the LinkObject. It is added after validation completes.",
+          "properties": {
+            "status": { "type": "string", "enum": [ "valid", "warning", "error" ], "description": "Validation result status" },
+            "error": { "type": "string", "description": "Error or warning message (only when status is 'error' or 'warning')" },
+            "suggestion": { "type": "string", "description": "Suggested fix (only when status is 'error' or 'warning')" },
+            "pathConversion": { "type": "object", "description": "Path conversion metadata (only when relevant)" }
+          },
+          "required": [ "status" ],
+          "allOf": [
+            {
+              "if": { "properties": { "status": { "enum": [ "error", "warning" ] } } },
+              "then": { "required": [ "error" ] }
+            }
+          ]
+        }
       },
       "required": [ "linkType", "scope", "anchorType", "source", "target", "text", "fullMatch", "line", "column" ]
     },
@@ -287,6 +359,8 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
 ```
 
 ### ParserOutputContract Example
+
+> **Note**: Links do NOT include `validation` property - added post-parse by CitationValidator ([Story 1.8 Acceptance Criteria](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%201.8%20Acceptance%20Criteria)).
 
 ```json
 {
@@ -396,47 +470,27 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
 
 ## Testing Strategy
 
-Tests for the `MarkdownParser` should validate its ability to correctly transform markdown into the `MarkdownParser.Output.DataContract`.
+**Philosophy**: Validate MarkdownParser's ability to correctly transform markdown into the `MarkdownParser.Output.DataContract` JSON Schema.
 
-```tsx
-// Test pattern: BDD-style behavioral validation.
-class MarkdownParserTests is
+**Test Location**: `tools/citation-manager/test/parser-output-contract.test.js`
 
-  // Test that all link syntaxes are correctly identified and parsed.
- method test_linkExtraction_shouldParseAllLinkTypes(): TestResult is
-   // Given: A markdown document with a mix of 'markdown' and 'wiki' style links on specific lines.
-   // When: The parser's 'parseFile()' method is called on the document.
-   // Then: The returned 'links' array should contain correctly structured Link Objects, and a spot-check of the 'line' and 'column' numbers for a known link confirms positional accuracy.
-   // Validation: Check 'linkType', 'scope', and the 'line' and 'column' for one or two examples.
-  
-  // Test that all anchor syntaxes are correctly identified.
-  method test_anchorExtraction_shouldParseAllAnchorTypes(): TestResult is
-    // Given: A document with 'header' anchors (including those with markdown) and 'block' anchors (^).
-    // When: The parser's 'parseFile()' method is called.
-    // Then: The returned 'anchors' array should contain correctly structured Anchor Objects for each syntax.
-    // Validation: Check the 'anchorType', 'id', and 'rawText' fields.
-    
-  // Test the integration with the FileCache for path resolution.
-  method test_pathResolution_shouldUseFileCacheForShortFilenames(): TestResult is
-    // Given: A link with a short filename (e.g., 'guide.md') and a pre-populated FileCache.
-    // When: 'parseFile()' is called.
-    // Then: The resulting Link Object's 'target.path.absolute' field should contain the correct absolute path resolved from the cache.
-    // Boundary: Verifies the interaction between the Parser and the FileCache dependency.
-    
- // Test that all source and target path variations are correctly resolved and calculated.
- method test_pathResolution_should_Correctly_Populate_All_Paths(): TestResult is
-   // Given: A fixture directory with files in the root, a subdirectory, and a parent directory.
-   // When: The parser is run on a source file containing links to targets in each of these locations.
-   // Then: The resulting Link Objects must have correctly populated path properties for all scenarios:
-   //
-   //   - The 'source.path.absolute' field must always be the correct absolute path of the file being parsed.
-   //   - The 'target.path.raw' field must exactly match the path string from the markdown link.
-   //   - The 'target.path.absolute' field must be correctly resolved for links pointing to the same directory, a subdirectory, and a parent directory.
-   //   - The 'target.path.relative' field must be the correctly calculated relative path between the source and target.
-   //   - For a link pointing to a non-existent file, the 'target.path.absolute' and 'target.path.relative' fields should be null.
-   //
-   // Validation: Create a test fixture for each scenario and assert the values of all four path fields in the resulting Link Object.
-```
+1. **Schema Compliance Validation**
+   - All output objects match JSON Schema definitions (LinkObject, AnchorObject, HeadingObject)
+   - Required fields present with correct types
+   - Enum properties adhere to documented constraints
+
+2. **Contract Boundary Testing**
+   - US1.6: Single anchor per header with dual ID properties (`id` + `urlEncodedId`)
+   - US1.6: Header anchors include `urlEncodedId`, block anchors omit it
+   - Path resolution: Verify raw/absolute/relative calculations
+   - No unexpected fields beyond documented contract
+
+3. **Link and Anchor Extraction**
+   - Parser correctly identifies all link syntaxes (markdown, wiki, cross-document, internal)
+   - Anchor types properly classified (header vs block)
+   - Position metadata (line/column) accurately captured
+
+**Contract Validation Pattern**: Tests validate against the JSON Schema documented in the [Data Contracts](#Data%20Contracts) section, ensuring parser output matches the published API contract.
 
 ---
 
@@ -712,24 +766,28 @@ Recommendation: Refine the Hybrid
 
   The current implementation could be more strategic about which layer handles what:
 
-  | Pattern                             | Current      | Better Approach    | Reasoning                           |
-  |-------------------------------------|--------------|--------------------|-------------------------------------|
-  | Standard markdown links \[text\](url) | Regex        | walkTokens         | Already in AST as type: "link"      |
-  | Headings ## Title                   | walkTokens ✅ | walkTokens ✅       | Structural element                  |
-  | Header anchors                      | Regex        | walkTokens         | Derive from heading tokens          |
-  | Wiki links \[\[page\]\]                 | Regex        | Regex OR extension | Not standard markdown               |
-  | Block refs ^id                      | Regex ✅      | Regex ✅            | Line-specific, EOL position matters |
-  | Citation syntax                     | Regex        | Extension          | Could be formalized                 |
+| Pattern                             | Current      | Better Approach    | Reasoning                           |
+|--|--|--|--|
+| Standard markdown links \[text\](url) | Regex        | walkTokens         | Already in AST as type: "link"      |
+| Headings ## Title                   | walkTokens ✅ | walkTokens ✅       | Structural element                  |
+| Header anchors                      | Regex        | walkTokens         | Derive from heading tokens          |
+| Wiki links \[\[page\]\]                 | Regex        | Regex OR extension | Not standard markdown               |
+| Block refs ^id                      | Regex ✅      | Regex ✅            | Line-specific, EOL position matters |
+| Citation syntax                     | Regex        | Extension          | Could be formalized                 |
 
-  Concrete Improvement
+#### Concrete Improvement
 
   Current code extracts standard markdown links with regex:
+
+  ```tsx
   // extractLinks() line 45
   const markdownLinkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
-
+  ```
+  
   But marked.js already parsed these!
 
-  // More efficient: extract from existing tokens
+```tsx
+// More efficient: extract from existing tokens
   function extractLinksFromTokens(tokens) {
     const links = [];
     marked.walkTokens(tokens, (token) => {
@@ -744,14 +802,95 @@ Recommendation: Refine the Hybrid
     });
     return links;
   }
+```
+  
+The line/column problem is the real challenge with pure walkTokens.
 
-  The line/column problem is the real challenge with pure walkTokens.
+My Recommendation
 
-  My Recommendation
+Keep the hybrid, but refactor to this principle:
 
-  Keep the hybrid, but refactor to this principle:
+If marked.js naturally parses it AND you don't need precise line/column → use walkTokensIf it's Obsidian-specific OR needs line/column positions → use regex
 
-  If marked.js naturally parses it AND you don't need precise line/column → use walkTokensIf it's Obsidian-specific OR needs line/column positions → use regex
+### Issue 4: Source Metadata Architectural Inconsistency
+
+**Problem**: Link Object structure has architectural inconsistency between `source` and `target` properties, with source metadata scattered across multiple locations.
+
+**Current State - Redundancy & Asymmetry** (LinkObject schema lines 243-273):
+
+```json
+// ParserOutputContract root level:
+{
+  "filePath": "/project/file.md",  // ← Source file path at root
+  "links": [{
+    "source": {
+      "path": { "absolute": "/project/file.md" }  // ← DUPLICATE of filePath!
+    },
+    "target": {
+      "path": { "raw": "...", "absolute": "...", "relative": "..." },
+      "anchor": "header"
+    },
+    // Source metadata scattered outside source object:
+    "text": "Link Text",      // ← Source link text
+    "fullMatch": "[...]",  // ← Source full match string
+    "line": 5,            // ← Source position
+    "column": 3           // ← Source position
+  }]
+}
+```
+
+**Issues**:
+1. **Data Duplication**: `source.path.absolute` duplicates `ParserOutputContract.filePath`
+2. **Architectural Asymmetry**: `target` groups all target info, but source metadata (`text`, `fullMatch`, `line`, `column`) scattered at link root level
+3. **No Clear Relationship Model**: Link object doesn't clearly express "source → target" relationship
+4. **Future-Proofing Gap**: If we need additional source metadata (e.g., context lines, parent heading), no clear place to add it
+
+**Better Architecture - Source/Target Symmetry**:
+
+```json
+{
+  "linkType": "markdown",
+  "scope": "cross-document",
+  "anchorType": "header",
+  "source": {
+    "path": { "absolute": "/project/file.md" },
+    "text": "Link Text",                           // ← Grouped with source
+    "fullMatch": "[Link Text](target.md#anchor)",  // ← Grouped with source
+    "line": 5,                                // ← Grouped with source
+    "column": 3                               // ← Grouped with source
+  },
+  "target": {
+    "path": { "raw": "...", "absolute": "...", "relative": "..." },
+    "anchor": "header"
+  }
+}
+```
+
+**Benefits of Refactoring**:
+- ✅ Clear source/target symmetry - relationship model explicit
+- ✅ Eliminates duplication - no redundant `filePath` copy
+- ✅ Logical grouping - all source data in `source`, all target data in `target`
+- ✅ Future extensibility - clear place for additional source metadata
+
+**Migration Cost**:
+- **High** - Breaking change to public API contract
+- Requires refactoring:
+  - `MarkdownParser.extractLinks()` (6 link pattern constructions)
+  - `CitationValidator` (accesses `link.text`, `link.line`, etc.)
+  - All test files (`parser-output-contract.test.js`, `citation-validator*.test.js`)
+  - Any downstream consumers
+
+**Recommendation**:
+- Document as architectural debt (this issue)
+- Prioritize for future refactoring epic when planning breaking changes
+- Consider alongside other contract changes (e.g., Legacy Issue 4 internal link support)
+- Batch multiple breaking changes into single migration to minimize disruption
+
+**Related Issues**: Issue 1 (Double-Parse) - both could be addressed in same refactoring epic
+
+**Discovery Date**: 2025-10-17
+**Discovered During**: Schema pretty-print formatting review
+**Priority**: Medium (architectural improvement, not blocking functionality)
 
 ---
 

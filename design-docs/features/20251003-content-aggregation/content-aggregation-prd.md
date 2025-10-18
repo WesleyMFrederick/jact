@@ -68,11 +68,13 @@ This feature directly supports the CC Workflows vision by:
 - **FR7: Centralized Execution:** The new aggregation feature SHALL be exposed via an **`--extract-context <output_file.md>` flag on the existing `validate` command**. ^FR7
 - **FR8: Preserve Existing Functionality:** All existing `citation-manager` features SHALL be preserved and function correctly. ^FR8
 - **FR9: Test Migration:** All existing unit tests for the `citation-manager` SHALL be migrated to the workspace and pass. ^FR9
+- **FR10: Extraction Control Markers:** The system SHALL recognize `%%extract-link%%` and `%%stop-extract-link%%` markers on the same line as a citation. `%%extract-link%%` SHALL force the extraction of a full-file link that would otherwise be skipped, and `%%stop-extract-link%%` SHALL prevent the extraction of a section or block link that would otherwise be included. These markers SHALL have the highest precedence over all other extraction rules. ^FR10
 
 ### Non-Functional Requirements
 - **NFR3: Reliability:** The citation-manager SHALL include unit tests that achieve at least 50% code coverage on new functionality. ^NFR3
 - **NFR4: Design Adherence:** Implementation SHALL adhere to the workspace's MVB design principles and testing strategy. ^NFR4
 - **NFR5: Performance:** The system SHALL parse each unique file at most once per command execution to minimize redundant I/O and processing time. ^NFR5
+- **NFR6: Marker Scanning Performance:** The process of scanning for extraction control markers SHALL not significantly degrade parsing performance. The check MUST be a localized, line-level operation. ^NFR6
 
 ## Technical Considerations
 
@@ -237,9 +239,9 @@ _Status_: ✅ COMPLETE (2025-10-15)
 > [!success] **Technical Lead Feedback**: ParsedDocument Facade Implementation ✅ COMPLETE
 >
 > **Resolution**: ParsedDocument facade successfully implemented with all core query methods. CitationValidator and ParsedFileCache refactored to use facade interface. Zero functional regressions confirmed via full test suite (114 passed tests).
-> 
+>
 > **Resolution Date**: 2025-10-15
-> 
+>
 > **Implementation Guide**: [ParsedDocument Implementation Guide](../../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md)
 >
 > **Known Limitation**:
@@ -247,52 +249,117 @@ _Status_: ✅ COMPLETE (2025-10-15)
 
 ---
 
-### Story 1.8: Refactor Anchor Validation to Use Strategy Pattern
+### Story 1.8: Implement Validation Enrichment Pattern
 
-*As a* **developer**,
-*I want* to **refactor** the **CitationValidator** to use a **Strategy pattern** for anchor validation,
-*so that* the **system** can be easily **extended** to support **different markdown flavors** (e.g., GitHub-style anchors) without modifying core validation logic.
+**As a** **developer** building content extraction features,
+**I want** the **`CitationValidator`** to enrich LinkObjects with validation metadata directly,
+**so that** downstream components can access validation results without data duplication and redundant parser calls.
 
 #### Story 1.8 Acceptance Criteria
 
-1. An `AnchorValidationStrategy` interface SHALL be created at `src/strategies/AnchorValidationStrategy.js`, defining a `validate()` method contract. ^US1-8AC1
-2. A default `ObsidianAnchorStrategy` SHALL be implemented, encapsulating the existing logic for validating Obsidian-style URL-escaped anchors. ^US1-8AC2
-3. The `CitationValidator` constructor SHALL be refactored to accept an `AnchorValidationStrategy` dependency, and its validation logic SHALL delegate to the injected strategy. ^US1-8AC3
-4. The `componentFactory` SHALL be updated to instantiate and inject the default `ObsidianAnchorStrategy` into the `CitationValidator`. ^US1-8AC4
-5. GIVEN the refactoring is complete, WHEN the full test suite is executed, THEN all existing tests SHALL pass, confirming zero functional regressions. ^US1-8AC5
-6. The component architecture documentation SHALL be updated to reflect the new Strategy pattern for anchor validation. ^US1-8AC6
+1. The `CitationValidator.validateFile()` method SHALL return a `ValidationResult` object with structure `{ summary: { total, valid, warnings, errors }, links: LinkObject[] }`, where `links` is the array of enriched LinkObjects. ^US1-8AC1
+2. GIVEN a LinkObject is validated, WHEN validation completes, THEN the LinkObject SHALL be enriched with a `validation` property containing `{ status: "valid"|"warning"|"error", error?: string, suggestion?: string, pathConversion?: object }`. ^US1-8AC2
+3. The `summary` object SHALL provide aggregate counts derived from the enriched links array, eliminating the need for separate validation result objects. ^US1-8AC3
+4. The CLI SHALL be refactored to consume the new `ValidationResult` structure, using `summary` for reporting and `links` for detailed validation information. ^US1-8AC4
+5. GIVEN the Validation Enrichment Pattern is implemented, WHEN a component needs both link structure and validation status, THEN it SHALL access a single enriched LinkObject instead of correlating separate data structures. ^US1-8AC5
+6. GIVEN the refactored validation workflow is complete, WHEN the full test suite executes, THEN all existing tests SHALL pass with zero functional regressions. ^US1-8AC6
 
 _Depends On_: [Story 1.7: Implement ParsedDocument Facade](#Story%201.7%20Implement%20ParsedDocument%20Facade)
-_Enables_: [Story 2.1: Enhance Parser to Handle Full-File and Section Links](#Story%202.1%20Enhance%20Parser%20to%20Handle%20Full-File%20and%20Section%20Links)
-_Closes Technical Debt_: Prevents future debt by decoupling validation logic and enabling extension over modification.
-_Functional Requirements_: [[#^FR8|FR8]]
-_Status_: 📋 PENDING
+_Enables_: [Story 2.1: Implement Extraction Eligibility using Strategy Pattern](#Story%202.1%20Implement%20Extraction%20Eligibility%20using%20Strategy%20Pattern)
+_Closes Technical Debt_: Data Duplication Between LinkObject and ValidationResult (80% duplication), Redundant getLinks() Calls Across Pipeline
+_Functional Requirements_: [[#^FR8|FR8]] (Preserve existing functionality with improved architecture)
+_Architecture Decision_: [ADR: Validation Enrichment Pattern](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Architectural%20Decision%20Validation%20Enrichment%20Pattern) (2025-10-17)
+_User Story Link_: [us1.8-implement-validation-enrichment-pattern](user-stories/us1.8-implement-validation-enrichment-pattern/us1.8-implement-validation-enrichment-pattern.md)%%stop-extract-link%%
+_Status_: 🔲 To Be Done
 
-> [!note] Technical Lead Feedback: Establishes Core Architectural Pattern
+> [!info] **Architecture Impact**
+> This story implements the Validation Enrichment Pattern, fundamentally changing how validation metadata flows through the system. The pattern achieves:
+> - **Zero Duplication**: Validation data stored once on LinkObject (50% memory reduction)
+> - **Single Data Flow**: One object passes through pipeline (parse → validate → filter → extract)
+> - **No Redundant Calls**: Validator returns enriched links; extractor uses them directly
+> - **Natural Lifecycle**: Progressive enhancement pattern (base data + validation metadata)
 >
-> Architectural Impact: This story establishes the Strategy Pattern as a core pattern for the application. By implementing it on an existing, well-tested feature (anchor validation), we prove its viability before reusing it for the more complex new feature (extraction eligibility) in Epic 2.
+> **Breaking Change**: The `ValidationResult` structure changes from separate validation arrays to enriched LinkObjects. Coordinated updates required across:
+> - `CitationValidator.js` (output contract)
+> - `ContentExtractor.js` (consumes enriched links)
+> - `citation-manager.js` CLI (reporting logic)
 >
-> Relevant Architecture Principles: [extension-over-modification](../../../../../design-docs/Architecture%20Principles.md#^extension-over-modification), [dependency-abstraction](../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction), [single-responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility).
+> **Implementation Priority**: Must complete before US2.1, as extraction eligibility strategies depend on `link.validation.status` being present.
 
 ---
-### Story 2.1: Enhance Parser to Handle Full-File and Section Links
 
-**As a** developer,
-**I want** the parser to identify links to both entire markdown files and specific sections within them,
-**so that** I can handle both types of content extraction in a unified way.
+## Epic 2: Content Extraction Component
+
+### Story 2.1: Implement Extraction Eligibility using Strategy Pattern
+
+**As a** developer creating context packages for an AI,
+**I want** to use link-level markers (`%%extract-link%%`, `%%stop-extract-link%%`) to override the default content extraction behavior, **
+so that** I can have fine-grained control and create precisely tailored context for my prompts.
 
 #### Story 2.1 Acceptance Criteria
-1. GIVEN a markdown file, WHEN the parser runs, THEN it SHALL extract an array of all links pointing to local markdown files, distinguishing between links with section anchors and those without. ^US2-1AC1
-2. GIVEN the parser identifies multiple links to the same file, but at least one link includes a section anchor, THEN the system SHALL prioritize the section link(s) for extraction and issue a warning that the full file content will be ignored in favor of the more specific section(s). ^US2-1AC2
-3. GIVEN the parser identifies only links without section anchors to a specific file, THEN it SHALL designate the entire file for content extraction. ^US2-1AC3
 
+1. GIVEN a link points to a full file (no anchor), WHEN the `--full-files` flag is **not** present, THEN the default eligibility decision SHALL be `ineligible`. ^US2-1AC1
+2. GIVEN a link points to a specific section or block (has an anchor), THEN the default eligibility decision SHALL be `eligible`. ^US2-1AC2
+3. GIVEN a full-file link has a `%%extract-link%%` marker on the same line, THEN its eligibility SHALL be overridden to `eligible`, even without the `--full-files` flag. ^US2-1AC3
+4. GIVEN a section or block link has a `%%stop-extract-link%%` marker on the same line, THEN its eligibility SHALL be overridden to `ineligible`. ^US2-1AC4
+5. The marker-based rules (`%%extract-link%%`, `%%stop-extract-link%%`) SHALL have the highest precedence, overriding both default behaviors and the `--full-files` CLI flag. ^US2-1AC5
+6. The eligibility logic SHALL be implemented using the **Strategy Pattern**, with each rule (e.g., `StopMarkerStrategy`, `CliFlagStrategy`) encapsulated in its own component, as defined in the architecture. ^US2-1AC6
+
+_Depends On_: [Story 1.7: Implement ParsedDocument Facade](user-stories/us1.7-implement-parsed-document-facade/us1.7-implement-parsed-document-facade.md)
+_Requirements_: [[#^FR4|FR4]], [[#^FR10|FR10]]
+_Non-Functional Requirements_: [[#^NFR6|NFR6]]
+_User Story Link_: [us2.1-implement-extraction-eligibility-strategy-pattern](user-stories/us2.1-implement-extraction-eligibility-strategy-pattern/us2.1-implement-extraction-eligibility-strategy-pattern.md)
+_Status_: 🔲 To Be Done
+
+> [!question] **ExtractionStrategy**
+> [Revised Recommendation: The Strategy Pattern](research/content-aggregation-architecture-whiteboard.md#Revised%20Recommendation%20The%20Strategy%20Pattern)
+<!-- -->
 > [!note] **Technical Lead Feedback**: Parser output data contract - Base schema validated ✅
 > _Base Schema Status_: Parser Output Contract validated in [US1.5 Phase 1](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md#Phase%201%20Parser%20Output%20Contract%20Validation%20&%20Documentation). Current schema: `{ filePath, content, tokens, links, headings, anchors }` with LinkObject (`linkType`, `scope`, `anchorType`, `source`, `target`) and AnchorObject (`anchorType`, `id`, `rawText`) structures.
 > _Epic 2 Analysis Required_: Story 2.1 implementation should review existing LinkObject schema to determine if current `linkType`/`scope`/`anchorType` fields sufficiently distinguish full-file vs. section links, or if minor schema extensions are needed for content extraction metadata.
 > _Relevant Architecture Principles_: [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [primitive-first-design](../../../../../design-docs/Architecture%20Principles.md#^primitive-first-design), [illegal-states-unrepresentable](../../../../../design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable), [explicit-relationships](../../../../../design-docs/Architecture%20Principles.md#^explicit-relationships)
 
-_Depends On_: [Story 1.5: Implement a Cache for Parsed File Objects](#Story%201.5%20Implement%20a%20Cache%20for%20Parsed%20File%20Objects)
-_Functional Requirements_: [[#^FR4|FR4]]
+---
+
+### The Strategic Solution ✅
+
+The Strategy Pattern, as required by **Acceptance Criterion 6**, solves this problem by decoupling the rules from the orchestrator. Each rule becomes its own small, independent component, and the main logic becomes a simple function:
+
+```javascript
+// analyzeEligibility.js - Supporting operation using strategy pattern
+// This is our chosen, extensible architecture.
+
+/**
+ * Analyze link eligibility using strategy chain
+ * @param {LinkObject} link - Link to analyze
+ * @param {Object} cliFlags - CLI flags
+ * @param {ExtractionStrategy[]} strategies - Strategy chain in precedence order
+ * @returns {{ eligible: boolean, reason: string }} Eligibility decision
+ */
+export function analyzeEligibility(link, cliFlags, strategies) {
+  // The order of the strategies array defines the rule precedence.
+  for (const strategy of strategies) {
+    const decision = strategy.getDecision(link, cliFlags);
+    // The first strategy that returns a non-null decision wins.
+    if (decision !== null) {
+      return decision;
+    }
+  }
+  // ... return default action
+  return { eligible: false, reason: 'default' };
+}
+
+/**
+ * Create eligibility analyzer with configured strategies
+ * @param {ExtractionStrategy[]} strategies - Ordered strategy chain
+ * @returns {Function} Configured analyzer function
+ */
+export function createEligibilityAnalyzer(strategies) {
+  return (link, cliFlags) => analyzeEligibility(link, cliFlags, strategies);
+}
+```
+
+This is a robust and maintainable design. Adding a new rule in the future is as simple as creating a new strategy class and adding it to the array in the factory—we never have to touch the core `analyzeEligibility` function again.
 
 ### Story 2.2: Implement Unified Content Extractor with Metadata
 
@@ -333,6 +400,41 @@ _Functional Requirements_: [[#^FR6|FR6]], [[#^FR7|FR7]]
 
 ---
 
+## Epic 3: Markdown Parser Refactoring for Flavor Extensibility
+
+This epic focuses on a significant architectural improvement to the `MarkdownParser`. Its goal is to replace the current hybrid parsing model with a fully token-based, extensible architecture that will serve as the engine for the `MarkdownFlavorService`, enabling support for multiple markdown syntaxes.
+
+---
+
+### Story 3.1: Research and POC for a Pluggable Parser Engine
+
+**As a** developer, **I want** to evaluate `micromark` and its extensions to prove it can serve as the engine for our `MarkdownFlavorService`, **so that** I can confirm we can generate the `MarkdownParser.Output.DataContract` for the "obsidian" flavor without custom regex.
+
+#### Acceptance Criteria
+1. GIVEN a proof-of-concept script using `micromark` and its Obsidian extensions, WHEN it's run on our test fixtures, THEN it SHALL produce a `MarkdownParser.Output.DataContract` that is structurally identical to the one from our current parser.
+2. The proof-of-concept SHALL successfully parse all existing link and anchor types using a single, token-based pass, demonstrating it can replace our custom regex patterns.
+3. The output from the proof-of-concept SHALL pass all tests in `parser-output-contract.test.js`, confirming zero regressions in the data contract.
+4. A research summary SHALL document how this new engine will be configured and controlled by the future `MarkdownFlavorService`.
+
+_Closes Technical Debt_: [Double-Parse Anti-Pattern](https://www.google.com/search?q=tools/citation-manager/design-docs/component-guides/Markdown%2520Parser%2520Implementation%2520Guide.md%23Performance%2520Double-Parse%2520Anti-Pattern) (Validation Phase)
+
+---
+
+### Story 3.2: Implement `MarkdownFlavorService` and Refactor Parser
+
+**As a** developer, **I want** to implement the `MarkdownFlavorService` and refactor the `MarkdownParser` to use the new `micromark` engine, **so that** the parser's logic is driven by the flavor configuration provided by the service.
+
+#### Story 3.2 Acceptance Criteria
+1. A new `MarkdownFlavorService` component SHALL be created at `src/services/MarkdownFlavorService.js`.
+2. The `MarkdownFlavorService` SHALL be responsible for providing the correct set of `micromark` extensions for a given flavor (starting with "obsidian").
+3. The internal logic of the `MarkdownParser` SHALL be replaced with the new `micromark`-based implementation.
+4. The `MarkdownParser` SHALL be refactored to request and use the parsing extensions from the `MarkdownFlavorService`.
+5. GIVEN the refactoring is complete, WHEN the full test suite is executed, THEN all 114+ existing tests SHALL pass, confirming zero behavioral regressions.
+6. The "Double-Parse Anti-Pattern" technical debt item SHALL be marked as "RESOLVED" in all architecture documentation.
+
+_Depends On_: "Story: Research and POC for a Pluggable Parser Engine" _Closes Technical Debt_: [Double-Parse Anti-Pattern](https://www.google.com/search?q=tools/citation-manager/design-docs/component-guides/Markdown%2520Parser%2520Implementation%2520Guide.md%23Performance%2520Double-Parse%2520Anti-Pattern) (Implementation and Documentation Phase)
+
+---
 ## Feature Validation Approach
 
 The feature will be validated through:

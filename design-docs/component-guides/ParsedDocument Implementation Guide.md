@@ -55,10 +55,10 @@ classDiagram
     ParsedDocument o-- MarkdownParserOutputDataContract : wraps
 ```
 
-1. [**MarkdownParser.Output.DataContract**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The raw data object being wrapped
+1. [MarkdownParser.Output.DataContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The raw data object being wrapped
 2. **ParsedDocument**: The facade providing query methods (this guide)
-3. [**CitationValidator**](CitationValidator%20Implementation%20Guide.md): Consumer using anchor/link query methods
-4. **ContentExtractor**: Future Epic 2 consumer using content extraction methods
+3. [CitationValidator](CitationValidator%20Implementation%20Guide.md): Consumer using anchor/link query methods
+4. [Citation Manager.Content Extractor](../features/20251003-content-aggregation/content-aggregation-architecture.md#==Citation%20Manager.Content%20Extractor==): Future Epic 2 consumer using content extraction methods
 
 ## Public Contracts
 

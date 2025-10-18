@@ -5,7 +5,7 @@ epic-number: 1
 epic-name: Citation Manager Test Migration & Content Aggregation
 epic-url: ../../content-aggregation-prd.md#Epic%20Citation%20Manager%20Test%20Migration%20&%20Content%20Aggregation
 user-story-number: 1.7
-status: In Progress
+status: Done
 ---
 
 # Story 1.7: Implement ParsedDocument Facade
@@ -718,7 +718,7 @@ This approach ensures the facade is not only a clean interface but also an effic
   - _Requirements_: Provides comprehensive implementation context for Tasks 4.2 and 4.3
   - _Leverage_: Completed implementation from Phases 1-3, US1.7 pseudocode, existing documentation structure
 
-- [ ] **4.2. Create ParsedDocument Implementation Guide** ^US1-7T4-2
+- [x] **4.2. Create ParsedDocument Implementation Guide** ^US1-7T4-2
   - **Implementation Details**: [tasks/04-4-2-create-implementation-guide-us1.7.md](tasks/04-4-2-create-implementation-guide-us1.7.md)
   - **Agent**: none
   - **Objective**: Create comprehensive Implementation Guide documenting ParsedDocument facade interface, method contracts, and usage patterns
@@ -738,7 +738,7 @@ This approach ensures the facade is not only a clean interface but also an effic
   - _Requirements_: Story references Implementation Guide as primary documentation
   - _Leverage_: Existing ParsedDocument Implementation Guide.md (already created)
 
-- [ ] **4.3. Update Architecture Documentation** ^US1-7T4-3
+- [x] **4.3. Update Architecture Documentation** ^US1-7T4-3
   - **Implementation Details**: [tasks/04-4-3-update-architecture-documentation-us1.7.md](tasks/04-4-3-update-architecture-documentation-us1.7.md)
   - **Agent**: none
   - **Objective**: Update content-aggregation-architecture.md to reflect ParsedDocument facade integration and mark technical debt as resolved
