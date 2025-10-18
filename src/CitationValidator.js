@@ -208,7 +208,6 @@ export class CitationValidator {
 
 		// 5. Return enriched links + summary (no separate results array)
 		return {
-			file: filePath,
 			summary,
 			links,
 		};
