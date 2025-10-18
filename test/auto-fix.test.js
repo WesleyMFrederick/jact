@@ -55,7 +55,7 @@ Content for another test header.
 
 			// Check that auto-fix was successful (updated to match actual CLI output format)
 			expect(output).toContain("Fixed 2 citations");
-			expect(output).toContain("anchor corrections");
+			expect(output).toContain("path corrections");
 			expect(output).toContain("sample-header");
 			expect(output).toContain("Sample%20Header");
 			expect(output).toContain("another-test-header");

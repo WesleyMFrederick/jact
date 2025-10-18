@@ -5,8 +5,8 @@ phase: "Phase 3: CLI Integration"
 task-id: "3.1"
 task-anchor: "#^US1-8T3-1"
 wave: "3"
-implementation-agent: "code-developer"
-status: "ready"
+implementation-agent: code-developer
+status: Done
 ---
 
 # Task 3.1: Update CLI to Consume New ValidationResult Structure

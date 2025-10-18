@@ -38,8 +38,8 @@ describe("End-to-End Cache Integration", () => {
 		expect(result.summary).toBeDefined();
 		expect(result.summary.total).toBeGreaterThan(0);
 		expect(result.summary.errors).toBe(0);
-		expect(result.results).toBeDefined();
-		expect(Array.isArray(result.results)).toBe(true);
+		expect(result.links).toBeDefined();
+		expect(Array.isArray(result.links)).toBe(true);
 	});
 
 	it("should handle multi-file validation with cache", async () => {
@@ -111,11 +111,13 @@ describe("End-to-End Cache Integration", () => {
 		expect(result2.summary.errors).toBe(result1.summary.errors);
 		expect(result2.summary.warnings).toBe(result1.summary.warnings);
 
-		// Then: Individual results match
-		expect(result2.results.length).toBe(result1.results.length);
-		for (let i = 0; i < result1.results.length; i++) {
-			expect(result2.results[i].status).toBe(result1.results[i].status);
-			expect(result2.results[i].line).toBe(result1.results[i].line);
+		// Then: Individual enriched links match
+		expect(result2.links.length).toBe(result1.links.length);
+		for (let i = 0; i < result1.links.length; i++) {
+			expect(result2.links[i].validation.status).toBe(
+				result1.links[i].validation.status,
+			);
+			expect(result2.links[i].line).toBe(result1.links[i].line);
 		}
 	});
 
@@ -132,7 +134,7 @@ describe("End-to-End Cache Integration", () => {
 		// Then: Workflow completes with expected results
 		expect(result).toBeDefined();
 		expect(result.summary).toBeDefined();
-		expect(result.results).toBeDefined();
+		expect(result.links).toBeDefined();
 		expect(result.summary.total).toBeGreaterThan(0);
 	});
 

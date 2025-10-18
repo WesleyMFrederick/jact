@@ -123,13 +123,13 @@ describe("CitationValidator Cache Integration", () => {
 		expect(cachedResult.summary.errors).toBe(directResult.summary.errors);
 		expect(cachedResult.summary.warnings).toBe(directResult.summary.warnings);
 
-		// Verify all result statuses match
-		expect(cachedResult.results.length).toBe(directResult.results.length);
-		for (let i = 0; i < directResult.results.length; i++) {
-			expect(cachedResult.results[i].status).toBe(
-				directResult.results[i].status,
+		// Verify all enriched link statuses match
+		expect(cachedResult.links.length).toBe(directResult.links.length);
+		for (let i = 0; i < directResult.links.length; i++) {
+			expect(cachedResult.links[i].validation.status).toBe(
+				directResult.links[i].validation.status,
 			);
-			expect(cachedResult.results[i].line).toBe(directResult.results[i].line);
+			expect(cachedResult.links[i].line).toBe(directResult.links[i].line);
 		}
 	});
 });

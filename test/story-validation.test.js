@@ -27,15 +27,15 @@ describe("Story File Validation with Scope", () => {
 			expect(result.summary.errors).toBeGreaterThan(0);
 
 			// Should detect the 3 intentional broken references
-			const errors = result.results.filter((r) => r.status === "error");
+			const errors = result.links.filter((r) => r.validation.status === "error");
 			expect(errors.length).toBeGreaterThanOrEqual(3);
 
 			// Verify at least one valid cross-document reference
-			const validCrossDoc = result.results.filter(
+			const validCrossDoc = result.links.filter(
 				(r) =>
-					r.status === "valid" &&
-					r.type === "cross-document" &&
-					r.citation.includes("test-target.md"),
+					r.validation.status === "valid" &&
+					r.scope === "cross-document" &&
+					r.fullMatch.includes("test-target.md"),
 			);
 			expect(validCrossDoc.length).toBeGreaterThan(0);
 

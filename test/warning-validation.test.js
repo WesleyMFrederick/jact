@@ -22,24 +22,24 @@ describe("Warning Status Validation Tests", () => {
 
 			const result = JSON.parse(output);
 
-			// Filter results by status
-			const warningResults = result.results.filter(
-				(r) => r.status === "warning",
+			// Filter enriched links by validation status
+			const warningResults = result.links.filter(
+				(r) => r.validation.status === "warning",
 			);
-			const _validResults = result.results.filter((r) => r.status === "valid");
-			const _errorResults = result.results.filter((r) => r.status === "error");
+			const _validResults = result.links.filter((r) => r.validation.status === "valid");
+			const _errorResults = result.links.filter((r) => r.validation.status === "error");
 
 			// Primary assertion: Should have warning status for cross-directory resolution
 			expect(warningResults.length).toBeGreaterThan(0);
 
 			// Specific validation: The citation with wrong path should be marked as warning
 			const warningCitation = warningResults.find((r) =>
-				r.citation.includes("../wrong-path/warning-test-target.md"),
+				r.fullMatch.includes("../wrong-path/warning-test-target.md"),
 			);
 
 			expect(warningCitation).toBeTruthy();
 
-			expect(warningCitation.status).toBe("warning");
+			expect(warningCitation.validation.status).toBe("warning");
 
 			// Verify summary includes warning count
 			expect(typeof result.summary.warnings).toBe("number");
@@ -89,7 +89,7 @@ describe("Warning Status Validation Tests", () => {
 
 			// Ensure backward compatibility - existing fields should still exist
 			expect(result.summary).toBeTruthy();
-			expect(Array.isArray(result.results)).toBe(true);
+			expect(Array.isArray(result.links)).toBe(true);
 			expect(typeof result.summary.total).toBe("number");
 			expect(typeof result.summary.valid).toBe("number");
 			expect(typeof result.summary.errors).toBe("number");
@@ -97,8 +97,8 @@ describe("Warning Status Validation Tests", () => {
 			// New warning functionality should extend, not replace
 			expect(typeof result.summary.warnings).toBe("number");
 
-			// Results should have proper status enum values
-			const allStatuses = result.results.map((r) => r.status);
+			// Enriched links should have proper validation status enum values
+			const allStatuses = result.links.map((r) => r.validation.status);
 			const validStatuses = ["valid", "error", "warning"];
 
 			for (const status of allStatuses) {

@@ -61,7 +61,7 @@ describe("Citation Manager Integration Tests", () => {
 			const result = JSON.parse(output);
 			expect(typeof result).toBe("object");
 			expect(result.summary).toBeTruthy();
-			expect(Array.isArray(result.results)).toBe(true);
+			expect(Array.isArray(result.links)).toBe(true);
 			expect(typeof result.summary.total).toBe("number");
 		} catch (error) {
 			expect.fail(`JSON format should work: ${error.stdout || error.message}`);
@@ -161,8 +161,8 @@ describe("Citation Manager Integration Tests", () => {
 
 			const result = JSON.parse(output);
 			expect(result.lineRange).toBe("13-14");
-			expect(Array.isArray(result.results)).toBe(true);
-			expect(result.results.every((r) => r.line >= 13 && r.line <= 14)).toBe(
+			expect(Array.isArray(result.links)).toBe(true);
+			expect(result.links.every((r) => r.line >= 13 && r.line <= 14)).toBe(
 				true,
 			);
 		} catch (error) {

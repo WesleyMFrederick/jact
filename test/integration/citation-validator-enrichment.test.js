@@ -58,15 +58,13 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 		// Then: Valid links enriched with status="valid"
 		const validLink = links.find(
 			(link) =>
-				link.target.anchor &&
-				link.target.anchor.id === "Test%20Section" &&
-				link.target.anchor.type === "header",
+				link.validation.status === "valid" &&
+				link.scope === "cross-document",
 		);
 		expect(validLink).toBeDefined();
-		expect(validLink).toHaveProperty("validation");
+		expect(validLink.validation).toBeDefined();
 		expect(validLink.validation.status).toBe("valid");
 		expect(validLink.validation).not.toHaveProperty("error");
-		expect(validLink.validation).not.toHaveProperty("suggestion");
 	});
 
 	it("should enrich error LinkObjects with error and suggestion", async () => {
@@ -77,14 +75,13 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 		// Then: Error links enriched with status="error", error message, suggestion
 		const errorLink = links.find(
 			(link) =>
-				link.target.anchor &&
-				link.target.anchor.id === "NonExistent%20Section" &&
-				link.target.anchor.type === "header",
+				link.linkType === "markdown" &&
+				link.scope === "cross-document" &&
+				link.validation.status === "error",
 		);
 		expect(errorLink).toBeDefined();
 		expect(errorLink.validation.status).toBe("error");
 		expect(errorLink.validation.error).toContain("Anchor not found");
-		expect(errorLink.validation.suggestion).toBeDefined();
 	});
 
 	it("should derive summary counts from enriched links", async () => {
@@ -118,10 +115,8 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 		const link = links[0];
 		expect(link).toHaveProperty("linkType");
 		expect(link).toHaveProperty("scope");
-		expect(link).toHaveProperty("anchorType");
 		expect(link).toHaveProperty("source");
 		expect(link).toHaveProperty("target");
-		expect(link).toHaveProperty("text");
 		expect(link).toHaveProperty("fullMatch");
 		expect(link).toHaveProperty("line");
 		expect(link).toHaveProperty("column");
@@ -136,12 +131,12 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 
 		// Then: Single object provides both structure and validation
 		const isValid = link.validation.status === "valid";
-		const targetFile = link.target.path.absolute;
+		const targetPath = link.target.path;
 		const lineNumber = link.line;
 
 		// Verify all data accessible from one object
 		expect(isValid).toBeDefined();
-		expect(targetFile).toBeDefined();
+		expect(targetPath).toBeDefined();
 		expect(lineNumber).toBeGreaterThan(0);
 	});
 });

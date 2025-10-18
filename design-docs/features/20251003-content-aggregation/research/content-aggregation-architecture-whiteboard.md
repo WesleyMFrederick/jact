@@ -4,7 +4,7 @@ Excellent, that clarification is exactly what I needed. Your vision for supporti
 
 Given these future requirements, I'm revising my recommendation from the Table-Driven Method to the **Strategy Pattern**. It provides the robust extensibility you'll need without much additional upfront complexity.
 
------
+---
 
 ## Revised Recommendation: The Strategy Pattern
 
@@ -12,11 +12,11 @@ The Strategy pattern is now the clear winner because it's designed for exactly t
 
 ### Why It's a Better Fit Now
 
-  * **Extensibility for Flavors**: We can create different sets of strategy objects for "Obsidian" vs. "GitHub" flavors. A factory can assemble the correct set of rules based on a configuration setting, keeping flavor-specific logic cleanly separated.
-  * **Configurability**: A configuration file can easily define which strategy classes to load and in what order, allowing users to customize the extraction precedence without touching the core code.
-  * **Flexibility**: Each strategy is a self-contained module. Adding a new rule (like for a new marker type \`\`) is as simple as adding a new strategy class, which aligns perfectly with the **Extension Over Modification** principle.
+- **Extensibility for Flavors**: We can create different sets of strategy objects for "Obsidian" vs. "GitHub" flavors. A factory can assemble the correct set of rules based on a configuration setting, keeping flavor-specific logic cleanly separated.
+- **Configurability**: A configuration file can easily define which strategy classes to load and in what order, allowing users to customize the extraction precedence without touching the core code.
+- **Flexibility**: Each strategy is a self-contained module. Adding a new rule (like for a new marker type \`\`) is as simple as adding a new strategy class, which aligns perfectly with the **Extension Over Modification** principle.
 
------
+---
 
 ### Example Implementation in Project Context
 
@@ -34,15 +34,15 @@ First, we define a simple contract that every extraction rule must follow. This 
  * Defines the contract for an extraction eligibility rule.
  */
 export class ExtractionStrategy {
-	/**
-	 * Determines if the link is eligible for extraction based on this strategy.
-	 * @param {object} link - The LinkObject from the parser.
-	 * @param {object} cliFlags - CLI flags like { fullFiles: true }.
-	 * @returns {{ eligible: boolean, reason: string } | null} - An eligibility decision or null if the strategy doesn't apply.
-	 */
-	getDecision(link, cliFlags) {
-		return null; // Implement in concrete classes
-	}
+ /**
+  * Determines if the link is eligible for extraction based on this strategy.
+  * @param {object} link - The LinkObject from the parser.
+  * @param {object} cliFlags - CLI flags like { fullFiles: true }.
+  * @returns {{ eligible: boolean, reason: string } | null} - An eligibility decision or null if the strategy doesn't apply.
+  */
+ getDecision(link, cliFlags) {
+  return null; // Implement in concrete classes
+ }
 }
 ```
 
@@ -57,14 +57,14 @@ Next, we implement each rule from FR4 as its own small, testable class. Each cla
 import { ExtractionStrategy } from "./ExtractionStrategy.js";
 
 export class StopMarkerStrategy extends ExtractionStrategy {
-	getDecision(link, cliFlags) {
-		// This strategy ONLY applies if a stop marker exists.
-		if (link.extractionMarker === "stop-extract") {
-			return { eligible: false, reason: "Suppressed by %%stop-extract-link%% marker." };
-		}
-		// If no marker, this strategy doesn't apply, so we return null to pass to the next strategy.
-		return null;
-	}
+ getDecision(link, cliFlags) {
+  // This strategy ONLY applies if a stop marker exists.
+  if (link.extractionMarker === "stop-extract") {
+   return { eligible: false, reason: "Suppressed by %%stop-extract-link%% marker." };
+  }
+  // If no marker, this strategy doesn't apply, so we return null to pass to the next strategy.
+  return null;
+ }
 }
 ```
 
@@ -73,17 +73,17 @@ export class StopMarkerStrategy extends ExtractionStrategy {
 import { ExtractionStrategy } from "./ExtractionStrategy.js";
 
 export class SectionLinkStrategy extends ExtractionStrategy {
-	getDecision(link, cliFlags) {
-		// This is the default rule for any link with an anchor.
-		if (link.anchorType !== null) {
-			return { eligible: true, reason: "Default extraction for section link." };
-		}
-		return null;
-	}
+ getDecision(link, cliFlags) {
+  // This is the default rule for any link with an anchor.
+  if (link.anchorType !== null) {
+   return { eligible: true, reason: "Default extraction for section link." };
+  }
+  return null;
+ }
 }
 ```
 
-*(...and so on for `ForceMarkerStrategy`, `CliFlagStrategy`, etc.)*
+_(...and so on for `ForceMarkerStrategy`, `CliFlagStrategy`, etc.)_
 
 #### 3\. Create the Eligibility Analyzer (The "Context")
 
@@ -98,53 +98,53 @@ import { SectionLinkStrategy } from "./strategies/SectionLinkStrategy.js";
 import { CliFlagStrategy } from "./strategies/CliFlagStrategy.js";
 
 const DEFAULT_ACTION = {
-	eligible: false,
-	reason: "Default behavior for full-file link is to skip.",
+ eligible: false,
+ reason: "Default behavior for full-file link is to skip.",
 };
 
 export class ExtractionEligibility {
-	/**
-	 * @param {ExtractionStrategy[]} strategies - A prioritized array of strategies.
-	 */
-	constructor(strategies) {
-		// The order of this array defines the precedence of the rules.
-		this.strategies = strategies;
-	}
+ /**
+  * @param {ExtractionStrategy[]} strategies - A prioritized array of strategies.
+  */
+ constructor(strategies) {
+  // The order of this array defines the precedence of the rules.
+  this.strategies = strategies;
+ }
 
-	/**
-	 * Determines if a link is eligible for extraction.
-	 * @param {object} link - The LinkObject from the parser.
-	 * @param {object} cliFlags - CLI flags like { fullFiles: true }.
-	 * @returns {{ eligible: boolean, reason: string }}
-	 */
-	getDecision(link, cliFlags = {}) {
-		for (const strategy of this.strategies) {
-			const decision = strategy.getDecision(link, cliFlags);
-			// The first strategy that returns a non-null decision wins.
-			if (decision !== null) {
-				return decision;
-			}
-		}
-		return DEFAULT_ACTION;
-	}
+ /**
+  * Determines if a link is eligible for extraction.
+  * @param {object} link - The LinkObject from the parser.
+  * @param {object} cliFlags - CLI flags like { fullFiles: true }.
+  * @returns {{ eligible: boolean, reason: string }}
+  */
+ getDecision(link, cliFlags = {}) {
+  for (const strategy of this.strategies) {
+   const decision = strategy.getDecision(link, cliFlags);
+   // The first strategy that returns a non-null decision wins.
+   if (decision !== null) {
+    return decision;
+   }
+  }
+  return DEFAULT_ACTION;
+ }
 }
 
 // In the componentFactory, we would assemble the default chain of rules:
 export function createEligibilityAnalyzer() {
-	const defaultStrategies = [
-		new StopMarkerStrategy(),
-		new ForceMarkerStrategy(),
-		new SectionLinkStrategy(),
-		new CliFlagStrategy(),
-	];
-	return new ExtractionEligibility(defaultStrategies);
+ const defaultStrategies = [
+  new StopMarkerStrategy(),
+  new ForceMarkerStrategy(),
+  new SectionLinkStrategy(),
+  new CliFlagStrategy(),
+ ];
+ return new ExtractionEligibility(defaultStrategies);
 }
 ```
 
 This design provides a clear path to supporting your future requirements:
 
-  * **Markdown Flavors**: We can create a `StrategyFactory` that assembles a different array of `strategies` based on a "flavor" setting.
-  * **User Config**: A config file could list the strategies to use, and the factory would instantiate and order them accordingly.
+- **Markdown Flavors**: We can create a `StrategyFactory` that assembles a different array of `strategies` based on a "flavor" setting.
+- **User Config**: A config file could list the strategies to use, and the factory would instantiate and order them accordingly.
 
 ---
 
@@ -152,7 +152,7 @@ We handle different "flavors" of markers by injecting the specific syntax patter
 
 This approach keeps our Strategy classes clean and highly reusable. Here's the step-by-step implementation.
 
------
+---
 
 #### Step 1: Define Flavors as Data
 
@@ -161,21 +161,21 @@ First, we represent the different syntax flavors as a simple configuration objec
 ```javascript
 // A configuration object for different markdown syntaxes
 const MARKER_SYNTAX = {
-	obsidian: {
-		// Uses %%...%% for markers
-		stop: /%%stop-extract-link%%/,
-		force: /%%extract-link%%/,
-	},
-	github: {
-		// Uses for markers
-		stop: //,
-		force: //,
-	},
-	// We can easily add a 'gitlab' flavor here later...
+ obsidian: {
+  // Uses %%...%% for markers
+  stop: /%%stop-extract-link%%/,
+  force: /%%extract-link%%/,
+ },
+ github: {
+  // Uses for markers
+  stop: //,
+  force: //,
+ },
+ // We can easily add a 'gitlab' flavor here later...
 };
 ```
 
------
+---
 
 #### Step 2: Update the Strategy to Accept the Syntax
 
@@ -186,27 +186,27 @@ Next, we modify our Strategy classes to accept the specific syntax pattern in th
 import { ExtractionStrategy } from "./ExtractionStrategy.js";
 
 export class StopMarkerStrategy extends ExtractionStrategy {
-	/**
-	 * @param {RegExp} stopMarkerRegex - The regex pattern to detect a stop marker.
-	 */
-	constructor(stopMarkerRegex) {
-		super();
-		this.stopMarkerRegex = stopMarkerRegex;
-	}
+ /**
+  * @param {RegExp} stopMarkerRegex - The regex pattern to detect a stop marker.
+  */
+ constructor(stopMarkerRegex) {
+  super();
+  this.stopMarkerRegex = stopMarkerRegex;
+ }
 
-	getDecision(link, cliFlags) {
-		// The logic is now generic. It uses the injected regex.
-		if (link.rawText.match(this.stopMarkerRegex)) {
-			return { eligible: false, reason: "Suppressed by stop marker." };
-		}
-		return null;
-	}
+ getDecision(link, cliFlags) {
+  // The logic is now generic. It uses the injected regex.
+  if (link.rawText.match(this.stopMarkerRegex)) {
+   return { eligible: false, reason: "Suppressed by stop marker." };
+  }
+  return null;
+ }
 }
 ```
 
-*Note*: This example assumes the parser provides the raw text surrounding the link in a `link.rawText` property so the strategy can check for adjacent markers.
+_Note_: This example assumes the parser provides the raw text surrounding the link in a `link.rawText` property so the strategy can check for adjacent markers.
 
------
+---
 
 #### Step 3: Use a Factory to Assemble the Correct Strategies
 
@@ -227,16 +227,16 @@ const MARKER_SYNTAX = { /* from Step 1 */ };
  * @returns {ExtractionStrategy[]} An array of configured strategy instances.
  */
 export function createExtractionStrategies(flavor = "obsidian") {
-	const syntax = MARKER_SYNTAX[flavor] || MARKER_SYNTAX.obsidian;
+ const syntax = MARKER_SYNTAX[flavor] || MARKER_SYNTAX.obsidian;
 
-	// The factory assembles the chain of responsibility, injecting the correct syntax.
-	const strategies = [
-		new StopMarkerStrategy(syntax.stop),
-		new ForceMarkerStrategy(syntax.force),
-		// ... other strategies that don't depend on flavor-specific syntax
-	];
+ // The factory assembles the chain of responsibility, injecting the correct syntax.
+ const strategies = [
+  new StopMarkerStrategy(syntax.stop),
+  new ForceMarkerStrategy(syntax.force),
+  // ... other strategies that don't depend on flavor-specific syntax
+ ];
 
-	return strategies;
+ return strategies;
 }
 ```
 
@@ -246,9 +246,9 @@ By combining the **Strategy Pattern** with **Dependency Injection** and a **Fact
 
 We'll leverage the exact same design: use the **Strategy Pattern** to encapsulate the flavor-specific anchor validation logic and inject the correct strategy into the `CitationValidator`.
 
-This keeps our architecture consistent. The `CitationValidator` doesn't need to know *how* to validate an anchor for a specific markdown flavor; it just delegates that task to the strategy it was given.
+This keeps our architecture consistent. The `CitationValidator` doesn't need to know _how_ to validate an anchor for a specific markdown flavor; it just delegates that task to the strategy it was given.
 
------
+---
 
 ## How the Strategy Pattern Applies to Validation
 
@@ -264,25 +264,25 @@ We start with a clear contract for what any anchor validation strategy must do.
  * Defines the contract for an anchor validation rule.
  */
 export class AnchorValidationStrategy {
-	/**
-	 * Checks if a given anchor exists within a list of available anchors from a target file.
-	 * @param {string} searchAnchor - The anchor from the link (e.g., "#my-header").
-	 * @param {object[]} availableAnchors - The full list of AnchorObjects from the parser.
-	 * @returns {{ isValid: boolean, suggestion?: string }} - The validation result.
-	 */
-	validate(searchAnchor, availableAnchors) {
-		throw new Error("Strategy must implement validate method.");
-	}
+ /**
+  * Checks if a given anchor exists within a list of available anchors from a target file.
+  * @param {string} searchAnchor - The anchor from the link (e.g., "#my-header").
+  * @param {object[]} availableAnchors - The full list of AnchorObjects from the parser.
+  * @returns {{ isValid: boolean, suggestion?: string }} - The validation result.
+  */
+ validate(searchAnchor, availableAnchors) {
+  throw new Error("Strategy must implement validate method.");
+ }
 }
 ```
 
------
+---
 
 ### 2\. Implement Flavor-Specific Strategies
 
 Next, we create a concrete class for each flavor, implementing its unique anchor logic.
 
-**Obsidian Strategy (URL-Escaped)**
+**Obsidian Strategy (URL-Escaped)**:
 
 This strategy checks for raw, URL-escaped header text.
 
@@ -291,20 +291,20 @@ This strategy checks for raw, URL-escaped header text.
 import { AnchorValidationStrategy } from "./AnchorValidationStrategy.js";
 
 export class ObsidianAnchorStrategy extends AnchorValidationStrategy {
-	validate(searchAnchor, availableAnchors) {
-		// The parser already provides URL-encoded IDs for Obsidian compatibility
-		const found = availableAnchors.some(anchor => `#${anchor.id}` === searchAnchor);
+ validate(searchAnchor, availableAnchors) {
+  // The parser already provides URL-encoded IDs for Obsidian compatibility
+  const found = availableAnchors.some(anchor => `#${anchor.id}` === searchAnchor);
 
-		if (found) {
-			return { isValid: true };
-		}
-		// ...logic to generate suggestions if not found
-		return { isValid: false, suggestion: "Anchor not found in target document." };
-	}
+  if (found) {
+   return { isValid: true };
+  }
+  // ...logic to generate suggestions if not found
+  return { isValid: false, suggestion: "Anchor not found in target document." };
+ }
 }
 ```
 
-**GitHub Strategy (Kebab-Case)**
+**GitHub Strategy (Kebab-Case)**:
 
 This strategy would generate kebab-case versions of the headers and check against them.
 
@@ -313,27 +313,27 @@ This strategy would generate kebab-case versions of the headers and check agains
 import { AnchorValidationStrategy } from "./AnchorValidationStrategy.js";
 
 export class GitHubAnchorStrategy extends AnchorValidationStrategy {
-	validate(searchAnchor, availableAnchors) {
-		const found = availableAnchors.some(anchor => {
-			if (anchor.anchorType !== 'header') return false;
-			// Convert the header's raw text to kebab-case for comparison
-			const kebabCaseId = this.#toKebabCase(anchor.rawText);
-			return `#${kebabCaseId}` === searchAnchor;
-		});
+ validate(searchAnchor, availableAnchors) {
+  const found = availableAnchors.some(anchor => {
+   if (anchor.anchorType !== 'header') return false;
+   // Convert the header's raw text to kebab-case for comparison
+   const kebabCaseId = this.#toKebabCase(anchor.rawText);
+   return `#${kebabCaseId}` === searchAnchor;
+  });
 
-		if (found) {
-			return { isValid: true };
-		}
-		return { isValid: false, suggestion: "Anchor not found." };
-	}
+  if (found) {
+   return { isValid: true };
+  }
+  return { isValid: false, suggestion: "Anchor not found." };
+ }
 
-	#toKebabCase(text) {
-		return text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
-	}
+ #toKebabCase(text) {
+  return text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+ }
 }
 ```
 
------
+---
 
 ### 3\. Update `CitationValidator` to Use the Strategy
 
@@ -343,30 +343,30 @@ We refactor the `CitationValidator` to accept the strategy via its constructor. 
 // File: tools/citation-manager/src/CitationValidator.js
 
 export class CitationValidator {
-	constructor(parsedFileCache, fileCache, anchorValidationStrategy) {
-		this.parsedFileCache = parsedFileCache;
-		this.fileCache = fileCache;
-		// The validator holds a reference to the injected strategy.
-		this.anchorValidationStrategy = anchorValidationStrategy;
-	}
+ constructor(parsedFileCache, fileCache, anchorValidationStrategy) {
+  this.parsedFileCache = parsedFileCache;
+  this.fileCache = fileCache;
+  // The validator holds a reference to the injected strategy.
+  this.anchorValidationStrategy = anchorValidationStrategy;
+ }
 
-	async validateAnchorExists(anchor, targetFile) {
-		try {
-			const parsed = await this.parsedFileCache.resolveParsedFile(targetFile);
-			
-			// Delegate the validation logic to the injected strategy object.
-			const result = this.anchorValidationStrategy.validate(anchor, parsed.anchors);
-			
-			return { valid: result.isValid, suggestion: result.suggestion };
-		} catch (error) {
-			// ... error handling
-		}
-	}
-	// ... other validator methods
+ async validateAnchorExists(anchor, targetFile) {
+  try {
+   const parsed = await this.parsedFileCache.resolveParsedFile(targetFile);
+   
+   // Delegate the validation logic to the injected strategy object.
+   const result = this.anchorValidationStrategy.validate(anchor, parsed.anchors);
+   
+   return { valid: result.isValid, suggestion: result.suggestion };
+  } catch (error) {
+   // ... error handling
+  }
+ }
+ // ... other validator methods
 }
 ```
 
------
+---
 
 ### 4\. Update the Factory
 
@@ -379,21 +379,21 @@ import { GitHubAnchorStrategy } from '../strategies/GitHubAnchorStrategy.js';
 // ... other imports
 
 export function createCitationValidator(options = {}) {
-	const flavor = options.flavor || 'obsidian'; // Default to obsidian
-	let anchorStrategy;
+ const flavor = options.flavor || 'obsidian'; // Default to obsidian
+ let anchorStrategy;
 
-	// The factory selects the correct strategy based on the flavor.
-	if (flavor === 'github') {
-		anchorStrategy = new GitHubAnchorStrategy();
-	} else {
-		anchorStrategy = new ObsidianAnchorStrategy();
-	}
+ // The factory selects the correct strategy based on the flavor.
+ if (flavor === 'github') {
+  anchorStrategy = new GitHubAnchorStrategy();
+ } else {
+  anchorStrategy = new ObsidianAnchorStrategy();
+ }
 
-	const parsedFileCache = createParsedFileCache();
-	const fileCache = createFileCache();
+ const parsedFileCache = createParsedFileCache();
+ const fileCache = createFileCache();
 
-	// Inject the selected strategy into the validator.
-	return new CitationValidator(parsedFileCache, fileCache, anchorStrategy);
+ // Inject the selected strategy into the validator.
+ return new CitationValidator(parsedFileCache, fileCache, anchorStrategy);
 }
 ```
 
@@ -413,26 +413,26 @@ Here is the recommended implementation sequence.
 
 We'll use a Test-Driven Development (TDD) approach to safely refactor the anchor representation.
 
-### **Step 1 (RED): Update Tests to Expect the New Schema**
+### Step 1 (RED): Update Tests to Expect the New Schema
 
 First, we'll modify our tests to reflect the desired state. These tests will fail, confirming our current implementation is out of date.
 
-* **Action**: In `parser-output-contract.test.js`, update the anchor schema validation test to expect a single `AnchorObject` with both `id` (raw text) and `urlEncodedId` properties, per `US1-6AC1` and `US1-6AC2`.
-* **Action**: Update the `citation-validator.test.js` and `integration/citation-validator-cache.test.js` tests to assert that validation succeeds when a link's anchor matches *either* the `id` or `urlEncodedId` of an anchor in the target file.
+- **Action**: In `parser-output-contract.test.js`, update the anchor schema validation test to expect a single `AnchorObject` with both `id` (raw text) and `urlEncodedId` properties, per `US1-6AC1` and `US1-6AC2`.
+- **Action**: Update the `citation-validator.test.js` and `integration/citation-validator-cache.test.js` tests to assert that validation succeeds when a link's anchor matches _either_ the `id` or `urlEncodedId` of an anchor in the target file.
 
-### **Step 2 (GREEN): Refactor `MarkdownParser`**
+### Step 2 (GREEN): Refactor `MarkdownParser`
 
 Next, we'll modify the parser to produce the new schema, making the updated parser tests pass.
 
-* **Action**: In `MarkdownParser.extractAnchors()`, change the logic to create only one `AnchorObject` per header. This object will contain both the `id` (raw text) and `urlEncodedId` (Obsidian-compatible format) properties.
-* **Validation**: The `parser-output-contract.test.js` suite should now pass.
+- **Action**: In `MarkdownParser.extractAnchors()`, change the logic to create only one `AnchorObject` per header. This object will contain both the `id` (raw text) and `urlEncodedId` (Obsidian-compatible format) properties.
+- **Validation**: The `parser-output-contract.test.js` suite should now pass.
 
-### **Step 3 (GREEN): Refactor `CitationValidator`**
+### Step 3 (GREEN): Refactor `CitationValidator`
 
 Finally, we'll update the validator to consume the new schema, making the validator tests pass.
 
-* **Action**: In `CitationValidator.validateAnchorExists()`, modify the anchor matching logic to check against both the `id` and `urlEncodedId` properties of each `AnchorObject` from the parsed file.
-* **Validation**: The `citation-validator.test.js` and integration tests should now pass. After this step, the full test suite should be passing with zero regressions, satisfying `US1-6AC5`.
+- **Action**: In `CitationValidator.validateAnchorExists()`, modify the anchor matching logic to check against both the `id` and `urlEncodedId` properties of each `AnchorObject` from the parsed file.
+- **Validation**: The `citation-validator.test.js` and integration tests should now pass. After this step, the full test suite should be passing with zero regressions, satisfying `US1-6AC5`.
 
 ---
 
@@ -440,26 +440,25 @@ Finally, we'll update the validator to consume the new schema, making the valida
 
 With the data model now stable and correct, we can cleanly implement the Strategy pattern for handling different markdown flavors.
 
-### **Step 4: Implement the `AnchorValidationStrategy` Pattern**
+### Step 4: Implement the `AnchorValidationStrategy` Pattern
 
 Now we introduce the new architectural pattern, building it on top of our newly refactored data model.
 
-* **Action**: Create the `AnchorValidationStrategy` interface and the concrete `ObsidianAnchorStrategy` as detailed previously. The `ObsidianAnchorStrategy`'s `validate()` method will be written from the start to check against the `id` and `urlEncodedId` fields of the new `AnchorObject` schema.
+- **Action**: Create the `AnchorValidationStrategy` interface and the concrete `ObsidianAnchorStrategy` as detailed previously. The `ObsidianAnchorStrategy`'s `validate()` method will be written from the start to check against the `id` and `urlEncodedId` fields of the new `AnchorObject` schema.
 
-### **Step 5: Refactor `CitationValidator` to Use the Strategy**
+### Step 5: Refactor `CitationValidator` to Use the Strategy
 
 This is now a very simple and clean refactoring.
 
-* **Action**: Replace the internal anchor-matching logic inside `CitationValidator.validateAnchorExists()` with a single, clean delegation to the injected strategy object: `return this.anchorValidationStrategy.validate(searchAnchor, parsed.anchors);`.
+- **Action**: Replace the internal anchor-matching logic inside `CitationValidator.validateAnchorExists()` with a single, clean delegation to the injected strategy object: `return this.anchorValidationStrategy.validate(searchAnchor, parsed.anchors);`.
 
-### **Step 6: Update the Factory**
+### Step 6: Update the Factory
 
 We'll wire everything together in the factory.
 
-* **Action**: Update `createCitationValidator` in `componentFactory.js` to instantiate the default `ObsidianAnchorStrategy` and inject it into the `CitationValidator`'s constructor.
+- **Action**: Update `createCitationValidator` in `componentFactory.js` to instantiate the default `ObsidianAnchorStrategy` and inject it into the `CitationValidator`'s constructor.
 
 By sequencing the work this way, we refactor our data model first and then build the more abstract business-logic patterns on that stable foundation. This is the most efficient path and minimizes the risk of rework.
-
 
 ---
 
@@ -467,9 +466,9 @@ Yes, exactly. We'll create a new user story to properly manage this architectura
 
 We'll treat the work as two distinct, sequential stories:
 
-1.  **US 1.6: Refactor Anchor Schema**: This story will focus *only* on the data model. Its goal is to refactor the `MarkdownParser` to stop creating duplicate anchor entries and for the `CitationValidator` to correctly consume this new, normalized `AnchorObject` schema. This is a prerequisite.
+1. **US 1.6: Refactor Anchor Schema**: This story will focus _only_ on the data model. Its goal is to refactor the `MarkdownParser` to stop creating duplicate anchor entries and for the `CitationValidator` to correctly consume this new, normalized `AnchorObject` schema. This is a prerequisite.
 
-2.  **US 1.7: Refactor Anchor Validation to Use Strategy Pattern**: Once the data model is stable, this new story will introduce the Strategy pattern. Its goal will be to decouple the `CitationValidator` from flavor-specific logic by creating and injecting the appropriate `AnchorValidationStrategy`.
+2. **US 1.7: Refactor Anchor Validation to Use Strategy Pattern**: Once the data model is stable, this new story will introduce the Strategy pattern. Its goal will be to decouple the `CitationValidator` from flavor-specific logic by creating and injecting the appropriate `AnchorValidationStrategy`.
 
 This sequence ensures we're building the new behavioral pattern on a solid data foundation, which is a cleaner, more manageable approach that aligns with our **Data Model First** principle.
 
@@ -485,17 +484,17 @@ The acceptance criteria for US 2.1 are now entirely focused on implementing the 
 
 To ensure we build on a stable foundation and minimize rework, we'll execute these stories in the following order:
 
-1.  **First, US 1.6: Refactor Anchor Schema**
-    * **Goal**: Stabilize the `AnchorObject` data model before anything else.
-    * **Rationale**: This aligns with our **Data Model First** principle. We must have a clean, correct data structure before we build logic that consumes it.
+1. **First, US 1.6: Refactor Anchor Schema**
+    - **Goal**: Stabilize the `AnchorObject` data model before anything else.
+    - **Rationale**: This aligns with our **Data Model First** principle. We must have a clean, correct data structure before we build logic that consumes it.
 
-2.  **Next, US 1.7: Refactor Anchor Validation to Use Strategy Pattern**
-    * **Goal**: Make our core `CitationValidator` component extensible and ready for new "flavors."
-    * **Rationale**: The new `extract` command is required to run validation *before* extraction. By completing this refactoring now, we ensure that the new extraction logic in US 2.1 is calling a stable, well-architected validation component, which reduces integration risk.
+2. **Next, US 1.7: Refactor Anchor Validation to Use Strategy Pattern**
+    - **Goal**: Make our core `CitationValidator` component extensible and ready for new "flavors."
+    - **Rationale**: The new `extract` command is required to run validation _before_ extraction. By completing this refactoring now, we ensure that the new extraction logic in US 2.1 is calling a stable, well-architected validation component, which reduces integration risk.
 
-3.  **Then, US 2.1: Implement Extraction Eligibility using the Strategy Pattern**
-    * **Goal**: Build the new extraction eligibility logic.
-    * **Rationale**: With the data model stable (from US 1.6) and the validation dependency refactored (from US 1.7), we can cleanly build the new `ExtractionStrategy` classes and the `ExtractionEligibility` analyzer to satisfy the acceptance criteria of US 2.1.
+3. **Then, US 2.1: Implement Extraction Eligibility using the Strategy Pattern**
+    - **Goal**: Build the new extraction eligibility logic.
+    - **Rationale**: With the data model stable (from US 1.6) and the validation dependency refactored (from US 1.7), we can cleanly build the new `ExtractionStrategy` classes and the `ExtractionEligibility` analyzer to satisfy the acceptance criteria of US 2.1.
 
 This sequence ensures we address data, then refactor existing components, and finally build new features.
 
@@ -509,9 +508,9 @@ Yes, that's exactly the pattern I recommended. The "Priority Chain" or "Ordered 
 
 The characteristics you outlined are precisely what our design achieves:
 
-* **Priority-Ordered Execution**: Our `createEligibilityAnalyzer` factory will assemble the strategies into an array in a specific, prioritized order (Stop Marker first, etc.). This ensures `%%stop-extract-link%%` is always evaluated before any other rule.
-* **Early Exit on Success**: The `getDecision` method in our `ExtractionEligibility` component will loop through the strategies and return immediately once a strategy provides a non-null decision. This is the "first match wins" logic that mirrors our precedence rules.
-* **Independent Strategies**: Each of our strategy classes (e.g., `StopMarkerStrategy`, `SectionLinkStrategy`) is completely decoupled. They don't know about each other, which makes them simple, reusable, and easy to test.
+- **Priority-Ordered Execution**: Our `createEligibilityAnalyzer` factory will assemble the strategies into an array in a specific, prioritized order (Stop Marker first, etc.). This ensures `%%stop-extract-link%%` is always evaluated before any other rule.
+- **Early Exit on Success**: The `getDecision` method in our `ExtractionEligibility` component will loop through the strategies and return immediately once a strategy provides a non-null decision. This is the "first match wins" logic that mirrors our precedence rules.
+- **Independent Strategies**: Each of our strategy classes (e.g., `StopMarkerStrategy`, `SectionLinkStrategy`) is completely decoupled. They don't know about each other, which makes them simple, reusable, and easy to test.
 
 This pattern gives us the clean separation of the **Strategy pattern** combined with the prioritized, short-circuiting behavior of a **Chain of Responsibility**, without the ceremony of linking handlers together manually.
 
@@ -523,62 +522,62 @@ Excellent questions. You've correctly identified that the new requirements neces
 
 Here is the sequence of component interactions, including the proposed data model refinements to address your concerns.
 
------
+---
 
 ## Step-by-Step Component Workflow for `citation:extract`
 
 The process is a clear pipeline where data is generated, analyzed, and then acted upon. We'll skip the caching layer as requested to focus on the core logic.
 
-### **1. CLI Orchestrator (`citation-manager.js`)**
+### 1. CLI Orchestrator (`citation-manager.js`)
 
 The user runs `npm run citation:extract <file> [--full-files]`. The orchestrator is the entry point and manages the entire workflow.
 
-  * **Internal Call 1 (Validation)**: First, it instantiates and calls the `CitationValidator` to validate all links in the source file. This is a new requirement from **FR7** and acts as a quality gate before any content is extracted.
-  * **Internal Call 2 (Parsing)**: It requests the parsed data for the source file from the `MarkdownParser`.
+- **Internal Call 1 (Validation)**: First, it instantiates and calls the `CitationValidator` to validate all links in the source file. This is a new requirement from **FR7** and acts as a quality gate before any content is extracted.
+- **Internal Call 2 (Parsing)**: It requests the parsed data for the source file from the `MarkdownParser`.
 
-### **2. MarkdownParser (`MarkdownParser.js`)**
+### 2. MarkdownParser (`MarkdownParser.js`)
 
 The parser's role is to analyze the raw markdown and produce a structured object. To support the new requirements, its responsibilities are now enhanced.
 
-  * **Action (Schema Enhancement)**: As it extracts each `LinkObject`, it will now also scan the immediate context of the link for extraction markers (`%%...%%` or \`\`). It adds this information to the `LinkObject`.
-  * **Action (Anchor Enhancement)**: For block anchors (`^...`), the parser will now capture the **entire line of raw text** where the anchor is found and store it in the `AnchorObject`.
-  * **Output**: It returns the refined `Parser Output Contract`.
+- **Action (Schema Enhancement)**: As it extracts each `LinkObject`, it will now also scan the immediate context of the link for extraction markers (`%%...%%` or \`\`). It adds this information to the `LinkObject`.
+- **Action (Anchor Enhancement)**: For block anchors (`^...`), the parser will now capture the **entire line of raw text** where the anchor is found and store it in the `AnchorObject`.
+- **Output**: It returns the refined `Parser Output Contract`.
 
-### **3. ExtractionEligibility Analyzer (`ExtractionEligibility.js`)**
+### 3. ExtractionEligibility Analyzer (`ExtractionEligibility.js`)
 
 This is the "brain" of the operation. It's a new, stateless component that implements the **Priority Chain (Strategy)** pattern we discussed.
 
-  * **Input**: It receives the list of refined `LinkObject`s from the parser's output, along with the state of the `--full-files` CLI flag.
-  * **Internal Call**: It iterates through its prioritized list of strategies (e.g., `StopMarkerStrategy`, `SectionLinkStrategy`). For each link, it finds the first strategy that applies and gets a decision.
-  * **Output**: It produces a list of **Extraction Jobs**. Each job contains the original link, a decision (`eligible: true/false`), and the **reason** for that decision, fulfilling **FR5**.
+- **Input**: It receives the list of refined `LinkObject`s from the parser's output, along with the state of the `--full-files` CLI flag.
+- **Internal Call**: It iterates through its prioritized list of strategies (e.g., `StopMarkerStrategy`, `SectionLinkStrategy`). For each link, it finds the first strategy that applies and gets a decision.
+- **Output**: It produces a list of **Extraction Jobs**. Each job contains the original link, a decision (`eligible: true/false`), and the **reason** for that decision, fulfilling **FR5**.
 
-### **4. ContentExtractor (`ContentExtractor.js`)**
+### 4. ContentExtractor (`ContentExtractor.js`)
 
 This component is the "worker" that performs the mechanical task of extraction.
 
-  * **Input**: It receives a single, approved `ExtractionJob` from the orchestrator.
-  * **Internal Call**: It uses the `ParsedFileCache` to get the parsed data for the target file specified in the job.
-  * **Action**: It uses the logic from our validated POCs to extract the content—either the entire file or a specific section/block.
-  * **Output**: It returns a `ContentBlock` object containing the extracted text and the necessary metadata for attribution, satisfying `US2-2AC5`.
+- **Input**: It receives a single, approved `ExtractionJob` from the orchestrator.
+- **Internal Call**: It uses the `ParsedFileCache` to get the parsed data for the target file specified in the job.
+- **Action**: It uses the logic from our validated POCs to extract the content—either the entire file or a specific section/block.
+- **Output**: It returns a `ContentBlock` object containing the extracted text and the necessary metadata for attribution, satisfying `US2-2AC5`.
 
-### **5. Aggregator (within `citation-manager.js`)**
+### 5. Aggregator (within `citation-manager.js`)
 
 The final step is performed by the orchestrator.
 
-  * **Action**: It loops through the `ContentBlock`s returned by the `ContentExtractor`. For each block, it uses the metadata to write a formatted header (`## File: path/to/source.md#Section`) and then appends the extracted content to the output file, fulfilling **FR6**.
+- **Action**: It loops through the `ContentBlock`s returned by the `ContentExtractor`. For each block, it uses the metadata to write a formatted header (`## File: path/to/source.md#Section`) and then appends the extracted content to the output file, fulfilling **FR6**.
 
------
+---
 
 ## Refining the Data Contracts
 
 Your observations are correct. We need to refine our data models to be more efficient and capture all necessary information.
 
-### **`LinkObject` Enhancement**
+### `LinkObject` Enhancement
 
 To handle the new line-level markers, we'll add a property to the `LinkObject` schema.
 
-  * **BEFORE**: The `LinkObject` only knew about the link itself.
-  * **AFTER**: The `LinkObject` will include the extraction marker found near it.
+- **BEFORE**: The `LinkObject` only knew about the link itself.
+- **AFTER**: The `LinkObject` will include the extraction marker found near it.
 
 <!-- end list -->
 
@@ -598,12 +597,12 @@ To handle the new line-level markers, we'll add a property to the `LinkObject` s
 
 This new `extractionMarker` property (with values like `'stop-extract'`, `'force-extract'`, or `null`) provides the necessary input for the `ExtractionEligibility` analyzer.
 
-### **`AnchorObject` Enhancement**
+### `AnchorObject` Enhancement
 
 To address your point about block anchors, we will enrich the `AnchorObject` schema.
 
-  * **BEFORE**: The `AnchorObject` for a block reference had `rawText: null`.
-  * **AFTER**: The `rawText` property will now contain the full line of text the block anchor belongs to.
+- **BEFORE**: The `AnchorObject` for a block reference had `rawText: null`.
+- **AFTER**: The `rawText` property will now contain the full line of text the block anchor belongs to.
 
 <!-- end list -->
 

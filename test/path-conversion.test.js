@@ -103,15 +103,15 @@ describe("Path Conversion Suggestion Integration", () => {
 			);
 
 			const result = JSON.parse(output);
-			const warningResults = result.results.filter(
-				(r) => r.status === "warning",
+			const warningResults = result.links.filter(
+				(r) => r.validation.status === "warning",
 			);
 
 			expect(warningResults.length).toBeGreaterThan(0);
 
 			// Find the specific warning citation that should have conversion suggestions
 			const conversionWarning = warningResults.find((r) =>
-				r.citation.includes("../wrong-path/warning-test-target.md"),
+				r.fullMatch.includes("../wrong-path/warning-test-target.md"),
 			);
 
 			expect(conversionWarning).toBeTruthy();
@@ -252,8 +252,8 @@ describe("Path Conversion Validation Result Structure", () => {
 			);
 
 			const result = JSON.parse(output);
-			const warningResults = result.results.filter(
-				(r) => r.status === "warning",
+			const warningResults = result.links.filter(
+				(r) => r.validation.status === "warning",
 			);
 
 			if (warningResults.length > 0) {

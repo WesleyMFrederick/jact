@@ -948,9 +948,12 @@ This duplication violates the **One Source of Truth** and **Illegal States Unrep
 **Status**: ✅ RESOLVED (2025-10-09) - Ready for Epic 2 ContentExtractor implementation
 %%
 
+%%
 ### Data Duplication Between LinkObject and ValidationResult
 
 **Risk Category**: Data Model / Performance / Architecture
+
+**Status**: ✅ RESOLVED (2025-10-18) - Implementation Complete, QA Validation Pending (Task 4.5)
 
 **Description**: The current architecture creates separate data structures for parser output (`LinkObject`) and validation results (`ValidationResult`), leading to 80% data duplication. LinkObject stores structural data (linkType, line, column, fullMatch, target path/anchor), while ValidationResult stores the same structural data plus validation status, error messages, and suggestions.
 
@@ -1002,7 +1005,31 @@ This duplication violates the **One Source of Truth** and **Illegal States Unrep
 
 **Architecture Decision**: [ADR: Validation Enrichment Pattern](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Architectural%20Decision%20Validation%20Enrichment%20Pattern) (2025-10-17)
 
-**Status**: 🔲 To Be Resolved (US1.8 implementation pending)
+**Resolution Date**: 2025-10-18 (Implementation Complete)
+
+**Implementation Summary**:
+- Refactored `CitationValidator.validateFile()` to return `{ summary, links }` structure with enriched LinkObjects
+- Added `validation` property to LinkObject instances with `{ status, error?, suggestion?, pathConversion? }` metadata
+- Implemented progressive enhancement pattern: base LinkObject from parser + validation metadata from validator
+- Updated CLI orchestrator to consume new ValidationResult structure for reporting
+- Migrated complete test suite to enriched structure (121/123 tests passing, 2 failures unrelated to US1.8)
+
+**Verification**:
+- CitationValidator.js (lines 162-213): validateFile() returns { summary, links } with enrichment pattern
+- JSDoc type annotations added (lines 4-48): EnrichedLinkObject, ValidationResult schemas
+- Test status: 121/123 passing (98.4%), zero regressions from US1.8 changes
+- Files modified: src/CitationValidator.js, src/citation-manager.js, 6+ test files
+- US1.8 tasks 1.1-4.2 complete (implementation phase done)
+
+**Pending**:
+- Formal QA validation (Task 4.5) - comprehensive AC validation
+- Documentation updates (Tasks 5.1-5.3) - component guides, architecture diagrams
+
+**References**:
+- Implementation: tools/citation-manager/src/CitationValidator.js:162-213
+- Story: [US1.8 Implement Validation Enrichment Pattern](user-stories/us1.8-implement-validation-enrichment-pattern/us1.8-implement-validation-enrichment-pattern.md)
+- ADR: [Validation Enrichment Pattern](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Architectural%20Decision%20Validation%20Enrichment%20Pattern)
+%%
 
 ### Scattered File I/O Operations
 
@@ -1148,35 +1175,84 @@ Refactor CitationValidator helper methods (`suggestObsidianBetterFormat()`, `fin
 **Timeline**: Revisit after MVP validation shows repetitive CLI usage patterns across projects.
 **Status**: Backlog (deferred from Epic 2 MVP scope).
 
-### Test Suite Edge Cases (CLI Display and URL Encoding)
+### Test Suite Edge Cases (CLI Display and POC Features)
 
 **Risk Category**: Quality / Testing
 
-**Description**: 7 tests in the citation manager test suite fail with pre-existing edge case issues unrelated to core functionality. These failures represent technical debt in CLI display formatting and URL-encoded anchor handling that accumulated before US1.5 implementation.
+**Description**: 2 tests in the citation manager test suite fail with pre-existing edge case issues unrelated to core functionality. These failures represent technical debt in auto-fix feature completeness and POC section extraction implementation.
 
 **Failing Tests**:
-1. **CLI Warning Output Formatting** (3 tests) - Display logic issues in warning section formatting
-2. **URL-Encoded Anchor Handling** (3 tests) - Edge case in anchor matching when anchors contain URL-encoded characters (e.g., spaces as `%20`)
-3. **Wiki-Style Link Classification** (1 test) - Edge case in pattern detection for wiki-style links
+1. **Auto-Fix Kebab-Case Anchor Conversion** (1 test) - Auto-fix feature does not convert kebab-case anchors to URL-encoded format (e.g., `#sample-header` → `#Sample%20Header`)
+2. **POC Section Extraction H4 Support** (1 test) - POC section extraction logic returns null when extracting H4 sections
 
 **Impact**:
-- **Low**: Core functionality works correctly. Issues affect edge cases in display formatting and specific anchor encoding patterns.
-- **Scope**: Affects CLI display logic and anchor matching edge cases
-- **Test Suite Status**: 44/51 tests passing (86%)
+- **Low**: Core functionality works correctly. Auto-fix handles path corrections but not anchor format normalization. POC feature affects only proof-of-concept code, not production validation.
+- **Scope**: Affects auto-fix feature completeness and POC section extraction edge cases
+- **Test Suite Status**: 121/123 tests passing (98.4%)
 
-**Rationale for Accepting Risk**: These edge case failures were identified during US1.5 validation but are unrelated to cache implementation. All schema validation tests (8/8) pass, confirming Phase 1 parser contract objectives met. Core parsing and validation functionality works correctly.
+**Current State**:
+- **US1.8 Validation Enrichment Pattern**: Implementation complete with zero regressions (121/123 passing)
+- **Unrelated Failures**: Both failures existed before US1.8 and are unrelated to validation enrichment changes
 
-**Mitigation Strategy**: Create dedicated user story to address edge cases in CLI warning display formatting and URL-encoded anchor handling.
+**Rationale for Accepting Risk**: These edge case failures are isolated to feature extensions (auto-fix anchor transformation, POC section extraction) and do not affect core validation functionality. All schema validation tests pass, all enrichment pattern tests pass, zero functional regressions from recent changes.
+
+**Mitigation Strategy**: Create dedicated user stories to address:
+1. Auto-fix anchor format transformation support
+2. POC section extraction H4 heading level support
 
 **Resolution Criteria**:
-- All 7 failing tests updated or refactored to pass
-- CLI warning output formatting matches expected format
-- URL-encoded anchors (e.g., spaces as `%20`) handled correctly in anchor matching
-- Wiki-style link classification edge cases resolved
+- Auto-fix feature converts kebab-case anchors to appropriate format
+- POC section extraction handles H4 sections correctly
+- All 123 tests passing
 
 **Timeline**: Low priority - address after Epic 2 Content Aggregation implementation complete.
-**Estimated Effort**: 2-3 tasks, ~4-6 hours total
+**Estimated Effort**: 1-2 tasks, ~2-4 hours total
 **Status**: Documented technical debt, low priority.
+
+### CLI Subprocess Testing Buffer Limits
+
+**Risk Category**: Testing Infrastructure / Architecture
+
+**Status**: Workaround Implemented (2025-10-18) - Refactoring Recommended
+
+**Description**: The current CLI integration testing pattern spawns the CLI as a subprocess using `execSync()`, which creates OS-level stdio pipes with ~64KB buffer limits on macOS. When CLI output exceeds this limit (e.g., large JSON validation results with 100+ citations producing 92KB+ output), data gets truncated, resulting in malformed JSON and test failures.
+
+**Root Cause**: Node.js `child_process` stdio pipes are subject to OS-level buffer limits (~64KB on macOS). Tests that spawn the CLI as a subprocess encounter these limits, while production CLI usage (writing directly to terminal stdout) is not affected.
+
+**Impact**:
+- **Medium**: Tests use different execution path than production code, requiring special workarounds
+- **Complexity**: Shell redirection to temporary files adds infrastructure complexity
+- **Debugging**: Subprocess spawning makes debugging more difficult
+- **Scope**: Affects all CLI integration tests that spawn subprocesses
+
+**Current Workaround**: Shell redirection to temporary files (`test/helpers/cli-runner.js`) bypasses pipe buffers by writing output to filesystem before reading. This works but adds complexity and maintenance overhead.
+
+**Recommended Mitigation**: Refactor tests to import CLI functions directly instead of spawning subprocesses:
+- Export `validateFile()`, `formatAsJSON()` from CLI Orchestrator component
+- Import functions directly in tests (no subprocess spawning)
+- Reserve subprocess testing for true E2E scenarios (argument parsing, exit codes)
+- Aligns test architecture with production architecture (both use same code path)
+
+**Benefits of Refactoring**:
+- ✅ No buffer limits (in-memory objects, not piped output)
+- ✅ Faster tests (no subprocess overhead)
+- ✅ Simpler debugging (same process, can use debugger)
+- ✅ Tests match production code paths
+- ✅ Eliminates workaround complexity
+
+**Resolution Criteria**:
+- CLI Orchestrator exports testable functions (`validateFile()`, `formatAsJSON()`)
+- 99% of tests import functions directly (unit/integration tests)
+- 1% of tests use subprocess spawning (E2E CLI behavior tests)
+- Remove or simplify `cli-runner.js` helper
+
+**Timeline**: Implement when adding more CLI integration tests or hitting other subprocess-related issues.
+**Estimated Effort**: 8-12 hours (1-2 days)
+**Priority**: Medium - current workaround functional but adds complexity
+
+**References**:
+- **Detailed Analysis**: [Bug 3: Buffer Limit Resolution](user-stories/us1.8-implement-validation-enrichment-pattern/bug3-buffer-limit-resolution.md)
+- **Workspace Architecture**: [Technical Debt: CLI Subprocess Testing Buffer Limits](../../../../../design-docs/Architecture%20-%20Baseline.md#Technical%20Debt%20CLI%20Subprocess%20Testing%20Buffer%20Limits)
 
 ## Architecture Decision Records (ADRs)
 

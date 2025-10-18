@@ -17,15 +17,15 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 		const result = await validator.validateFile(testFile);
 
 		// Then: Validation succeeds via ParsedDocument.hasAnchor() facade method
-		// Find result for link using raw format (should be validated via hasAnchor())
-		const rawFormatResult = result.results.find(
-			(r) =>
-				r.citation ===
+		// Find enriched link for link using raw format (should be validated via hasAnchor())
+		const rawFormatLink = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
 		);
 
-		expect(rawFormatResult).toBeDefined();
-		expect(rawFormatResult.status).toBe("valid");
+		expect(rawFormatLink).toBeDefined();
+		expect(rawFormatLink.validation.status).toBe("valid");
 
 		// Verify summary counts - should have valid citations
 		expect(result.summary.total).toBeGreaterThan(0);
@@ -42,19 +42,22 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 		const result = await validator.validateFile(testFile);
 
 		// Then: Error includes suggestion generated via ParsedDocument.findSimilarAnchors()
-		const brokenLinkResult = result.results.find(
-			(r) =>
-				r.citation ===
+		const brokenLinkObject = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link to non-existent anchor](anchor-matching.md#NonExistent)",
 		);
 
-		expect(brokenLinkResult).toBeDefined();
-		expect(brokenLinkResult.status).toBe("error");
-		expect(brokenLinkResult.error).toContain("Anchor not found");
+		expect(brokenLinkObject).toBeDefined();
+		expect(brokenLinkObject.validation.status).toBe("error");
+		expect(brokenLinkObject.validation.error).toContain("Anchor not found");
 
 		// Verify suggestion was provided (comes from findSimilarAnchors())
 		// Note: The suggestion format may include multiple anchor suggestions
-		expect(brokenLinkResult.error || brokenLinkResult.suggestion).toBeDefined();
+		expect(
+			brokenLinkObject.validation.error ||
+				brokenLinkObject.validation.suggestion,
+		).toBeDefined();
 	});
 
 	it("should validate both raw and URL-encoded anchor formats", async () => {
@@ -69,22 +72,22 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 		// The hasAnchor() method should check both id and urlEncodedId properties
 
 		// Raw format link
-		const rawResult = result.results.find(
-			(r) =>
-				r.citation ===
+		const rawLink = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
 		);
-		expect(rawResult).toBeDefined();
-		expect(rawResult.status).toBe("valid");
+		expect(rawLink).toBeDefined();
+		expect(rawLink.validation.status).toBe("valid");
 
 		// URL-encoded format link
-		const encodedResult = result.results.find(
-			(r) =>
-				r.citation ===
+		const encodedLink = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link using URL-encoded format](anchor-matching.md#Story%201.5%20Implement%20Cache)",
 		);
-		expect(encodedResult).toBeDefined();
-		expect(encodedResult.status).toBe("valid");
+		expect(encodedLink).toBeDefined();
+		expect(encodedLink.validation.status).toBe("valid");
 
 		// Both should reference the same anchor object in the target document
 		// This validates that hasAnchor() correctly checks both ID fields
@@ -102,38 +105,39 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 
 		// Then: Results match expected pre-refactoring behavior
 		// Valid citations file - all should pass
-		expect(validResult.file).toBe(validCitationsFile);
 		expect(validResult.summary.total).toBeGreaterThan(0);
 		expect(validResult.summary.valid).toBe(validResult.summary.total);
 		expect(validResult.summary.errors).toBe(0);
 
-		// Verify all individual results are valid
-		for (const citation of validResult.results) {
-			expect(citation.status).toBe("valid");
+		// Verify all enriched links are valid
+		for (const link of validResult.links) {
+			expect(link.validation.status).toBe("valid");
 		}
 
 		// Broken links file - should detect errors
-		expect(brokenResult.file).toBe(brokenLinksFile);
 		expect(brokenResult.summary.total).toBeGreaterThan(0);
 		expect(brokenResult.summary.errors).toBeGreaterThan(0);
 
-		// Verify error results have proper error messages
-		const errorResults = brokenResult.results.filter((r) => r.status === "error");
-		expect(errorResults.length).toBe(brokenResult.summary.errors);
+		// Verify error links have proper error messages
+		const errorLinks = brokenResult.links.filter(
+			(link) => link.validation.status === "error",
+		);
+		expect(errorLinks.length).toBe(brokenResult.summary.errors);
 
-		for (const errorResult of errorResults) {
-			expect(errorResult.error).toBeDefined();
-			expect(typeof errorResult.error).toBe("string");
-			expect(errorResult.error.length).toBeGreaterThan(0);
+		for (const errorLink of errorLinks) {
+			expect(errorLink.validation.error).toBeDefined();
+			expect(typeof errorLink.validation.error).toBe("string");
+			expect(errorLink.validation.error.length).toBeGreaterThan(0);
 		}
 
-		// Verify result structure consistency (behavioral equivalence)
-		for (const citation of [...validResult.results, ...brokenResult.results]) {
-			expect(citation).toHaveProperty("line");
-			expect(citation).toHaveProperty("citation");
-			expect(citation).toHaveProperty("status");
-			expect(citation).toHaveProperty("linkType");
-			expect(citation).toHaveProperty("scope");
+		// Verify enriched link structure consistency
+		for (const link of [...validResult.links, ...brokenResult.links]) {
+			expect(link).toHaveProperty("line");
+			expect(link).toHaveProperty("target");
+			expect(link).toHaveProperty("validation");
+			expect(link.validation).toHaveProperty("status");
+			expect(link).toHaveProperty("linkType");
+			expect(link).toHaveProperty("scope");
 		}
 	});
 });

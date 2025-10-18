@@ -17,13 +17,13 @@ describe("CitationValidator Anchor Matching with Dual IDs", () => {
 		const result = await validator.validateFile(testFile);
 
 		// Then: Validation succeeds (finds anchor by id field)
-		const linkResult = result.results.find(
-			(r) =>
-				r.citation ===
+		const linkObject = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
 		);
-		expect(linkResult).toBeDefined();
-		expect(linkResult.status).toBe("valid");
+		expect(linkObject).toBeDefined();
+		expect(linkObject.validation.status).toBe("valid");
 	});
 
 	it("should match anchor using URL-encoded ID format", async () => {
@@ -35,13 +35,13 @@ describe("CitationValidator Anchor Matching with Dual IDs", () => {
 		const result = await validator.validateFile(testFile);
 
 		// Then: Validation succeeds (finds anchor by urlEncodedId field)
-		const linkResult = result.results.find(
-			(r) =>
-				r.citation ===
+		const linkObject = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link using URL-encoded format](anchor-matching.md#Story%201.5%20Implement%20Cache)",
 		);
-		expect(linkResult).toBeDefined();
-		expect(linkResult.status).toBe("valid");
+		expect(linkObject).toBeDefined();
+		expect(linkObject.validation.status).toBe("valid");
 	});
 
 	it("should match both ID formats to same anchor object", async () => {
@@ -53,21 +53,21 @@ describe("CitationValidator Anchor Matching with Dual IDs", () => {
 		const result = await validator.validateFile(testFile);
 
 		// Then: Both succeed (both match SAME underlying anchor)
-		const rawResult = result.results.find(
-			(r) =>
-				r.citation ===
+		const rawLink = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
 		);
-		const encodedResult = result.results.find(
-			(r) =>
-				r.citation ===
+		const encodedLink = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link using URL-encoded format](anchor-matching.md#Story%201.5%20Implement%20Cache)",
 		);
 
-		expect(rawResult).toBeDefined();
-		expect(rawResult.status).toBe("valid");
-		expect(encodedResult).toBeDefined();
-		expect(encodedResult.status).toBe("valid");
+		expect(rawLink).toBeDefined();
+		expect(rawLink.validation.status).toBe("valid");
+		expect(encodedLink).toBeDefined();
+		expect(encodedLink.validation.status).toBe("valid");
 		// Both should reference same anchor object in parsed data
 	});
 
@@ -80,13 +80,13 @@ describe("CitationValidator Anchor Matching with Dual IDs", () => {
 		const result = await validator.validateFile(testFile);
 
 		// Then: Validation fails with suggestions
-		const linkResult = result.results.find(
-			(r) =>
-				r.citation ===
+		const linkObject = result.links.find(
+			(link) =>
+				link.fullMatch ===
 				"[Link to non-existent anchor](anchor-matching.md#NonExistent)",
 		);
-		expect(linkResult).toBeDefined();
-		expect(linkResult.status).toBe("error");
-		expect(linkResult.error).toContain("Anchor not found");
+		expect(linkObject).toBeDefined();
+		expect(linkObject.validation.status).toBe("error");
+		expect(linkObject.validation.error).toContain("Anchor not found");
 	});
 });

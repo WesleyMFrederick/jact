@@ -29,13 +29,13 @@ describe("Enhanced Citation Pattern Tests", () => {
 		// Should find all citations (some will have validation errors due to missing files, but parsing should work)
 		expect(result.summary.total).toBeGreaterThanOrEqual(10);
 
-		// Check for specific citation types
-		const citations = result.results;
+		// Check for specific citation types - use enriched links
+		const citations = result.links;
 
 		// Should find cross-document links with anchors
 		const withAnchors = citations.filter(
 			(c) =>
-				c.scope === "cross-document" && c.citation.includes("#auth-service"),
+				c.scope === "cross-document" && c.fullMatch.includes("#auth-service"),
 		);
 		expect(withAnchors.length).toBeGreaterThan(0);
 
@@ -43,15 +43,15 @@ describe("Enhanced Citation Pattern Tests", () => {
 		const withoutAnchors = citations.filter(
 			(c) =>
 				c.scope === "cross-document" &&
-				(c.citation.includes("test-target.md)") ||
-					c.citation.includes("another-file.md)") ||
-					c.citation.includes("setup-guide.md)")) &&
-				!c.citation.includes("#"),
+				(c.fullMatch.includes("test-target.md)") ||
+					c.fullMatch.includes("another-file.md)") ||
+					c.fullMatch.includes("setup-guide.md)")) &&
+				!c.fullMatch.includes("#"),
 		);
 		expect(withoutAnchors.length).toBeGreaterThan(0);
 
 		// Should find cite format
-		const citeFormat = citations.filter((c) => c.citation.includes("[cite:"));
+		const citeFormat = citations.filter((c) => c.fullMatch.includes("[cite:"));
 		expect(citeFormat.length).toBeGreaterThanOrEqual(3);
 
 		// Should find caret references
@@ -122,7 +122,7 @@ describe("Enhanced Citation Pattern Tests", () => {
 		const result = JSON.parse(output);
 
 		// Find the line with mixed patterns (should be around line 24)
-		const mixedLineCitations = result.results.filter((c) => c.line === 24);
+		const mixedLineCitations = result.links.filter((c) => c.line === 24);
 
 		// Should find both standard link and cite format on the same line
 		expect(mixedLineCitations.length).toBeGreaterThanOrEqual(2);
@@ -130,10 +130,10 @@ describe("Enhanced Citation Pattern Tests", () => {
 		// Should include both pattern types
 		const hasStandardLink = mixedLineCitations.some(
 			(c) =>
-				c.citation.includes("[Standard Link](") && c.scope === "cross-document",
+				c.fullMatch.includes("[Standard Link](") && c.scope === "cross-document",
 		);
 		const hasCiteFormat = mixedLineCitations.some(
-			(c) => c.citation.includes("[cite:") && c.scope === "cross-document",
+			(c) => c.fullMatch.includes("[cite:") && c.scope === "cross-document",
 		);
 
 		expect(hasStandardLink).toBe(true);
@@ -159,32 +159,32 @@ describe("Enhanced Citation Pattern Tests", () => {
 		const result = JSON.parse(output);
 
 		// Should find wiki-style cross-document links
-		const wikiCrossDoc = result.results.filter(
-			(c) => c.scope === "cross-document" && c.citation.startsWith("[["),
+		const wikiCrossDoc = result.links.filter(
+			(c) => c.scope === "cross-document" && c.fullMatch.startsWith("[["),
 		);
 		expect(wikiCrossDoc.length).toBeGreaterThan(0);
 
 		// Should validate file existence - valid links to test-target.md
 		const validLinks = wikiCrossDoc.filter(
-			(c) => c.status === "valid" && c.citation.includes("test-target.md"),
+			(c) => c.validation.status === "valid" && c.fullMatch.includes("test-target.md"),
 		);
 		expect(validLinks.length).toBeGreaterThan(0);
 
 		// Should catch broken file references
 		const brokenFile = wikiCrossDoc.find((c) =>
-			c.citation.includes("nonexistent.md"),
+			c.fullMatch.includes("nonexistent.md"),
 		);
 		expect(brokenFile).toBeDefined();
-		expect(brokenFile.status).toBe("error");
+		expect(brokenFile.validation.status).toBe("error");
 
 		// Should catch directory references (isFile() validation)
 		// Note: Directory references like [[../fixtures#anchor]] may not be detected
 		// by the citation parser if they use relative parent paths
 		const dirReference = wikiCrossDoc.find((c) =>
-			c.citation.includes("../fixtures"),
+			c.fullMatch.includes("../fixtures"),
 		);
 		if (dirReference) {
-			expect(dirReference.status).toBe("error");
+			expect(dirReference.validation.status).toBe("error");
 		}
 		// If directory reference not detected, that's acceptable - just verify other validations work
 	});

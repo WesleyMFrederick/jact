@@ -18,15 +18,19 @@ describe("Component Integration", () => {
 			const result = await validator.validateFile(testFile);
 
 			// Then: Validation succeeds with expected citation count
-			expect(result.file).toBe(testFile);
 			expect(result.summary.total).toBeGreaterThan(0);
 			expect(result.summary.valid).toBe(result.summary.total);
 			expect(result.summary.errors).toBe(0);
-			expect(result.results).toBeInstanceOf(Array);
-			expect(result.results.length).toBe(result.summary.total);
-			// Verify all results have valid status
-			for (const citation of result.results) {
-				expect(citation.status).toBe("valid");
+			expect(result.links).toBeInstanceOf(Array);
+			expect(result.links.length).toBe(result.summary.total);
+			// Verify all enriched links have valid status in validation property
+			for (const link of result.links) {
+				expect(link.validation).toBeDefined();
+				expect(link.validation.status).toBe("valid");
+				// Verify LinkObject base properties remain intact
+				expect(link.linkType).toBeDefined();
+				expect(link.line).toBeDefined();
+				expect(link.target).toBeDefined();
 			}
 		});
 
@@ -39,16 +43,15 @@ describe("Component Integration", () => {
 			const result = await validator.validateFile(testFile);
 
 			// Then: Component collaboration detects errors
-			expect(result.file).toBe(testFile);
 			expect(result.summary.total).toBeGreaterThan(0);
 			expect(result.summary.errors).toBeGreaterThan(0);
-			// Verify that errors are properly detected
-			const errorResults = result.results.filter((r) => r.status === "error");
-			expect(errorResults.length).toBe(result.summary.errors);
+			// Verify that errors are properly detected in enriched links
+			const errorLinks = result.links.filter((link) => link.validation.status === "error");
+			expect(errorLinks.length).toBe(result.summary.errors);
 			// Verify error messages are populated
-			for (const errorResult of errorResults) {
-				expect(errorResult.error).toBeDefined();
-				expect(typeof errorResult.error).toBe("string");
+			for (const errorLink of errorLinks) {
+				expect(errorLink.validation.error).toBeDefined();
+				expect(typeof errorLink.validation.error).toBe("string");
 			}
 		});
 
@@ -61,20 +64,20 @@ describe("Component Integration", () => {
 			const result = await validator.validateFile(testFile);
 
 			// Then: Cache-assisted validation succeeds
-			expect(result.file).toBe(testFile);
 			expect(result.summary.total).toBeGreaterThan(0);
 			// Verify cache can resolve valid citations
-			const validResults = result.results.filter(
-				(r) => r.status === "valid" || r.status === "warning",
+			const validLinks = result.links.filter(
+				(link) => link.validation.status === "valid" || link.validation.status === "warning",
 			);
-			expect(validResults.length).toBeGreaterThan(0);
-			// Verify component collaboration through result structure
-			for (const citation of result.results) {
-				expect(citation).toHaveProperty("line");
-				expect(citation).toHaveProperty("citation");
-				expect(citation).toHaveProperty("status");
-				expect(citation).toHaveProperty("linkType");
-				expect(citation).toHaveProperty("scope");
+			expect(validLinks.length).toBeGreaterThan(0);
+			// Verify component collaboration through enriched link structure
+			for (const link of result.links) {
+				expect(link).toHaveProperty("line");
+				expect(link).toHaveProperty("target");
+				expect(link).toHaveProperty("validation");
+				expect(link.validation).toHaveProperty("status");
+				expect(link).toHaveProperty("linkType");
+				expect(link).toHaveProperty("scope");
 			}
 		});
 	});
