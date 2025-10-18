@@ -6,7 +6,7 @@ task-id: "2.1"
 task-anchor: "#^US1-8T2-1"
 wave: "2"
 implementation-agent: "code-developer"
-status: "ready"
+status: "Done"
 ---
 
 # Task 2.1: Implement Link Enrichment Logic in CitationValidator
@@ -233,13 +233,17 @@ No debug logs generated. Implementation was straightforward refactoring.
 
 ### Completion Notes
 
-Successfully refactored `validateFile()` method to implement progressive enhancement pattern. Changed from creating separate validation results array to enriching LinkObjects in-place with validation metadata. All success criteria met:
+RE-EXECUTION: Fixed missing `file` property in return object. Previous implementation was incomplete - validateFile() was returning `{ summary, links }` instead of `{ file, summary, links }`.
 
-- Return structure changed from `{ file, summary, results }` to `{ file, summary, links }`
-- Each link enriched with `validation` property containing `{ status, error?, suggestion?, pathConversion? }`
-- Summary counts derived from `link.validation.status` values
-- Parallel execution maintained via `Promise.all()`
-- No modifications to `validateSingleCitation()` or other methods/components
+**Re-execution Fix Applied:**
+- Added `file: filePath,` property to return object (line 211)
+- Ensures correct contract alignment for Task 2.2 integration
+- All success criteria now met:
+  - Return structure: `{ file, summary, links }` ✓
+  - Each link enriched with `validation` property containing `{ status, error?, suggestion?, pathConversion? }` ✓
+  - Summary counts derived from `link.validation.status` values ✓
+  - Parallel execution maintained via `Promise.all()` ✓
+  - No modifications to `validateSingleCitation()` or other methods/components ✓
 
 ### File List
 
@@ -247,52 +251,50 @@ Successfully refactored `validateFile()` method to implement progressive enhance
 - `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/src/CitationValidator.js`
 
 **Changes:**
-- Refactored `validateFile()` method (lines 111-162)
-- Changed from sequential loop with results array to parallel enrichment with `Promise.all()`
-- Added validation property to LinkObjects instead of creating separate ValidationResult objects
-- Updated summary generation to derive counts from enriched links
+- Added missing `file: filePath,` property to validateFile() return object (line 211)
+- This completes the required return contract: `{ file, summary, links }`
 
 ### Implementation Challenges
 
-#### Challenge 1: Formatting Compliance
+#### Challenge 1: Missing file Property in Return Contract (RE-EXECUTION ISSUE)
 
-- Biome linter required minor formatting adjustments (trailing commas, line breaks)
-- Resolution: Applied `npx biome check --write` to auto-fix formatting
+- Previous implementation omitted `file: filePath,` from return object
+- Return was `{ summary, links }` instead of specification `{ file, summary, links }`
+- Resolution: Added single-line property to return object
 
-#### Challenge 2: None - Implementation matched specification exactly
+#### Challenge 2: None - Fix was minimal and surgical
 
-- Specification was clear and complete
-- No ambiguities encountered
+- Single property addition fixed the contract mismatch
+- No other changes needed
 
-### Validation Results
+### Validation Results (RE-EXECUTION)
 
 ```bash
-# Validation 1: Only one method modified
-$ git diff HEAD tools/citation-manager/src/CitationValidator.js | grep "@@" | wc -l
-1
-# ✅ PASS: Only validateFile() method modified
+# RE-EXECUTION VALIDATION - Task 2.1 Fix
 
-# Validation 2: No test files modified in this phase
-$ git status --short | grep "test/"
-A  tools/citation-manager/test/fixtures/enrichment/error-links-source.md
-A  tools/citation-manager/test/fixtures/enrichment/error-links-target.md
-A  tools/citation-manager/test/fixtures/enrichment/mixed-validation-source.md
-A  tools/citation-manager/test/fixtures/enrichment/valid-links-source.md
-A  tools/citation-manager/test/fixtures/enrichment/valid-links-target.md
-A  tools/citation-manager/test/fixtures/enrichment/warning-links-source.md
-A  tools/citation-manager/test/fixtures/enrichment/warning-links-target.md
-?? tools/citation-manager/test/integration/citation-validator-enrichment.test.js
-# ✅ PASS: Test files shown are from Phase 1 (previous task), not modified in this phase
-
-# Validation 3: Method signature unchanged
+# Validation 1: Method signature unchanged
 $ grep -n "async validateFile" tools/citation-manager/src/CitationValidator.js
-111: async validateFile(filePath) {
+162: async validateFile(filePath) {
 # ✅ PASS: Signature remains "async validateFile(filePath)"
 
-# Validation 4: Code formatting compliant
+# Validation 2: Return object includes file property
+$ grep -A 5 "Return enriched" tools/citation-manager/src/CitationValidator.js
+// 5. Return enriched links + summary (no separate results array)
+return {
+  file: filePath,
+  summary,
+  links,
+};
+# ✅ PASS: Return structure includes file, summary, and links properties
+
+# Validation 3: Code formatting compliant
 $ npx biome check tools/citation-manager/src/CitationValidator.js
-Checked 1 file in 10ms. No fixes needed.
-# ✅ PASS: Code passes linter after auto-fix applied
+Checked 1 file in 8ms. No fixes applied.
+# ✅ PASS: Code passes linter without changes needed
+
+# Validation 4: No modifications to helper methods
+$ git diff HEAD tools/citation-manager/src/CitationValidator.js | grep -E "^\+" | grep -E "(validateSingleCitation|createValidationResult|resolveTargetPath)"
+# ✅ PASS: No changes to validation logic or helper methods
 ```
 
 ## Evaluation Agent Instructions
