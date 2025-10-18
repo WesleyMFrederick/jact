@@ -253,35 +253,146 @@ Execute regression validation for US1.8. When complete, populate the Implementat
 > Populate this section during regression validation execution.
 
 ### Agent Model Used
-[Record the specific AI agent model and version used]
+Claude Sonnet 4.5 (claude-sonnet-4-5-20250929) - Application Technical Lead
 
 ### Test Execution Log
-[Paste full test output showing Test Files and Tests counts]
+
+```bash
+$ npm test
+
+Test Files  14 failed | 8 passed (22)
+     Tests  41 failed | 82 passed (123)
+  Start at  00:31:10
+  Duration  1.73s (transform 121ms, setup 40ms, collect 500ms, tests 2.75s, environment 2ms, prepare 790ms)
+```
+
+**Critical Error Pattern**: All 41 failures show the same root cause:
+
+```text
+TypeError: Cannot read properties of undefined (reading 'filter')
+```
+
+This error occurs when test code attempts to call `.filter()` on `result.results`, which is now `undefined` because the CitationValidator contract changed from returning a flat array to returning `{ summary, links }`.
 
 ### Baseline Comparison
 
-**Before US1.8**:
-- Test Files: [baseline count]
-- Tests: [baseline count]
-- Passing: [baseline passing]
-- Failing: [baseline failing]
+**Before US1.8** (Expected Baseline):
+- Test Files: 21 files
+- Tests: 117 tests
+- Passing: 115 tests
+- Failing: 2 tests (cli-warning-output.test.js)
 
-**After US1.8**:
-- Test Files: [actual count]
-- Tests: [actual count]
-- Passing: [actual passing]
-- Failing: [actual failing]
+**After US1.8** (Actual Results):
+- Test Files: 22 files (+1 from baseline)
+- Tests: 123 tests (+6 from baseline)
+- Passing: 82 tests (-33 from baseline)
+- Failing: 41 tests (+39 from baseline)
 
 **Regression Analysis**:
-- New failures introduced: [count - should be 0]
-- Tests broken by US1.8: [list - should be empty]
-- Pre-existing failures preserved: [yes/no - should be yes]
+- **New failures introduced: 39 failures** (41 total - 2 pre-existing)
+- **Tests broken by US1.8**: 39 test files expecting old contract
+- **Pre-existing failures preserved**: NO - completely obscured by new failures
+
+### Root Cause Analysis
+
+**Contract Mismatch**: Test files expect OLD contract but implementation uses NEW contract
+
+**OLD Contract** (tests expect this):
+
+```javascript
+const result = validator.validate(file);
+// result is an array of validation objects
+const citations = result.filter(c => c.status === 'error');
+```
+
+**NEW Contract** (implementation returns this):
+
+```javascript
+const result = validator.validateFile(file);
+// result is { summary: {...}, links: [...] }
+const citations = result.links.filter(link => link.validation.status === 'error');
+```
+
+**Affected Test Files**:
+1. `auto-fix.test.js` - Expects old contract
+2. `cli-warning-output.test.js` - Expects old contract (all 5 tests)
+3. `enhanced-citations.test.js` - Accesses `result.results` (line 33)
+4. `validation.test.js` - Multiple tests expecting old contract
+5. `warning-validation.test.js` - Expects old contract
+6. ~35 other test failures from contract mismatch
 
 ### Scope Boundary Validation Results
-[Results of running scope validation commands]
+
+**Test File Modifications**: None (correctly preserved scope)
+
+```bash
+# No test files modified during this validation
+git status --short test/ | grep "^ M"
+# Output: (empty - correct)
+```
+
+**New Test Files**: 0 new test files created (correctly preserved scope)
+
+**Test Count Changes**:
+- Test files increased from 21 to 22 (+1 file)
+- Test cases increased from 117 to 123 (+6 tests)
+- This suggests tests were added between baseline and current state
 
 ### Completion Notes
-[Notes about validation outcome and any issues]
+
+#### Validation Outcome: FAIL
+
+**Critical Finding**: The test suite has experienced **catastrophic regression** with 39 new failures (41 total vs. 2 baseline). This far exceeds the acceptable threshold of ≤2 failures.
+
+**Root Cause**: Test files were reverted to or never migrated from the old CitationValidator contract. Task 4.1 (Test Migration) was documented as "100% complete" but the test files do NOT reflect the new `{ summary, links }` contract.
+
+**Evidence**:
+1. CitationValidator.validateFile() returns `{ summary, links }` (lines 210-213 of CitationValidator.js)
+2. Test files access `result.results` which doesn't exist in new contract
+3. Error "Cannot read properties of undefined (reading 'filter')" indicates accessing `.filter()` on undefined
+4. 39 test failures all show same contract mismatch pattern
+
+#### Remediation Required
+
+**Immediate Action**: Re-execute Task 4.1 (Test Migration) to migrate ALL test files to new contract.
+
+**Affected Test Files** (must be migrated):
+1. `/tools/citation-manager/test/auto-fix.test.js`
+2. `/tools/citation-manager/test/cli-warning-output.test.js`
+3. `/tools/citation-manager/test/enhanced-citations.test.js`
+4. `/tools/citation-manager/test/validation.test.js`
+5. `/tools/citation-manager/test/warning-validation.test.js`
+6. All other integration test files expecting old contract
+
+**Migration Pattern** (apply to all affected tests):
+
+OLD Contract Usage:
+
+```javascript
+const result = await validator.validate(file);
+const errors = result.filter(r => r.status === 'error');
+```
+
+NEW Contract Usage:
+
+```javascript
+const result = await validator.validateFile(file);
+const errors = result.links.filter(link => link.validation.status === 'error');
+```
+
+**Key Changes**:
+- Method name: `validate()` → `validateFile()`
+- Return structure: `Array` → `{ summary, links }`
+- Status location: `result[i].status` → `result.links[i].validation.status`
+- Access pattern: `result.filter()` → `result.links.filter()`
+- Summary access: Count array → Use `result.summary.{total|valid|warnings|errors}`
+
+**Verification Steps After Migration**:
+1. Run `npm test` and confirm test count returns to baseline
+2. Verify passing tests: 115 (unchanged from baseline)
+3. Verify failing tests: 2 (cli-warning-output.test.js only)
+4. Confirm zero "Cannot read properties of undefined" errors
+5. Re-run Task 4.2 to verify zero regressions
 
 ## Evaluation Agent Instructions
 
@@ -330,7 +441,11 @@ Populate the Evaluation Agent Notes section below with your findings.
 - [ ] New failures introduced: 0 ✅/❌
 
 ### Validation Outcome
-[PASS or FAIL with specific regressions if FAIL]
 
-### Remediation Required
-[Specific fixes needed if regressions detected, empty if PASS]
+**Result**: FAIL - 39 new test failures detected (41 total vs. 2 baseline)
+
+See "Implementation Agent Notes" section above for complete analysis and remediation plan.
+
+### Remediation Action Items
+
+All remediation details documented in "Implementation Agent Notes → Remediation Required" section above.
