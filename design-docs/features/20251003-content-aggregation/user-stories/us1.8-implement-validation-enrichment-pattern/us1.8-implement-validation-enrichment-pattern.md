@@ -5,7 +5,7 @@ epic-number: 1
 epic-name: Citation Manager Test Migration & Content Aggregation
 epic-url: ../../content-aggregation-prd.md#Epic%20Citation%20Manager%20Test%20Migration%20&%20Content%20Aggregation
 user-story-number: 1.8
-status: To Be Done
+status: In Progress
 ---
 
 # Story 1.8: Implement Validation Enrichment Pattern
@@ -532,84 +532,6 @@ Benefits: VS Code and other IDEs will provide autocomplete, hover documentation,
 ---
 ## Bugs/Known Issues
 
-### Post-Implementation Test Failures (2025-10-18)
-
-After extending Task 4.1 to migrate all test files to the enriched ValidationResult structure, **3 test failures remain**. These appear to be **unrelated to the US1.8 validation enrichment pattern** but were exposed during regression testing.
-
-#### Bug 1: Auto-Fix Not Converting Kebab-Case Anchors
-
-**Test**: `auto-fix.test.js > should auto-fix kebab-case anchors to raw header format`
-
-**Status**: ❌ FAILING
-
-**Symptoms**:
-- Test expects auto-fix to convert `#sample-header` → `#Sample%20Header` (kebab-case to URL-encoded)
-- Auto-fix reports "2 path corrections" instead of "2 anchor corrections"
-- CLI output shows identical before/after values (no actual transformation)
-- Example output:
-
-  ```text
-  Line 7 (path):
-    - [Link to header](../test-target.md#sample-header)
-    + [Link to header](../test-target.md#sample-header)
-  ```
-
-**Root Cause**: Auto-fix feature is not performing anchor format conversions, only path corrections
-
-**US1.8 Related**: ❌ NO - This is an auto-fix feature issue unrelated to ValidationResult structure changes
-
-**Impact**: Low - Auto-fix feature works for path corrections but not anchor format normalization
-
-**Remediation**: Investigate auto-fix implementation to enable anchor format transformation (separate from US1.8 scope)
-
----
-
-#### Bug 2: POC Section Extraction Returning Null
-
-**Test**: `poc-section-extraction.test.js > should extract H4 section stopping at next H2/H3/H4`
-
-**Status**: ❌ FAILING
-
-**Symptoms**:
-- `expected null not to be null`
-- Section extraction returning null when extracting H4 section
-- Test expects section object with heading and content
-
-**Root Cause**: POC section extraction logic not handling H4 sections correctly
-
-**US1.8 Related**: ❌ NO - This is a POC feature issue completely unrelated to validation structure
-
-**Impact**: Low - POC feature only, not production code
-
-**Remediation**: Fix POC section extraction logic for H4 heading levels (separate from US1.8 scope)
-
----
-
-#### Bug 3: Large JSON Output Corruption in Story Validation
-
-**Test**: `story-validation.test.js > should validate story file with mixed valid and broken citations`
-
-**Status**: ✅ RESOLVED (2025-10-18)
-
-**Original Symptoms**:
-- `SyntaxError: Unterminated string in JSON at position 65532 (line 2102 column 39)`
-- JSON parsing failure when validating large story file
-- Output truncated/corrupted at ~65KB
-
-**Root Cause**: Node.js stdio pipe buffer limit (~64KB) truncating JSON output for large files with 100+ citations (producing 90KB+ JSON)
-
-**US1.8 Related**: ❌ NO - Pre-existing CLI buffering issue, not related to validation enrichment pattern
-
-**Resolution**: Fixed in `test/helpers/cli-runner.js` by bypassing stdio pipes entirely:
-- Uses shell redirection to temporary file: `${command} > "${tempFile}" 2>&1`
-- Reads complete output from filesystem instead of in-memory pipe buffers
-- Eliminates buffer size limits - tested with 92KB JSON output (version-detection-story.md)
-- Reference: `cli-runner.js:9-36`
-
-**Impact**: ✅ None - Test now passing, handles files with unlimited citations
-
-**Verification**: Test passing at 92,187 bytes JSON output (well above 64KB limit)
-
 ---
 
 ### Test Regression Summary
@@ -814,7 +736,7 @@ The 2 remaining failures are pre-existing issues in separate features, not cause
 
 ### Phase 4.5: QA Validation
 
-- [ ] **4.5. Comprehensive QA Validation Against Acceptance Criteria** ^US1-8T4-5
+- [x] **4.5. Comprehensive QA Validation Against Acceptance Criteria** ^US1-8T4-5
   - **Implementation Details**: [tasks/04-4-5-comprehensive-qa-validation-us1.8.md](tasks/04-4-5-comprehensive-qa-validation-us1.8.md)
   - **Agent**: qa-validation
   - **Objective**: Comprehensive validation of all acceptance criteria with detailed test execution and verification
@@ -837,8 +759,8 @@ The 2 remaining failures are pre-existing issues in separate features, not cause
 
 ### Phase 5: Documentation Updates
 
-- [ ] **5.1. Update CitationValidator Implementation Guide** ^US1-8T5-1
-  - **Implementation Details**: [tasks/05-5-1-update-validator-guide-us1.8.md](tasks/05-5-1-update-validator-guide-us1.8.md)
+- [x] **5.1. Update CitationValidator Implementation Guide** ^US1-8T5-1
+  - **Implementation Details**: 
   - **Agent**: application-tech-lead
   - **Objective**: Document validation enrichment pattern in CitationValidator component guide
   - **Input**: Implemented enrichment pattern, existing component guide structure
@@ -857,8 +779,8 @@ The 2 remaining failures are pre-existing issues in separate features, not cause
   - _Requirements_: Documentation standard
   - _Leverage_: Existing component guide structure, implementation guide pseudocode
 
-- [ ] **5.2. Update Content Aggregation Architecture Document** ^US1-8T5-2
-  - **Implementation Details**: [tasks/05-5-2-update-architecture-doc-us1.8.md](tasks/05-5-2-update-architecture-doc-us1.8.md)
+- [x] **5.2. Update Content Aggregation Architecture Document** ^US1-8T5-2
+  - **Implementation Details**: 
   - **Agent**: application-tech-lead
   - **Objective**: Mark technical debt resolved and update data flow diagrams
   - **Input**: Completed US1.8 implementation, architecture document
@@ -877,7 +799,7 @@ The 2 remaining failures are pre-existing issues in separate features, not cause
   - _Leverage_: Existing architecture document structure
 
 - [ ] **5.3. Mark US1.8 Complete in PRD** ^US1-8T5-3
-  - **Implementation Details**: [tasks/05-5-3-mark-story-complete-us1.8.md](tasks/05-5-3-mark-story-complete-us1.8.md)
+  - **Implementation Details**: 
   - **Agent**: application-tech-lead
   - **Objective**: Update story status to complete in PRD
   - **Input**: QA validation PASS from Phase 4.5

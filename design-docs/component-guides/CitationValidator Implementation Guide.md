@@ -77,6 +77,49 @@ classDiagram
 4. [ParsedDocument](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Parsed%20Document): The facade providing query methods over parser output (US1.7).
 5. [ValidationResult](#`CitationValidator.ValidationResult.Output.DataContract`%20JSON%20Schema): The composite object returned by the validator.
 
+---
+
+## File Structure
+
+### Current Implementation
+
+```text
+tools/citation-manager/
+├── src/
+│   └── CitationValidator.js                       // Monolithic validation component (745+ lines)
+│
+├── test/
+│   ├── integration/
+│   │   ├── citation-validator.test.js             // Core validation tests
+│   │   ├── citation-validator-enrichment.test.js  // US1.8 enrichment pattern tests
+│   │   ├── citation-validator-anchor-matching.test.js // Anchor validation tests
+│   │   ├── citation-validator-cache.test.js       // ParsedFileCache integration tests
+│   │   └── citation-validator-parsed-document.test.js // ParsedDocument facade tests
+│   │
+│   └── fixtures/
+│       ├── enrichment/                            // US1.8 enrichment pattern fixtures (7 files)
+│       │
+│       ├── section-extraction/                    // Content extraction fixtures (2 files)
+│       │   └── ...
+│       │
+│       ├── subdir/                                // Path resolution fixtures (1 file)
+│       │   └── ...
+│       │
+│       ├── anchor-matching.md                     // Anchor validation scenarios
+│       ├── anchor-matching-source.md              // Cross-document anchor tests
+│       └── ... (32 fixtures total)
+│
+└── design-docs/
+    └── component-guides/
+        └── CitationValidator Implementation Guide.md // This document
+```
+
+**Current State**: The CitationValidator exists as a single monolithic file containing all validation logic (745+ lines). See [Technical Debt Issue 2](#Issue%202%20Monolithic%20File%20Structure%20Violates%20File%20Naming%20Patterns) for proposed component folder refactoring.
+
+_Source_: [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns)
+
+---
+
 ## Public Contracts
 
 ### Input Contract
@@ -89,77 +132,13 @@ The primary public method, `validateFile()`, accepts one argument:
 
 ### Output Contract
 
-**Enrichment Pattern**: The `validateFile()` method will return `{ summary, links }` where:
+**Enrichment Pattern**: The `validateFile()` method returns `{ summary, links }` where:
 - **`summary`** (object): Aggregate counts of `total`, `valid`, `warning`, and `error` links
 - **`links`** (EnrichedLinkObject[]): Original LinkObjects from parser with added `validation` property
 
 ## Pseudocode
 
-### Current Implementation (Pre-US1.8)
-
-This pseudocode follows the **MEDIUM-IMPLEMENTATION** abstraction level, showing the refactored logic that uses ParsedDocument facade.
-
-```tsx
-// The CitationValidator class, responsible for the semantic validation of links.
-class CitationValidator is
-  private field parsedFileCache: ParsedFileCacheInterface
-  private field fileCache: FileCacheInterface
-
-  // The constructor accepts its cache dependencies.
-  constructor CitationValidator(pCache: ParsedFileCacheInterface, fCache: FileCacheInterface) is
-    // Integration: These dependencies are provided by the factory at runtime.
-    this.parsedFileCache = pCache
-    this.fileCache = fCache
-
-  // The primary public method that orchestrates the validation of a source file.
-  public async method validateFile(filePath: string): ValidationResult is
-    // Boundary: Get the ParsedDocument facade instance from the cache.
-    field sourceParsedDoc = await this.parsedFileCache.resolveParsedFile(filePath)
-
-    field validationPromises = new array of Promise
-    // Use facade method to get links instead of direct array access
-    foreach (link in sourceParsedDoc.getLinks()) do
-      // Pattern: Concurrently validate all links found in the source document.
-      validationPromises.add(this.validateSingleLink(link))
-
-    field results = await Promise.all(validationPromises)
-
-    return this.generateSummary(results)
-
-  // Validates a single Link Object and returns separate validation result.
-  private async method validateSingleLink(link: Link): object is
-    // Decision: Check if the target file path was successfully resolved by the parser.
-    if (link.target.path.absolute == null) then
-      // The parser already determined the path is invalid.
-      return { status: "error", error: "File not found: " + link.target.path.raw, ... }
-
-    // Decision: Does the link have an anchor that needs validation?
-    if (link.anchorType == "header" || link.anchorType == "block") then
-      return await this.validateAnchorExists(link)
-    else
-      // This is a full-file link; path existence is sufficient.
-      return { status: "valid", ... }
-
-  // Validates that an anchor exists in its target document.
-  private async method validateAnchorExists(link: Link): object is
-    try
-      // Boundary: Retrieve the ParsedDocument facade for the target file
-      field targetParsedDoc = await this.parsedFileCache.resolveParsedFile(link.target.path.absolute)
-
-      // Use facade method instead of manual array operations
-      if (targetParsedDoc.hasAnchor(link.target.anchor)) then
-        return { status: "valid", ... }
-      else
-        // Pattern: Delegate suggestion generation to facade
-        field suggestions = targetParsedDoc.findSimilarAnchors(link.target.anchor)
-        return { status: "error", error: "Anchor not found", suggestion: suggestions[0], ... }
-
-    catch (error) is
-      // Error Handling: If the target file can't be parsed (e.g., doesn't exist), propagate the error.
-      return { status: "error", error: error.message, ... }
-```
-
-### US1.8 Enrichment Pattern (Target Implementation)
+### Current Implementation
 
 This pseudocode shows the **validation enrichment pattern** where LinkObjects are enriched with validation metadata instead of creating separate result objects.
 
@@ -173,7 +152,7 @@ class CitationValidator is
     this.parsedFileCache = pCache
     this.fileCache = fCache
 
-  // US1.8: Returns { summary, links } instead of separate validation results
+  // Returns { summary, links } with enriched LinkObjects
   public async method validateFile(filePath: string): { summary: object, links: EnrichedLinkObject[] } is
     // Boundary: Get the ParsedDocument facade instance from the cache.
     field sourceParsedDoc = await this.parsedFileCache.resolveParsedFile(filePath)
@@ -181,24 +160,24 @@ class CitationValidator is
     // Get links array - these will be enriched in place
     field links = sourceParsedDoc.getLinks()
 
-    // US1.8 Pattern: Enrich each link with validation metadata
+    // Pattern: Enrich each link with validation metadata
     field validationPromises = new array of Promise
     foreach (link in links) do
       validationPromises.add(this.enrichLinkWithValidation(link))
 
     await Promise.all(validationPromises)
 
-    // US1.8: Generate summary from enriched links, return both
+    // Generate summary from enriched links, return both
     return {
       summary: this.generateSummaryFromEnrichedLinks(links),
       links: links  // Return enriched links (no duplication!)
     }
 
-  // US1.8: Enriches a LinkObject with validation metadata (instead of returning separate result)
+  // Enriches a LinkObject with validation metadata (instead of returning separate result)
   private async method enrichLinkWithValidation(link: EnrichedLinkObject): void is
     // Decision: Check if the target file path was successfully resolved by the parser.
     if (link.target.path.absolute == null) then
-      // US1.8 Enrichment: Add validation property directly to link
+      // Enrichment: Add validation property directly to link
       link.validation = {
         status: "error",
         error: "File not found: " + link.target.path.raw
@@ -210,10 +189,10 @@ class CitationValidator is
       await this.enrichWithAnchorValidation(link)
     else
       // This is a full-file link; path existence is sufficient.
-      // US1.8 Enrichment: Add validation property with valid status
+      // Enrichment: Add validation property with valid status
       link.validation = { status: "valid" }
 
-  // US1.8: Enriches link with anchor validation metadata
+  // Enriches link with anchor validation metadata
   private async method enrichWithAnchorValidation(link: EnrichedLinkObject): void is
     try
       // Boundary: Retrieve the ParsedDocument facade for the target file
@@ -221,12 +200,12 @@ class CitationValidator is
 
       // Use facade method to check anchor existence
       if (targetParsedDoc.hasAnchor(link.target.anchor)) then
-        // US1.8 Enrichment: Valid anchor found
+        // Enrichment: Valid anchor found
         link.validation = { status: "valid" }
       else
         // Pattern: Delegate suggestion generation to facade
         field suggestions = targetParsedDoc.findSimilarAnchors(link.target.anchor)
-        // US1.8 Enrichment: Add error with suggestion
+        // Enrichment: Add error with suggestion
         link.validation = {
           status: "error",
           error: "Anchor not found",
@@ -235,13 +214,13 @@ class CitationValidator is
 
     catch (error) is
       // Error Handling: If the target file can't be parsed (e.g., doesn't exist)
-      // US1.8 Enrichment: Add error metadata
+      // Enrichment: Add error metadata
       link.validation = {
         status: "error",
         error: error.message
       }
 
-  // US1.8: Generate summary by counting validation statuses from enriched links
+  // Generate summary by counting validation statuses from enriched links
   private method generateSummaryFromEnrichedLinks(links: EnrichedLinkObject[]): object is
     field summary = { total: links.length, valid: 0, warnings: 0, errors: 0 }
 
@@ -257,21 +236,15 @@ class CitationValidator is
     return summary
 ```
 
-**Key Differences in US1.8 Pattern:**
-1. **Progressive Enhancement**: `enrichLinkWithValidation()` modifies links in-place instead of returning separate objects
-2. **Zero Duplication**: Validation data stored once on LinkObject (not duplicated in separate result)
-3. **Single Data Flow**: Same link objects pass through entire pipeline (parse → validate → filter → extract)
-4. **Summary Derivation**: `generateSummaryFromEnrichedLinks()` counts from `link.validation.status` values
+## `CitationValidator.ValidationResult.Output.DataContract` JSON Schema
 
-## `CitationValidator.ValidationResult.Output.DataContract` JSON Schema (US1.8)
-
-**US1.8 Breaking Change**: The `ValidationResult` structure now returns enriched LinkObjects instead of separate validation result objects.
+The `ValidationResult` structure returns enriched LinkObjects with validation metadata added by the validator (updated in US1.8, 2025-10-17).
 
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cc-workflows.com/validation-result.schema.json",
-  "title": "CitationValidator Validation Result Contract (US1.8)",
+  "title": "CitationValidator Validation Result Contract",
   "description": "The complete output from the CitationValidator's validateFile() method. Returns a summary and the array of enriched LinkObjects (with validation metadata added).",
   "type": "object",
   "properties": {
@@ -446,11 +419,11 @@ class CitationValidator is
 
 ## Testing Strategy
 
-**Philosophy**: Validate CitationValidator's ability to correctly enrich LinkObjects with validation metadata and return accurate ValidationResult structures per the US1.8 enrichment pattern.
+**Philosophy**: Validate CitationValidator's ability to correctly enrich LinkObjects with validation metadata and return accurate ValidationResult structures using the enrichment pattern.
 
 **Test Location**: `tools/citation-manager/test/citation-validator.test.js`
 
-1. **Output Contract Validation (US1.8)**
+1. **Output Contract Validation**
    - `validateFile()` returns `{ summary, links }` structure matching JSON Schema
    - Summary object contains correct aggregate counts (`total`, `valid`, `warnings`, `errors`)
    - Links array contains enriched LinkObjects with `validation` property
@@ -592,3 +565,60 @@ tools/citation-manager/src/
 - Implement during Epic 2 or as standalone refactoring story
 
 _Source_: [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns)
+
+---
+
+### Issue 3: Anchor Validation Fails on Special Characters in Headers
+
+**Status**: Identified (2025-10-18) - To Be Fixed
+
+**Current Problem**:
+The citation validator fails to validate internal anchor references when the target heading contains special characters like `/` (forward slash). For example, the anchor `#Scattered%20File%20I/O%20Operations` fails validation with error "File 'O%20Operations' not found" - the validator incorrectly splits on `/` and only processes the text after it.
+
+**Example Failure**:
+
+```markdown
+### Scattered File I/O Operations
+
+[Link to section](#Scattered%20File%20I/O%20Operations)
+```
+
+**Error Output**:
+
+```text
+Line 169: [Scattered File I/O Operations](#Scattered%20File%20I/O%20Operations)
+└─ File not found: #Scattered%20File%20I/O%20Operations
+└─ Suggestion: File "O%20Operations" not found
+```
+
+**Root Cause**:
+The validator's anchor matching logic does not properly handle URL-encoded special characters in anchor references. When encountering `/` in a URL-encoded anchor string, the validator appears to be splitting on this character instead of treating it as part of the anchor ID.
+
+**Impact**:
+- **Medium**: Causes false positive validation errors for legitimate internal anchor references
+- **User Experience**: Developers see "CRITICAL ERRORS" for valid citations, reducing trust in validation results
+- **Workaround Available**: Users can avoid special characters in headings or ignore false positives
+- **Scope**: Affects any heading containing special characters: `/`, `\`, `|`, `<`, `>`, `:`, `*`, `?`, `"`
+
+**Resolution Strategy**:
+Implement comprehensive URL encoding/decoding handling in anchor validation:
+
+1. **Decode anchor IDs before matching**: Convert `%20` → ` `, `%2F` → `/`, etc.
+2. **Normalize both reference and target**: Ensure consistent encoding/decoding on both sides
+3. **Test special characters**: Add test fixtures covering all filesystem-forbidden characters
+4. **Update anchor matching logic**: Handle encoded characters in `CitationValidator.validateAnchorExists()`
+
+**Affected Code Locations**:
+- `CitationValidator.js` - Anchor matching logic needs URL decoding
+- `MarkdownParser.js` - Anchor extraction may need normalization
+- Test fixtures - Need coverage for special characters in headings
+
+**Resolution Criteria**:
+- Internal anchor references with URL-encoded special characters validate correctly
+- Test coverage for all special characters: `/`, `\`, `|`, `<`, `>`, `:`, `*`, `?`, `"`
+- Zero false positives for valid internal anchor references
+- Validation correctly identifies truly broken anchors (not just encoding mismatches)
+
+**Priority**: Medium (affects validation accuracy, but workaround exists)
+
+**Estimated Effort**: 4-6 hours (anchor matching logic update + comprehensive test coverage)
