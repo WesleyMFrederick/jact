@@ -82,7 +82,7 @@ The facade exposes a set of query methods for consumers.
 
 ## Pseudocode
 
-This pseudocode follows the **MEDIUM-IMPLEMENTATION** abstraction level, showing the core facade pattern and query method implementations.
+This [Psuedocode - Medium Level -Implementation Ready Patterns](../../../../design-docs/Psuedocode%20Style%20Guide.md#MEDIUM-IMPLEMENTATION%20Implementation-Ready%20Patterns), showing the core facade pattern and query method implementations.
 
 ```tsx
 // The ParsedDocument class, providing a stable query interface over parser output

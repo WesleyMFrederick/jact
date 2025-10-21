@@ -1,0 +1,1 @@
+/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/design-docs/Architecture Principles.md

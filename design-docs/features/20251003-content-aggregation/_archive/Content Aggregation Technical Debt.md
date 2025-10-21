@@ -170,3 +170,93 @@ This duplication violates the **One Source of Truth** and **Illegal States Unrep
 - Story: [US1.8 Implement Validation Enrichment Pattern](user-stories/us1.8-implement-validation-enrichment-pattern/us1.8-implement-validation-enrichment-pattern.md)
 - ADR: [Validation Enrichment Pattern](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Architectural%20Decision%20Validation%20Enrichment%20Pattern)
 %%
+
+%%
+### Redundant File Parsing During Validation
+
+**Risk Category**: Performance / Architecture
+
+**Description**: The [CitationValidator](#Citation%20Manager%2ECitation%20Validator) previously operated without a caching mechanism for parsed files. During a single validation run, if a source document linked to the same target file multiple times, the system would read and parse that file from disk repeatedly, leading to significant I/O and CPU overhead.
+
+**Impact**:
+- **High**: This inefficiency would have been a severe performance bottleneck for Epic 2 Content Aggregation, as the ContentExtractor component would compound redundant operations.
+- **Medium**: It was a latent performance issue in validation and `--fix` logic.
+
+**Resolution**: Implemented via [Story 1.5: Implement a Cache for Parsed File Objects](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md)
+
+**Resolution Date**: 2025-10-07
+
+**Implementation Summary**:
+- Created `ParsedFileCache` component providing in-memory cache of MarkdownParser.Output.DataContract objects
+- Refactored `CitationValidator` to use `ParsedFileCache` instead of direct `MarkdownParser` calls
+- Integrated cache into factory pattern for production deployment
+- Ensured files are parsed at most once per command execution
+- Zero functional regressions confirmed via full test suite validation
+
+**Verification**:
+- All existing tests pass (50+ test suite)
+- New ParsedFileCache unit tests validate cache hit/miss behavior
+- CitationValidator integration tests confirm single-parse-per-file guarantee
+- Factory tests validate correct dependency wiring
+- End-to-end tests verify complete workflow with cache integration
+
+**Status**: ✅ RESOLVED (2025-10-07)
+
+### Duplicate Anchor Entries in MarkdownParser.Output.DataContract
+
+**Risk Category**: Data Model / Performance / Maintainability
+
+**Description**: The `MarkdownParser.extractAnchors()` method currently generates duplicate AnchorObject entries for each header - one with the raw text as the `id` and another with the URL-encoded (Obsidian-compatible) format as the `id`. For example, a header "Story 1.5: Implement Cache" produces two anchor objects:
+- `{ anchorType: "header", id: "Story 1.5: Implement Cache", rawText: "Story 1.5: Implement Cache", ... }`
+- `{ anchorType: "header", id: "Story%201.5%20Implement%20Cache", rawText: "Story 1.5: Implement Cache", ... }`
+
+This duplication violates the **One Source of Truth** and **Illegal States Unrepresentable** architecture principles.
+
+**Root Cause**: The current implementation at `MarkdownParser.js:513-538` creates two separate anchor objects to support both standard markdown linking (raw text) and Obsidian-style linking (URL-encoded). This was a pragmatic solution but creates data redundancy.
+
+**Impact**:
+- **Medium**: Increases memory footprint of MarkdownParser.Output.DataContract (2x anchor objects for each header)
+- **Medium**: Complicates downstream consumer logic (CitationValidator, future ContentExtractor)
+- **Low**: Creates confusing contract for developers working with anchor arrays
+- **Scope**: Affects all files with headers containing special characters (colons, spaces, etc.)
+
+**Better Design**: Each header should produce a single AnchorObject with both ID variants as separate properties:
+
+```javascript
+{
+  anchorType: "header",
+  id: "Story 1.5: Implement Cache",           // Raw text format
+  urlEncodedId: "Story%201.5%20Implement%20Cache", // Obsidian format (only when differs from id)
+  rawText: "Story 1.5: Implement Cache",
+  fullMatch: "### Story 1.5: Implement Cache",
+  line: 166,
+  column: 0
+}
+```
+
+**Migration Requirements**:
+- Refactor `MarkdownParser.extractAnchors()` to generate single anchor with dual ID properties
+- Update `CitationValidator.validateAnchorExists()` to check both `id` and `urlEncodedId` fields
+- Update MarkdownParser.Output.DataContract test fixtures and validation schema
+- Update MarkdownParser.Output.DataContract JSON schema documentation
+
+**Resolution**: ✅ RESOLVED in [Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](content-aggregation-prd.md#Story%201.6%20Refactor%20MarkdownParser.Output.DataContract%20-%20Eliminate%20Duplicate%20Anchor%20Entries)
+
+**Resolution Date**: 2025-10-09 (Wave 2: Phase 2 & 3 Complete)
+
+**Resolution Summary**:
+- Refactored `MarkdownParser.extractAnchors()` to create single AnchorObject per header with both `id` (raw text) and `urlEncodedId` (Obsidian-compatible) properties
+- Updated `CitationValidator.validateAnchorExists()` to check both `id` and `urlEncodedId` fields using logical OR pattern
+- Eliminated duplicate anchor entries, achieving 50% memory reduction for headers with special characters
+- Updated MarkdownParser.Output.DataContract schema with dual ID properties
+- All Phase 1 parser schema tests passing (12/12)
+- All Phase 1 integration tests passing (4/4)
+- Zero functional regressions (100/102 tests passing, 2 pre-existing failures unrelated)
+
+**Resolution Verification**:
+- Parser test: `npm test -- parser-output-contract` → All tests passing, including "should prevent duplicate anchor entries"
+- Integration test: `npm test -- integration/citation-validator-anchor-matching` → All tests passing with both ID formats
+- Files modified: `src/MarkdownParser.js` (lines 497-513), `src/CitationValidator.js` (lines 522-587)
+
+**Status**: ✅ RESOLVED (2025-10-09) - Ready for Epic 2 ContentExtractor implementation
+%%

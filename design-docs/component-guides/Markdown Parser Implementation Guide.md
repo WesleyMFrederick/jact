@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD025 -->
 # Markdown Parser Implementation Guide
 
 ## Problem
@@ -494,15 +495,15 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
 
 ---
 
-## Whiteboard
+# Whiteboard
 
-### MarkdownParser.Output.DataContract: How Tokens, Links, and Anchors Are Populated
+## MarkdownParser.Output.DataContract: How Tokens, Links, and Anchors Are Populated
 
 **Key Question**: How does the MarkdownParser.Output.DataContract get its data? Which code is responsible for each array?
 
 **Answer**: MarkdownParser uses a **two-layer parsing approach** - standard markdown parsing via marked.js, plus custom regex extraction for Obsidian-specific syntax.
 
-#### Layer 1: Standard Markdown Parsing (marked.js)
+### Layer 1: Standard Markdown Parsing (marked.js)
 
 **Code Location**: `MarkdownParser.parseFile()` lines 23-36
 
@@ -534,9 +535,9 @@ async parseFile(filePath) {
 - Epic 2 Section Extraction POC - Walks tokens to find section boundaries
 - Future ContentExtractor component
 
-#### Layer 2: Custom Regex Parsing (Obsidian Extensions)
+### Layer 2: Custom Regex Parsing (Obsidian Extensions)
 
-##### Links Array Population
+#### Links Array Population
 
 **Code Location**: `extractLinks(content)` lines 38-291
 
@@ -569,7 +570,7 @@ async parseFile(filePath) {
 }
 ```
 
-##### Anchors Array Population
+#### Anchors Array Population
 
 **Code Location**: `extractAnchors(content)` lines 345-450
 
@@ -612,7 +613,7 @@ async parseFile(filePath) {
 }
 ```
 
-#### Why Two Layers?
+### Why Two Layers?
 
 **marked.js handles**:
 - ✅ Standard markdown syntax (CommonMark spec)
@@ -625,7 +626,7 @@ async parseFile(filePath) {
 - ✅ Line/column position metadata for error reporting
 - ✅ Path resolution (absolute/relative) via filesystem
 
-#### Epic 2 Content Extraction: Which Layer?
+### Epic 2 Content Extraction: Which Layer?
 
 **Section Extraction** (headings):
 - Uses **Layer 1** (tokens array)
@@ -641,7 +642,7 @@ async parseFile(filePath) {
 - Uses **both layers** (content string + metadata from tokens/anchors)
 - Algorithm: Return entire `content` field with metadata from parser output
 
-#### Viewing MarkdownParser.Output.DataContract
+### Viewing MarkdownParser.Output.DataContract
 
 To see the complete JSON structure for any file:
 
@@ -711,9 +712,10 @@ Example output saved at: `tools/citation-manager/design-docs/features/20251003-c
 **POC Validation**: Section extraction (7/7 tests) + Block extraction (9/9 tests) = 100% success rate
 **Epic 2 Readiness**: ContentExtractor implementation can proceed with validated data contracts
 
-## Technical Debt
+---
+# Technical Debt
 
-### Issue 1: Duplicate Parsing - Parse Twice, Use Once
+## Issue 1: Duplicate Parsing - Parse Twice, Use Once
 
 **Current Problem** (extractLinks() lines 104-357):
 - `marked.lexer()` creates tokens with `type: "link"` objects containing `href`, `text`, `raw`
@@ -736,7 +738,7 @@ const links = filterByTypesCached([ "link" ])
   .filter(link => !((link.parent?.type === "atxHeadingText")));
 ```
 
-### Issue 2: Header Anchor Redundancy
+## Issue 2: Header Anchor Redundancy
 
 > [!note] **US1.6 Resolution (2025-10-09)**
 > US1.6 resolved the **duplicate anchor entries** issue - each header now generates a single AnchorObject with both `id` (raw text) and `urlEncodedId` (Obsidian-compatible) properties. See [Story 1.6](../../features/20251003-content-aggregation/content-aggregation-prd.md#Story%201.6%20Refactor%20MarkdownParser.Output.DataContract%20-%20Eliminate%20Duplicate%20Anchor%20Entries).
@@ -753,7 +755,7 @@ const links = filterByTypesCached([ "link" ])
 - These are Obsidian-specific, not in CommonMark/GFM
 - Neither marked.js nor micromark parse these patterns
 
-### Issue 3: Link Pattern Duplication
+## Issue 3: Link Pattern Duplication
 
 **Current Problem** (extractLinks() lines 109-353):
 - 6 link patterns each construct nearly identical link objects (127+ lines each)
@@ -775,7 +777,7 @@ Recommendation: Refine the Hybrid
 | Block refs ^id                      | Regex ✅      | Regex ✅            | Line-specific, EOL position matters |
 | Citation syntax                     | Regex        | Extension          | Could be formalized                 |
 
-#### Concrete Improvement
+### Concrete Improvement
 
   Current code extracts standard markdown links with regex:
 
@@ -812,7 +814,7 @@ Keep the hybrid, but refactor to this principle:
 
 If marked.js naturally parses it AND you don't need precise line/column → use walkTokensIf it's Obsidian-specific OR needs line/column positions → use regex
 
-### Issue 4: Source Metadata Architectural Inconsistency
+## Issue 4: Source Metadata Architectural Inconsistency
 
 **Problem**: Link Object structure has architectural inconsistency between `source` and `target` properties, with source metadata scattered across multiple locations.
 
@@ -892,11 +894,56 @@ If marked.js naturally parses it AND you don't need precise line/column → use 
 **Discovered During**: Schema pretty-print formatting review
 **Priority**: Medium (architectural improvement, not blocking functionality)
 
+## Issue 5: Hardcoded Extraction Marker Detection (MVP Tech Debt)
+
+**Current Problem**: MarkdownParser hardcodes detection of extraction markers (`%% %%` and `<!-- -->` delimiters) after links for the content extraction feature. This creates coupling between the parser (generic markdown processing) and a specific feature (content extraction).
+
+**Coupling Issues**:
+- Parser knows about extraction-specific marker syntax
+- Cannot reuse parser in contexts where extraction markers are irrelevant
+- Adding new marker types requires modifying parser internals
+- Violates Single Responsibility Principle (parser handles both link detection AND feature-specific annotation)
+
+**Current Implementation** (MVP):
+
+```javascript
+// Parser hardcodes extraction marker detection
+const extractionMarkerMatch = remainingLine.match(/\s*(%%(.+?)%%|<!--\s*(.+?)\s*-->)/);
+if (extractionMarkerMatch) {
+  linkObject.extractionMarker = {
+    fullMatch: extractionMarkerMatch[1],
+    innerText: extractionMarkerMatch[2] || extractionMarkerMatch[3]
+  };
+}
+```
+
+**Future Enhancement**: Make parser extensible by accepting custom parsing rules/patterns as configuration:
+
+```javascript
+// Future: Parser accepts custom annotation detectors
+const parser = new MarkdownParser({
+  annotationDetectors: [
+    { name: 'extractionMarker', pattern: /\s*(%%(.+?)%%|<!--\s*(.+?)\s*-->)/, scope: 'after-link' },
+    { name: 'customTag', pattern: /<tag>(.+?)<\/tag>/, scope: 'wrapper' }
+  ]
+});
+```
+
+**Benefits of Future Approach**:
+- Parser stays generic and reusable
+- Features register their own annotation patterns
+- No parser modifications needed for new features
+- Clear separation: parser provides extensibility hooks, features provide patterns
+
+**Discovery Date**: 2025-10-20
+**Discovered During**: ContentExtractor implementation guide development
+**Priority**: Low (MVP trade-off accepted; address when multiple features need custom markdown annotations or when parser reuse is required)
+
 ---
 
-## Legacy Technical Debt Documentation
+# Legacy Technical Debt Documentation
 
-### Performance: Double-Parse Anti-Pattern
+## Performance: Double-Parse Anti-Pattern
 
 **Problem**: Current implementation parses content twice with wasted effort.
 
@@ -938,7 +985,7 @@ for (const link of links) {
 - Keep regex ONLY for Obsidian-specific syntax (`^anchor`, `[[wikilinks]]`) not in CommonMark
 - Header anchors should derive from existing heading tokens, not re-parse
 
-### Code Duplication: Link Object Construction
+## Code Duplication: Link Object Construction
 
 **Problem**: Six regex patterns (lines 111-353) construct nearly identical link objects with 127-38 lines each.
 
@@ -961,7 +1008,7 @@ function createLinkObject(match, classification, sourcePath) {
 }
 ```
 
-### Unused Infrastructure: headings Array
+## Unused Infrastructure: headings Array
 
 **Problem**: `headings` array extracted from tokens but never consumed by production code.
 
@@ -974,7 +1021,7 @@ function createLinkObject(match, classification, sourcePath) {
 
 **Recommendation**: Remove from output contract or document concrete planned consumer.
 
-### Issue 4: Missing Standard Markdown Internal Link Extraction
+## Issue 4: Missing Standard Markdown Internal Link Extraction
 
 **Problem**: Parser extracts wiki-style internal links but NOT standard markdown internal links, creating gaps in validation coverage.
 
@@ -1013,7 +1060,7 @@ Task specification (tasks/01-1-2-write-validator-anchor-matching-tests-us1.6.md:
 Actual implementation deviated:
 
 ```markdown
-# File: anchor-matching-source.md
+File: anchor-matching-source.md
 [Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)
 [Link using URL-encoded format](anchor-matching.md#Story%201.5%20Implement%20Cache)
 ```
@@ -1091,31 +1138,31 @@ marked.walkTokens(tokens, (token) => {
 
 ---
 
-## Markdownlint Approach
+# Markdownlint Approach
 
 Markdownlint does not primarily rely on whole-file regex or naive line-by-line scans; it parses Markdown once into a structured token stream and a lines array, then runs rules over those structures. Regex is used selectively for small, local checks, while most logic is token-based and linear-time over the parsed representation.
 
-### Parsing model
+## Parsing model
 - The core parse is done once per file/string and produces a micromark token stream plus an array of raw lines, which are then shared with every rule.
 - Built-in rules operate on micromark tokens; custom rules can choose micromark, markdown-it, or a text-only mode if they really want to work directly on lines.
 - Front matter is stripped via a start-of-file match and HTML comments are interpreted for inline enable/disable, reducing the effective content that rules must consider.
 
-### How rules match
+## How rules match
 - A rule’s function receives both tokens and the original lines and typically iterates tokens to identify semantic structures like headings, lists, links, and code fences.
 - For formatting checks that are inherently textual (for example trailing spaces or line length), rules iterate the lines array and may apply small, targeted regex on a single line or substring.
 - Violations are reported via a callback with precise line/column and optional fix info, so rules avoid global regex sweeps and focus only on the minimal spans they need.
 
-### Regex vs tokens
+## Regex vs tokens
 - Token-driven checks dominate because they’re resilient to Markdown edge cases and avoid brittle, backtracking-heavy regex across the whole document.
 - Regex is used as a tactical tool for localized patterns (e.g., trimming whitespace, counting spaces, or validating a fragment) rather than as the primary parsing mechanism.
 - This hybrid keeps rules simple and fast: structure from tokens, micro-patterns from small regex where appropriate.
 
-### Large content handling
+## Large content handling
 - The single-parse-per-file design means the Markdown is parsed once and reused, preventing N× reparsing as the number of rules grows.
 - Most built-in rules are O(n) in the size of the token stream or the number of lines, and many short-circuit early within a line or token subtree to minimize work.
 - Inline configuration and front matter exclusion reduce the effective scan area, and costly rules (like line-length over code/table regions) can be tuned or disabled to cap worst-case work.
 
-### Practical implications
+## Practical implications
 - For big documents and repos, parsing once and sharing tokens keeps total runtime closer to linear in input size, even with many rules.
 - Prefer writing custom rules against tokens to avoid reinventing Markdown parsing and to keep checks robust across edge cases.
 - Use line-based or small regex only where semantics aren’t needed, keeping scans local to a line or token’s text to preserve performance.
@@ -1140,6 +1187,58 @@ Markdownlint does not primarily rely on whole-file regex or naive line-by-line s
 18. [https://github.com/DavidAnson/markdownlint/issues/762](https://github.com/DavidAnson/markdownlint/issues/762)
 19. [http://xiangxing98.github.io/Markdownlint_Rules.html](http://xiangxing98.github.io/Markdownlint_Rules.html)
 20. [https://pypi.org/project/pymarkdownlnt/](https://pypi.org/project/pymarkdownlnt/)
+
+
+Here is **the exact code in the markdownlint repo** that takes rule definitions and runs logic on them—**no guessing**:
+
+**Location: `lib/markdownlint.mjs` (v0.39.0)**
+
+## 1. Registering and Validating Rules
+
+Custom and built-in rules are merged:
+
+js
+
+`const ruleList = rules.concat(customRuleList); const ruleErr = validateRuleList(ruleList, synchronous);`
+
+(field validation is enforced in `validateRuleList`, requiring `"names"`, `"description"`, `"function"`, etc.)
+
+## 2. **Core Linting Flow: `lintContent`**
+
+This function is where each rule function is called:
+
+js
+
+`// Function to run for each rule const forRule = (rule) => {   ...   // Prepares the onError handler and params   function onError(errorInfo) { ... }   // Calls the rule's implementation (your callback)   function invokeRuleFunction() {     rule.function(params, onError);   }   if (rule.asynchronous) {     // For async rules: return a Promise-wrapped call     return Promise.resolve().then(invokeRuleFunction)                           .catch(catchCallsOnError);   }   // For sync rules   try {     invokeRuleFunction();   } catch (error) {     if (handleRuleFailures) { catchCallsOnError(error); } else { throw error; }   }   return null; }; const ruleResults = ruleListAsyncFirst.map(forRule);`
+
+- **`params`**: The first argument, with content and parsed tokens.
+    
+- **`onError`**: The second argument, to report rule violations.
+    
+
+## 3. **How Rules Are Iterated and Called**
+
+After preprocessing:
+
+- The relevant rules (including custom) are placed in `ruleList`.
+    
+- **Each rule’s `.function` property is invoked with `params` + `onError`.**
+    
+- Results/errors are collected for output.
+    
+
+## 4. **Direct Code Example – Rule Execution (Sync/Async)**
+
+js
+
+`const forRule = (rule) => {   ...   function invokeRuleFunction() {     rule.function(params, onError); // <- rule "runs" here   }   if (rule.asynchronous) {     return Promise.resolve().then(invokeRuleFunction)                           .catch(catchCallsOnError);   }   try {     invokeRuleFunction();   } catch (error) {     if (handleRuleFailures) { catchCallsOnError(error); } else { throw error; }   }   return null; }; // Then: ruleListAsyncFirst.map(forRule);`
+
+**Source: [`lib/markdownlint.mjs`](https://github.com/DavidAnson/markdownlint/blob/v0.39.0/lib/markdownlint.mjs) v0.39.0**[github](https://github.com/DavidAnson/markdownlint/raw/refs/tags/v0.39.0/lib/markdownlint.mjs)​
+
+This is the specific, canonical spot where _every_ rule definition—internal or custom, sync or async—is executed with the parsed file content and can report lint errors. No extra speculation—this is the repo source of rule handling and invocation.
+
+1. [https://github.com/DavidAnson/markdownlint/raw/refs/tags/v0.39.0/lib/markdownlint.mjs](https://github.com/DavidAnson/markdownlint/raw/refs/tags/v0.39.0/lib/markdownlint.mjs)
+2. [https://github.com/DavidAnson/markdownlint/blob/v0.39.0/test/rules/node_modules/markdownlint-rule-sample-commonjs/sample-rule.cjs](https://github.com/DavidAnson/markdownlint/blob/v0.39.0/test/rules/node_modules/markdownlint-rule-sample-commonjs/sample-rule.cjs)
 
 ---
 ## Micromark 3rd Party Obsidian Extensions
@@ -1189,3 +1288,4 @@ Yes—micromark has third‑party extensions that implement Obsidian‑flavored 
 18. [https://forum.inkdrop.app/t/backlinks-roam-obsidian/1928](https://forum.inkdrop.app/t/backlinks-roam-obsidian/1928)
 19. [https://www.youtube.com/watch?v=sdVNiSQcMv0](https://www.youtube.com/watch?v=sdVNiSQcMv0)
 20. [https://forum.inkdrop.app/t/different-checkbox-types/3237](https://forum.inkdrop.app/t/different-checkbox-types/3237)
+

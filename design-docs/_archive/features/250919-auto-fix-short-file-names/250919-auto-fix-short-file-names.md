@@ -26,7 +26,7 @@ The citation manager currently resolves short filename references (like `version
 5. GIVEN existing fix command functionality for kebab-case anchors, WHEN the enhanced fix command runs, THEN all existing anchor fix behavior SHALL continue to work unchanged. ^AC5
 
 ## Project Root
-[`agentic-workflows/utility-scripts/citation-links`](../../../citation-links/)
+[`agentic-workflows/utility-scripts/citation-links`](../../../../citation-links)
 
 ## Tasks/SubTasks
 

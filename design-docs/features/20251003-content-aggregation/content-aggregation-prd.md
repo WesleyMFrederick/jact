@@ -312,55 +312,6 @@ _Non-Functional Requirements_: [[#^NFR6|NFR6]]
 _User Story Link_: [us2.1-implement-extraction-eligibility-strategy-pattern](user-stories/us2.1-implement-extraction-eligibility-strategy-pattern/us2.1-implement-extraction-eligibility-strategy-pattern.md)
 _Status_: 🔲 To Be Done
 
-> [!question] **ExtractionStrategy**
-> [Revised Recommendation: The Strategy Pattern](research/content-aggregation-architecture-whiteboard.md#Revised%20Recommendation%20The%20Strategy%20Pattern)
-<!-- -->
-> [!note] **Technical Lead Feedback**: Parser output data contract - Base schema validated ✅
-> _Base Schema Status_: Parser Output Contract validated in [US1.5 Phase 1](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md#Phase%201%20Parser%20Output%20Contract%20Validation%20&%20Documentation). Current schema: `{ filePath, content, tokens, links, headings, anchors }` with LinkObject (`linkType`, `scope`, `anchorType`, `source`, `target`) and AnchorObject (`anchorType`, `id`, `rawText`) structures.
-> _Epic 2 Analysis Required_: Story 2.1 implementation should review existing LinkObject schema to determine if current `linkType`/`scope`/`anchorType` fields sufficiently distinguish full-file vs. section links, or if minor schema extensions are needed for content extraction metadata.
-> _Relevant Architecture Principles_: [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [primitive-first-design](../../../../../design-docs/Architecture%20Principles.md#^primitive-first-design), [illegal-states-unrepresentable](../../../../../design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable), [explicit-relationships](../../../../../design-docs/Architecture%20Principles.md#^explicit-relationships)
-
----
-
-### The Strategic Solution ✅
-
-The Strategy Pattern, as required by **Acceptance Criterion 6**, solves this problem by decoupling the rules from the orchestrator. Each rule becomes its own small, independent component, and the main logic becomes a simple function:
-
-```javascript
-// analyzeEligibility.js - Supporting operation using strategy pattern
-// This is our chosen, extensible architecture.
-
-/**
- * Analyze link eligibility using strategy chain
- * @param {LinkObject} link - Link to analyze
- * @param {Object} cliFlags - CLI flags
- * @param {ExtractionStrategy[]} strategies - Strategy chain in precedence order
- * @returns {{ eligible: boolean, reason: string }} Eligibility decision
- */
-export function analyzeEligibility(link, cliFlags, strategies) {
-  // The order of the strategies array defines the rule precedence.
-  for (const strategy of strategies) {
-    const decision = strategy.getDecision(link, cliFlags);
-    // The first strategy that returns a non-null decision wins.
-    if (decision !== null) {
-      return decision;
-    }
-  }
-  // ... return default action
-  return { eligible: false, reason: 'default' };
-}
-
-/**
- * Create eligibility analyzer with configured strategies
- * @param {ExtractionStrategy[]} strategies - Ordered strategy chain
- * @returns {Function} Configured analyzer function
- */
-export function createEligibilityAnalyzer(strategies) {
-  return (link, cliFlags) => analyzeEligibility(link, cliFlags, strategies);
-}
-```
-
-This is a robust and maintainable design. Adding a new rule in the future is as simple as creating a new strategy class and adding it to the array in the factory—we never have to touch the core `analyzeEligibility` function again.
 
 ### Story 2.2: Implement Unified Content Extractor with Metadata
 

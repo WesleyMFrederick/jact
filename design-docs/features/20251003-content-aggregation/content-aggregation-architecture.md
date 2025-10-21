@@ -1,5 +1,4 @@
-<!-- markdownlint-disable MD024 -->
-# Citation Manager - Tool Architecture [DRAFT]
+==========# Citation Manager - Tool Architecture [DRAFT]
 
 **Critical LLM Initialization Instructions**: When first reading this file, you MUST IMMEDIATELY run citation manager to extract base paths: `npm run citation:base-paths <this-file-path> -- --format json`. Read ALL discovered base path files to gather complete architectural context before proceeding.
 
@@ -81,72 +80,6 @@ graph TB
 
 ### Citation Manager Components
 
-```mermaid
-graph TB
-    AiAssistant["<div style='font-weight: bold'>AI Coding Assistant</div><div style='font-size: 85%; margin-top: 0px'>[Person]</div><div style='font-size: 85%; margin-top:10px'>Executes commands to<br/>validate and fix citations.</div>"]
-    
-    subgraph systemBoundary ["Citation Manager [Container]"]
-        direction TB
-    
-    CLI("
-      <div style='font-weight: bold'>CLI Orchestrator</div><div style='font-size: 85%; margin-top: 0px'>[Component: Node.js, Commander.js]</div><div style='font-size: 85%; margin-top:10px'>Parses commands and coordinates the<br/>end-to-end workflow.</div>
-    ")
-        
-        
-
-        subgraph coreServices ["Core Services"]
-            direction TB
-
-            Parser("
-                <div style='font-weight: bold'>Markdown Parser</div><div style='font-size: 85%; margin-top: 0px'>[Component: Node.js, marked.js]</div><div style='font-size: 85%; margin-top:10px'>Recognizes and extracts syntactic<br/>elements (links, anchors).</div>
-            ")
-
-            Validator("
-                <div style='font-weight: bold'>Citation Validator</div><div style='font-size: 85%; margin-top: 0px'>[Component: Node.js]</div><div style='font-size: 85%; margin-top:10px'>Orchestrates semantic validation<br/>of link paths and anchors.</div>
-            ")
-            
-            ContentExtractor("
-                <div style='font-weight: bold'>Content Extractor </div><div style='font-size: 85%; margin-top: 0px'>[Component: Node.js]</div><div style='font-size: 85%; margin-top:10px'>Extracts content based on<br/>eligibility rules.</div>
-            ")
-        end
-        
-        MarkdownFlavors("
-      <div style='font-weight: bold'>Markdown Flavors (Future)</div><div style='font-size: 85%; margin-top: 0px'>[Component: Node.js]</div><div style='font-size: 85%; margin-top:10px'>Provides flavor-specific algorithms for<br/>parsing, validation, and extraction.</div>
-    ")
-    
-    FileCaches("
-      <div style='font-weight: bold'>File Caches</div><div style='font-size: 85%; margin-top: 0px'>[Component: Node.js]</div><div style='font-size: 85%; margin-top:10px'>Manages in-memory caches for file<br/>paths and parsed file objects.</div>
-    ")
-        
-  end
-
-    FileSystem["<div style='font-weight: bold'>File System</div><div style='font-size: 85%; margin-top: 0px'>[Software System]</div><div style='font-size: 85%; margin-top:10px'>Stores markdown documentation.</div>"]
-
-    AiAssistant -. "Executes commands USING<br/><span style='font-size:85%'>[CLI]</span>" .-> CLI
-  
-  CLI -. "Writes fixes VIA<br/><span style='font-size:85%'>[Node.js fs API]</span>" .-> FileSystem
-    CLI -->|"Invokes"| coreServices
-    
-  coreServices -- "USES rules from<br/><span style='font-size:85%'>[Sync]</span>" --> MarkdownFlavors
-  coreServices -- "USES <br/><span style='font-size:85%'>[Async]</span>" --> FileCaches
-    
-    FileCaches -. "Reads/Scans files VIA<br/><span style='font-size:85%'>[Node.js fs API]</span>" .-> FileSystem
-
-    style systemBoundary fill:#fafafa, stroke:#555555, stroke-width:2px
-    style coreServices fill:transparent, stroke:#aaa
-  
-    style AiAssistant fill:#08427b,stroke:#052e56,color:#ffffff, stroke-width:2px
-    style FileSystem fill:#999999,stroke:#6b6b6b,color:#ffffff, stroke-width:2px
-
-    classDef component fill:#438dd5,stroke:#2e6295,color:#ffffff, stroke-width:2px
-    classDef futureComponent fill:#85bbf0,stroke:#444444,color:#444444, stroke-width:2px, stroke-dasharray: 5 5
-    
-    class CLI,Parser,Validator,FileCaches,ContentExtractor component
-    class MarkdownFlavors futureComponent
-    
-    linkStyle default color:#555555
-```
-
 #### Citation Manager.CLI Orchestrator
 
 - **Path(s):** `tools/citation-manager/src/citation-manager.js`
@@ -184,7 +117,7 @@ The component's primary responsibility is to delegate core business logic (e.g.,
   - `marked` markdown tokenizer library
   - ESM modules
 - **Technology Status:** Production
-- **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates single anchor per header with dual ID properties (raw text and URL-encoded) for Obsidian compatibility (US1.6). ==Output (`MarkdownParser.Output.DataContract`) is consumed directly by CLI commands for debugging/inspection, or wrapped in `ParsedDocument` facade via `ParsedFileCache` for validation workflows.==
+- **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates single anchor per header with dual ID properties (raw text and URL-encoded) for Obsidian compatibility (US1.6). This component's output (`MarkdownParser.Output.DataContract`) is encapsulated by the `ParsedDocument` facade before being consumed by other components.
 - **Implementation Guide**: [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md) for the detailed data contract schema and examples
 
 ##### Interactions
@@ -193,7 +126,7 @@ The component's primary responsibility is to delegate core business logic (e.g.,
 - _provides_ structured AST data to `CLI Orchestrator` and `Citation Validator` (synchronous)
 
 ##### Boundaries
-The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. ==The component is **not** aware of the `ParsedDocument` facade that wraps its output.== The component is **not** responsible for:
+The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** aware of the `ParsedDocument` facade that wraps its output. The component is **not** responsible for:
 - Validating the existence or accessibility of file paths.
 - Verifying the semantic correctness of links or anchors.
 - Interpreting or executing any code within the document.
@@ -226,19 +159,19 @@ The component's primary output is from the `resolveFile()` method, which returns
   - `Node.js` class
   - ESM modules
 - **Technology Status:** Production
-- **Description:** Validates `Link Objects` by consuming `ParsedDocument` facade instances from the `ParsedFileCache`. Implements validation enrichment pattern (US1.8) - enriches LinkObjects in-place with validation metadata and returns `{ summary, links }` structure. Classifies citation patterns (caret syntax, cross-document, wiki-style), resolves file paths using multiple strategies (relative paths, symlinks, Obsidian absolute paths, cache lookup), uses `ParsedDocument` query methods to check for target and anchor existence, enriches each LinkObject with `validation` property containing status/error/suggestion metadata.
+- **Description:** Validates `Link Objects` by consuming `ParsedDocument` facade instances from the `ParsedFileCache` It classifies citation patterns (caret syntax, cross-document, wiki-style), resolves file paths using multiple strategies (relative paths, symlinks, Obsidian absolute paths, cache lookup), uses `ParsedDocument` query methods to check for target and anchor existence, generates validation results with actionable suggestions.
 - **Implementation Guide**: [CitationValidator Implementation Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md) for public contracts and data objects
 
 ##### Interactions
-- _uses_ the `ParsedFileCache` to retrieve ==`ParsedDocument` instances== for target files (asynchronous).
-- ==_uses_ `ParsedDocument` query methods (`hasAnchor()`, `getAnchorIds()`, `findSimilarAnchors()`) instead of direct data structure access (synchronous).==
+- _uses_ the `ParsedFileCache` to retrieve `ParsedDocument` instances for target files (asynchronous).
+- _uses_ `ParsedDocument` query methods (`hasAnchor()`, `getAnchorIds()`, `findSimilarAnchors()`) instead of direct data structure access (synchronous).
 - _uses_ the `FileCache` for filename resolution when a scope is provided (synchronous, optional dependency).
 - _validates_ file existence directly via the file system as a fallback (synchronous).
 - _returns_ validation results with status and suggestions to the `CLI Orchestrator` (asynchronous).
 
 ##### Boundaries
 - The component is exclusively responsible for the semantic validation of `Link Objects` (e.g., "does this link point to a real target?").
-- ==It is **not** responsible for parsing markdown (delegated to `MarkdownParser` via the cache) or navigating parser output structures (delegated to `ParsedDocument` facade).==
+- It is **not** responsible for parsing markdown (delegated to `MarkdownParser` via the cache) or navigating parser output structures (delegated to `ParsedDocument` facade).
 - It is **not** responsible for managing the efficiency of parsing operations (delegated to `ParsedFileCache`).
 - It does **not** perform file modifications; it only generates suggestions.
 
@@ -248,17 +181,17 @@ The component's primary output is from the `resolveFile()` method, which returns
   - `Node.js` class
   - ESM modules
 - **Technology Status:** Implemented
-- **Description:** Maintains an in-memory cache of ==`ParsedDocument` facade instances== for the duration of a single command run. ==Wraps `MarkdownParser.Output.DataContract` objects in the `ParsedDocument` facade before returning them==, ensuring each file is read from disk and parsed by the `MarkdownParser` at most once.
+- **Description:** Maintains an in-memory cache of `ParsedDocument` facade instances for the duration of a single command run. Wraps `MarkdownParser.Output.DataContract` objects in the `ParsedDocument` facade before returning them, ensuring each file is read from disk and parsed by the `MarkdownParser` at most once.
 - **Implementation Guide**: [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md) for public contracts and data objects
 
 ##### Interactions
 - _is consumed by_ the `CitationValidator` and ==`ContentExtractor`== to retrieve ==`ParsedDocument` instances== (asynchronous).
 - _delegates to_ the `MarkdownParser` to parse files that are not yet in the cache (asynchronous).
-- ==_creates_ `ParsedDocument` facade instances by wrapping `MarkdownParser.Output.DataContract` before returning (synchronous).==
+- _creates_ `ParsedDocument` facade instances by wrapping `MarkdownParser.Output.DataContract` before returning (synchronous).
 - _is instantiated by_ the `CLI Orchestrator` (via its factory) (synchronous).
 
 ##### Boundaries
-- The component's sole responsibility is to manage the in-memory lifecycle of ==`ParsedDocument` facade instances==. It acts as a key-value store mapping file paths to ==`ParsedDocument` instances==.
+- The component's sole responsibility is to manage the in-memory lifecycle of `ParsedDocument` facade instances. It acts as a key-value store mapping file paths to `ParsedDocument` instances.
 - It is **not** responsible for the parsing logic itself (which is delegated) or for any direct file system operations.
 
 ##### Error Handling & Cache Correctness
@@ -266,10 +199,9 @@ The component's primary output is from the `resolveFile()` method, which returns
 - **Retry Support**: Removing failed promises from cache enables retry on transient errors (temporary permission issues, network drive timeouts).
 - **Implementation Critical**: The `.catch()` handler must execute `cache.delete(key)` synchronously to prevent race conditions between error handling and new requests.
 
----
-#### Citation Manager.Parsed Document
+#### Citation Manager.ParsedDocument
 
-- **Path(s):** `tools/citation-manager/src/ParsedDocument.js` (Implemented - [Story 1.7](user-stories/us1.7-implement-parsed-document-facade/us1.7-implement-parsed-document-facade.md))
+- **Path(s):** `tools/citation-manager/src/ParsedDocument.js`
 - **Technology:**
   - `Node.js` class
   - ESM modules
@@ -294,61 +226,24 @@ The component's primary output is from the `resolveFile()` method, which returns
 
 ##### Output Public Contract
 The facade exposes query methods that return transformed/filtered data from the wrapped contract:
-- **Anchor Queries**: `hasAnchor(anchorId)`, `findSimilarAnchors(anchorId)`
-- **Link Queries**: `getLinks()`
-- **Content Extraction**: `extractFullContent()`; `extractSection(headingText)`, `extractBlock(anchorId)` - Stubbed for Epic 2
+- **Anchor Queries**: `hasAnchor(anchorId)`, `findSimilarAnchors(anchorId)` - Implemented in US1.7
+- **Link Queries**: `getLinks()` - Implemented in US1.7
+- **Content Extraction**: `extractFullContent()` - Implemented in US1.7; `extractSection(headingText)`, `extractBlock(anchorId)` - Stubbed for Epic 2
 - **Note**: `getBlockAnchors()`, `getHeaderAnchors()` not implemented - Epic 2 placeholders only
 
----
-#### ==Citation Manager.Markdown Flavors==
-- ==**Path(s):** `tools/citation-manager/src/flavors/MarkdownFlavorService.js` (_PROPOSED)_==
-- ==**Technology:**== ==`Node.js` class==, ==ESM modules==
-- ==**Technology Status:** To Be Implemented==
-- ==**Description:** Acts as a centralized service that **constructs and provides** flavor-specific rule sets for parsing, validation, and extraction. It translates a flavor name (e.g., "obsidian") into a concrete set of configurations and algorithms that other components use to perform their tasks.==
-
-##### ==Interactions==
-- ==The `componentFactory` _instantiates_ this service with a flavor name (e.g., "obsidian").==
-- ==The `Markdown Parser` _retrieves_ a set of link recognition patterns (e.g., regex for `[[wikilinks]]` and `[markdown links]`) from this service.==
-- ==The `Citation Validator` _retrieves_ a specific anchor validation algorithm (a strategy object) from this service.==
-- ==The `Content Extractor` _retrieves_ a set of extraction eligibility rules from this service.==
-
-##### ==Boundaries==
-- ==The component's sole responsibility is to **construct and provide** configuration objects and strategy instances based on a selected markdown flavor.==
-- ==It is **not** responsible for performing any parsing, validation, or extraction itself; it only provides the rules.==
-- ==It is **not** responsible for orchestrating the workflow.==
-
-##### ==Input Public Contract==
-1. ==A **flavor identifier** (e.g., "obsidian", "github"), provided to its constructor to set the context for which rule set to prepare.==
-
-##### ==Output Public Contract==
-
-==The component's public contract consists of methods that return the **configurations and strategy objects** themselves.==
-
-==**Example Methods and Return Values:**==
-
-- ==`getLinkExtractionPatterns()`: Returns an **array of configuration objects**, where each object contains a regex pattern and a handler function for a specific link syntax (e.g., markdown vs. wiki).==
-
-- ==`getAnchorValidationStrategy()`: Returns an **instance of a strategy class** (e.g., an `ObsidianAnchorStrategy` object) that contains the `validate()` method for a specific flavor.==
-
----
 #### ==Citation Manager.Content Extractor==
-- ==**Path(s):** `tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js` (_PROPOSED - [Epic 2: Content Extraction Component](content-aggregation-prd.md#Epic%202%20Content%20Extraction%20Component))_==
-- ==**Supporting Modules:**==
-  - ==`tools/citation-manager/src/core/ContentExtractor/analyzeEligibility.js` - Eligibility analysis orchestrator using strategy pattern==
-  - ==`tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/*.js` - Strategy pattern implementations for extraction rules==
+- ==**Path(s):** `tools/citation-manager/src/ContentExtractor.js` (_PROPOSED - [Epic 2](https://www.google.com/search?q=content-aggregation-prd.md%23Feature%2520Epics))_==
 - ==**Technology:**==
   - ==`Node.js` class==
   - ==ESM modules==
 - ==**Technology Status:** To Be Implemented==
-- ==**Description:** Extracts full content from linked documents or specific sections within them. Main component class (`ContentExtractor`) orchestrates extraction eligibility analysis and content retrieval. Supporting `analyzeEligibility` module implements strategy pattern for evaluating extraction rules. It consumes `ParsedDocument` facade instances from the `ParsedFileCache` to perform content extraction using the facade's `extractSection()`, `extractBlock()`, and `extractFullContent()` methods.==
-- **Implementation Guide**: [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
+- ==**Description:** Extracts full content from linked documents or specific sections within them. It consumes `ParsedDocument` facade instances from the `ParsedFileCache` to perform content extraction using the facade's `extractSection()`, `extractBlock()`, and `extractFullContent()` methods.==
+- - **Implementation Guide**: [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 
 ##### ==Interactions==
-- ==_Triggered By_  `CLI Orchestrator` to perform content aggregation (asynchronous).==
-- ==_Sends Data To_  `CLI Orchestrator` to display information in CLI (asynchronous).==
-- ==_Calls_  `ParsedFileCache` to retrieve `ParsedDocument` instances for target documents (asynchronous).==
-- ==_Uses_ `ParsedDocument` content extraction methods (`extractSection()`, `extractBlock()`, `extractFullContent()`) to retrieve content (synchronous).==
-- ==_Persists Data To_ `FileSystem` content extraction methods (`extractSection()`, `extractBlock()`, `extractFullContent()`) to retrieve content (synchronous).==
+- ==_is consumed by_ the `CLI Orchestrator` to perform content aggregation (asynchronous).==
+- ==_uses_ the `ParsedFileCache` to retrieve `ParsedDocument` instances for target documents (asynchronous).==
+- ==_uses_ `ParsedDocument` content extraction methods (`extractSection()`, `extractBlock()`, `extractFullContent()`) to retrieve content (synchronous).==
 
 ##### ==Boundaries==
 - ==The component's sole responsibility is to extract content strings based on `Link Objects` by orchestrating calls to `ParsedDocument` facade methods.==
@@ -362,8 +257,7 @@ The facade exposes query methods that return transformed/filtered data from the 
 ##### ==Output Public Contract==
 ==The `extract()` method returns a `Promise` that resolves with a **Content Block object**. This object contains the extracted `content` (string) and `metadata` about its source (e.g., the source file path and anchor).==
 
----
-### Validate Citations - Component Interaction Diagram
+### `validate` Command Component Sequence Diagram
 
 ```mermaid
 sequenceDiagram
@@ -389,68 +283,44 @@ sequenceDiagram
 
     CLI->>+Validator: validateFile(filePath)
 
-    note over Validator: Get source file's parsed document and extract links
-    Validator->>+ParsedCache: resolveParsedFile(sourceFilePath)
-    ParsedCache-->>-Validator: ParsedDocument instance
-    Validator->>+ParsedDoc: getLinks()
-    ParsedDoc-->>-Validator: Array of LinkObjects
+    loop FOR EACH: unique file needed for validation
+        Validator->>+ParsedCache: resolveParsedFile(filePath)
 
-    loop FOR EACH: cross-document link
+        alt ON: Cache Miss
+            ParsedCache->>+Parser: parseFile(filePath)
 
-        opt IF: FileCache available (--scope flag provided)
-            note over Validator, FileCache: Path resolution Strategy 4: Smart filename matching
-            Validator->>+FileCache: resolveFile(filename)
-            FileCache-->>-Validator: { found, path, fuzzyMatch }
+            note over Parser, FS: Parser reads file content from File System.
+            Parser->>FS: readFileSync(filePath)
+            FS-->>Parser: Return content
+
+            note over Parser: Tokenizes content using marked library and extracts links, anchors, headings.
+
+            Parser-->>-ParsedCache: Return MarkdownParser.Output.DataContract (Promise)
+
+            note over ParsedCache, ParsedDoc: Cache wraps raw contract in ParsedDocument facade
+            ParsedCache->>+ParsedDoc: new ParsedDocument(contract)
+            ParsedDoc-->>-ParsedCache: ParsedDocument instance
+        else On a Cache Hit
+            note over ParsedCache: Returns cached ParsedDocument instance directly from memory.
         end
 
-        alt IF: Target file exists
-            Validator->>+ParsedCache: resolveParsedFile(targetFilePath)
+        ParsedCache-->>-Validator: Return ParsedDocument instance (Promise)
 
-            alt ON: Cache Miss
-                ParsedCache->>+Parser: parseFile(filePath)
-
-                note over Parser, FS: Parser reads file content from File System.
-                Parser->>FS: readFileSync(filePath)
-                FS-->>Parser: Return content
-
-                note over Parser: Tokenizes content using marked library and extracts links, anchors, headings.
-
-                Parser-->>-ParsedCache: Return MarkdownParser.Output.DataContract (Promise)
-
-                note over ParsedCache, ParsedDoc: Cache wraps raw contract in ParsedDocument facade
-                ParsedCache->>+ParsedDoc: new ParsedDocument(contract)
-                ParsedDoc-->>-ParsedCache: ParsedDocument instance
-            else ON: Cache Hit
-                note over ParsedCache: Returns cached ParsedDocument instance directly from memory.
-            end
-
-            ParsedCache-->>-Validator: Return ParsedDocument instance (Promise)
-
-            note over Validator, ParsedDoc: Validator uses facade query methods for anchor validation
-            Validator->>+ParsedDoc: hasAnchor(anchorId) / findSimilarAnchors()
-            ParsedDoc-->>-Validator: Query results
-
-        else IF: Target file NOT found
-            opt IF: FileCache available (--scope flag provided)
-                note over Validator, FileCache: Enhanced error messages with fuzzy matching
-                Validator->>+FileCache: resolveFile(filename)
-                FileCache-->>-Validator: { found, path, fuzzyMatch, message }
-                note over Validator: Use fuzzy match for "Did you mean?" suggestions
-            end
-        end
+        note over Validator, ParsedDoc: Validator uses facade query methods
+        Validator->>+ParsedDoc: hasAnchor(anchorId) / getAnchorIds()
+        ParsedDoc-->>-Validator: Query results
     end
 
-    note over Validator: Validator now has all validation results in memory.
+    note over Validator: Validator now has all parsed data and performs its validation logic in memory.
 
-    Validator-->>-CLI: Return ValidationResult { summary, links } with enriched LinkObjects
+    Validator-->>-CLI: Return validation results
     CLI-->>-User: Display report
 ```
 
 #### Workflow Characteristics
 - **Component Creation**: The `CLI Orchestrator` (via its factory) creates instances of all components at runtime.
 - **Dependency Injection**: Dependencies are injected at instantiation (`fileSystem` into `Parser`, `ParsedFileCache` into `Validator`), decoupling components.
-- **Dual Caching Strategy**: The workflow uses two distinct caches: `FileCache` for mapping short filenames to absolute paths, and `ParsedFileCache` to store in-memory `ParsedDocument` facade instances.
-- **Validation Enrichment Pattern (US1.8)**: CitationValidator enriches LinkObjects in-place with validation metadata via `validation` property. Returns `{ summary, links }` structure where summary provides aggregate counts and links array contains enriched LinkObjects with embedded validation status/error/suggestion.
+- **Dual Caching Strategy**: The workflow uses two distinct caches: `FileCache` for mapping short filenames to absolute paths, and `ParsedFileCache` to store in-memory ==`ParsedDocument` facade instances==.
 - **Facade Pattern**: `ParsedFileCache` wraps `MarkdownParser.Output.DataContract` in `ParsedDocument` facade before returning, providing stable query interface.
 - **Layered Data Retrieval**: The `CitationValidator` is decoupled from the `MarkdownParser`; it requests `ParsedDocument` instances from the `ParsedFileCache`, which delegates to the `Parser` on cache misses.
 - **Query-Based Access**: Consumers use `ParsedDocument` query methods (`hasAnchor()`, `getLinks()`) instead of direct data structure access, decoupling from parser internals.
@@ -458,68 +328,10 @@ sequenceDiagram
 - **File System Access**: `FileCache` scans directories, `MarkdownParser` reads file content synchronously (`readFileSync`), and `CLI Orchestrator` writes file modifications for the `--fix` operation.
 - **Fix Logic Location**: The `fix` logic remains within the `CLI Orchestrator`, operating on the final validation results.
 
----
-### Extract Citation Content: Component Interaction Diagram
+### `extract` Command Component Sequence Diagram
+![ContentExtractor Workflow: Component Interaction Diagram](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
 
-```mermaid
-sequenceDiagram
-  actor User
-    participant CLI as CLI Orchestrator
-    participant Extractor as Content Extractor
-    participant Validator as Citation Validator
-    participant ParsedCache as ParsedFileCache
-
-    User->>CLI: extract <file> --scope <dir>
-
-    note over CLI: Instantiates ContentExtractor via factory
-
-    CLI->>+Extractor: extractLinksContent(sourceFilePath, cliFlags)
-
-    note over Extractor: 0. Internal Validation (prerequisite)
-    Extractor->>+Validator: validateFile(sourceFilePath)
-    Validator->>ParsedCache: resolveParsedFile(sourceFilePath)
-    ParsedCache-->>Validator: Return ParsedDocument
-    Validator-->>-Extractor: Return { summary, links } with enriched LinkObjects
-
-    note over Extractor: Extractor uses enriched links directly (no redundant getLinks call)
-    note over Extractor: Get links from source document
-    Extractor->>+ParsedCache: resolveParsedFile(sourceFilePath)
-    ParsedCache-->>-Extractor: Return ParsedDocument (source)
-    Extractor->>Extractor: parsedDoc.getLinks()
-    
-    note over Extractor: 1. Internal Eligibility Analysis (Strategy Pattern)
-    Extractor->>Extractor: Analyze Links for Eligibility (using internal Analyzer class)
-
-    note over Extractor: 2. Internal Content Retrieval Loop
-    loop FOR EACH: eligible Link
-        Extractor->>+ParsedCache: resolveParsedFile(targetPath)
-        
-        ParsedCache->>ParsedCache: get ParsedDocument using cache 
-        ParsedCache-->>Extractor: Return ParsedDocument (Facade)
-
-        Extractor->>Extractor: Extract content using ParsedDocument.extract*() methods
-        
-        note over Extractor: Aggregates content chunk internally, manages formatting/metadata.
-    end
-
-    Extractor-->>-CLI: Return Aggregated Content (String + Metadata)
-
-    CLI->>User: Write Output File / Display Report (Final I/O)
-```
-
-#### Extract Citation Content: Workflow Characteristics
-- **Single Service Interface**: The core operation is executed via a **single, high-level call** to the `Content Extractor` component: `extractLinksContent(sourceFilePath, cliFlags)`. This abstracts the entire multi-step process from the CLI.
-- **Internal Validation**: The `Content Extractor` internally calls `CitationValidator` to validate the source file before extraction, ensuring citations are valid before content aggregation begins.
-- **Enriched Link Consumption (US1.8)**: The `Content Extractor` receives enriched LinkObjects from validation with embedded `validation` metadata. Uses `links.filter(link => link.validation.status === "valid")` for eligibility without separate correlation or redundant parser calls.
-- **Encapsulated Logic**: The `Content Extractor` internally manages the complex control flow, performing the **Link Eligibility Analysis** (via its internal Strategy Pattern class) and the subsequent **Content Retrieval Loop**.
-- **Data Retrieval**: The workflow depends on the `ParsedFileCache` to retrieve the `ParsedDocument` facade instances. This leverages the performance guarantee that each unique file is parsed only once.
-- **Complexity Abstraction**: Content retrieval is handled by declarative calls to the `ParsedDocument` facade's methods (`extractSection()`, `extractBlock()`, `extractFullContent()`). The facade hides the underlying token-walking or line-lookup mechanics.
-- **Aggregation Point**: The `Content Extractor` is responsible for **internal content aggregation** (managing formatting and metadata) before returning the final result to the CLI.
-- **Final I/O**: The `CLI Orchestrator` performs the single, final I/O operation: writing the fully aggregated content string to the output file.
-- **Asynchronous Flow**: The core content retrieval operations remain **asynchronous** (`Promise`-based) to accommodate the file I/O operations necessary during cache misses.
-
----
-### Auto-Fix Workflow: Component Interaction Diagram
+### Auto-Fix Workflow
 
 The `--fix` flag enables automatic correction of broken citations. This workflow executes after async validation completes, applying corrections based on validation suggestions.
 
@@ -667,7 +479,6 @@ tools/citation-manager/
 **Type**: ECMAScript Modules (ESM)
 - Uses `import`/`export` syntax
 - Explicit `.js` extensions in import paths
-- Confirmed in [US1.3 Implementation Note](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/user-stories/us1.3-make-migrated-citation-manager-executable/us1.3-make-migrated-citation-manager-executable.md)
 
 **Import Pattern Example**:
 
@@ -678,10 +489,6 @@ import { CitationValidator } from "./src/CitationValidator.js";
 ### Coding Standards
 
 Follows workspace coding standards defined in [Architecture: Coding Standards](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Coding%20Standards%20and%20Conventions):
-- Files: `kebab-case.js`
-- Functions/Variables: `camelCase`
-- Classes: `TitleCase`
-- Test Descriptions: Natural language with spaces in `it()` methods
 
 ---
 
@@ -721,12 +528,6 @@ tools/citation-manager/test/
     ├── shared-target.md              # Cache fixtures (US1.5)
     └── [additional fixtures]
 ```
-
-**Test Suite Statistics** (post-US1.5):
-- **Total tests**: 73
-- **Passing**: 71 (97.3%)
-- **Pre-existing failures**: 2 (documented in [Test Suite Edge Cases](#Test%20Suite%20Edge%20Cases%20(CLI%20Display%20and%20URL%20Encoding)))
-- **US1.5 additions**: 31 new tests (contract validation, cache unit, integration, factory, E2E)
 
 ### Test Categories
 
@@ -824,8 +625,8 @@ pkill -f "vitest"
 | Technology | Version | Purpose | Source |
 |------------|---------|---------|--------|
 | **Node.js** | ≥18.0.0 | Runtime environment | [Workspace Tech Stack](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
-| **Commander.js** | ≥14.0.1 | CLI command parsing and argument handling | Tool-specific dependency |
-| **marked** | ≥!!15.0.12 | Markdown tokenization and AST generation | Tool-specific dependency |
+| **Commander.js** | ^14.0.1 | CLI command parsing and argument handling | Tool-specific dependency |
+| **marked** | ^15.0.12 | Markdown tokenization and AST generation | Tool-specific dependency |
 | **Vitest** | latest | Testing framework (shared) | [Workspace Tech Stack](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
 | **Biome** | latest | Linting/formatting (shared) | [Workspace Tech Stack](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
 | **Node.js built-in modules** | native | File I/O (fs), path operations (path), URL utilities (url) | Node.js standard library |
@@ -861,28 +662,7 @@ This tool follows workspace design principles defined in [Architecture Principle
 
 ## Known Risks and Technical Debt
 
-### ✅ RESOLVED: Data Duplication Between LinkObject and ValidationResult
 
-**Resolution Date**: 2025-10-18
-**Resolved By**: [US1.8: Implement Validation Enrichment Pattern](user-stories/us1.8-implement-validation-enrichment-pattern/us1.8-implement-validation-enrichment-pattern.md)
-
-**Original Problem**: Pre-US1.8 architecture created separate data structures for parser output (`LinkObject`) and validation results (`ValidationResult`), leading to 80% data duplication. Same fields (line, column, citation, linkType) stored twice in memory.
-
-**Solution Implemented**: Validation enrichment pattern - validation metadata now lives directly on LinkObject via `validation` property. ValidationResult structure changed to `{ summary, links }` where `links` is the array of enriched LinkObjects.
-
-**Benefits Achieved**:
-- Zero duplication of structural data (line, column, linkType, fullMatch)
-- Single getLinks() call - validator returns enriched links that downstream components use directly
-- Progressive enhancement pattern - parser creates base LinkObject, validator enriches with validation metadata
-- Natural data flow through pipeline (parse → validate → filter → extract)
-
-**Implementation Evidence**:
-- CitationValidator.validateFile() returns `{ summary, links }` structure (CitationValidator.js:209-213)
-- Links enriched in-place with `validation` property during parallel execution (CitationValidator.js:173-198)
-- CLI consumes enriched structure for reporting (citation-manager.js:188-247)
-- 5+ integration tests validate pattern (citation-validator-enrichment.test.js)
-
-**ADR Reference**: [Validation Enrichment Pattern ADR](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Architectural%20Decision%20Validation%20Enrichment%20Pattern)
 
 ### Scattered File I/O Operations
 
@@ -1028,100 +808,67 @@ Refactor CitationValidator helper methods (`suggestObsidianBetterFormat()`, `fin
 **Timeline**: Revisit after MVP validation shows repetitive CLI usage patterns across projects.
 **Status**: Backlog (deferred from Epic 2 MVP scope).
 
-### Test Suite Edge Cases (CLI Display and POC Features)
+### Test Suite Edge Cases (CLI Display and URL Encoding)
 
 **Risk Category**: Quality / Testing
 
-**Description**: 2 tests in the citation manager test suite fail with pre-existing edge case issues unrelated to core functionality. These failures represent technical debt in auto-fix feature completeness and POC section extraction implementation.
+**Description**: 7 tests in the citation manager test suite fail with pre-existing edge case issues unrelated to core functionality. These failures represent technical debt in CLI display formatting and URL-encoded anchor handling that accumulated before US1.5 implementation.
 
 **Failing Tests**:
-1. **Auto-Fix Kebab-Case Anchor Conversion** (1 test) - Auto-fix feature does not convert kebab-case anchors to URL-encoded format (e.g., `#sample-header` → `#Sample%20Header`)
-2. **POC Section Extraction H4 Support** (1 test) - POC section extraction logic returns null when extracting H4 sections
+1. **CLI Warning Output Formatting** (3 tests) - Display logic issues in warning section formatting
+2. **URL-Encoded Anchor Handling** (3 tests) - Edge case in anchor matching when anchors contain URL-encoded characters (e.g., spaces as `%20`)
+3. **Wiki-Style Link Classification** (1 test) - Edge case in pattern detection for wiki-style links
 
 **Impact**:
-- **Low**: Core functionality works correctly. Auto-fix handles path corrections but not anchor format normalization. POC feature affects only proof-of-concept code, not production validation.
-- **Scope**: Affects auto-fix feature completeness and POC section extraction edge cases
-- **Test Suite Status**: 121/123 tests passing (98.4%)
+- **Low**: Core functionality works correctly. Issues affect edge cases in display formatting and specific anchor encoding patterns.
+- **Scope**: Affects CLI display logic and anchor matching edge cases
+- **Test Suite Status**: 44/51 tests passing (86%)
 
-**Current State**:
-- **US1.8 Validation Enrichment Pattern**: Implementation complete with zero regressions (121/123 passing)
-- **Unrelated Failures**: Both failures existed before US1.8 and are unrelated to validation enrichment changes
+**Rationale for Accepting Risk**: These edge case failures were identified during US1.5 validation but are unrelated to cache implementation. All schema validation tests (8/8) pass, confirming Phase 1 parser contract objectives met. Core parsing and validation functionality works correctly.
 
-**Rationale for Accepting Risk**: These edge case failures are isolated to feature extensions (auto-fix anchor transformation, POC section extraction) and do not affect core validation functionality. All schema validation tests pass, all enrichment pattern tests pass, zero functional regressions from recent changes.
-
-**Mitigation Strategy**: Create dedicated user stories to address:
-1. Auto-fix anchor format transformation support
-2. POC section extraction H4 heading level support
+**Mitigation Strategy**: Create dedicated user story to address edge cases in CLI warning display formatting and URL-encoded anchor handling.
 
 **Resolution Criteria**:
-- Auto-fix feature converts kebab-case anchors to appropriate format
-- POC section extraction handles H4 sections correctly
-- All 123 tests passing
+- All 7 failing tests updated or refactored to pass
+- CLI warning output formatting matches expected format
+- URL-encoded anchors (e.g., spaces as `%20`) handled correctly in anchor matching
+- Wiki-style link classification edge cases resolved
 
 **Timeline**: Low priority - address after Epic 2 Content Aggregation implementation complete.
-**Estimated Effort**: 1-2 tasks, ~2-4 hours total
+**Estimated Effort**: 2-3 tasks, ~4-6 hours total
 **Status**: Documented technical debt, low priority.
 
-### CLI Subprocess Testing Buffer Limits
-
-**Risk Category**: Testing Infrastructure / Architecture
-
-**Status**: Workaround Implemented (2025-10-18) - Refactoring Recommended
-
-**Description**: The current CLI integration testing pattern spawns the CLI as a subprocess using `execSync()`, which creates OS-level stdio pipes with ~64KB buffer limits on macOS. When CLI output exceeds this limit (e.g., large JSON validation results with 100+ citations producing 92KB+ output), data gets truncated, resulting in malformed JSON and test failures.
-
-**Root Cause**: Node.js `child_process` stdio pipes are subject to OS-level buffer limits (~64KB on macOS). Tests that spawn the CLI as a subprocess encounter these limits, while production CLI usage (writing directly to terminal stdout) is not affected.
-
-**Impact**:
-- **Medium**: Tests use different execution path than production code, requiring special workarounds
-- **Complexity**: Shell redirection to temporary files adds infrastructure complexity
-- **Debugging**: Subprocess spawning makes debugging more difficult
-- **Scope**: Affects all CLI integration tests that spawn subprocesses
-
-**Current Workaround**: Shell redirection to temporary files (`test/helpers/cli-runner.js`) bypasses pipe buffers by writing output to filesystem before reading. This works but adds complexity and maintenance overhead.
-
-**Recommended Mitigation**: Refactor tests to import CLI functions directly instead of spawning subprocesses:
-- Export `validateFile()`, `formatAsJSON()` from CLI Orchestrator component
-- Import functions directly in tests (no subprocess spawning)
-- Reserve subprocess testing for true E2E scenarios (argument parsing, exit codes)
-- Aligns test architecture with production architecture (both use same code path)
-
-**Benefits of Refactoring**:
-- ✅ No buffer limits (in-memory objects, not piped output)
-- ✅ Faster tests (no subprocess overhead)
-- ✅ Simpler debugging (same process, can use debugger)
-- ✅ Tests match production code paths
-- ✅ Eliminates workaround complexity
-
-**Resolution Criteria**:
-- CLI Orchestrator exports testable functions (`validateFile()`, `formatAsJSON()`)
-- 99% of tests import functions directly (unit/integration tests)
-- 1% of tests use subprocess spawning (E2E CLI behavior tests)
-- Remove or simplify `cli-runner.js` helper
-
-**Timeline**: Implement when adding more CLI integration tests or hitting other subprocess-related issues.
-**Estimated Effort**: 8-12 hours (1-2 days)
-**Priority**: Medium - current workaround functional but adds complexity
-
-**References**:
-- **Detailed Analysis**: [Bug 3: Buffer Limit Resolution](user-stories/us1.8-implement-validation-enrichment-pattern/bug3-buffer-limit-resolution.md)
-- **Workspace Architecture**: [Technical Debt: CLI Subprocess Testing Buffer Limits](../../../../../design-docs/Architecture%20-%20Baseline.md#Technical%20Debt%20CLI%20Subprocess%20Testing%20Buffer%20Limits)
-
-## Known Bugs
-### Bug 001: POC Section Extraction Returning Null
-
-**Test**: `poc-section-extraction.test.js > should extract H4 section stopping at next H2/H3/H4`
-**Status**: ❌ FAILING
-**Symptoms**:
-- `expected null not to be null`
-- Section extraction returning null when extracting H4 section
-- Test expects section object with heading and content
-**Root Cause**: POC section extraction logic not handling H4 sections correctly
-**US1.8 Related**: ❌ NO - This is a POC feature issue completely unrelated to validation structure
-**Impact**: Low - POC feature only, not production code
-**Remediation**: Fix POC section extraction logic for H4 heading levels (separate from US1.8 scope)
-
 ## Architecture Decision Records (ADRs)
+
+### ADR-001: Phased Test Migration Strategy
+
+- **Status**: Accepted
+- **Date**: 2025-10-04
+- **Context**: Analysis of US1.4 scope revealed that test migration involves two distinct, separable work streams with different risk profiles:
+ 1. **Test Framework Conversion**: Migrating 1,863 lines across 7 test files from `node:test` to Vitest with `expect()` assertions
+ 2. **Component DI Refactoring**: Restructuring CitationValidator, MarkdownParser, and FileCache for constructor-based dependency injection with factory pattern implementation
+
+ Combining both efforts creates compound risk: test conversion failures could mask DI refactoring issues, and vice versa. Additionally, Epic 2 architecture design will establish DI patterns for new components (ContentExtractor), making it more effective to refactor existing components after new patterns are proven.
+
+- **Decision**: Split US1.4 into two sequential stories:
+  - **US1.4a - Test Migration**: Convert test suite to Vitest, update assertions to expect(), fix paths to workspace structure. Accept non-DI component instantiation as temporary technical debt.
+  - **US1.4b - DI Refactoring**: Implement constructor-based DI, create factory pattern, update tests for DI usage, add integration tests. Resolves documented technical debt.
+
+- **Alternatives Considered**:
+  - **Comprehensive US1.4**: Do both simultaneously - rejected due to compound risk and delayed Epic 2 delivery
+  - **Minimal US1.4 with indefinite debt**: Accept non-DI architecture permanently - rejected as violates workspace architecture principles
+
+- **Consequences**:
+  - **Positive**: Risk isolation - test conversion validated independently before component refactoring begins
+  - **Positive**: Faster Epic 2 start - US1.4a unblocks architecture design for new components
+  - **Positive**: Better DI patterns - Epic 2 design informs US1.4b refactoring approach
+  - **Positive**: Incremental validation - clear gates between test migration and DI implementation
+  - **Negative**: Temporary architectural non-compliance during US1.4a execution (mitigated by time-boxed technical debt)
+  - **Negative**: Two-phase migration overhead (mitigated by reduced compound risk)
+
+- **Implementation Timeline**:
+  - US1.4a: Immediate (Epic 1 completion)
+  - US1.4b: After Epic 2 architecture design, before US2.1 implementation
 
 ---
 
@@ -1142,6 +889,31 @@ npm run citation:validate <file-path> [options]
 npm run citation:ast <file-path> [options]
 npm run citation:base-paths <file-path> -- --format json
 ```
+
+---
+
+## Future Enhancements (Epic 2)
+
+**Content Aggregation Feature** (planned):
+- Extract full content from linked sections
+- Aggregate content into single output file
+- Support both section-specific and full-file extraction
+- Provide metadata-rich output for AI context management
+
+**Reference**: [Epic 2: citation-manager Content Aggregation Enhancement](content-aggregation-prd.md#Feature%20Epics)
+
+---
+
+## Document Status
+
+**Last Updated**: 2025-10-05
+**Version**: 0.2 (Draft)
+**Next Steps**:
+- ✓ Complete US1.4a test migration to Vitest (DONE)
+- ✓ Implement US1.4b DI refactoring with factory pattern (DONE)
+- Design Epic 2 architecture with DI patterns for ContentExtractor
+- Document component interfaces and data contracts
+- Create component interaction diagrams
 
 ---
 

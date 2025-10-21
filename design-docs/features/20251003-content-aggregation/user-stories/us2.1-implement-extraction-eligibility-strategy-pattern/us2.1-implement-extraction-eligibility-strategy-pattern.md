@@ -40,7 +40,7 @@ _Non-Functional Requirements_: [[../../content-aggregation-prd.md#^NFR6|NFR6]]
 ### Architectural Context (C4)
 
 > [!help] Overview
-> - **Creates** `ContentExtraction` component that contains the:
+> - **Creates** `ContentExtractor` component that contains the:
 >   - `ExtractionEligibilityAnalyzer`
 >   - `ExtractionStrategy` classes, which implement the eligibility rule logic using the Strategy Pattern.
 > - **Updates**
@@ -50,7 +50,7 @@ _Non-Functional Requirements_: [[../../content-aggregation-prd.md#^NFR6|NFR6]]
 
 ### US 2.1 Scope
 
-1. **Create** the `ContentExtractor` component structure following [Action-Based File Organization](../../../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition) principles:
+1. **Create** the `ContentExtractor` component structure following [Action-Based File Organization](../../../../Architecture%20Principles.md#^action-based-file-organization-definition) principles:
     - `src/core/ContentExtractor/ContentExtractor.js` - Main component class (Component Entry Point, TitleCase)
     - `src/core/ContentExtractor/analyzeEligibility.js` - Supporting operation implementing strategy pattern (verb-noun, camelCase)
     - `src/core/ContentExtractor/eligibilityStrategies/` directory for strategy classes
@@ -82,13 +82,16 @@ _Non-Functional Requirements_: [[../../content-aggregation-prd.md#^NFR6|NFR6]]
     - Inject strategy array into `ContentExtractor` constructor
     - Return configured component instance
 
+> [!note] **US2.1 Scope Limitation**
+> US2.1 creates ContentExtractor with eligibility analysis only. The `ParsedFileCache` and `CitationValidator` dependencies will be added in Story 2.2 when content retrieval functionality is implemented.
+
 ### US2.1 Components Impacted
 
 - [Content Extractor](../../content-aggregation-architecture.md#==Citation%20Manager.Content%20Extractor==)(CREATE)
   - Encapsulate extraction eligibility logic using the Strategy Pattern.
   - Orchestrate `Strategy` classes (`StopMarkerStrategy`, `ForceMarkerStrategy`, `SectionLinkStrategy`, `CliFlagStrategy`) to determine link eligibility.
   - Produce an `ExtractionJob` object with a decision (`{ eligible: boolean, reason: string }`) for each link.
--[Markdown Parser](../../content-aggregation-architecture.md#Citation%20Manager.Markdown%20Parser) (UPDATE)
+- [Markdown Parser](../../content-aggregation-architecture.md#Citation%20Manager.Markdown%20Parser) (UPDATE)
   - Scan for `%%extract-link%%` and `%%stop-extract-link%%` markers on the same line as a link.
   - Add an `extractionMarker` property to the `LinkObject` schema in `MarkdownParser.Output.DataContract`.
 - [CLI Orchestrator](../../content-aggregation-architecture.md#Citation%20Manager.CLI%20Orchestrator) (UPDATE)
@@ -102,21 +105,70 @@ _Non-Functional Requirements_: [[../../content-aggregation-prd.md#^NFR6|NFR6]]
 #### Implementation Guides
 - [Content Extractor Implementation Guide](../../../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 - [Markdown Parser Implementation Guide](../../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md)
-- [Extract Citation Content: Component Interaction Diagram](../../content-aggregation-architecture.md#Extract%20Citation%20Content%20Component%20Interaction%20Diagram)
+- [Component Interaction Diagram After US1.7](../../content-aggregation-architecture.md#Component%20Interaction%20Diagram%20After%20US1.7)
 - [Revised Recommendation: The Strategy Pattern](../../research/content-aggregation-architecture-whiteboard.md#Revised%20Recommendation%20The%20Strategy%20Pattern)
 
 ### Files Impacted
 
-|File Path|Action|Description|Rationale & Requirements|
-|---|---|---|---|
-|`tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js`|**(CREATE)**|Main component class orchestrating content extraction.|Component entry point (TitleCase, noun-based) per [Component Entry Point Priority](../../../component-guides/Content%20Extractor%20Implementation%20Guide.md#File%20Naming%20Conventions). Orchestrates eligibility analysis and content retrieval.|
-|`tools/citation-manager/src/core/ContentExtractor/analyzeEligibility.js`|**(CREATE)**|Supporting operation implementing strategy pattern for eligibility analysis.|Supporting operation (camelCase, verb-noun) per [Action-Based File Organization](../../../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition). Orchestrates prioritized strategy chain execution.|
-|`tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/ExtractionStrategy.js`|**(CREATE)**|Base interface class defining the contract for extraction eligibility strategies.|Required by [AC6](#^US2-1AC6) (Strategy Pattern). All concrete strategy classes extend this interface with a `getDecision(link, cliFlags)` method.|
-|`tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js`|**(CREATE)**|Concrete strategy checking for `%%stop-extract-link%%` marker.|Highest precedence rule ([AC5](#^US2-1AC5)). Returns `{ eligible: false, reason: "..." }` when marker present, `null` otherwise.|
-|`tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js`|**(CREATE)**|Concrete strategy checking for `%%extract-link%%` marker.|Second-highest precedence rule ([AC5](#^US2-1AC5), [AC3](#^US2-1AC3)). Overrides default full-file behavior to force extraction.|
-|`tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js`|**(CREATE)**|Concrete strategy for default section/block link behavior.|Returns `{ eligible: true }` when `link.anchorType` is not null ([AC2](#^US2-1AC2)), implementing default extraction for links with anchors.|
-|`tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js`|**(CREATE)**|Concrete strategy evaluating `--full-files` CLI flag.|Lowest precedence rule. Returns `{ eligible: true }` for full-file links when flag present, `{ eligible: false }` otherwise ([AC1](#^US2-1AC1)).|
-|`tools/citation-manager/src/MarkdownParser.js`|**(UPDATE)**|Add marker detection logic in `extractLinks()` method.|Required by [FR10](../../content-aggregation-prd.md#^FR10), [NFR6](../../content-aggregation-prd.md#^NFR6). Scan for `%%extract-link%%` and `%%stop-extract-link%%` on same line as links. Add `extractionMarker` property to LinkObject schema (values: `'force-extract'`, `'stop-extract'`, `null`).|
-|`tools/citation-manager/src/citation-manager.js`|**(UPDATE)**|CLI orchestrator to instantiate ContentExtractor and pass `--full-files` flag.|Required for Epic 2 integration. Create ContentExtractor via factory, invoke component methods for eligibility analysis and content extraction. Handle results for content aggregation workflow.|
-|`tools/citation-manager/src/factories/componentFactory.js`|**(UPDATE)**|Add `createContentExtractor()` factory function.|Required by [AC6](#^US2-1AC6) and DI pattern. Instantiate ContentExtractor with strategy array in precedence order (StopMarkerStrategy, ForceMarkerStrategy, SectionLinkStrategy, CliFlagStrategy), return configured component instance.|
-|`tools/citation-manager/design-docs/component-guides/Markdown Parser Implementation Guide.md`|**(UPDATE)**|Document `extractionMarker` property in `LinkObject` schema.|Required for contract documentation. Update `LinkObject` JSON schema with new `extractionMarker: string\|null` field. Add examples showing marker detection in parser output.|
+| File Path                                                                                       | Action       | Description                                                                       | Rationale & Requirements                                                                                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js`                          | **(CREATE)** | Main component class orchestrating content extraction.                            | Component entry point (TitleCase, noun-based) per [File Structure](../../../../component-guides/Content%20Extractor%20Implementation%20Guide.md#File%20Structure). Orchestrates eligibility analysis and content retrieval.                                                    |
+| `tools/citation-manager/src/core/ContentExtractor/analyzeEligibility.js`                        | **(CREATE)** | Supporting operation implementing strategy pattern for eligibility analysis.      | Supporting operation (camelCase, verb-noun) per [Action-Based File Organization](../../../../Architecture%20Principles.md#^action-based-file-organization-definition). Orchestrates prioritized strategy chain execution.                                                            |
+| `tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/ExtractionStrategy.js`  | **(CREATE)** | Base interface class defining the contract for extraction eligibility strategies. | Required by [AC6](#^US2-1AC6) (Strategy Pattern). All concrete strategy classes extend this interface with a `getDecision(link, cliFlags)` method.                                                                                                                                                     |
+| `tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js`  | **(CREATE)** | Concrete strategy checking for `%%stop-extract-link%%` marker.                    | Highest precedence rule ([AC5](#^US2-1AC5)). Returns `{ eligible: false, reason: "..." }` when marker present, `null` otherwise.                                                                                                                                                                       |
+| `tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js` | **(CREATE)** | Concrete strategy checking for `%%extract-link%%` marker.                         | Second-highest precedence rule ([AC5](#^US2-1AC5), [AC3](#^US2-1AC3)). Overrides default full-file behavior to force extraction.                                                                                                                                                                       |
+| `tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js` | **(CREATE)** | Concrete strategy for default section/block link behavior.                        | Returns `{ eligible: true }` when `link.anchorType` is not null ([AC2](#^US2-1AC2)), implementing default extraction for links with anchors.                                                                                                                                                           |
+| `tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js`     | **(CREATE)** | Concrete strategy evaluating `--full-files` CLI flag.                             | Lowest precedence rule. Returns `{ eligible: true }` for full-file links when flag present, `{ eligible: false }` otherwise ([AC1](#^US2-1AC1)).                                                                                                                                                       |
+| `tools/citation-manager/src/MarkdownParser.js`                                                  | **(UPDATE)** | Add marker detection logic in `extractLinks()` method.                            | Required by [FR10](../../content-aggregation-prd.md#^FR10), [NFR6](../../content-aggregation-prd.md#^NFR6). Scan for `%%extract-link%%` and `%%stop-extract-link%%` on same line as links. Add `extractionMarker` property to LinkObject schema (values: `'force-extract'`, `'stop-extract'`, `null`). |
+| `tools/citation-manager/src/citation-manager.js`                                                | **(UPDATE)** | CLI orchestrator to instantiate ContentExtractor and pass `--full-files` flag.    | Required for Epic 2 integration. Create ContentExtractor via factory, invoke component methods for eligibility analysis and content extraction. Handle results for content aggregation workflow.                                                                                                       |
+| `tools/citation-manager/src/factories/componentFactory.js`                                      | **(UPDATE)** | Add `createContentExtractor()` factory function.                                  | Required by [AC6](#^US2-1AC6) and DI pattern. Instantiate ContentExtractor with strategy array in precedence order (StopMarkerStrategy, ForceMarkerStrategy, SectionLinkStrategy, CliFlagStrategy), return configured component instance.                                                              |
+| `tools/citation-manager/design-docs/component-guides/Markdown Parser Implementation Guide.md`   | **(UPDATE)** | Document `extractionMarker` property in `LinkObject` schema.                      | Required for contract documentation. Update `LinkObject` JSON schema with new `extractionMarker: string\|null` field. Add examples showing marker detection in parser output.                                                                                                                          |
+
+## Whiteboard
+
+> [!note] **Technical Lead Feedback**: Parser output data contract - Base schema validated ✅
+> _Base Schema Status_: Parser Output Contract validated in [US1.5 Phase 1](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md#Phase%201%20Parser%20Output%20Contract%20Validation%20&%20Documentation). Current schema: `{ filePath, content, tokens, links, headings, anchors }` with LinkObject (`linkType`, `scope`, `anchorType`, `source`, `target`) and AnchorObject (`anchorType`, `id`, `rawText`) structures.
+> _Epic 2 Analysis Required_: Story 2.1 implementation should review existing LinkObject schema to determine if current `linkType`/`scope`/`anchorType` fields sufficiently distinguish full-file vs. section links, or if minor schema extensions are needed for content extraction metadata.
+> _Relevant Architecture Principles_: [data-model-first](../../../../Architecture%20Principles.md#^data-model-first), [primitive-first-design](../../../../Architecture%20Principles.md#^primitive-first-design), [illegal-states-unrepresentable](../../../../Architecture%20Principles.md#^illegal-states-unrepresentable), [explicit-relationships](../../../../Architecture%20Principles.md#^explicit-relationships)
+
+---
+
+### The Strategic Solution ✅
+
+The Strategy Pattern, as required by **Acceptance Criterion 6**, solves this problem by decoupling the rules from the orchestrator. Each rule becomes its own small, independent component, and the main logic becomes a simple function:
+
+```javascript
+// analyzeEligibility.js - Supporting operation using strategy pattern
+// This is our chosen, extensible architecture.
+
+/**
+ * Analyze link eligibility using strategy chain
+ * @param {LinkObject} link - Link to analyze
+ * @param {Object} cliFlags - CLI flags
+ * @param {ExtractionStrategy[]} strategies - Strategy chain in precedence order
+ * @returns {{ eligible: boolean, reason: string }} Eligibility decision
+ */
+export function analyzeEligibility(link, cliFlags, strategies) {
+  // The order of the strategies array defines the rule precedence.
+  for (const strategy of strategies) {
+    const decision = strategy.getDecision(link, cliFlags);
+    // The first strategy that returns a non-null decision wins.
+    if (decision !== null) {
+      return decision;
+    }
+  }
+  // ... return default action
+  return { eligible: false, reason: 'default' };
+}
+
+/**
+ * Create eligibility analyzer with configured strategies
+ * @param {ExtractionStrategy[]} strategies - Ordered strategy chain
+ * @returns {Function} Configured analyzer function
+ */
+export function createEligibilityAnalyzer(strategies) {
+  return (link, cliFlags) => analyzeEligibility(link, cliFlags, strategies);
+}
+```
+
+This is a robust and maintainable design. Adding a new rule in the future is as simple as creating a new strategy class and adding it to the array in the factory—we never have to touch the core `analyzeEligibility` function again.
