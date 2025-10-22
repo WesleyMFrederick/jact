@@ -60,6 +60,20 @@ classDiagram
 3. [CitationValidator](CitationValidator%20Implementation%20Guide.md): Consumer using anchor/link query methods
 4. [Citation Manager.Content Extractor](../features/20251003-content-aggregation/content-aggregation-architecture.md#==Citation%20Manager.Content%20Extractor==): Future Epic 2 consumer using content extraction methods
 
+## File Structure
+
+```text
+tools/citation-manager/
+└── src/
+    └── core/
+        └── ParsedDocument.js    # Facade class with query and extraction methods
+```
+
+**Architecture Notes:**
+- Maintained as single facade class per Facade Pattern
+- Future refactoring may extract operations following Action-Based Organization if complexity warrants
+- Current structure prioritizes encapsulation and interface stability
+
 ## Public Contracts
 
 ### Input Contract
@@ -128,15 +142,73 @@ class ParsedDocument is
   public method extractFullContent(): string is
     return this._data.content
 
-  // Extract content for a specific section (stubbed for US 1.7)
-  public method extractSection(headingText: string): string | null is
-    // Token Navigation Complexity will be encapsulated here in Epic 2.
-    throw new Error("Not implemented - full implementation in Epic 2")
+  // Extract content for a specific section by heading text
+  public method extractSection(headingText: string, headingLevel: number): string | null is
+    // Phase 1: Walk tokens to build ordered list and find target heading
+    // Uses walkTokens pattern (child before sibling) for in-order traversal
+    field orderedTokens = []
+    field targetToken = null
+    field targetIndex = -1
 
-  // Extract content for a specific block reference (stubbed for US 1.7)
+    method walkTokens(tokenList) is
+      foreach (token in tokenList) do
+        field currentIndex = orderedTokens.length
+        orderedTokens.push(token)
+
+        // Check if this is our target heading
+        if (targetToken == null &&
+            token.type == "heading" &&
+            token.depth == headingLevel &&
+            token.text == headingText) then
+          targetToken = token
+          targetIndex = currentIndex
+
+        // Process nested tokens (child before sibling)
+        if (token.tokens != null) then
+          walkTokens(token.tokens)
+
+    walkTokens(this._data.tokens)
+
+    // Return null if heading not found
+    if (targetToken == null) then
+      return null
+
+    // Phase 2: Find section boundary (next same-or-higher level heading)
+    field endIndex = orderedTokens.length
+    for (i = targetIndex + 1; i < orderedTokens.length; i++) do
+      field token = orderedTokens[i]
+      if (token.type == "heading" && token.depth <= headingLevel) then
+        endIndex = i
+        break
+
+    // Phase 3: Extract tokens and reconstruct content from token.raw
+    field sectionTokens = orderedTokens.slice(targetIndex, endIndex)
+    field content = sectionTokens.map(t => t.raw).join("")
+
+    return content
+
+  // Extract content for a specific block reference by anchor ID
   public method extractBlock(anchorId: string): string | null is
-    // Line-based lookup logic will be encapsulated here in Epic 2.
-    throw new Error("Not implemented - full implementation in Epic 2")
+    // Find anchor with matching ID and anchorType === "block"
+    field anchor = this._data.anchors.find(a =>
+      a.anchorType == "block" && a.id == anchorId
+    )
+
+    if (anchor == null) then
+      return null
+
+    // Split content into lines (anchor.line is 1-based)
+    field lines = this._data.content.split("\n")
+    field lineIndex = anchor.line - 1
+
+    // Validate line index is within bounds
+    if (lineIndex < 0 || lineIndex >= lines.length) then
+      return null
+
+    // Extract single line containing block anchor
+    field blockContent = lines[lineIndex]
+
+    return blockContent
 
 
   // === INTERNAL (PRIVATE) HELPERS ===
@@ -205,17 +277,21 @@ class ParsedDocument is
 - **Logic**: Checks both `anchor.id` and `anchor.urlEncodedId` for match
 - **Example**: `hasAnchor("Story 1.7: Implementation")` → `true`
 
-#### `getBlockAnchors(): Anchor[]` - **Epic 2 - Not Implemented in US1.7**
+#### `getBlockAnchors(): Anchor[]`
 - **Purpose**: Get all block-type anchors (caret syntax: `^anchor-id`)
 - **Returns**: Array of anchor objects with `anchorType === "block"`
-- **Status**: Cache field `_cachedBlockAnchors` exists but helper method not implemented
-- **Example**: `[{ anchorType: "block", id: "FR1", ... }]`
+- **Caching**: Result cached after first call for performance
+- **Status**: Private helper method implemented, cache field `_cachedBlockAnchors` available
+- **Example**: `[{ anchorType: "block", id: "FR1", line: 42, column: 28, ... }]`
+- **Note**: Currently private implementation used internally by extraction methods
 
-#### `getHeaderAnchors(): Anchor[]` - **Epic 2 - Not Implemented in US1.7**
+#### `getHeaderAnchors(): Anchor[]`
 - **Purpose**: Get all header-type anchors (from headings)
 - **Returns**: Array of anchor objects with `anchorType === "header"`
-- **Status**: Cache field `_cachedHeaderAnchors` exists but helper method not implemented
+- **Caching**: Result cached after first call for performance
+- **Status**: Private helper method implemented, cache field `_cachedHeaderAnchors` available
 - **Example**: `[{ anchorType: "header", id: "Overview", urlEncodedId: "Overview", ... }]`
+- **Note**: Currently private implementation used internally by extraction methods
 
 #### `findSimilarAnchors(anchorId: string): string[]`
 - **Purpose**: Find anchors similar to given anchor ID (fuzzy matching for suggestions)
@@ -242,19 +318,132 @@ class ParsedDocument is
 - **Use Case**: Full-file extraction for Epic 2
 - **Note**: Returns direct reference to internal string for performance. Consumers should not mutate returned values.
 
-#### `extractSection(headingText: string): string | null`
-- **Purpose**: Extract content under specific heading
-- **Parameters**: `headingText` - Heading text to extract section for
-- **Returns**: Section content string or `null` if heading not found
-- **Implementation**: US1.7 stub, full implementation in Epic 2
-- **Example**: `extractSection("Overview")` → content between Overview and next same-level heading
+**Pseudocode:**
+
+```typescript
+public method extractFullContent(): string is
+  // Boundary: Direct access to encapsulated raw content
+  return this._data.content
+```
+
+#### `extractSection(headingText: string, headingLevel: number): string | null`
+- **Purpose**: Extract content under specific heading until next same-or-higher level heading
+- **Parameters**:
+  - `headingText` - Exact text of the heading to extract (case-sensitive)
+  - `headingLevel` - Heading level (1-6, where 1 is `#`, 2 is `##`, etc.)
+- **Returns**: Section content string including heading and all nested content, or `null` if heading not found
+- **Algorithm**:
+  - Phase 1: Walk tokens recursively to build ordered list, find target heading
+  - Phase 2: Find section boundary (next heading at same or higher level)
+  - Phase 3: Extract tokens and reconstruct content from `token.raw`
+- **Edge Cases**:
+  - Returns `null` when heading text not found at specified level
+  - Includes all nested lower-level headings (e.g., H3/H4 within H2 section)
+  - Last section includes all remaining content to end of file
+- **Example**: `extractSection("Overview", 2)` → `"## Overview\n\nContent here...\n### Subsection\n..."`
+- **Proof Of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-section-extraction.test.js`
+
+**Pseudocode:**
+
+```typescript
+/**
+ * Extract content for a specific section by heading text and level.
+ * Integration: Uses marked.js token tree for structural navigation.
+ *
+ * @param headingText - Exact heading text to find
+ * @param headingLevel - Heading depth (1-6)
+ * @returns Section content string or null if not found
+ */
+extractSection(headingText: string, headingLevel: number): string | null {
+  // Phase 1: Flatten token tree and locate target heading
+  const orderedTokens = [];
+  let targetIndex = -1;
+
+  const walkTokens = (tokenList) => {
+    for (const token of tokenList) {
+      orderedTokens.push(token);
+
+      // Found our target heading?
+      if (token.type === 'heading' &&
+          token.depth === headingLevel &&
+          token.text === headingText) {
+        targetIndex = orderedTokens.length - 1;
+      }
+
+      // Recurse into nested tokens (child-before-sibling traversal)
+      if (token.tokens) walkTokens(token.tokens);
+    }
+  };
+
+  walkTokens(this._data.tokens);
+
+  // Not found? Return null
+  if (targetIndex === -1) return null;
+
+  // Phase 2: Find section boundary (next same-or-higher level heading)
+  let endIndex = orderedTokens.length;  // Default: to end of file
+  for (let i = targetIndex + 1; i < orderedTokens.length; i++) {
+    const token = orderedTokens[i];
+    if (token.type === 'heading' && token.depth <= headingLevel) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  // Phase 3: Reconstruct content from token.raw properties
+  const sectionTokens = orderedTokens.slice(targetIndex, endIndex);
+  return sectionTokens.map(t => t.raw).join('');
+}
+```
 
 #### `extractBlock(anchorId: string): string | null`
-- **Purpose**: Extract content for specific block anchor
-- **Parameters**: `anchorId` - Block anchor ID (e.g., "FR1")
-- **Returns**: Block content string or `null` if anchor not found
-- **Implementation**: US1.7 stub, full implementation in Epic 2
-- **Example**: `extractBlock("FR1")` → line containing `^FR1` anchor
+- **Purpose**: Extract single line containing specific block anchor
+- **Parameters**: `anchorId` - Block anchor ID without `^` prefix (e.g., "FR1" for `^FR1`)
+- **Returns**: Single line content string containing block anchor, or `null` if anchor not found
+- **Algorithm**:
+  - Find anchor in `_data.anchors` where `anchorType === "block"` and `id === anchorId`
+  - Use anchor's `line` property (1-based) to locate content
+  - Extract single line at that position
+- **Edge Cases**:
+  - Returns `null` when anchor ID not found
+  - Returns `null` when anchor exists but is header type (not block type)
+  - Returns `null` when line number is out of bounds
+- **Example**: `extractBlock("FR1")` → `"This is the functional requirement. ^FR1"`
+- **Note**: Currently extracts single line only. Future iterations may expand to handle multi-line paragraphs or list items.
+- **Proof Of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-block-extraction.test.js`
+
+**Pseudocode:**
+
+```typescript
+/**
+ * Extract content for a specific block reference by anchor ID.
+ * Integration: Uses anchor metadata from MarkdownParser output.
+ *
+ * @param anchorId - Block anchor ID without ^ prefix
+ * @returns Single line content string or null if not found
+ */
+extractBlock(anchorId: string): string | null {
+  // --- Anchor Lookup ---
+  // Integration: Query anchors array from parser output
+  const anchor = this._data.anchors.find(a =>
+    a.anchorType === 'block' && a.id === anchorId
+  );
+
+  // Decision: Return null if block anchor not found (edge case handling)
+  if (!anchor) return null;
+
+  // --- Line Positioning ---
+  // Boundary: Split raw content into lines for line-based extraction
+  const lines = this._data.content.split('\n');
+  const lineIndex = anchor.line - 1;  // Pattern: Convert 1-based to 0-based indexing
+
+  // Decision: Validate line index within bounds (edge case handling)
+  if (lineIndex < 0 || lineIndex >= lines.length) return null;
+
+  // --- Content Extraction ---
+  return lines[lineIndex];
+}
+```
 
 ## Testing Strategy
 
@@ -334,41 +523,109 @@ describe("ParsedDocument", () => {
     expect(content).toBe(mockContent);
   });
 
-  // Test stubs for future Epic 2 methods to ensure they exist on the interface
-  it("extractSection should throw a 'Not Implemented' error for US 1.7", () => {
-    // Given: A ParsedDocument instance
-    const parsedDoc = new ParsedDocument({ tokens: [] });
+  // Test Epic 2 extraction methods
+  it("extractSection should extract section content by heading text and level", () => {
+    // Given: A ParsedDocument with tokenized sections
+    const parserOutput = {
+      tokens: [
+        { type: "heading", depth: 2, text: "First Section", raw: "## First Section\n" },
+        { type: "paragraph", raw: "Section content here.\n" },
+        { type: "heading", depth: 3, text: "Subsection", raw: "### Subsection\n" },
+        { type: "paragraph", raw: "Nested content.\n" },
+        { type: "heading", depth: 2, text: "Second Section", raw: "## Second Section\n" }
+      ]
+    };
+    const parsedDoc = new ParsedDocument(parserOutput);
 
-    // When/Then: Calling the stubbed method should throw an error
-    expect(() => parsedDoc.extractSection("any")).toThrow("Not implemented");
+    // When: extractSection() is called with heading text and level
+    const section = parsedDoc.extractSection("First Section", 2);
+
+    // Then: It returns the section content including nested headings
+    expect(section).toContain("## First Section");
+    expect(section).toContain("Section content here");
+    expect(section).toContain("### Subsection");
+    expect(section).toContain("Nested content");
+    expect(section).not.toContain("Second Section");
   });
 
-  it("extractBlock should throw a 'Not Implemented' error for US 1.7", () => {
-    // Given: A ParsedDocument instance
-    const parsedDoc = new ParsedDocument({ anchors: [] });
+  it("extractSection should return null when heading not found", () => {
+    // Given: A ParsedDocument with sections
+    const parserOutput = { tokens: [{ type: "heading", depth: 2, text: "Existing", raw: "## Existing\n" }] };
+    const parsedDoc = new ParsedDocument(parserOutput);
 
-    // When/Then: Calling the stubbed method should throw an error
-    expect(() => parsedDoc.extractBlock("any")).toThrow("Not implemented");
+    // When: extractSection() is called with non-existent heading
+    const section = parsedDoc.extractSection("Non-Existent", 2);
+
+    // Then: It returns null
+    expect(section).toBeNull();
+  });
+
+  it("extractBlock should extract single line by anchor ID", () => {
+    // Given: A ParsedDocument with block anchors
+    const parserOutput = {
+      content: "Line 1\nThis is important content. ^important-block\nLine 3",
+      anchors: [
+        { anchorType: "block", id: "important-block", line: 2, column: 28 }
+      ]
+    };
+    const parsedDoc = new ParsedDocument(parserOutput);
+
+    // When: extractBlock() is called with anchor ID
+    const block = parsedDoc.extractBlock("important-block");
+
+    // Then: It returns the line containing the block anchor
+    expect(block).toBe("This is important content. ^important-block");
+  });
+
+  it("extractBlock should return null when anchor not found", () => {
+    // Given: A ParsedDocument with block anchors
+    const parserOutput = { content: "Some content", anchors: [{ anchorType: "block", id: "existing", line: 1 }] };
+    const parsedDoc = new ParsedDocument(parserOutput);
+
+    // When: extractBlock() is called with non-existent anchor
+    const block = parsedDoc.extractBlock("non-existent");
+
+    // Then: It returns null
+    expect(block).toBeNull();
   });
 });
 ```
 
 ## Epic 2 Content Extraction Methods
 
-The `extractSection()` and `extractBlock()` methods are stubbed in US1.7 and will be fully implemented in Epic 2. Here's the planned implementation approach:
+The `extractSection()` and `extractBlock()` methods are now fully implemented with algorithms proven through POC testing. See the Pseudocode section above for complete implementation details.
 
-### Section Extraction Algorithm
-1. Get heading tokens from `_data.tokens`
-2. Find target heading by matching `headingText`
-3. Collect all tokens between target heading and next same-or-higher level heading
-4. Convert token range to content string using line numbers
-5. Return extracted content or null if heading not found
+### Section Extraction Algorithm (Implemented)
 
-### Block Extraction Algorithm
-1. Find anchor in `_data.anchors` by `anchorId`
-2. Use anchor's `line` property to locate content
-3. Extract line content containing block anchor
-4. Return extracted content or null if anchor not found
+**Algorithm Overview:**
+1. **Phase 1 - Token Walking**: Recursively walk tokens to build ordered list and locate target heading
+2. **Phase 2 - Boundary Detection**: Find section boundary (next same-or-higher level heading)
+3. **Phase 3 - Content Reconstruction**: Extract tokens and reconstruct content from `token.raw` properties
+
+**Key Implementation Details:**
+- Uses `walkTokens` pattern (child before sibling) for in-order traversal
+- Matches heading by exact text and level (case-sensitive)
+- Includes all nested lower-level headings within section
+- Last section automatically includes all remaining content to end of file
+- Returns `null` when heading not found
+
+**Proof of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-section-extraction.test.js`
+
+### Block Extraction Algorithm (Implemented)
+
+**Algorithm Overview:**
+1. **Anchor Lookup**: Find anchor in `_data.anchors` where `anchorType === "block"` and `id === anchorId`
+2. **Line Positioning**: Use anchor's `line` property (1-based) to locate content
+3. **Content Extraction**: Extract single line at that position
+4. **Validation**: Return `null` if anchor not found or line out of bounds
+
+**Key Implementation Details:**
+- Filters anchors by type to ensure block anchor (not header anchor)
+- Converts 1-based line number to 0-based array index
+- Validates line index is within content bounds
+- Currently extracts single line only (future: may expand to multi-line paragraphs)
+
+**Proof of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-block-extraction.test.js`
 
 ## Known Limitations (US1.7)
 

@@ -50,12 +50,12 @@ This feature directly supports the CC Workflows vision by:
 
 ## Changelog
 
-| Date | Version | Description | Author |
-|------|---------|-------------|---------|
-| 2025-10-03 | 1.0 | Initial feature PRD creation with Epic 2 and US 1.4 from workspace PRD | Product Manager Agent |
-| 2025-10-04 | 2.1 | Split US1.4 into US1.4a (Test Migration) and US1.4b (DI Refactoring) per ADR-001, rewrote all AC in EARS format, updated dependency chain for Epic 2 | Application Tech Lead |
-| 2025-10-07 | 2.2 | Mark US1.5 as COMPLETE, update Technical Lead Feedback sections: Parser data contract RESOLVED (US1.5 Phase 1), US1.5 caching feedback IMPLEMENTED, Epic 2 feedback remains active for Stories 2.2-2.3 | Application Tech Lead |
-| 2025-10-19 | 2.3 | Mark US1.8 as COMPLETE - Validation Enrichment Pattern successfully implemented, all acceptance criteria validated, zero regressions confirmed (121/123 tests passing, 2 pre-existing failures unrelated to US1.8) | Application Tech Lead (Claude Sonnet 4.5) |
+| Date       | Version | Description                                                                                                                                                                                                        | Author                                    |
+| ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| 2025-10-03 | 1.0     | Initial feature PRD creation with Epic 2 and US 1.4 from workspace PRD                                                                                                                                             | Product Manager Agent                     |
+| 2025-10-04 | 2.1     | Split US1.4 into US1.4a (Test Migration) and US1.4b (DI Refactoring) per ADR-001, rewrote all AC in EARS format, updated dependency chain for Epic 2                                                               | Application Tech Lead                     |
+| 2025-10-07 | 2.2     | Mark US1.5 as COMPLETE, update Technical Lead Feedback sections: Parser data contract RESOLVED (US1.5 Phase 1), US1.5 caching feedback IMPLEMENTED, Epic 2 feedback remains active for Stories 2.2-2.3             | Application Tech Lead                     |
+| 2025-10-19 | 2.3     | Mark US1.8 as COMPLETE - Validation Enrichment Pattern successfully implemented, all acceptance criteria validated, zero regressions confirmed (121/123 tests passing, 2 pre-existing failures unrelated to US1.8) | Application Tech Lead (Claude Sonnet 4.5) |
 
 ---
 
@@ -66,7 +66,7 @@ This feature directly supports the CC Workflows vision by:
 - **FR4: Link Section Identification:** The `citation-manager` SHALL parse a given markdown document and identify all links that point to local markdown files, distinguishing between links **with section anchors and those without**. ^FR4
 - **FR5: Section Content Extraction:** The `citation-manager` SHALL be able to extract content from a target file in two ways: 1) If a section anchor is provided, it SHALL extract the full content under that specific heading, 2) If no section anchor is provided, it SHALL extract the **entire content of the file**. ^FR5
 - **FR6: Content Aggregation:** The `citation-manager` SHALL aggregate the extracted content into a single markdown file, where each piece of content is **preceded by a markdown header that clearly identifies the source file and, if applicable, the section heading**. ^FR6
-- **FR7: Centralized Execution:** The new aggregation feature SHALL be exposed via an **`--extract-context <output_file.md>` flag on the existing `validate` command**. ^FR7
+- **FR7: Centralized Execution:** The new aggregation feature SHALL be exposed via a dedicated **`extract` command** that orchestrates validation internally as a prerequisite step. ^FR7
 - **FR8: Preserve Existing Functionality:** All existing `citation-manager` features SHALL be preserved and function correctly. ^FR8
 - **FR9: Test Migration:** All existing unit tests for the `citation-manager` SHALL be migrated to the workspace and pass. ^FR9
 - **FR10: Extraction Control Markers:** The system SHALL recognize `%%extract-link%%` and `%%stop-extract-link%%` markers on the same line as a citation. `%%extract-link%%` SHALL force the extraction of a full-file link that would otherwise be skipped, and `%%stop-extract-link%%` SHALL prevent the extraction of a section or block link that would otherwise be included. These markers SHALL have the highest precedence over all other extraction rules. ^FR10
@@ -121,11 +121,11 @@ This feature encompasses two critical phases:
 5. GIVEN all test framework conversions are complete, WHEN the migrated test suite executes, THEN all 50+ existing tests SHALL pass without regression. ^US1-4aAC5
 6. WHEN test migration validation confirms success (AC5 satisfied), THEN the legacy test location `src/tools/utility-scripts/citation-links/test/` SHALL be removed. ^US1-4aAC6
 
-**Accepted Technical Debt**: Component tests will temporarily use non-DI instantiation (`new CitationValidator()`) until US1.4b implements constructor-based dependency injection. This deviation from workspace architecture principles is documented in [ADR-001: Phased Test Migration Strategy](content-aggregation-architecture.md#ADR-001%20Phased%20Test%20Migration%20Strategy).
+**Accepted Technical Debt**: Component tests will temporarily use non-DI instantiation (`new CitationValidator()`) until US1.4b implements constructor-based dependency injection. This deviation from workspace architecture principles is documented in [ADR-001: Phased Test Migration Strategy](content-aggregation-architecture.md#ADR-001%20Phased%20Test%20Migration%20Strategy)%% stop-extract-link %%.
 
 _Depends On_: [US1.3: Make Migrated citation-manager Executable](../../../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/user-stories/us1.3-make-migrated-citation-manager-executable/us1.3-make-migrated-citation-manager-executable.md)
 _Functional Requirements_: [[#^FR2|FR2]], [[#^FR9|FR9]]
-_User Story Link:_ [us1.4a-migrate-test-suite-to-vitest](user-stories/us1.4a-migrate-test-suite-to-vitest/us1.4a-migrate-test-suite-to-vitest.md)%%stop-extract-link%%
+_User Story Link:_ [us1.4a-migrate-test-suite-to-vitest](user-stories/us1.4a-migrate-test-suite-to-vitest/us1.4a-migrate-test-suite-to-vitest.md)
 _Status_: ✅ COMPLETE (2025-10-07)claudeclaude
 
 ---
@@ -310,45 +310,86 @@ _Depends On_: [Story 1.7: Implement ParsedDocument Facade](user-stories/us1.7-im
 _Requirements_: [[#^FR4|FR4]], [[#^FR10|FR10]]
 _Non-Functional Requirements_: [[#^NFR6|NFR6]]
 _User Story Link_: [us2.1-implement-extraction-eligibility-strategy-pattern](user-stories/us2.1-implement-extraction-eligibility-strategy-pattern/us2.1-implement-extraction-eligibility-strategy-pattern.md)
-_Status_: 🔲 To Be Done
+_Status_: ✅ COMPLETE (2025-10-21)
 
-
-### Story 2.2: Implement Unified Content Extractor with Metadata
+### Story 2.2: Implement Content Retrieval in ContentExtractor
 
 **As a** developer,
-**I want** to create a content extraction module that can return either a full file's content or a specific section's content, including source metadata,
-**so that** I have a single, reliable way to retrieve content for aggregation.
+**I want** to extend the ContentExtractor component with content retrieval capabilities using the ParsedDocument facade,
+**so that** the component can orchestrate the complete extraction workflow from validation through aggregation.
 
 #### Story 2.2 Acceptance Criteria
-1. GIVEN a file path and an optional heading, WHEN the extractor is called, THEN it SHALL return a structured object containing the extracted `content` string and `metadata`. ^US2-2AC1
-2. IF a heading is provided, THEN the `content` SHALL be the text between that heading and the next heading of an equal or higher level. ^US2-2AC2
-3. IF no heading is provided, THEN the `content` SHALL be the entire content of the file. ^US2-2AC3
-4. GIVEN a file path or heading that does not exist, WHEN the extractor is called, THEN it SHALL fail gracefully by returning null or an empty object and log a warning. ^US2-2AC4
 
-> [!warning] **Technical Lead Feedback**: Parser-extractor interaction model design required
-> _Architecture Impact_: The interaction model between the parser and this new extractor component needs to be designed, including the specific data structures they will use to communicate.
-> _Relevant Architecture Principles_: [black-box-interfaces](../../../../../design-docs/Architecture%20Principles.md#^black-box-interfaces), [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [single-responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility)
+1. The `ContentExtractor` component SHALL accept `parsedFileCache` and `citationValidator` dependencies via constructor injection in addition to the existing `eligibilityStrategies` dependency. ^US2-2AC1
+2. The `ContentExtractor` component SHALL provide a public `extractLinksContent(sourceFilePath, cliFlags)` method that orchestrates the complete extraction workflow: validation → eligibility analysis → content retrieval → aggregation. ^US2-2AC2
+3. GIVEN a source file path is provided, WHEN `extractLinksContent()` is called, THEN the component SHALL internally call `citationValidator.validateFile()` to discover and validate links, returning enriched LinkObjects with validation metadata. ^US2-2AC3
+4. GIVEN enriched links are returned from validation, WHEN eligibility analysis executes, THEN the component SHALL filter links using the strategy chain from US2.1, excluding links where `link.validation.status === "error"` or eligibility decision is `false`. ^US2-2AC4
+5. GIVEN an eligible link points to a section (`anchorType: "header"`), WHEN content retrieval executes, THEN the component SHALL use `parsedFileCache.resolveParsedFile()` to get the TARGET document, **normalize the anchor by URL-decoding it**, and call `parsedDoc.extractSection()` **with the decoded anchor text** to retrieve section content. ^US2-2AC5
+6. GIVEN an eligible link points to a block (`anchorType: "block"`), WHEN content retrieval executes, THEN the component SHALL **normalize the anchor by removing any leading `^` character** and call `parsedDoc.extractBlock()` **with the normalized block ID** to retrieve block content. ^US2-2AC6
+7. GIVEN an eligible link points to a full file (anchorType: null), WHEN content retrieval executes, THEN the component SHALL call `parsedDoc.extractFullContent()` to retrieve the entire file content. ^US2-2AC7
+8. WHEN content extraction is attempted for an eligible link, THEN the `extractLinksContent` method SHALL produce an `ExtractionResult` object for that link within its returned array. Each `ExtractionResult` SHALL contain the `sourceLink` (`LinkObject`), a `status` ('success', 'skipped', or 'error'), and either `successDetails` (with `decisionReason` and `extractedContent` if status is 'success') or `failureDetails` (with a `reason` string if status is 'skipped' or 'error'). ^US2-2AC8
+9. The `extractLinksContent()` method SHALL return a Promise resolving to an `array of ExtractionResult` objects. ^US2-2AC9
+10. The `createContentExtractor()` factory function SHALL be updated to accept and inject `parsedFileCache` and `citationValidator` dependencies with optional override parameters for testing. ^US2-2AC10
+11. GIVEN the content retrieval implementation is complete, WHEN integration tests execute, THEN they SHALL validate the complete workflow using real **`ParsedFileCache`**, **`CitationValidator`**, and **ParsedDocument** instances per the "Real Systems, Fake Fixtures" principle. ^US2-2AC11
+12. GIVEN the complete ContentExtractor implementation, WHEN the full test suite executes, THEN all US2.1 tests (35+ tests) SHALL continue passing with zero regressions. ^US2-2AC12
 
-_Depends On_: Story 2.1
-_Functional Requirements_: [[#^FR5|FR5]]
+**Architecture Notes:**
+- Follows the [ContentExtractor Workflow: Component Interaction Diagram](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
+- Implements Validation Enrichment Pattern from US1.8
+- Single service interface abstracts multi-step workflow from CLI
 
-### Story 2.3: Add `--extract-context` Flag to `validate` Command
+_Depends On_: [Story 2.1: Implement Extraction Eligibility using Strategy Pattern](#Story%202.1%20Implement%20Extraction%20Eligibility%20using%20Strategy%20Pattern)
+_Enables_: [Story 2.3: Implement `extract` Command](#Story%202.3%20Implement%20extract%20Command)
+_Functional Requirements_: [[#^FR5|FR5]], [[#^FR6|FR6]]
+_Non-Functional Requirements_: [[#^NFR5|NFR5]] (ParsedFileCache ensures single parse per file)
+_Architecture Reference_: 
+- [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
+- [ParsedDocument Implementation Guide](../../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md)
+- [CLI Integration Guide](../../component-guides/CLI%20Integration%20Guide.md)
+_User Story Link_: [us2.2-implement-content-retrieval](user-stories/us2.2-implement-content-retrieval/us2.2-implement-content-retrieval.md)
+_Status_: Pending
 
-**As a** developer,
-**I want** to add an `--extract-context` flag to the existing `validate` command,
-**so that** I can generate a structured context file based on the links found in a source document.
+### Story 2.3: Implement `extract` Command
+
+**As a** developer creating context packages for AI,
+**I want** a new `extract` command that generates a self-contained markdown document with all linked content aggregated in place,
+**so that** I can automate context assembly instead of manually copying and pasting content from multiple files.
 
 #### Story 2.3 Acceptance Criteria
-1. GIVEN a new `--extract-context <output_file.md>` flag is added to the `validate` command, WHEN run, THEN it SHALL execute the end-to-end context aggregation process and write the result to the specified output file. ^US2-3AC1
-2. GIVEN the output file, THEN the content from each extracted source SHALL be clearly delineated by a markdown header indicating its origin file (e.g., `## File: path/to/source.md`). ^US2-3AC2
-3. IF content is extracted from a specific section, THEN the header in the output file SHALL also include the section heading (e.g., `## File: path/to/source.md#Section Heading`). ^US2-3AC3
 
-> [!warning] **Technical Lead Feedback**: Research & Design CLI feature flag/command pattern
-> _Architecture Impact_: Research and a design decision are needed to confirm if adding a feature flag to the `validate` command is the correct long-term CLI interface, or if a new, dedicated `extract` command would be more intuitive and extensible.
-> _Relevant Architecture Principles_: [simplicity-first](../../../../../design-docs/Architecture%20Principles.md#^simplicity-first), [follow-conventions](../../../../../design-docs/Architecture%20Principles.md#^follow-conventions), [immediate-understanding](../../../../../design-docs/Architecture%20Principles.md#^immediate-understanding), [extension-over-modification](../../../../../design-docs/Architecture%20Principles.md#^extension-over-modification)
+1. A new `extract` command SHALL be implemented in the citation-manager CLI with signature: `extract <source-file> [options]`. ^US2-3AC1
+2. The `extract` command SHALL support the following options:
+   - `--scope <directory>`: Folder scope for smart file resolution (optional, inherits from validation)
+   - `--full-files`: Enable extraction of full-file links without markers (optional, default: false)
+   ^US2-3AC2
+3. WHEN the `extract` command executes, THEN it SHALL instantiate `ContentExtractor` via the `createContentExtractor()` factory with default production dependencies (parsedFileCache, citationValidator, eligibilityStrategies). ^US2-3AC3
+4. The command SHALL call `contentExtractor.extractLinksContent(sourceFilePath, cliFlags)` and receive the `array of ExtractionResult` objects. ^US2-3AC4
+5. GIVEN the `extract` command executes, WHEN validation errors or warnings are encountered, THEN they SHALL be reported to the user (e.g., to stderr) clearly indicating which citations have issues. ^US2-3AC5
+6. GIVEN validation has been reported, WHEN the command proceeds to content extraction, THEN it SHALL skip any links marked with `validation.status === "error"` and extract content only for valid or eligible links. ^US2-3AC6
+7. GIVEN extraction has completed successfully with results, WHEN output is ready, THEN the command SHALL output the raw `array of ExtractionResult` objects (e.g., as valid JSON to stdout), detailing the outcome (`status`, `successDetails` or `failureDetails`) for each processed link. The command SHALL exit with status code 0 if at least one link resulted in `status: 'success'`, even if other links resulted in `skipped` or `error`. It SHALL exit non-zero only if no links resulted in successful extraction. ^US2-3AC7
+8. GIVEN extraction fails completely (source file not found, no eligible content to extract, or severe validation errors prevent any extraction), WHEN this condition is detected, THEN the command SHALL exit with a non-zero status code to signal failure. ^US2-3AC8
+9. The `extract` command SHALL preserve all existing `validate` command functionality, maintaining backward compatibility with current validation workflows. ^US2-3AC9
+10. GIVEN the `extract` command is implemented, WHEN CLI integration tests execute with real fixture files, THEN they SHALL validate the complete end-to-end workflow from source file → validation → eligibility → extraction → successful output of the raw `ExtractionResult` array (e.g., as valid JSON to stdout). ^US2-3AC10
+11. The citation-manager help text SHALL document the new `extract` command with usage examples showing common workflows. ^US2-3AC11
 
-_Depends On_: Story 2.2
-_Functional Requirements_: [[#^FR6|FR6]], [[#^FR7|FR7]]
+**Deferred Scope Note:** Output formatting (originally AC5), file writing (originally AC6, AC7), and the `--output` option (originally AC2) have been deferred. See the 'Future Work' section in the [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Future%20Work) for details.
+
+> [!warning] **Technical Lead Feedback**: CLI Testing Buffer Limits & Workaround
+>
+> **Resolution**: Defer direct import refactor for tests; continue using shell redirection workaround (`runCLI` helper) for US2.3 CLI integration testing (AC11). **Resolution Date**: 2025-10-22
+>
+> **Architecture Reference**: [Technical Debt: CLI Subprocess Testing Buffer Limits](../../../../../design-docs/Architecture%20-%20Baseline.md#Technical%20Debt%20CLI%20Subprocess%20Testing%20Buffer%20Limits)
+>
+> **Known Limitation**: Testing the `extract` command via subprocesses (using the `runCLI` helper) relies on shell redirection to bypass stdio buffer limits (~64KB). This adds complexity compared to directly importing and testing CLI functions. The recommended refactor (direct import) is deferred to maintain MVP velocity. Ensure AC11 tests use the `runCLI` helper or similar redirection to handle potentially large output from `extractLinksContent`.
+
+> [!note] **Technical Lead Feedback**: CLI Design Decision
+> The `extract` command is a separate command (not a flag on `validate`) because extraction is a distinct operation with different inputs (requires --output), different outputs (aggregated content vs validation report), and different workflow (validation is an internal prerequisite step, as shown in the ContentExtractor Workflow diagram).
+
+_Depends On_: [Story 2.2: Implement Content Retrieval in ContentExtractor](#Story%202.2%20Implement%20Content%20Retrieval%20in%20ContentExtractor)
+_Functional Requirements_: [[#^FR6|FR6]], [[#^FR7|FR7]] (updated: dedicated command vs flag)
+_Architecture Workflow Reference_: [ContentExtractor Workflow: Component Interaction Diagram](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
+_User Story Link_: [us2.3-implement-extract-command](user-stories/us2.3-implement-extract-command/us2.3-implement-extract-command.md)
+_Status_: Pending
 
 ---
 

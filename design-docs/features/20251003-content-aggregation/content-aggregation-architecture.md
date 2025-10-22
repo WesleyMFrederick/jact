@@ -1,4 +1,4 @@
-==========# Citation Manager - Tool Architecture [DRAFT]
+# Citation Manager - Tool Architecture [DRAFT]
 
 **Critical LLM Initialization Instructions**: When first reading this file, you MUST IMMEDIATELY run citation manager to extract base paths: `npm run citation:base-paths <this-file-path> -- --format json`. Read ALL discovered base path files to gather complete architectural context before proceeding.
 
@@ -85,16 +85,16 @@ graph TB
 - **Path(s):** `tools/citation-manager/src/citation-manager.js`
 - **Technology:** `Node.js` class, `Commander.js` CLI framework, ESM modules
 - **Technology Status:** Production
-- **Description:** CLI entry point orchestrating all citation management operations. Parses commands (validate, ast, base-paths, fix), coordinates workflow execution, formats output for CLI/JSON display, and implements auto-fix logic for broken citations and paths.
+- **Description:** CLI entry point orchestrating all citation management operations. Parses commands (validate, ast, base-paths, fix, extract), coordinates workflow execution, formats output for CLI/JSON display, and implements auto-fix logic for broken citations and paths. For extract command, delegates to ContentExtractor and outputs JSON results to stdout. See [CLI Integration Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram) and CLI Architecture Overview for command orchestration patterns.
 
 ##### Interactions
-- _creates and coordinates_ `Markdown Parser`, `File Cache`, `ParsedFileCache`, ==`ParsedDocument`,== `Citation Validator`, ==and `ContentExtractor`== components (synchronous).
+- _creates and coordinates_ `Markdown Parser`, `File Cache`, `ParsedFileCache`, `ParsedDocument`, `Citation Validator`, and `ContentExtractor` components (synchronous).
 - _injects_ dependencies such as the `FileCache` and `ParsedFileCache` into components like the `CitationValidator` at instantiation (synchronous).
-- ==_delegates factory creation_ of `ParsedDocument` instances to `ParsedFileCache` via constructor injection (synchronous).==
+- _delegates factory creation_ of `ParsedDocument` instances to `ParsedFileCache` via constructor injection (synchronous).
 - _delegates to_ the `MarkdownParser` for the `ast` command (asynchronous).
-- ==_ast command_ continues to access raw `MarkdownParser.Output.DataContract` directly for debugging purposes, bypassing `ParsedDocument` facade.==
+- _ast command_ continues to access raw `MarkdownParser.Output.DataContract` directly for debugging purposes, bypassing `ParsedDocument` facade.
 - _delegates to_ the `CitationValidator` for the `validate` command (asynchronous).
-- ==_delegates to_ the `ContentExtractor` to aggregate document content (asynchronous).==
+- _delegates to_ the `ContentExtractor.extractLinksContent()` for the `extract` command to aggregate document content (asynchronous).
 - _reads and writes_ markdown files directly for the `--fix` operation (synchronous).
 - _outputs_ formatted results to stdout/stderr (synchronous).
 
@@ -185,7 +185,7 @@ The component's primary output is from the `resolveFile()` method, which returns
 - **Implementation Guide**: [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md) for public contracts and data objects
 
 ##### Interactions
-- _is consumed by_ the `CitationValidator` and ==`ContentExtractor`== to retrieve ==`ParsedDocument` instances== (asynchronous).
+- _is consumed by_ the `CitationValidator` and `ContentExtractor` to retrieve `ParsedDocument` instances (asynchronous).
 - _delegates to_ the `MarkdownParser` to parse files that are not yet in the cache (asynchronous).
 - _creates_ `ParsedDocument` facade instances by wrapping `MarkdownParser.Output.DataContract` before returning (synchronous).
 - _is instantiated by_ the `CLI Orchestrator` (via its factory) (synchronous).
@@ -231,31 +231,42 @@ The facade exposes query methods that return transformed/filtered data from the 
 - **Content Extraction**: `extractFullContent()` - Implemented in US1.7; `extractSection(headingText)`, `extractBlock(anchorId)` - Stubbed for Epic 2
 - **Note**: `getBlockAnchors()`, `getHeaderAnchors()` not implemented - Epic 2 placeholders only
 
-#### ==Citation Manager.Content Extractor==
-- ==**Path(s):** `tools/citation-manager/src/ContentExtractor.js` (_PROPOSED - [Epic 2](https://www.google.com/search?q=content-aggregation-prd.md%23Feature%2520Epics))_==
-- ==**Technology:**==
-  - ==`Node.js` class==
-  - ==ESM modules==
-- ==**Technology Status:** To Be Implemented==
-- ==**Description:** Extracts full content from linked documents or specific sections within them. It consumes `ParsedDocument` facade instances from the `ParsedFileCache` to perform content extraction using the facade's `extractSection()`, `extractBlock()`, and `extractFullContent()` methods.==
-- - **Implementation Guide**: [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
+#### Citation Manager.ContentExtractor
+- **Path(s):** `tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js`
+- **Technology:**
+  - `Node.js` class
+  - ESM modules
+- **Technology Status:** Implementation In Progress (US2.2)
+- **Description:** Orchestrates content extraction workflow for linked documents. Validates source files via `CitationValidator` to discover links, analyzes link eligibility using Strategy Pattern, and retrieves content from target documents via `ParsedDocument` facade methods. Returns `ExtractionResult` objects containing extraction status, source link reference, and either success details (extracted content + decision reason) or failure details. See [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md) for complete workflow and CLI integration patterns.
+- **Implementation Guide**: [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 
-##### ==Interactions==
-- ==_is consumed by_ the `CLI Orchestrator` to perform content aggregation (asynchronous).==
-- ==_uses_ the `ParsedFileCache` to retrieve `ParsedDocument` instances for target documents (asynchronous).==
-- ==_uses_ `ParsedDocument` content extraction methods (`extractSection()`, `extractBlock()`, `extractFullContent()`) to retrieve content (synchronous).==
+##### Interactions
+- _is consumed by_ the `CLI Orchestrator` via `extractLinksContent(sourceFilePath, cliFlags)` method to perform content aggregation (asynchronous).
+- _delegates to_ the `CitationValidator.validateFile()` to discover and validate links in source file (asynchronous).
+- _uses_ the `ParsedFileCache.resolveParsedFile()` to retrieve `ParsedDocument` instances for target documents (asynchronous).
+- _uses_ `ParsedDocument` content extraction methods (`extractSection()`, `extractBlock()`, `extractFullContent()`) with normalized anchors to retrieve content (synchronous).
+- _analyzes eligibility_ using injected `ExtractionStrategy` chain to filter links by precedence rules (synchronous).
 
-##### ==Boundaries==
-- ==The component's sole responsibility is to extract content strings based on `Link Objects` by orchestrating calls to `ParsedDocument` facade methods.==
-- ==It is **not** responsible for parsing markdown (delegated to `MarkdownParser`) or navigating parser output structures (delegated to `ParsedDocument` facade).==
-- ==It is **not** responsible for reading files from disk (delegated to `ParsedFileCache`).==
+##### Boundaries
+- The component's responsibilities are: (1) orchestrating validation enrichment workflow to discover links, (2) analyzing extraction eligibility via Strategy Pattern, (3) extracting content from target documents via `ParsedDocument` facade methods, and (4) aggregating `ExtractionResult` objects for CLI output.
+- It is **not** responsible for parsing markdown (delegated to `MarkdownParser`) or navigating parser output structures (delegated to `ParsedDocument` facade).
+- It is **not** responsible for reading files from disk (delegated to `ParsedFileCache`).
+- It is **not** responsible for final output formatting or file writing (delegated to `CLI Orchestrator`).
 
-##### ==Input Public Contract==
-1. ==A **`ParsedFileCache` interface**, provided at instantiation.==
-2. ==A **`Link Object`**, provided to its public `extract()` method, which specifies the target file and anchor to extract.==
+##### Input Public Contract
+1. A **`ParsedFileCache` interface**, provided at instantiation via constructor injection.
+2. A **`CitationValidator` interface**, provided at instantiation via constructor injection.
+3. An **`eligibilityStrategies` array**, provided at instantiation containing `ExtractionStrategy` implementations in precedence order.
+4. A **`sourceFilePath`** (string), provided to `extractLinksContent()` method specifying the source markdown file containing citations.
+5. A **`cliFlags`** (object), provided to `extractLinksContent()` method containing command-line options (e.g., `{ fullFiles: true }`).
 
-##### ==Output Public Contract==
-==The `extract()` method returns a `Promise` that resolves with a **Content Block object**. This object contains the extracted `content` (string) and `metadata` about its source (e.g., the source file path and anchor).==
+##### Output Public Contract
+The `extractLinksContent()` method returns a `Promise` that resolves with an **array of `ExtractionResult`** objects. Each object contains:
+- `sourceLink` (LinkObject): Complete enriched LinkObject with validation metadata
+- `status` (string): Extraction outcome - `'success'`, `'skipped'`, or `'error'`
+- `successDetails` (object, optional): Present only when `status === 'success'` with `decisionReason` and `extractedContent` properties
+- `failureDetails` (object, optional): Present only when `status === 'skipped'` or `status === 'error'` with `reason` property
+See [ExtractionResult schema](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ExtractionResult%20Output) for complete specification.
 
 ### `validate` Command Component Sequence Diagram
 
@@ -434,6 +445,16 @@ tools/citation-manager/
 │   ├── MarkdownParser.js            # Parser (MarkdownParser.Output.DataContract)
 │   ├── FileCache.js                 # Filename-to-path resolution cache
 │   ├── ParsedFileCache.js           # Parsed file object cache (US1.5)
+│   ├── core/
+│   │   └── ContentExtractor/        # ContentExtractor component (US2.2)
+│   │       ├── ContentExtractor.js              # Main orchestrator class
+│   │       ├── analyzeEligibility.js            # Eligibility analysis operation
+│   │       └── eligibilityStrategies/           # Strategy pattern implementations
+│   │           ├── ExtractionStrategy.js
+│   │           ├── StopMarkerStrategy.js
+│   │           ├── ForceMarkerStrategy.js
+│   │           ├── SectionLinkStrategy.js
+│   │           └── CliFlagStrategy.js
 │   └── factories/
 │       └── componentFactory.js      # Component instantiation with DI (US1.4b)
 ├── test/
@@ -463,9 +484,52 @@ tools/citation-manager/
     │       └── component-guides/
     │           ├── CitationValidator Implementation Guide.md
     │           ├── Markdown Parser Implementation Guide.md
-    │           └── ParsedFileCache Implementation Guide.md  
+    │           ├── ParsedFileCache Implementation Guide.md
+    │           └── Content Extractor Implementation Guide.md
     └── [additional documentation]
 ```
+
+### ContentExtractor File Structure
+
+**Current MVP Implementation** (US2.2):
+
+```text
+tools/citation-manager/
+└── src/
+    ├── core/
+    │   └── ContentExtractor/
+    │       ├── ContentExtractor.js              # Main orchestrator class
+    │       ├── analyzeEligibility.js            # Eligibility analysis operation
+    │       └── eligibilityStrategies/           # Strategy pattern implementations
+    │           ├── ExtractionStrategy.js
+    │           ├── StopMarkerStrategy.js
+    │           ├── ForceMarkerStrategy.js
+    │           ├── SectionLinkStrategy.js
+    │           └── CliFlagStrategy.js
+    └── factories/
+        └── componentFactory.js                  # createContentExtractor() with DI
+```
+
+**Helper Utilities Approach:**
+MVP implements `normalizeBlockId()` and `decodeUrlAnchor()` as co-located private methods in ContentExtractor.js per [Helper Co-location pattern](../../../../../design-docs/Architecture%20Principles.md#^co-located-helpers). Future extraction to `normalizeAnchor.js` if utilities needed by other components.
+
+**Planned Refactoring** (Future - Action-Based Organization):
+
+```text
+tools/citation-manager/
+└── src/
+    ├── core/
+    │   └── ContentExtractor/
+    │       ├── ContentExtractor.js              # Orchestrator class
+    │       ├── extractLinksContent.js           # Main extraction operation
+    │       ├── analyzeEligibility.js            # Eligibility analysis operation
+    │       ├── normalizeAnchor.js               # Anchor normalization utilities
+    │       └── eligibilityStrategies/           # Strategy implementations
+    └── factories/
+        └── componentFactory.js
+```
+
+Refactoring will extract operations when complexity warrants or if utilities needed by multiple components. See [Action-Based File Organization](../../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition) for principles.
 
 **Key Changes Post-US1.5**:
 - **ParsedFileCache.js**: New component providing in-memory cache of parsed file objects
@@ -661,8 +725,6 @@ This tool follows workspace design principles defined in [Architecture Principle
 ---
 
 ## Known Risks and Technical Debt
-
-
 
 ### Scattered File I/O Operations
 
