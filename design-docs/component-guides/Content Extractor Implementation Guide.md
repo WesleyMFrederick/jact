@@ -45,9 +45,9 @@ classDiagram
     }
 
     
-		
+  
 
-	  class ParsedFileCache {
+   class ParsedFileCache {
         <<interface>>
         +resolveParsedFile(filePath: string): Promise~ParsedDocument~
     }
@@ -59,36 +59,36 @@ classDiagram
         +extractBlock(anchorId: string): string
         +extractFullContent(): string
     }
-		
-		class ExtractionStrategy {
+  
+  class ExtractionStrategy {
     <<interface>>
         %% +getMarker(): string|null
         +getDecision(link: string, cliFlags: Object): Decision|null
     }
-		
-		namespace Strategies {
-		  class Strategy {
-			  +getDecision(link: string, cliFlags: Object): Decision|null
-		  }
-		
-		  class Note {
-			  <<note>>
-			  Implements custom extraction logic. Strategies include:
-			  . - StopMarkerStrategy
-			  . - ForceMarkerStrategy
-			  . - SectionLinkStrategy
-			  . - CliFlagStrategy
-		  }
-		  
-		}
-		
+  
+  namespace Strategies {
+    class Strategy {
+     +getDecision(link: string, cliFlags: Object): Decision|null
+    }
+  
+    class Note {
+     <<note>>
+     Implements custom extraction logic. Strategies include:
+     . - StopMarkerStrategy
+     . - ForceMarkerStrategy
+     . - SectionLinkStrategy
+     . - CliFlagStrategy
+    }
+    
+  }
+  
     class ContentBlock {
         +content: string
         +metadata: object
     }
-		
-		
-		
+  
+  
+  
     CLIOrchestrator --> ContentExtractor : calls
     
     ContentExtractor ..> ParsedFileCache : depends on
@@ -170,7 +170,7 @@ sequenceDiagram
     participant Validator as Citation Validator
     participant ParsedCache as ParsedFileCache
     participant Parser as MarkdownParser
-    
+
 
     User->>CLI: extract <file> --scope <dir>
     note over CLI: Instantiates ContentExtractor via factory
@@ -179,22 +179,18 @@ sequenceDiagram
 
     note over Extractor: 0. Validation & Link Discovery (Validation Enrichment Pattern)
     Extractor->>+Validator: validateFile(sourceFilePath)
-    %% note over Validator: Collect marker patterns from strategies
-    %% Validator->>+Strategies: getMarker() for each strategy
-    %% Strategies-->>-Validator: ['%%stop-extract-link%%', '%%force-extract%%', null, null]
-    %% Validator->>+ParsedCache: resolveParsedFile(sourceFilePath, markerPatterns)
     Validator->>+ParsedCache: resolveParsedFile(sourceFilePath)
-    %% note over ParsedCache: Pass markers to MarkdownParser
-    ParsedCache->>+Parser: parse(content, markerPatterns)
-    Parser->>Parser: Detect links + scan for markers<br/>Auto-detect %% %% or <!-- --> delimiters
-    Parser-->>-ParsedCache: LinkObject[] with extractionMarker: { fullMatch, innerText }
-    ParsedCache-->>-Validator: ParsedDocument (SOURCE document with enriched links)
+    ParsedCache->>+Parser: parseFile(filePath)
+    Parser->>Parser: Detect links using marked.js + regex patterns
+    Parser-->>-ParsedCache: MarkdownParser.Output.DataContract
+    ParsedCache->>ParsedCache: Wrap in ParsedDocument facade
+    ParsedCache-->>-Validator: ParsedDocument (SOURCE document)
     Validator->>Validator: Validate links, add validation metadata
     Validator-->>-Extractor: { summary, links: EnrichedLinkObject[] }
-    note over Extractor: Links have both extractionMarker and validation properties
+    note over Extractor: Links enriched with validation metadata only
 
     note over Extractor: 1. Eligibility Analysis (Strategy Pattern)
-    Extractor->>Extractor: Filter eligible links using strategy chain<br/>Strategies check link.extractionMarker.innerText
+    Extractor->>Extractor: Filter eligible links using strategy chain<br/>Checks link.anchorType and CLI flags
 
     note over Extractor: 2. Content Retrieval Loop (TARGET documents)
     loop FOR EACH: eligible Link
@@ -685,7 +681,6 @@ The following design documents require updates to reflect the Validation Enrichm
 **Total**: 10 documents requiring updates to reflect the Validation Enrichment Pattern
 
 ---
-
 
 # `ContentExtractor` Component Technical Debt
 

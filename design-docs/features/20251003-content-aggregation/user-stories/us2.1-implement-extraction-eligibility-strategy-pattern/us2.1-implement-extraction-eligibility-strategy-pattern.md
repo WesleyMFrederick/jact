@@ -50,7 +50,7 @@ _Non-Functional Requirements_: [[../../content-aggregation-prd.md#^NFR6|NFR6]]
 
 ### US 2.1 Scope
 
-1. **Create** the `ContentExtractor` component structure following [Action-Based File Organization](../../../../Architecture%20Principles.md#^action-based-file-organization-definition) principles:
+1. **Create** the `ContentExtractor` component structure following [Action-Based File Organization](../../../../../../../design-docs/Architecture%20Principles.md#Action-Based%20File%20Organization)  principles:
     - `src/core/ContentExtractor/ContentExtractor.js` - Main component class (Component Entry Point, TitleCase)
     - `src/core/ContentExtractor/analyzeEligibility.js` - Supporting operation implementing strategy pattern (verb-noun, camelCase)
     - `src/core/ContentExtractor/eligibilityStrategies/` directory for strategy classes
@@ -105,8 +105,7 @@ _Non-Functional Requirements_: [[../../content-aggregation-prd.md#^NFR6|NFR6]]
 #### Implementation Guides
 - [Content Extractor Implementation Guide](../../../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 - [Markdown Parser Implementation Guide](../../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md)
-- [Component Interaction Diagram After US1.7](../../content-aggregation-architecture.md#Component%20Interaction%20Diagram%20After%20US1.7)
-- [Revised Recommendation: The Strategy Pattern](../../research/content-aggregation-architecture-whiteboard.md#Revised%20Recommendation%20The%20Strategy%20Pattern)
+- [`validate` Command Component Sequence Diagram](../../content-aggregation-architecture.md#`validate`%20Command%20Component%20Sequence%20Diagram)
 
 ### Files Impacted
 
@@ -126,10 +125,6 @@ _Non-Functional Requirements_: [[../../content-aggregation-prd.md#^NFR6|NFR6]]
 
 ## Whiteboard
 
-> [!note] **Technical Lead Feedback**: Parser output data contract - Base schema validated ✅
-> _Base Schema Status_: Parser Output Contract validated in [US1.5 Phase 1](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md#Phase%201%20Parser%20Output%20Contract%20Validation%20&%20Documentation). Current schema: `{ filePath, content, tokens, links, headings, anchors }` with LinkObject (`linkType`, `scope`, `anchorType`, `source`, `target`) and AnchorObject (`anchorType`, `id`, `rawText`) structures.
-> _Epic 2 Analysis Required_: Story 2.1 implementation should review existing LinkObject schema to determine if current `linkType`/`scope`/`anchorType` fields sufficiently distinguish full-file vs. section links, or if minor schema extensions are needed for content extraction metadata.
-> _Relevant Architecture Principles_: [data-model-first](../../../../Architecture%20Principles.md#^data-model-first), [primitive-first-design](../../../../Architecture%20Principles.md#^primitive-first-design), [illegal-states-unrepresentable](../../../../Architecture%20Principles.md#^illegal-states-unrepresentable), [explicit-relationships](../../../../Architecture%20Principles.md#^explicit-relationships)
 
 ---
 
