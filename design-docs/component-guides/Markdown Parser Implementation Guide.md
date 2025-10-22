@@ -303,6 +303,15 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
     "fullMatch": { "type": "string", "description": "Parser-created: Full matched link text" },
     "line": { "type": "integer", "minimum": 1, "description": "Parser-created: Line number in source file" },
     "column": { "type": "integer", "minimum": 1, "description": "Parser-created: Column number in source file" },
+        "extractionMarker": {
+          "type": ["object", "null"],
+          "description": "Parser-created: Optional extraction control marker found after the link. Used by ContentExtractor to override default extraction eligibility. See Issue 5 for MVP technical debt.",
+          "properties": {
+            "fullMatch": { "type": "string", "description": "Complete marker text including delimiters (e.g., '%%force-extract%%')" },
+            "innerText": { "type": "string", "description": "Marker content without delimiters (e.g., 'force-extract')" }
+          },
+          "required": [ "fullMatch", "innerText" ]
+        },
         "validation": {
           "type": "object",
           "description": "ADDED POST-PARSE by CitationValidator (US1.8): Validation metadata enrichment. This property does NOT exist when MarkdownParser returns the LinkObject. It is added after validation completes.",
@@ -468,6 +477,19 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
   ]
 }
 ```
+
+### Extraction Marker Examples
+
+The `extractionMarker` property captures optional control markers that appear after links, used by ContentExtractor to override default extraction eligibility:
+
+| Markdown | extractionMarker Value |
+|----------|----------------------|
+| `[link](file.md)%%force-extract%%` | `{ fullMatch: '%%force-extract%%', innerText: 'force-extract' }` |
+| `[link](file.md) %%stop-extract-link%%` | `{ fullMatch: '%%stop-extract-link%%', innerText: 'stop-extract-link' }` |
+| `[link](file.md)<!-- force-extract -->` | `{ fullMatch: '<!-- force-extract -->', innerText: 'force-extract' }` |
+| `[link](file.md)` | `null` |
+
+**Note**: See [Issue 5: Hardcoded Extraction Marker Detection](#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20MVP%20Tech%20Debt) for MVP technical debt discussion.
 
 ## Testing Strategy
 
@@ -1188,7 +1210,6 @@ Markdownlint does not primarily rely on whole-file regex or naive line-by-line s
 19. [http://xiangxing98.github.io/Markdownlint_Rules.html](http://xiangxing98.github.io/Markdownlint_Rules.html)
 20. [https://pypi.org/project/pymarkdownlnt/](https://pypi.org/project/pymarkdownlnt/)
 
-
 Here is **the exact code in the markdownlint repo** that takes rule definitions and runs logic on them—**no guessing**:
 
 **Location: `lib/markdownlint.mjs` (v0.39.0)**
@@ -1212,20 +1233,18 @@ js
 `// Function to run for each rule const forRule = (rule) => {   ...   // Prepares the onError handler and params   function onError(errorInfo) { ... }   // Calls the rule's implementation (your callback)   function invokeRuleFunction() {     rule.function(params, onError);   }   if (rule.asynchronous) {     // For async rules: return a Promise-wrapped call     return Promise.resolve().then(invokeRuleFunction)                           .catch(catchCallsOnError);   }   // For sync rules   try {     invokeRuleFunction();   } catch (error) {     if (handleRuleFailures) { catchCallsOnError(error); } else { throw error; }   }   return null; }; const ruleResults = ruleListAsyncFirst.map(forRule);`
 
 - **`params`**: The first argument, with content and parsed tokens.
-    
+
 - **`onError`**: The second argument, to report rule violations.
-    
 
 ## 3. **How Rules Are Iterated and Called**
 
 After preprocessing:
 
 - The relevant rules (including custom) are placed in `ruleList`.
-    
+
 - **Each rule’s `.function` property is invoked with `params` + `onError`.**
-    
+
 - Results/errors are collected for output.
-    
 
 ## 4. **Direct Code Example – Rule Execution (Sync/Async)**
 
@@ -1288,4 +1307,3 @@ Yes—micromark has third‑party extensions that implement Obsidian‑flavored 
 18. [https://forum.inkdrop.app/t/backlinks-roam-obsidian/1928](https://forum.inkdrop.app/t/backlinks-roam-obsidian/1928)
 19. [https://www.youtube.com/watch?v=sdVNiSQcMv0](https://www.youtube.com/watch?v=sdVNiSQcMv0)
 20. [https://forum.inkdrop.app/t/different-checkbox-types/3237](https://forum.inkdrop.app/t/different-checkbox-types/3237)
-

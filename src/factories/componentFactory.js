@@ -20,6 +20,11 @@ import { CitationValidator } from "../CitationValidator.js";
 import { FileCache } from "../FileCache.js";
 import { MarkdownParser } from "../MarkdownParser.js";
 import { ParsedFileCache } from "../ParsedFileCache.js";
+import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.js";
+import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { ForceMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
+import { SectionLinkStrategy } from "../core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
+import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
 
 /**
  * Create markdown parser with file system dependency
@@ -71,4 +76,28 @@ export function createCitationValidator(
 	const _parsedFileCache = parsedFileCache || createParsedFileCache();
 	const _fileCache = fileCache || createFileCache();
 	return new CitationValidator(_parsedFileCache, _fileCache);
+}
+
+/**
+ * Create ContentExtractor with eligibility strategies.
+ * Factory pattern for dependency injection.
+ *
+ * Precedence order (highest to lowest):
+ * 1. StopMarkerStrategy - %%stop-extract-link%%
+ * 2. ForceMarkerStrategy - %%force-extract%%
+ * 3. SectionLinkStrategy - Anchors eligible by default
+ * 4. CliFlagStrategy - --full-files flag (terminal)
+ *
+ * @param {ExtractionStrategy[]|null} [strategies=null] - Optional strategy override
+ * @returns {ContentExtractor} Configured ContentExtractor instance
+ */
+export function createContentExtractor(strategies = null) {
+	const _strategies = strategies || [
+		new StopMarkerStrategy(),
+		new ForceMarkerStrategy(),
+		new SectionLinkStrategy(),
+		new CliFlagStrategy(),
+	];
+
+	return new ContentExtractor(_strategies);
 }

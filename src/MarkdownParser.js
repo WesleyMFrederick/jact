@@ -108,7 +108,7 @@ export class MarkdownParser {
 					? relative(dirname(sourceAbsolutePath), absolutePath)
 					: null;
 
-				links.push({
+				const linkObject = {
 					linkType: linkType,
 					scope: scope,
 					anchorType: anchorType,
@@ -129,7 +129,12 @@ export class MarkdownParser {
 					fullMatch: match[0],
 					line: index + 1,
 					column: match.index,
-				});
+					extractionMarker: this._detectExtractionMarker(
+						line,
+						match.index + match[0].length,
+					),
+				};
+				links.push(linkObject);
 				match = linkPattern.exec(line);
 			}
 
@@ -149,7 +154,7 @@ export class MarkdownParser {
 					? relative(dirname(sourceAbsolutePath), absolutePath)
 					: null;
 
-				links.push({
+				const citeLinkObject = {
 					linkType: linkType,
 					scope: scope,
 					anchorType: anchorType,
@@ -170,7 +175,12 @@ export class MarkdownParser {
 					fullMatch: match[0],
 					line: index + 1,
 					column: match.index,
-				});
+					extractionMarker: this._detectExtractionMarker(
+						line,
+						match.index + match[0].length,
+					),
+				};
+				links.push(citeLinkObject);
 				match = citePattern.exec(line);
 			}
 
@@ -197,7 +207,7 @@ export class MarkdownParser {
 						? relative(dirname(sourceAbsolutePath), absolutePath)
 						: null;
 
-					links.push({
+					const relativeDocLinkObject = {
 						linkType: linkType,
 						scope: scope,
 						anchorType: anchorType,
@@ -218,7 +228,12 @@ export class MarkdownParser {
 						fullMatch: match[0],
 						line: index + 1,
 						column: match.index,
-					});
+						extractionMarker: this._detectExtractionMarker(
+							line,
+							match.index + match[0].length,
+						),
+					};
+					links.push(relativeDocLinkObject);
 				}
 				match = relativeDocRegex.exec(line);
 			}
@@ -240,7 +255,7 @@ export class MarkdownParser {
 					? relative(dirname(sourceAbsolutePath), absolutePath)
 					: null;
 
-				links.push({
+				const wikiCrossDocLinkObject = {
 					linkType: linkType,
 					scope: scope,
 					anchorType: anchorType,
@@ -261,7 +276,12 @@ export class MarkdownParser {
 					fullMatch: match[0],
 					line: index + 1,
 					column: match.index,
-				});
+					extractionMarker: this._detectExtractionMarker(
+						line,
+						match.index + match[0].length,
+					),
+				};
+				links.push(wikiCrossDocLinkObject);
 				match = wikiCrossDocRegex.exec(line);
 			}
 
@@ -276,7 +296,7 @@ export class MarkdownParser {
 				const scope = "internal";
 				const anchorType = this.determineAnchorType(anchor);
 
-				links.push({
+				const wikiLinkObject = {
 					linkType: linkType,
 					scope: scope,
 					anchorType: anchorType,
@@ -297,8 +317,54 @@ export class MarkdownParser {
 					fullMatch: match[0],
 					line: index + 1,
 					column: match.index,
-				});
+					extractionMarker: this._detectExtractionMarker(
+						line,
+						match.index + match[0].length,
+					),
+				};
+				links.push(wikiLinkObject);
 				match = wikiRegex.exec(line);
+			}
+
+			// Internal markdown anchor links: [text](#anchor)
+			const internalAnchorRegex = /\[([^\]]+)\]\(#([^)]+)\)/g;
+			match = internalAnchorRegex.exec(line);
+			while (match !== null) {
+				const text = match[1];
+				const anchor = match[2];
+
+				const linkType = "markdown";
+				const scope = "internal";
+				const anchorType = this.determineAnchorType(anchor);
+
+				const internalAnchorLinkObject = {
+					linkType: linkType,
+					scope: scope,
+					anchorType: anchorType,
+					source: {
+						path: {
+							absolute: sourceAbsolutePath,
+						},
+					},
+					target: {
+						path: {
+							raw: null,
+							absolute: null,
+							relative: null,
+						},
+						anchor: anchor,
+					},
+					text: text,
+					fullMatch: match[0],
+					line: index + 1,
+					column: match.index,
+					extractionMarker: this._detectExtractionMarker(
+						line,
+						match.index + match[0].length,
+					),
+				};
+				links.push(internalAnchorLinkObject);
+				match = internalAnchorRegex.exec(line);
 			}
 
 			// Caret syntax references (internal references)
@@ -311,7 +377,7 @@ export class MarkdownParser {
 				const scope = "internal";
 				const anchorType = "block";
 
-				links.push({
+				const caretLinkObject = {
 					linkType: linkType,
 					scope: scope,
 					anchorType: anchorType,
@@ -332,12 +398,43 @@ export class MarkdownParser {
 					fullMatch: match[0],
 					line: index + 1,
 					column: match.index,
-				});
+					extractionMarker: this._detectExtractionMarker(
+						line,
+						match.index + match[0].length,
+					),
+				};
+				links.push(caretLinkObject);
 				match = caretRegex.exec(line);
 			}
 		});
 
 		return links;
+	}
+
+	/**
+	 * Detect extraction markers after link on same line.
+	 * Supports %%marker%% and <!-- marker --> formats.
+	 *
+	 * @param {string} line - Full line containing the link
+	 * @param {number} linkEndColumn - Column where link ends
+	 * @returns {Object|null} { fullMatch, innerText } or null if no marker
+	 */
+	_detectExtractionMarker(line, linkEndColumn) {
+		// Get text after link on same line
+		const remainingLine = line.substring(linkEndColumn);
+
+		// Pattern: %%text%% or <!-- text -->
+		const markerPattern = /\s*(%%(.+?)%%|<!--\s*(.+?)\s*-->)/;
+		const match = remainingLine.match(markerPattern);
+
+		if (match) {
+			return {
+				fullMatch: match[1], // Full marker with delimiters
+				innerText: match[2] || match[3], // Text between delimiters
+			};
+		}
+
+		return null;
 	}
 
 	// Classify anchor as "block" (^prefix) or "header"
