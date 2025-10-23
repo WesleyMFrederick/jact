@@ -79,7 +79,7 @@ export function createCitationValidator(
 }
 
 /**
- * Create ContentExtractor with eligibility strategies.
+ * Create ContentExtractor with eligibility strategies and dependencies.
  * Factory pattern for dependency injection.
  *
  * Precedence order (highest to lowest):
@@ -88,10 +88,19 @@ export function createCitationValidator(
  * 3. SectionLinkStrategy - Anchors eligible by default
  * 4. CliFlagStrategy - --full-files flag (terminal)
  *
+ * @param {ParsedFileCache|null} [parsedFileCache=null] - Optional cache for testing
+ * @param {CitationValidator|null} [citationValidator=null] - Optional validator for testing
  * @param {ExtractionStrategy[]|null} [strategies=null] - Optional strategy override
  * @returns {ContentExtractor} Configured ContentExtractor instance
  */
-export function createContentExtractor(strategies = null) {
+export function createContentExtractor(
+	parsedFileCache = null,
+	citationValidator = null,
+	strategies = null,
+) {
+	// Create or use provided dependencies
+	const _parsedFileCache = parsedFileCache || createParsedFileCache();
+	const _citationValidator = citationValidator || createCitationValidator();
 	const _strategies = strategies || [
 		new StopMarkerStrategy(),
 		new ForceMarkerStrategy(),
@@ -99,5 +108,6 @@ export function createContentExtractor(strategies = null) {
 		new CliFlagStrategy(),
 	];
 
-	return new ContentExtractor(_strategies);
+	// Instantiate ContentExtractor with ALL dependencies
+	return new ContentExtractor(_strategies, _parsedFileCache, _citationValidator);
 }

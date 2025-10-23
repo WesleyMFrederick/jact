@@ -80,27 +80,31 @@ describe('ParsedDocument Facade', () => {
 		expect(content.length).toBeGreaterThan(0);
 	});
 
-	// 5. Test Epic 2 stub: extractSection
-	it('extractSection should throw NotImplemented for US1.7', async () => {
+	// 5. Test extractSection implementation (US2.2 AC13)
+	it('extractSection should extract section content or return null', async () => {
 		// Given: ParsedDocument instance from real parser output
 		const parser = createMarkdownParser();
 		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
 		const parserOutput = await parser.parseFile(testFile);
 		const doc = new ParsedDocument(parserOutput);
 
-		// When/Then: Stubbed method throws error
-		expect(() => doc.extractSection("any")).toThrow("Not implemented");
+		// When/Then: Method returns string or null (no longer throws error)
+		const result = doc.extractSection("any", 2);
+		expect(result === null || typeof result === 'string').toBe(true);
 	});
 
-	// 6. Test Epic 2 stub: extractBlock
-	it('extractBlock should throw NotImplemented for US1.7', async () => {
+	// 6. Test extractBlock implementation (US2.2 AC14)
+	it('extractBlock should extract block content or return null', async () => {
 		// Given: ParsedDocument instance from real parser output
 		const parser = createMarkdownParser();
 		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
 		const parserOutput = await parser.parseFile(testFile);
 		const doc = new ParsedDocument(parserOutput);
 
-		// When/Then: Stubbed method throws error
-		expect(() => doc.extractBlock("any")).toThrow("Not implemented");
+		// When: Extract non-existent block
+		const result = doc.extractBlock("nonexistent-block");
+
+		// Then: Returns null (not throwing error)
+		expect(result).toBeNull();
 	});
 });

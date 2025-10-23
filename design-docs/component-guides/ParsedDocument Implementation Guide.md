@@ -1,18 +1,18 @@
 # ParsedDocument Implementation Guide
 
-This guide provides the Level 4 (Code) details for the **`ParsedDocument`** facade, which will be implemented as part of User Story 1.7.
+This guide provides the Level 4 (Code) details for the **`ParsedDocument`** facade, which is the facade wrapper implemented in User Story 1.7.
 
 ## Problem
 
-Consumers like the `CitationValidator` are tightly coupled to the internal structure of the `MarkdownParser.Output.DataContract`. This makes the `CitationValidator` complex, forces it to contain data-querying logic, and makes any future change to the parser's output a breaking change for all consumers.
+Consumers like the `CitationValidator` are tightly coupled to the internal structure of the [**`MarkdownParser.Output.DataContract`**](../../../../../resume-coach/design-docs/examples/component-guides/Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts). This makes the `CitationValidator` complex, forces it to contain data-querying logic, and makes any future change to the parser's output a breaking change for all consumers.
 
 ## Solution
 
-The **`ParsedDocument`** facade is a wrapper class that encapsulates the raw `MarkdownParser.Output.DataContract`. It provides a stable, method-based API for querying links, anchors, and content, hiding the complex internal data structures from all consumers. This simplifies consumer logic and isolates the system from future changes to the underlying parser.
+The **`ParsedDocument`** facade is a wrapper class that encapsulates the raw [**`MarkdownParser.Output.DataContract`**](../../../../../resume-coach/design-docs/examples/component-guides/Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts). It provides a stable, method-based API for querying links, anchors, and content, hiding the complex internal data structures from all consumers. This simplifies consumer logic and isolates the system from future changes to the underlying parser.
 
 ## Structure
 
-The `ParsedFileCache` is responsible for creating `ParsedDocument` instances. Consumers like `CitationValidator` and the future `ContentExtractor` will depend on the `ParsedDocument` interface for all data access.
+The [**`ParsedFileCache`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedFileCache%20Implementation%20Guide.md#Output%20Contract) is responsible for creating `ParsedDocument` instances. Consumers like `CitationValidator` and `ContentExtractor` depend on the `ParsedDocument` interface for all data access.
 
 ```mermaid
 classDiagram
@@ -58,15 +58,14 @@ classDiagram
 1. [MarkdownParser.Output.DataContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The raw data object being wrapped
 2. **ParsedDocument**: The facade providing query methods (this guide)
 3. [CitationValidator](CitationValidator%20Implementation%20Guide.md): Consumer using anchor/link query methods
-4. [Citation Manager.Content Extractor](../features/20251003-content-aggregation/content-aggregation-architecture.md#==Citation%20Manager.Content%20Extractor==): Future Epic 2 consumer using content extraction methods
+4. [Citation Manager.ContentExtractor](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ContentExtractor): Consumer using content extraction methods
 
 ## File Structure
 
 ```text
 tools/citation-manager/
 └── src/
-    └── core/
-        └── ParsedDocument.js    # Facade class with query and extraction methods
+    └── ParsedDocument.js    # Facade class with query and extraction methods
 ```
 
 **Architecture Notes:**
@@ -83,15 +82,15 @@ tools/citation-manager/
 The facade exposes a set of query methods for consumers.
 
 #### Anchor Queries
-- **`hasAnchor(anchorId: string): boolean`**: Returns `true` or `false` if an anchor ID exists in the document. This method encapsulates all complex matching logic, including direct, URL-decoded, and flexible markdown matching.
+- [**`hasAnchor(anchorId: string): boolean`**](#`hasAnchor(anchorId%20string)%20boolean`): Returns `true` or `false` if an anchor ID exists in the document. This method encapsulates all complex matching logic, including direct, URL-decoded, and flexible markdown matching.
 - **`findSimilarAnchors(anchorId: string): string`**: Returns a formatted suggestion string (e.g., "Did you mean...") when an anchor is not found, encapsulating all suggestion-generation logic.
 
 #### Link Queries
 - **`getLinks(): LinkObject[]`**: Returns the full array of `LinkObject`s from the document for consumers that need to iterate over all links.
 
 #### Content Extraction
-- **`extractSection(headingText: string): string`**: Returns the string content for a specific section by encapsulating the complex token-walking logic.
-- **`extractBlock(anchorId: string): string`**: Returns the string content for a specific block reference (e.g., `^my-block-id`).
+- **`extractSection(headingText: string, headingLevel: number): string | null`**: Returns the string content for a specific section by encapsulating the complex token-walking logic.
+- **`extractBlock(anchorId: string): string | null`**: Returns the string content for a specific block reference (e.g., `^my-block-id`).
 - **`extractFullContent(): string`**: A simple getter that returns the entire raw content of the document as a string.
 
 ## Pseudocode
@@ -103,9 +102,6 @@ This [Psuedocode - Medium Level -Implementation Ready Patterns](../../../../desi
 class ParsedDocument is
   private field _data: MarkdownParser.Output.DataContract
   private field _cachedAnchorIds: string[] = null
-  private field _cachedBlockAnchors: Anchor[] = null
-  private field _cachedHeaderAnchors: Anchor[] = null
-  private field _cachedCrossDocumentLinks: Link[] = null
 
   // Constructor accepts and wraps the raw parser output
   constructor ParsedDocument(parserOutput: MarkdownParser.Output.DataContract) is
@@ -136,7 +132,7 @@ class ParsedDocument is
   public method getLinks(): Link[] is
     return this._data.links
 
-  // --- Content Extraction (for Epic 2) ---
+  // --- Content Extraction ---
 
   // Get the entire raw content of the document as a string
   public method extractFullContent(): string is
@@ -226,18 +222,6 @@ class ParsedDocument is
       this._cachedAnchorIds = Array.from(ids)
     return this._cachedAnchorIds
 
-  // Get all block-level anchors, cached for performance
-  private method _getBlockAnchors(): Anchor[] is
-    if (this._cachedBlockAnchors == null) then
-      this._cachedBlockAnchors = this._data.anchors.filter(a => a.anchorType == "block")
-    return this._cachedBlockAnchors
-
-  // Get all header-level anchors, cached for performance
-  private method _getHeaderAnchors(): Anchor[] is
-    if (this._cachedHeaderAnchors == null) then
-        this._cachedHeaderAnchors = this._data.anchors.filter(a => a.anchorType == "header")
-    return this._cachedHeaderAnchors
-
   // Fuzzy matching implementation to find similar strings
   private method _fuzzyMatch(target: string, candidates: string[]): string[] is
     // Implementation: Uses Levenshtein distance for similarity calculation
@@ -277,22 +261,6 @@ class ParsedDocument is
 - **Logic**: Checks both `anchor.id` and `anchor.urlEncodedId` for match
 - **Example**: `hasAnchor("Story 1.7: Implementation")` → `true`
 
-#### `getBlockAnchors(): Anchor[]`
-- **Purpose**: Get all block-type anchors (caret syntax: `^anchor-id`)
-- **Returns**: Array of anchor objects with `anchorType === "block"`
-- **Caching**: Result cached after first call for performance
-- **Status**: Private helper method implemented, cache field `_cachedBlockAnchors` available
-- **Example**: `[{ anchorType: "block", id: "FR1", line: 42, column: 28, ... }]`
-- **Note**: Currently private implementation used internally by extraction methods
-
-#### `getHeaderAnchors(): Anchor[]`
-- **Purpose**: Get all header-type anchors (from headings)
-- **Returns**: Array of anchor objects with `anchorType === "header"`
-- **Caching**: Result cached after first call for performance
-- **Status**: Private helper method implemented, cache field `_cachedHeaderAnchors` available
-- **Example**: `[{ anchorType: "header", id: "Overview", urlEncodedId: "Overview", ... }]`
-- **Note**: Currently private implementation used internally by extraction methods
-
 #### `findSimilarAnchors(anchorId: string): string[]`
 - **Purpose**: Find anchors similar to given anchor ID (fuzzy matching for suggestions)
 - **Parameters**: `anchorId` - Target anchor ID to find matches for
@@ -315,7 +283,7 @@ class ParsedDocument is
 #### `extractFullContent(): string`
 - **Purpose**: Get complete file content
 - **Returns**: Full content string from `_data.content`
-- **Use Case**: Full-file extraction for Epic 2
+- **Use Case**: Full-file extraction
 - **Note**: Returns direct reference to internal string for performance. Consumers should not mutate returned values.
 
 **Pseudocode:**
@@ -523,7 +491,7 @@ describe("ParsedDocument", () => {
     expect(content).toBe(mockContent);
   });
 
-  // Test Epic 2 extraction methods
+  // Test content extraction methods
   it("extractSection should extract section content by heading text and level", () => {
     // Given: A ParsedDocument with tokenized sections
     const parserOutput = {
@@ -591,9 +559,9 @@ describe("ParsedDocument", () => {
 });
 ```
 
-## Epic 2 Content Extraction Methods
+## Content Extraction Methods
 
-The `extractSection()` and `extractBlock()` methods are now fully implemented with algorithms proven through POC testing. See the Pseudocode section above for complete implementation details.
+The `extractSection()` and `extractBlock()` methods are fully implemented with algorithms proven through POC testing. See the Pseudocode section above for complete implementation details.
 
 ### Section Extraction Algorithm (Implemented)
 
@@ -631,7 +599,7 @@ The `extractSection()` and `extractBlock()` methods are now fully implemented wi
 
 ### Incomplete Facade Encapsulation for Advanced Queries
 
-**Status**: Technical debt created by US1.7, resolution planned for Epic 2
+**Status**: Technical debt created by US1.7, remains as low-priority technical debt (extraction methods work correctly)
 
 **Issue**: CitationValidator helper methods require direct `_data.anchors` access for metadata-dependent operations:
 - Line 528: `suggestObsidianBetterFormat()` needs anchor objects with `anchorType` and `rawText` properties
@@ -639,22 +607,20 @@ The `extractSection()` and `extractBlock()` methods are now fully implemented wi
 - Lines 570-578: Suggestion generation needs anchor objects filtered by type
 
 **Missing Facade Methods**:
-- `getHeaderAnchors(): AnchorObject[]` - Return header anchor objects with metadata
-- `getBlockAnchors(): AnchorObject[]` - Return block anchor objects with metadata
-- `getAnchorByIdWithMetadata(anchorId): AnchorObject|null` - Return full anchor object
+- `getAnchorByIdWithMetadata(anchorId): AnchorObject|null` - Return full anchor object with metadata
 
 **Impact**: Primary validation fully decoupled via `hasAnchor()` and `findSimilarAnchors()` methods, but error reporting and advanced matching still coupled to internal anchor schema.
 
-**Workaround**: Helper methods access `parsedDoc._data.anchors` directly until facade extended in Epic 2.
+**Workaround**: Helper methods access `parsedDoc._data.anchors` directly. This is acceptable as a low-priority technical debt since the core extraction functionality works correctly.
 
-**Resolution**: Epic 2 will extend facade with metadata-aware query methods to eliminate remaining coupling.
+**Resolution**: Future work may extend facade with metadata-aware query methods to eliminate remaining coupling, but this is not currently prioritized.
 
 ## Design Notes
 
 **Encapsulation Benefits**:
 - All direct access to `_data` is private - consumers cannot bypass facade
 - Fuzzy matching complexity hidden in `_fuzzyMatch()` private method
-- Token navigation complexity will be hidden in extraction methods (Epic 2)
+- Token navigation complexity is hidden in extraction methods
 
 **Performance Optimization**:
 - Lazy-load and cache anchor IDs on first call
@@ -693,11 +659,11 @@ const anchorExists = parsed.anchors.some(a => a.id === anchor)
 const anchorExists = parsedDoc.hasAnchor(anchor)
 ```
 
-### ContentExtractor Integration (Epic 2)
-The future `ContentExtractor` will use extraction methods:
+### ContentExtractor Integration
+The `ContentExtractor` uses extraction methods:
 
 ```javascript
-const section = parsedDoc.extractSection(headingText)
+const section = parsedDoc.extractSection(headingText, headingLevel)
 const block = parsedDoc.extractBlock(anchorId)
 const fullContent = parsedDoc.extractFullContent()
 ```

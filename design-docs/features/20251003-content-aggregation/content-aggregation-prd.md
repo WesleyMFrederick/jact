@@ -56,6 +56,8 @@ This feature directly supports the CC Workflows vision by:
 | 2025-10-04 | 2.1     | Split US1.4 into US1.4a (Test Migration) and US1.4b (DI Refactoring) per ADR-001, rewrote all AC in EARS format, updated dependency chain for Epic 2                                                               | Application Tech Lead                     |
 | 2025-10-07 | 2.2     | Mark US1.5 as COMPLETE, update Technical Lead Feedback sections: Parser data contract RESOLVED (US1.5 Phase 1), US1.5 caching feedback IMPLEMENTED, Epic 2 feedback remains active for Stories 2.2-2.3             | Application Tech Lead                     |
 | 2025-10-19 | 2.3     | Mark US1.8 as COMPLETE - Validation Enrichment Pattern successfully implemented, all acceptance criteria validated, zero regressions confirmed (121/123 tests passing, 2 pre-existing failures unrelated to US1.8) | Application Tech Lead (Claude Sonnet 4.5) |
+| 2025-10-23 | 2.4     | Mark US2.2 as COMPLETE - Content retrieval implemented with ParsedDocument facade integration, zero regressions confirmed                                                                                          | Application Tech Lead (Claude Sonnet 4.5) |
+| 2025-10-23 | 2.5     | Add US2.2 AC15 - Filter out internal links (scope='internal') before processing to exclude them from ExtractionResult array                                                                                        | Application Tech Lead (Claude Sonnet 4.5) |
 
 ---
 
@@ -332,8 +334,12 @@ _Status_: ✅ COMPLETE (2025-10-21)
 10. The `createContentExtractor()` factory function SHALL be updated to accept and inject `parsedFileCache` and `citationValidator` dependencies with optional override parameters for testing. ^US2-2AC10
 11. GIVEN the content retrieval implementation is complete, WHEN integration tests execute, THEN they SHALL validate the complete workflow using real **`ParsedFileCache`**, **`CitationValidator`**, and **ParsedDocument** instances per the "Real Systems, Fake Fixtures" principle. ^US2-2AC11
 12. GIVEN the complete ContentExtractor implementation, WHEN the full test suite executes, THEN all US2.1 tests (35+ tests) SHALL continue passing with zero regressions. ^US2-2AC12
+13. The `ParsedDocument.extractSection(headingText)` method SHALL be fully implemented using a 3-phase algorithm: (1) flatten token tree via recursive walk to locate target heading, (2) find section boundary by locating next same-or-higher level heading, (3) reconstruct content from token.raw properties. The method SHALL return the complete section content as a string, or null if heading not found. ^US2-2AC13
+14. The `ParsedDocument.extractBlock(anchorId)` method SHALL be fully implemented to find the block anchor by ID in the anchors array, validate the line index is within bounds, and extract the single line containing the block anchor. The method SHALL return the line content as a string, or null if block anchor not found or line index invalid. ^US2-2AC14
+15. GIVEN enriched links are returned from validation, WHEN `extractLinksContent()` processes links, THEN the component SHALL filter out links where `link.scope === 'internal'` before entering the processing loop, excluding them from the returned ExtractionResult array. ^US2-2AC15
 
 **Architecture Notes:**
+- AC13-AC14 are prerequisites for AC5-AC7: extraction methods must be implemented before ContentExtractor can retrieve content
 - Follows the [ContentExtractor Workflow: Component Interaction Diagram](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
 - Implements Validation Enrichment Pattern from US1.8
 - Single service interface abstracts multi-step workflow from CLI
@@ -342,12 +348,12 @@ _Depends On_: [Story 2.1: Implement Extraction Eligibility using Strategy Patter
 _Enables_: [Story 2.3: Implement `extract` Command](#Story%202.3%20Implement%20extract%20Command)
 _Functional Requirements_: [[#^FR5|FR5]], [[#^FR6|FR6]]
 _Non-Functional Requirements_: [[#^NFR5|NFR5]] (ParsedFileCache ensures single parse per file)
-_Architecture Reference_: 
+_Architecture Reference_:
 - [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 - [ParsedDocument Implementation Guide](../../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md)
 - [CLI Integration Guide](../../component-guides/CLI%20Integration%20Guide.md)
 _User Story Link_: [us2.2-implement-content-retrieval](user-stories/us2.2-implement-content-retrieval/us2.2-implement-content-retrieval.md)
-_Status_: Pending
+_Status_: ✅ COMPLETE (2025-10-23)
 
 ### Story 2.3: Implement `extract` Command
 

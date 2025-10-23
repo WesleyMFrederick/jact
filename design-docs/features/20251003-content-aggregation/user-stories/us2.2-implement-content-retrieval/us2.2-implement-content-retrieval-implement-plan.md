@@ -8,6 +8,20 @@
 
 **Tech Stack:** Node.js ESM, Vitest, existing citation-manager components (CitationValidator, ParsedFileCache, ParsedDocument)
 
+**Checkpoint Strategy:** This plan uses git checkpoints after each task (Tasks 1-8) to track granular progress with full attribution. A single comprehensive commit is created after Task 9 to represent the complete US2.2 implementation.
+
+---
+
+## Initial Setup: Create Baseline Checkpoint
+
+**Before Task 1 begins:**
+
+```bash
+git checkpoint "claude-sonnet-4-5" "pre-us2.2-baseline" "Clean state before US2.2 implementation begins"
+```
+
+This captures the clean state before any US2.2 work, allowing easy comparison and rollback if needed.
+
 ---
 
 ## Task 1: Create Anchor Normalization Utility File
@@ -144,20 +158,11 @@ Run: `npm test -- normalize-anchor.test.js`
 
 Expected: PASS (6/6 tests total)
 
-### Step 9: Commit anchor normalization utilities
+### Step 9: Create checkpoint for anchor normalization utilities
 
 ```bash
 git add tools/citation-manager/src/core/ContentExtractor/normalizeAnchor.js tools/citation-manager/test/normalize-anchor.test.js
-git commit -m "feat(us2.2): create anchor normalization utility file
-
-- Create normalizeAnchor.js with exported normalizeBlockId() and decodeUrlAnchor()
-- normalizeBlockId() removes '^' prefix from block anchors
-- decodeUrlAnchor() handles URL-encoded strings with graceful fallback
-- Add unit tests for both utilities (6 tests)
-- Follows Action-Based File Organization (utility extraction pattern)
-- Per ADR-CE02: normalization in ContentExtractor, not ParsedDocument
-
-US2.2 AC5, AC6"
+git checkpoint "claude-sonnet-4-5" "task-1-anchor-normalization" "Create normalizeAnchor.js with exported normalizeBlockId() and decodeUrlAnchor(). normalizeBlockId() removes '^' prefix from block anchors. decodeUrlAnchor() handles URL-encoded strings with graceful fallback. Add unit tests for both utilities (6 tests). Follows Action-Based File Organization (utility extraction pattern). Per ADR-CE02: normalization in ContentExtractor, not ParsedDocument. US2.2 AC5, AC6"
 ```
 
 ---
@@ -223,17 +228,11 @@ Run: `npm test -- content-extractor.test.js`
 
 Expected: PASS
 
-### Step 5: Commit constructor update
+### Step 5: Create checkpoint for constructor update
 
 ```bash
 git add tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js tools/citation-manager/test/content-extractor.test.js
-git commit -m "feat(us2.2): add DI for ParsedFileCache and CitationValidator
-
-- Update ContentExtractor constructor to accept parsedFileCache and citationValidator
-- Add unit test validating dependency injection
-- Maintains backward compatibility with existing eligibilityStrategies parameter
-
-US2.2 AC1"
+git checkpoint "claude-sonnet-4-5" "task-2-constructor-di" "Update ContentExtractor constructor to accept parsedFileCache and citationValidator. Add unit test validating dependency injection. Maintains backward compatibility with existing eligibilityStrategies parameter. US2.2 AC1"
 ```
 
 ---
@@ -446,23 +445,11 @@ Run: `npm test -- content-extractor.test.js`
 
 Expected: PASS (validates AC3-AC9)
 
-### Step 7: Commit extractLinksContent operation
+### Step 7: Create checkpoint for extractLinksContent operation
 
 ```bash
-git add tools/citation-manager/src/core/ContentExtractor/extractLinksContent.js tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js tools/citation-manager/test/extract-links-content.test.js tools/citation-manager/test/fixtures/us2.2/
-git commit -m "feat(us2.2): create extractLinksContent operation file
-
-- Create extractLinksContent.js as primary operation file (verb-noun naming)
-- Orchestrates validation → eligibility → content retrieval workflow
-- Internally calls CitationValidator.validateFile() to get enriched links
-- Filters by validation status and eligibility using strategy chain
-- Extracts content via ParsedDocument methods (extractSection/extractBlock/extractFullContent)
-- Returns ExtractionResult array with success/skipped/error statuses
-- Add delegation method in ContentExtractor.js (thin wrapper pattern)
-- Add comprehensive workflow tests with mixed link types
-- Follows Action-Based File Organization (operation extraction)
-
-US2.2 AC2, AC3, AC4, AC5, AC6, AC7, AC8, AC9"
+git add tools/citation-manager/src/core/ContentExtractor/extractLinksContent.js tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js tools/citation-manager/test/content-extractor.test.js tools/citation-manager/test/fixtures/us2.2/
+git checkpoint "claude-sonnet-4-5" "task-3-extract-links-content" "Create extractLinksContent.js as primary operation file (verb-noun naming). Orchestrates validation → eligibility → content retrieval workflow. Internally calls CitationValidator.validateFile() to get enriched links. Filters by validation status and eligibility using strategy chain. Extracts content via ParsedDocument methods (extractSection/extractBlock/extractFullContent). Returns ExtractionResult array with success/skipped/error statuses. Add delegation method in ContentExtractor.js (thin wrapper pattern). Add comprehensive workflow tests with mixed link types. Follows Action-Based File Organization (operation extraction). US2.2 AC2, AC3, AC4, AC5, AC6, AC7, AC8, AC9"
 ```
 
 ---
@@ -545,18 +532,11 @@ Run: `npm test -- component-factory.test.js`
 
 Expected: PASS (both factory tests)
 
-### Step 5: Commit factory update
+### Step 5: Create checkpoint for factory update
 
 ```bash
 git add tools/citation-manager/src/factories/componentFactory.js tools/citation-manager/test/component-factory.test.js
-git commit -m "feat(us2.2): update factory to wire ParsedFileCache and CitationValidator
-
-- Update createContentExtractor() to accept parsedFileCache and citationValidator parameters
-- Wire dependencies using existing factory functions (createParsedFileCache, createCitationValidator)
-- Support optional dependency override for testing
-- Maintain default strategy chain instantiation
-
-US2.2 AC10"
+git checkpoint "claude-sonnet-4-5" "task-4-factory-wiring" "Update createContentExtractor() to accept parsedFileCache and citationValidator parameters. Wire dependencies using existing factory functions (createParsedFileCache, createCitationValidator). Support optional dependency override for testing. Maintain default strategy chain instantiation. US2.2 AC10"
 ```
 
 ---
@@ -642,18 +622,11 @@ ls -la tools/citation-manager/test/fixtures/us2.2/
 
 Expected output: Shows all created fixture files
 
-### Step 6: Commit fixtures
+### Step 6: Create checkpoint for test fixtures
 
 ```bash
 git add tools/citation-manager/test/fixtures/us2.2/
-git commit -m "test(us2.2): add test fixtures for content extraction
-
-- Add mixed-links-source.md with section/block/full-file links
-- Add target-doc.md with extractable section and block content
-- Add error-links-source.md for validation error scenarios
-- Fixtures support integration testing for AC5-AC9
-
-US2.2 test infrastructure"
+git checkpoint "claude-sonnet-4-5" "task-5-test-fixtures" "Add mixed-links-source.md with section/block/full-file links. Add target-doc.md with extractable section and block content. Add error-links-source.md for validation error scenarios. Fixtures support integration testing for AC5-AC9. US2.2 test infrastructure"
 ```
 
 ---
@@ -697,17 +670,11 @@ Run: `npm test -- content-extraction-workflow.test.js`
 
 Expected: PASS (validates AC11 - real component integration)
 
-### Step 3: Commit integration tests
+### Step 3: Create checkpoint for integration tests
 
 ```bash
 git add tools/citation-manager/test/integration/content-extraction-workflow.test.js
-git commit -m "test(us2.2): add integration tests for extraction workflow
-
-- Test complete workflow with real ParsedFileCache, CitationValidator, ParsedDocument
-- Follow 'Real Systems, Fake Fixtures' principle (no mocks)
-- Validate end-to-end orchestration from validation through content retrieval
-
-US2.2 AC11"
+git checkpoint "claude-sonnet-4-5" "task-6-integration-tests" "Test complete workflow with real ParsedFileCache, CitationValidator, ParsedDocument. Follow 'Real Systems, Fake Fixtures' principle (no mocks). Validate end-to-end orchestration from validation through content retrieval. US2.2 AC11"
 ```
 
 ---
@@ -782,17 +749,11 @@ Run: `npm test -- us2.2-acceptance-criteria.test.js`
 
 Expected: PASS (all 12 ACs validated)
 
-### Step 3: Commit AC tests
+### Step 3: Create checkpoint for AC tests
 
 ```bash
 git add tools/citation-manager/test/integration/us2.2-acceptance-criteria.test.js
-git commit -m "test(us2.2): add acceptance criteria validation tests
-
-- Validate all AC1-AC12 with dedicated integration tests
-- One test per acceptance criteria for traceability
-- Confirms complete US2.2 implementation
-
-US2.2 acceptance validation"
+git checkpoint "claude-sonnet-4-5" "task-7-acceptance-tests" "Validate all AC1-AC12 with dedicated integration tests. One test per acceptance criteria for traceability. Confirms complete US2.2 implementation. US2.2 acceptance validation"
 ```
 
 ---
@@ -946,22 +907,47 @@ npm run citation:validate tools/citation-manager/design-docs/component-guides/Co
 
 Expected: All markdown linting passes, all citations validate without errors
 
-### Step 7: Commit documentation updates
+### Step 7: Create comprehensive final commit
+
+After documentation updates are complete, create the final commit that captures the entire US2.2 implementation:
 
 ```bash
-git add tools/citation-manager/design-docs/
-git commit -m "docs(us2.2): update architecture and guides post-implementation
+git add .
+git commit -m "feat(us2.2): implement content retrieval in ContentExtractor
 
-- Mark US2.2 as complete in PRD with completion date
-- Update ContentExtractor component description in architecture document
-- Verify file structure matches actual implementation
-- Update Content Extractor Implementation Guide with final contracts
-- Validate workflow diagrams reflect implemented behavior
-- Add implementation notes and known limitations (if any)
-- All citations validated, markdown linting passed
+Complete implementation of US2.2 with all 12 acceptance criteria:
+- AC1: Constructor accepts ParsedFileCache and CitationValidator dependencies
+- AC2: Provides extractLinksContent public method
+- AC3: Internally calls CitationValidator.validateFile for enriched links
+- AC4: Filters validation errors and ineligible links via strategy chain
+- AC5: Extracts section content with URL-decoded anchors
+- AC6: Extracts block content with normalized anchors (^ prefix removed)
+- AC7: Extracts full file content
+- AC8: Returns ExtractionResult with sourceLink, status, and details
+- AC9: Returns Promise<ExtractionResult[]>
+- AC10: Factory wires all dependencies correctly
+- AC11: Integration tests use real components (no mocks)
+- AC12: Zero regressions - all US2.1 tests pass
 
-US2.2 documentation sync"
+Technical implementation:
+- Created normalizeAnchor.js utility file (Action-Based File Organization)
+- Created extractLinksContent.js operation file (verb-noun naming)
+- Updated ContentExtractor constructor for dependency injection
+- Updated componentFactory for complete dependency wiring
+- Added comprehensive test fixtures for integration testing
+- Added integration tests following 'Real Systems, Fake Fixtures' principle
+- Added acceptance criteria validation tests (one test per AC)
+- Verified regression suite passes (35+ US2.1 tests)
+- Updated all architectural documentation post-implementation
+
+Architecture: ContentExtractor orchestrates validation → eligibility → content retrieval → aggregation workflow
+Testing: ~57 steps across 9 tasks, TDD (RED-GREEN-REFACTOR) throughout
+Documentation: PRD, architecture docs, and implementation guides synchronized
+
+US2.2 COMPLETE"
 ```
+
+**Note:** This final commit represents the complete, tested US2.2 feature. All previous work was tracked via git checkpoints with full attribution.
 
 ### Success Criteria
 
@@ -983,20 +969,32 @@ US2.2 documentation sync"
 
 ### Implementation Summary
 
+**Initial Setup:**
+- Create baseline checkpoint before starting work
+
 **9 Tasks with TDD approach:**
-1. ✅ Anchor normalization helpers (normalizeBlockId, decodeUrlAnchor)
-2. ✅ Constructor DI for ParsedFileCache and CitationValidator
-3. ✅ Core extractLinksContent orchestration method
-4. ✅ Factory updates for dependency wiring
-5. ✅ Test fixtures for integration testing
-6. ✅ Integration tests with real components
-7. ✅ Acceptance criteria validation tests
-8. ✅ Regression verification
-9. ✅ Documentation updates post-implementation
+1. ✅ Anchor normalization helpers (normalizeBlockId, decodeUrlAnchor) → checkpoint
+2. ✅ Constructor DI for ParsedFileCache and CitationValidator → checkpoint
+3. ✅ Core extractLinksContent orchestration method → checkpoint
+4. ✅ Factory updates for dependency wiring → checkpoint
+5. ✅ Test fixtures for integration testing → checkpoint
+6. ✅ Integration tests with real components → checkpoint
+7. ✅ Acceptance criteria validation tests → checkpoint
+8. ✅ Regression verification (test execution only)
+9. ✅ Documentation updates post-implementation → comprehensive final commit
 
 **Total Steps:** ~57 steps across 9 tasks
 **Pattern:** Test-first (RED-GREEN-REFACTOR) throughout
 **Architecture:** Follows workspace testing principles (Real Systems, Fake Fixtures)
+**Git Strategy:** Checkpoints after each task (1-8) for granular tracking, single comprehensive commit after task 9
+
+### Checkpoint Benefits
+
+- **Granular Progress Tracking**: Each task completion captured with full attribution
+- **Easy Rollback**: Can return to any task completion state if issues discovered
+- **AI Attribution**: All work clearly attributed to claude-sonnet-4-5 model
+- **Clean History**: Single commit represents complete, tested US2.2 feature
+- **Detailed Context**: Full descriptions preserved at each checkpoint for future reference
 
 ### Two Execution Options
 
@@ -1021,9 +1019,12 @@ All tasks scaffolded with detailed pseudocode. Dev agent has:
 - Clear test expectations (Given/When/Then)
 - Implementation pseudocode (logic flow)
 - Exact file paths
-- Commit messages
+- Checkpoint commands (Tasks 1-8) and final commit command (Task 9)
 - Expected outputs
 
-**Which execution approach would you like to use?**
+**Git Checkpoint Workflow:**
+1. Initial baseline: `git checkpoint "claude-sonnet-4-5" "pre-us2.2-baseline" "..."`
+2. After each task: `git checkpoint "claude-sonnet-4-5" "task-N-description" "..."`
+3. After Task 9: `git commit -m "feat(us2.2): implement content retrieval in ContentExtractor..."`
 
 ---

@@ -17,10 +17,8 @@ class ParsedDocument {
 		// Store parser output privately for encapsulation
 		this._data = parserOutput;
 
-		// Initialize lazy-load caches for performance
+		// Initialize lazy-load cache for performance
 		this._cachedAnchorIds = null;
-		this._cachedBlockAnchors = null;
-		this._cachedHeaderAnchors = null;
 	}
 
 	// === PUBLIC QUERY METHODS ===
@@ -76,34 +74,121 @@ class ParsedDocument {
 	}
 
 	/**
-	 * Extract section content by heading text
+	 * Extract section content by heading text and level
 	 *
-	 * STUB: Content extraction deferred to Epic 2
+	 * Uses 3-phase algorithm: (1) flatten token tree and locate target heading,
+	 * (2) find section boundary (next same-or-higher level heading),
+	 * (3) reconstruct content from token.raw properties.
 	 *
-	 * @param {string} headingText - Heading text to extract section for
-	 * @returns {string|null} Section content or null if not found
-	 * @throws {Error} Not implemented - deferred to Epic 2
+	 * @param {string} headingText - Exact heading text to find (case-sensitive)
+	 * @param {number} headingLevel - Heading level (1-6, where 1 is #, 2 is ##, etc.)
+	 * @returns {string|null} Section content string or null if not found
 	 */
-	extractSection(headingText) {
-		// Stub implementation for Epic 2
-		throw new Error("Not implemented - Epic 2");
+	extractSection(headingText, headingLevel) {
+		// Phase 1: Flatten token tree and locate target heading
+		const orderedTokens = [];
+		let targetIndex = -1;
+
+		const walkTokens = (tokenList) => {
+			for (const token of tokenList) {
+				const currentIndex = orderedTokens.length;
+				orderedTokens.push(token);
+
+				// Found our target heading?
+				if (token.type === "heading" &&
+					token.text === headingText &&
+					token.depth === headingLevel) {
+					targetIndex = currentIndex;
+				}
+
+				// Recurse into nested tokens ONLY if token.raw doesn't already include child content
+				// Skip for: heading, paragraph (their .raw includes full content with inline formatting)
+				// Recurse for: list, list_item, blockquote, table (structural tokens where .raw is minimal)
+				if (token.tokens && !this._tokenIncludesChildrenInRaw(token.type)) {
+					walkTokens(token.tokens);
+				}
+			}
+		};
+
+		walkTokens(this._data.tokens);
+
+		// Not found? Return null
+		if (targetIndex === -1) return null;
+
+		// Phase 2: Find section boundary (next same-or-higher level heading)
+		const targetHeadingLevel = orderedTokens[targetIndex].depth;
+		let endIndex = orderedTokens.length; // Default: to end of file
+
+		for (let i = targetIndex + 1; i < orderedTokens.length; i++) {
+			const token = orderedTokens[i];
+			if (token.type === "heading" && token.depth <= targetHeadingLevel) {
+				endIndex = i;
+				break;
+			}
+		}
+
+		// Phase 3: Reconstruct content from token.raw properties
+		const sectionTokens = orderedTokens.slice(targetIndex, endIndex);
+		return sectionTokens.map((t) => t.raw).join("");
 	}
 
 	/**
 	 * Extract block content by anchor ID
 	 *
-	 * STUB: Content extraction deferred to Epic 2
+	 * Finds block anchor by ID, validates line index is within bounds,
+	 * and extracts the single line containing the block anchor.
 	 *
-	 * @param {string} anchorId - Block anchor ID
-	 * @returns {string|null} Block content or null if not found
-	 * @throws {Error} Not implemented - deferred to Epic 2
+	 * @param {string} anchorId - Block anchor ID without ^ prefix
+	 * @returns {string|null} Single line content string or null if not found
 	 */
 	extractBlock(anchorId) {
-		// Stub implementation for Epic 2
-		throw new Error("Not implemented - Epic 2");
+		// Find anchor with matching ID and anchorType === "block"
+		const anchor = this._data.anchors.find(a =>
+			a.anchorType === 'block' && a.id === anchorId
+		);
+
+		// Not found? Return null
+		if (!anchor) return null;
+
+		// Split content into lines (anchor.line is 1-based)
+		const lines = this._data.content.split('\n');
+		const lineIndex = anchor.line - 1;  // Convert to 0-based
+
+		// Validate line index within bounds
+		if (lineIndex < 0 || lineIndex >= lines.length) return null;
+
+		// Extract single line containing block anchor
+		return lines[lineIndex];
 	}
 
 	// === PRIVATE HELPER METHODS ===
+
+	/**
+	 * Check if token type includes children content in its raw property
+	 *
+	 * For some token types (heading, paragraph), the .raw property includes
+	 * the full content including nested inline formatting. For these types,
+	 * we should NOT recurse into .tokens to avoid duplication.
+	 *
+	 * For structural tokens (list, blockquote, table), .raw is minimal and
+	 * we MUST recurse into .tokens to capture nested content.
+	 *
+	 * @private
+	 * @param {string} tokenType - Token type from marked.js
+	 * @returns {boolean} True if token.raw includes all child content
+	 */
+	_tokenIncludesChildrenInRaw(tokenType) {
+		// Token types where .raw includes full content (skip recursion)
+		const inclusiveTypes = new Set([
+			'heading',      // "## Title\n" includes inline text
+			'paragraph',    // "Text with **bold**\n" includes inline formatting
+			'text',         // Inline text tokens
+			'code',         // Code blocks include full content
+			'html',         // HTML blocks include full content
+		]);
+
+		return inclusiveTypes.has(tokenType);
+	}
 
 	/**
 	 * Get all anchor IDs (both id and urlEncodedId variants)

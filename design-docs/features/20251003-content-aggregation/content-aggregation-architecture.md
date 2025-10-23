@@ -206,7 +206,7 @@ The component's primary output is from the `resolveFile()` method, which returns
   - `Node.js` class
   - ESM modules
 - **Technology Status:** Implemented (US1.7)
-- **Description:** Facade providing a stable, method-based query interface over `MarkdownParser.Output.DataContract`. Encapsulates internal data structure access and navigation complexity, decoupling consumers from parser internals. Implements anchor query methods (`hasAnchor()`, `findSimilarAnchors()`), link query methods (`getLinks()`), and content extraction methods (`extractFullContent()`). Methods `extractSection()` and `extractBlock()` stubbed for Epic 2. Note: `getBlockAnchors()` and `getHeaderAnchors()` cache fields exist but methods not implemented (Epic 2 placeholders).
+- **Description:** Facade providing a stable, method-based query interface over `MarkdownParser.Output.DataContract`. Encapsulates internal data structure access and navigation complexity, decoupling consumers from parser internals. Implements anchor query methods (`hasAnchor()`, `findSimilarAnchors()`), link query methods (`getLinks()`), and content extraction methods (`extractFullContent()`, `extractSection()`, `extractBlock()`).
 - **Implementation Guide**: [ParsedDocument Implementation Guide](../../component-guides/ParsedDocument%20Implementation%20Guide.md)
 
 ##### Interactions
@@ -226,18 +226,17 @@ The component's primary output is from the `resolveFile()` method, which returns
 
 ##### Output Public Contract
 The facade exposes query methods that return transformed/filtered data from the wrapped contract:
-- **Anchor Queries**: `hasAnchor(anchorId)`, `findSimilarAnchors(anchorId)` - Implemented in US1.7
-- **Link Queries**: `getLinks()` - Implemented in US1.7
-- **Content Extraction**: `extractFullContent()` - Implemented in US1.7; `extractSection(headingText)`, `extractBlock(anchorId)` - Stubbed for Epic 2
-- **Note**: `getBlockAnchors()`, `getHeaderAnchors()` not implemented - Epic 2 placeholders only
+- **Anchor Queries**: `hasAnchor(anchorId)`, `findSimilarAnchors(anchorId)`
+- **Link Queries**: `getLinks()`
+- **Content Extraction**: `extractFullContent()`, `extractSection(headingText)`, `extractBlock(anchorId)`
 
 #### Citation Manager.ContentExtractor
 - **Path(s):** `tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js`
 - **Technology:**
   - `Node.js` class
   - ESM modules
-- **Technology Status:** Implementation In Progress (US2.2)
-- **Description:** Orchestrates content extraction workflow for linked documents. Validates source files via `CitationValidator` to discover links, analyzes link eligibility using Strategy Pattern, and retrieves content from target documents via `ParsedDocument` facade methods. Returns `ExtractionResult` objects containing extraction status, source link reference, and either success details (extracted content + decision reason) or failure details. See [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md) for complete workflow and CLI integration patterns.
+- **Technology Status:** ✅ Implemented (US2.2 Complete - 2025-10-23)
+- **Description:** Orchestrates content extraction workflow for linked documents. Validates source files via `CitationValidator` to discover links, filters out internal links (scope='internal') before processing (US2.2 AC15), analyzes link eligibility using Strategy Pattern, and retrieves content from target documents via `ParsedDocument` facade methods. Returns `ExtractionResult` objects containing extraction status, source link reference, and either success details (extracted content + decision reason) or failure details.
 - **Implementation Guide**: [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 
 ##### Interactions
@@ -491,15 +490,17 @@ tools/citation-manager/
 
 ### ContentExtractor File Structure
 
-**Current MVP Implementation** (US2.2):
+**Current Implementation** (US2.2 Complete):
 
 ```text
 tools/citation-manager/
 └── src/
     ├── core/
     │   └── ContentExtractor/
-    │       ├── ContentExtractor.js              # Main orchestrator class
+    │       ├── ContentExtractor.js              # Main orchestrator class (thin wrapper)
+    │       ├── extractLinksContent.js           # Content extraction operation
     │       ├── analyzeEligibility.js            # Eligibility analysis operation
+    │       ├── normalizeAnchor.js               # Anchor normalization utilities
     │       └── eligibilityStrategies/           # Strategy pattern implementations
     │           ├── ExtractionStrategy.js
     │           ├── StopMarkerStrategy.js
@@ -510,26 +511,11 @@ tools/citation-manager/
         └── componentFactory.js                  # createContentExtractor() with DI
 ```
 
-**Helper Utilities Approach:**
-MVP implements `normalizeBlockId()` and `decodeUrlAnchor()` as co-located private methods in ContentExtractor.js per [Helper Co-location pattern](../../../../../design-docs/Architecture%20Principles.md#^co-located-helpers). Future extraction to `normalizeAnchor.js` if utilities needed by other components.
-
-**Planned Refactoring** (Future - Action-Based Organization):
-
-```text
-tools/citation-manager/
-└── src/
-    ├── core/
-    │   └── ContentExtractor/
-    │       ├── ContentExtractor.js              # Orchestrator class
-    │       ├── extractLinksContent.js           # Main extraction operation
-    │       ├── analyzeEligibility.js            # Eligibility analysis operation
-    │       ├── normalizeAnchor.js               # Anchor normalization utilities
-    │       └── eligibilityStrategies/           # Strategy implementations
-    └── factories/
-        └── componentFactory.js
-```
-
-Refactoring will extract operations when complexity warrants or if utilities needed by multiple components. See [Action-Based File Organization](../../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition) for principles.
+**Architecture Decisions Implemented:**
+- **Action-Based File Organization**: `extractLinksContent.js` follows verb-noun naming convention
+- **Utility Extraction**: `normalizeAnchor.js` created with `normalizeBlockId()` and `decodeUrlAnchor()` utilities
+- **Thin Orchestrator**: `ContentExtractor.js` delegates to operation files, maintains minimal surface area
+- **Dependency Injection**: Constructor accepts `eligibilityStrategies`, `parsedFileCache`, and `citationValidator`
 
 **Key Changes Post-US1.5**:
 - **ParsedFileCache.js**: New component providing in-memory cache of parsed file objects
@@ -968,7 +954,7 @@ npm run citation:base-paths <file-path> -- --format json
 
 ## Document Status
 
-**Last Updated**: 2025-10-05
+**Last Updated**: 2025-10-23
 **Version**: 0.2 (Draft)
 **Next Steps**:
 - ✓ Complete US1.4a test migration to Vitest (DONE)

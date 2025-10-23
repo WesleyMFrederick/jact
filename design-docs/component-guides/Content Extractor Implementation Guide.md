@@ -282,11 +282,14 @@ class ContentExtractor is
     // Call injected CitationValidator to get enriched links (US2.2 AC3)
     field validationResult = await this.citationValidator.validateFile(sourceFilePath)
 
+    // --- Step 1b: Filter Internal Links (US2.2 AC15) ---
+    // Internal links are excluded from extraction processing
+    field crossDocumentLinks = validationResult.links.filter(link => link.scope != 'internal')
+
     // --- Step 2: Process Each Link and Build Results ---
     field allResults = []
-    field sourceParsedDoc = null // Lazy load source doc if needed for internal links
 
-    for (field link in validationResult.links) do
+    for (field link in crossDocumentLinks) do
       // --- 2a: Check Validation Status ---
       // Skip links that failed validation (US2.2 AC4)
       if (link.validation.status == 'error') then
@@ -313,15 +316,11 @@ class ContentExtractor is
         continue
 
       // --- 2c: Determine Target Document ---
+      // All links are cross-document after AC15 filter
       field targetDoc = null
       try
-        if (link.scope == 'internal') then
-          // Internal link: target is the source document
-          if (sourceParsedDoc == null) then
-            sourceParsedDoc = await this.parsedFileCache.resolveParsedFile(sourceFilePath)
-          targetDoc = sourceParsedDoc
-        else if (link.target.path.absolute) then
-          // Cross-document link: fetch target document via cache (US2.2 AC5)
+        if (link.target.path.absolute) then
+          // Fetch target document via cache (US2.2 AC5)
           targetDoc = await this.parsedFileCache.resolveParsedFile(link.target.path.absolute)
         else
           // No resolvable target path
