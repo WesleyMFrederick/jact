@@ -129,18 +129,21 @@ The component's interface is designed as a single execution point to hide intern
 
 ### Output Contract
 
-The `extractLinksContent()` method returns a `Promise` that resolves with an **array of `ExtractionResult`** objects. Each `ExtractionResult` represents the outcome of attempting to extract content for a single link.
+The `extractLinksContent()` method returns a `Promise` that resolves with an **`ExtractionResult`** object. This is the ONLY public output contract for the ContentExtractor component.
 
-**ExtractionResult Structure** (as defined in [Data Schemas](#ExtractionResult%20Output)):
-- `sourceLink` (LinkObject): The complete, enriched LinkObject that was processed (contains all link metadata and validation status)
-- `status` (string): The extraction outcome - `'success'`, `'skipped'`, or `'error'`
-- `successDetails` (object, optional): Present only when `status === 'success'`
-  - `decisionReason` (string): Justification from the eligibility strategy
-  - `extractedContent` (string): The raw extracted markdown content
-- `failureDetails` (object, optional): Present only when `status === 'skipped'` or `status === 'error'`
-  - `reason` (string): Explanation of why extraction was skipped or failed
+**Complete Schema**: See [ExtractionResult (Public Output Contract)](#ExtractionResult%20(Public%20Output%20Contract)) in Content Deduplication Strategy section
 
-**Final Output**: The CLI receives this array and outputs it as JSON to stdout (per US2.3 AC7). File writing and formatted output are deferred to future work.
+**Design Rationale**:
+- **Primary goal**: Minimize token usage for LLM context packages via content deduplication
+- **No backward compatibility**: Epic 2 is cohesive unit; intermediate format never exposed publicly
+- **Content-based hashing**: Detects duplicates even when different files contain identical text
+- **Single source of truth**: Each unique content piece stored once, referenced by multiple links
+- **Deduplication is default**: Content deduplication is standard behavior, not an optional variant
+- **Names as Contracts**: `ExtractionResult` describes WHAT (extraction results), not HOW (deduplicated)
+
+**Internal Implementation Detail**: The extraction workflow internally produces intermediate extraction attempts (stored in `_LinkExtractionAttempt[]` array) during processing, but these are immediately transformed via internal `_deduplicateExtractionResults()` function before returning. See [`_LinkExtractionAttempt` schema](#_LinkExtractionAttempt%20(Internal%20Intermediate%20Format)).
+
+**Final Output**: The CLI receives the deduplicated structure and outputs it as JSON to stdout (per US2.3 AC7). File writing and formatted output are deferred to future work.
 
 ---
 
@@ -156,6 +159,7 @@ tools/citation-manager/
     │       ├── ContentExtractor.js                    // Thin orchestrator class (entry point)
     │       ├── extractLinksContent.js                 // PRIMARY operation: content extraction workflow (verb-noun)
     │       ├── analyzeEligibility.js                  // Supporting operation: eligibility analysis (verb-noun)
+    │       ├── deduplicateExtractionResults.js        // Supporting operation: content deduplication via hashing (verb-noun)
     │       ├── normalizeAnchor.js                     // Utility helpers: anchor normalization (verb-noun)
     │       └── eligibilityStrategies/                 // Strategy pattern implementations
     │           ├── ExtractionStrategy.js             // Base interface for all eligibility rules
@@ -170,8 +174,9 @@ tools/citation-manager/
 
 **File Organization Rationale**:
 - **ContentExtractor.js**: Thin class wrapper for DI/factory pattern, delegates to operation functions
-- **extractLinksContent.js**: Primary operation orchestrating validation → eligibility → retrieval workflow
+- **extractLinksContent.js**: Primary operation orchestrating validation → eligibility → retrieval → deduplication workflow
 - **analyzeEligibility.js**: Supporting operation implementing strategy chain pattern
+- **deduplicateExtractionResults.js**: Supporting operation implementing content-based hashing for deduplication
 - **normalizeAnchor.js**: Utility functions for anchor normalization (`decodeUrlAnchor`, `normalizeBlockId`)
 
 _Source_: [Action-Based File Organization](../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition), [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns)
@@ -417,18 +422,22 @@ end class // ContentExtractor
 ---
 ## Data Schemas
 
-### `ExtractionResult` Output
+### `_LinkExtractionAttempt` (Internal Intermediate Format)
+
+**Visibility**: Private implementation detail, not exposed in public API
+
+This intermediate structure is produced during the extraction loop before deduplication. Each attempt represents one link's extraction outcome.
 
 ```javascript
 /**
- * Represents the outcome of attempting to extract content for a single link.
- * Produced by the ContentExtractor.extractLinksContent method.
+ * INTERNAL: Intermediate extraction attempt structure.
+ * This is transformed into ExtractionResult via _deduplicateExtractionResults().
+ * NOT part of the public API.
  */
-type ExtractionResult = {
+type _LinkExtractionAttempt = {
   /**
    * The original, complete LinkObject from the MarkdownParser that was processed.
    * Provides full context about the link itself (source, target, line, column, anchor, etc.).
-   *
    */
   sourceLink: LinkObject;
 
@@ -523,6 +532,230 @@ This is the clean, simple, and authoritative data model that the `ContentExtract
   reason: string
 }
 ```
+
+---
+
+## Content Deduplication Strategy
+
+### Purpose
+
+The Content Deduplication Strategy minimizes token usage in LLM context packages by storing identical extracted content only once. When multiple links reference the same target or when different files contain identical content, the system uses content-based hashing to detect duplicates and create an indexed structure that eliminates redundancy.
+
+### Algorithm: Content-Based Hashing
+
+**Approach**: Generate SHA-256 hash of extracted content string to create unique contentId.
+
+**Key Generation**:
+
+```javascript
+function generateContentId(extractedContent) {
+  const crypto = require('crypto');
+  return crypto.createHash('sha256')
+    .update(extractedContent)
+    .digest('hex')
+    .substring(0, 16); // Truncate to 16 chars for readability
+}
+```
+
+**Benefits of Content-Based Approach**:
+- Catches duplicates even when different files contain identical text
+- Automatic cache invalidation when content changes (different hash)
+- Deterministic: same content always produces same ID
+- Collision risk negligible (SHA-256 has 2^64 possible values for 16 hex chars)
+
+**Trade-offs**:
+- Whitespace-sensitive: minor formatting differences create different hashes (acceptable for MVP)
+- Cannot detect partial matches (e.g., H3 content as substring of H2 extraction)
+
+### `ExtractionResult` (Public Output Contract)
+
+**Visibility**: Public API - THE ONLY format returned by `extractLinksContent()`
+
+The output structure uses an indexed format to minimize token usage through content deduplication. This is the final, deduplicated format after internal transformation of `_LinkExtractionAttempt[]` array.
+
+```javascript
+{
+  /**
+   * Content index mapping contentId (SHA-256 hash) to unique content.
+   * Each entry stores content once with metadata about all sources.
+   */
+  contentIndex: {
+    [contentId: string]: {
+      /** The extracted markdown content (stored once) */
+      content: string,
+
+      /** Character count of content (for stats calculation) */
+      contentLength: number,
+
+      /** Array of all source locations that produced this identical content */
+      sources: Array<{
+        /** Absolute path to target file */
+        targetFile: string,
+
+        /** Anchor fragment (with # or ^ prefix) or null for full-file */
+        anchor: string | null,
+
+        /** Type of anchor: "header", "block", or null */
+        anchorType: "header" | "block" | null
+      }>
+    }
+  },
+
+  /**
+   * Array of link references pointing to content via contentId.
+   * Preserves source location and extraction metadata.
+   */
+  links: Array<{
+    /** Hash reference to contentIndex entry, or null for skipped/error links */
+    contentId: string | null,
+
+    /** 1-based line number in source file */
+    sourceLine: number,
+
+    /** 0-based column position in source file */
+    sourceColumn: number,
+
+    /** Display text from original markdown link */
+    linkText: string,
+
+    /** Status of extraction: "success", "skipped", or "error" */
+    status: "success" | "skipped" | "error",
+
+    /** Eligibility decision reason (present when status === "success") */
+    decisionReason?: string,
+
+    /** Failure explanation (present when status !== "success") */
+    reason?: string
+  }>,
+
+  /**
+   * Aggregate statistics about deduplication effectiveness
+   */
+  stats: {
+    /** Total number of links processed */
+    totalLinks: number,
+
+    /** Count of unique content entries in contentIndex */
+    uniqueContent: number,
+
+    /** Count of links referencing duplicate content */
+    duplicateContentDetected: number,
+
+    /** Sum of character counts for deduplicated content */
+    tokensSaved: number,
+
+    /** Ratio of tokens saved to total content size (0.0 to 1.0) */
+    compressionRatio: number
+  }
+}
+```
+
+### Deduplication Workflow
+
+The deduplication operation transforms intermediate extraction attempts into the final `ExtractionResult`:
+
+```typescript
+/**
+ * Transform flat array of intermediate extraction attempts into deduplicated indexed structure.
+ * Implements content-based hashing to detect and eliminate duplicate content.
+ * This is an internal operation; the intermediate array format is not exposed publicly.
+ */
+function _deduplicateExtractionResults(attempts: _LinkExtractionAttempt[]): ExtractionResult is
+  field contentIndex = {}
+  field links = []
+  field totalSaved = 0
+
+  // Process each extraction result
+  for (field result in results) do
+    if (result.status == 'success') then
+      // Generate content hash
+      field contentId = generateContentId(result.successDetails.extractedContent)
+
+      // Check if content already exists in index
+      if (!contentIndex[contentId]) then
+        // First occurrence: store content with source metadata
+        contentIndex[contentId] = {
+          content: result.successDetails.extractedContent,
+          contentLength: result.successDetails.extractedContent.length,
+          sources: [{
+            targetFile: result.sourceLink.target.path.absolute,
+            anchor: result.sourceLink.target.anchor,
+            anchorType: result.sourceLink.anchorType
+          }]
+        }
+      else
+        // Duplicate detected: add source to existing entry, track savings
+        contentIndex[contentId].sources.push({
+          targetFile: result.sourceLink.target.path.absolute,
+          anchor: result.sourceLink.target.anchor,
+          anchorType: result.sourceLink.anchorType
+        })
+        totalSaved += result.successDetails.extractedContent.length
+
+      // Create link reference
+      links.push({
+        contentId: contentId,
+        sourceLine: result.sourceLink.line,
+        sourceColumn: result.sourceLink.column,
+        linkText: result.sourceLink.text,
+        status: 'success',
+        decisionReason: result.successDetails.decisionReason
+      })
+    else
+      // Preserve skipped/error results without content
+      links.push({
+        contentId: null,
+        sourceLine: result.sourceLink.line,
+        sourceColumn: result.sourceLink.column,
+        linkText: result.sourceLink.text,
+        status: result.status,
+        reason: result.failureDetails.reason
+      })
+
+  // Calculate statistics
+  field uniqueCount = Object.keys(contentIndex).length
+  field duplicateCount = results.filter(r => r.status === 'success').length - uniqueCount
+  field totalContentSize = Object.values(contentIndex).reduce((sum, entry) => sum + entry.contentLength, 0)
+
+  return {
+    contentIndex: contentIndex,
+    links: links,
+    stats: {
+      totalLinks: results.length,
+      uniqueContent: uniqueCount,
+      duplicateContentDetected: duplicateCount,
+      tokensSaved: totalSaved,
+      compressionRatio: totalSaved / (totalContentSize + totalSaved)
+    }
+  }
+end function
+```
+
+### Integration with ContentExtractor
+
+The `extractLinksContent()` method applies deduplication as the final step before returning:
+
+```typescript
+class ContentExtractor is
+  // ... existing methods ...
+
+  public async method extractLinksContent(sourceFilePath: string, cliFlags: object): Promise<ExtractionResult> is
+    // Phase 1-3: Validation, filtering, content extraction
+    field attempts = []
+    // ... existing extraction logic produces _LinkExtractionAttempt[] ...
+
+    // Phase 4: Deduplication (internal transformation)
+    return _deduplicateExtractionResults(attempts)
+  end method
+end class
+```
+
+**Architecture Notes**:
+- **No backward compatibility**: Intermediate flat array format never exposed; Epic 2 is cohesive unit
+- **Primary goal**: Minimize token usage for LLM context packages
+- **Operation file**: Deduplication logic lives in `deduplicateExtractionResults.js` per Action-Based File Organization
+- **Factory pattern**: Factory creates ContentExtractor with deduplication enabled by default
+- **Names as Contracts**: Public contract is `ExtractionResult`, deduplication is default behavior not optional variant
 
 ---
 
@@ -1024,7 +1257,61 @@ The following design documents require updates to reflect the Validation Enrichm
 
 # `ContentExtractor` Component Technical Debt
 
-## Issue 1: Strategy-Defined Extraction Markers (Future Enhancement)
+## Issue 1: Nested Content Duplication Detection (Deferred - US2.2a)
+
+**Current Limitation**: The content deduplication strategy uses content-based hashing (SHA-256) to detect identical extracted content. However, it cannot detect when one piece of content is a substring of another, which occurs in the following scenario:
+
+**Scenario**: H2 Section Containing H3 Subsections
+- **Link A** extracts an H2 section: `## Architecture`
+- **Link B** directly targets an H3 within that section: `### Component Design`
+- The H2 extraction includes all nested H3 content
+- The H3 extraction contains only the subsection content
+- **Result**: Both extractions stored separately in contentIndex despite H3 being substring of H2
+
+**Example**:
+
+```markdown
+## Architecture
+This section describes the architecture.
+
+### Component Design
+Components follow these patterns...
+
+### Data Flow
+Data flows through these stages...
+```
+
+**Link Behavior**:
+- `[architecture](doc.md#Architecture)` → Extracts entire H2 section (includes both H3s)
+- `[components](doc.md#Component%20Design)` → Extracts only H3 subsection
+
+**Current Behavior**: Two separate contentIndex entries created:
+- ContentId A: Full H2 content (large)
+- ContentId B: H3 subset (small, duplicate of portion of A)
+
+**Desired Future Behavior**: Detect that ContentId B is substring of ContentId A and either:
+1. Reference offset/range within ContentId A
+2. Store only ContentId A, mark ContentId B as derived
+3. Provide substring relationship in stats
+
+**Why Deferred**:
+- Substring detection adds significant complexity (O(n²) comparisons or suffix tree construction)
+- Edge case handling (multiple overlapping substrings, partial matches)
+- MVP goal is exact duplicate detection, not partial content analysis
+- Token savings from exact duplicates provides majority of value
+
+**Workaround for MVP**: Accept that nested content creates separate entries. Document in stats that some duplicated content may exist within larger extractions.
+
+**Mitigation Strategy**: Users should prefer linking to higher-level sections when context is needed, avoiding granular subsection links when parent section provides sufficient context.
+
+**Discovery Date**: 2025-10-25
+**Discovered During**: US2.2a design brainstorming
+**Priority**: Low (edge case, minimal impact on primary goal of token reduction)
+**Estimated Impact**: 5-10% additional token usage in documents with many nested subsection links
+
+---
+
+## Issue 2: Strategy-Defined Extraction Markers (Future Enhancement)
 
 **Current MVP Limitation**: Extraction markers (`%%force-extract%%`, `%%stop-extract-link%%`) are hardcoded in MarkdownParser. Strategies cannot define custom markers, limiting extensibility for new markdown flavors or user-defined rules.
 

@@ -58,6 +58,7 @@ This feature directly supports the CC Workflows vision by:
 | 2025-10-19 | 2.3     | Mark US1.8 as COMPLETE - Validation Enrichment Pattern successfully implemented, all acceptance criteria validated, zero regressions confirmed (121/123 tests passing, 2 pre-existing failures unrelated to US1.8) | Application Tech Lead (Claude Sonnet 4.5) |
 | 2025-10-23 | 2.4     | Mark US2.2 as COMPLETE - Content retrieval implemented with ParsedDocument facade integration, zero regressions confirmed                                                                                          | Application Tech Lead (Claude Sonnet 4.5) |
 | 2025-10-23 | 2.5     | Add US2.2 AC15 - Filter out internal links (scope='internal') before processing to exclude them from ExtractionResult array                                                                                        | Application Tech Lead (Claude Sonnet 4.5) |
+| 2025-10-25 | 2.6     | Add US2.2a - Implement content deduplication using SHA-256 hashing to minimize token usage in LLM context. No backward compatibility required (Epic 2 cohesive unit)                                               | Application Tech Lead (Claude Sonnet 4.5) |
 
 ---
 
@@ -72,12 +73,14 @@ This feature directly supports the CC Workflows vision by:
 - **FR8: Preserve Existing Functionality:** All existing `citation-manager` features SHALL be preserved and function correctly. ^FR8
 - **FR9: Test Migration:** All existing unit tests for the `citation-manager` SHALL be migrated to the workspace and pass. ^FR9
 - **FR10: Extraction Control Markers:** The system SHALL recognize `%%extract-link%%` and `%%stop-extract-link%%` markers on the same line as a citation. `%%extract-link%%` SHALL force the extraction of a full-file link that would otherwise be skipped, and `%%stop-extract-link%%` SHALL prevent the extraction of a section or block link that would otherwise be included. These markers SHALL have the highest precedence over all other extraction rules. ^FR10
+- **FR11: Content Deduplication:** The system SHALL deduplicate extracted content using content-based hashing (SHA-256) such that identical content is stored once in an indexed structure, regardless of how many links reference it. ^FR11
 
 ### Non-Functional Requirements
 - **NFR3: Reliability:** The citation-manager SHALL include unit tests that achieve at least 50% code coverage on new functionality. ^NFR3
 - **NFR4: Design Adherence:** Implementation SHALL adhere to the workspace's MVB design principles and testing strategy. ^NFR4
 - **NFR5: Performance:** The system SHALL parse each unique file at most once per command execution to minimize redundant I/O and processing time. ^NFR5
 - **NFR6: Marker Scanning Performance:** The process of scanning for extraction control markers SHALL not significantly degrade parsing performance. The check MUST be a localized, line-level operation. ^NFR6
+- **NFR7: Token Usage Optimization:** The output structure SHALL minimize redundant data to reduce LLM token consumption, with deduplicated content stored once and referenced by multiple links. ^NFR7
 
 ## Technical Considerations
 
@@ -345,7 +348,7 @@ _Status_: ✅ COMPLETE (2025-10-21)
 - Single service interface abstracts multi-step workflow from CLI
 
 _Depends On_: [Story 2.1: Implement Extraction Eligibility using Strategy Pattern](#Story%202.1%20Implement%20Extraction%20Eligibility%20using%20Strategy%20Pattern)
-_Enables_: [Story 2.3: Implement `extract` Command](#Story%202.3%20Implement%20extract%20Command)
+_Enables_: [Story 2.2a: Implement Content Deduplication for ExtractionResults](#Story%202.2a%20Implement%20Content%20Deduplication%20for%20ExtractionResults)
 _Functional Requirements_: [[#^FR5|FR5]], [[#^FR6|FR6]]
 _Non-Functional Requirements_: [[#^NFR5|NFR5]] (ParsedFileCache ensures single parse per file)
 _Architecture Reference_:
@@ -354,6 +357,47 @@ _Architecture Reference_:
 - [CLI Integration Guide](../../component-guides/CLI%20Integration%20Guide.md)
 _User Story Link_: [us2.2-implement-content-retrieval](user-stories/us2.2-implement-content-retrieval/us2.2-implement-content-retrieval.md)
 _Status_: ✅ COMPLETE (2025-10-23)
+
+---
+
+### Story 2.2a: Implement Content Deduplication for ExtractionResults
+
+**As a** developer creating context packages for AI,
+**I want** the ContentExtractor to deduplicate identical extracted content using content-based hashing,
+**so that** LLM token usage is minimized by storing each unique piece of content only once.
+
+#### Story 2.2a Acceptance Criteria
+
+1. The `ContentExtractor` SHALL internally deduplicate extracted content as part of the `extractLinksContent()` workflow, transforming intermediate extraction attempts into an optimized `ExtractionResult` structure. ^US2-2aAC1
+2. GIVEN an intermediate extraction attempt contains successfully extracted content, WHEN deduplication executes, THEN the system SHALL generate a content identifier using SHA-256 hashing of the `extractedContent` string, truncated to the first 16 hexadecimal characters. ^US2-2aAC2
+3. The `ExtractionResult` structure SHALL contain three top-level properties: `contentIndex` (object mapping contentId to content data), `links` (array of link references), and `stats` (aggregate statistics). ^US2-2aAC3
+4. GIVEN multiple intermediate extraction attempts contain identical `extractedContent` values, WHEN deduplication executes, THEN the content SHALL be stored once in `contentIndex` with all source metadata tracked in a `sources` array. ^US2-2aAC4
+5. Each entry in `contentIndex` SHALL include: `content` (extracted text), `contentLength` (character count), and `sources` (array of objects containing `targetFile`, `anchor`, `anchorType` for all links that produced this content). ^US2-2aAC5
+6. Each entry in the `links` array SHALL reference content via `contentId` and SHALL include: `sourceLine`, `sourceColumn`, `linkText`, `decisionReason`, and `status` from the intermediate extraction attempt. ^US2-2aAC6
+7. GIVEN deduplication is complete, WHEN the `stats` object is populated, THEN it SHALL include: `totalLinks` (count of all processed links), `uniqueContent` (count of contentIndex entries), `duplicateContentDetected` (links referencing duplicate content), and `tokensSaved` (sum of deduplicated content lengths). ^US2-2aAC7
+8. GIVEN an intermediate extraction attempt has `status: "skipped"` or `status: "error"`, WHEN deduplication processes it, THEN the link SHALL be included in the `links` array with `contentId: null` and `reason` from `failureDetails`. ^US2-2aAC8
+9. The `extractLinksContent()` method SHALL return `ExtractionResult` with deduplicated content structure as the only public output format. The intermediate flat array format is an internal implementation detail. ^US2-2aAC9
+10. GIVEN the deduplication implementation is complete, WHEN integration tests execute, THEN they SHALL validate correct hash generation, duplicate detection, stats calculation, and preservation of all link metadata. ^US2-2aAC10
+
+_Depends On_: [Story 2.2: Implement Content Retrieval in ContentExtractor](#Story%202.2%20Implement%20Content%20Retrieval%20in%20ContentExtractor)
+_Enables_: [Story 2.3: Implement `extract` Command](#Story%202.3%20Implement%20extract%20Command)
+_Functional Requirements_: [[#^FR11|FR11]] (Content deduplication)
+_Non-Functional Requirements_: [[#^NFR7|NFR7]] (Token usage optimization)
+_Architecture Reference_:
+- [Content Extractor Implementation Guide - Content Deduplication Strategy](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Content%20Deduplication%20Strategy)
+- [US2.2a Design Plan](user-stories/us2.2a-implement-content-deduplication/us2.2a-implement-content-deduplication-design-plan.md)
+
+_Status_: Pending
+
+> [!info] **Architecture Decision: Names as Contracts**
+> Per **Names as Contracts** principle, the public contract remains `ExtractionResult` (not `DeduplicatedExtractionResult`). Deduplication is the default behavior of `extractLinksContent()`, not an optional variant. The intermediate flat array format used during processing is an internal implementation detail with a private name (`_LinkExtractionAttempt`).
+
+> [!warning] **Technical Lead Architecture Notes**
+> **No backward compatibility**: Epic 2 is a cohesive unit; flat array format is replaced entirely
+> - **Primary goal**: Minimize token usage for LLM context packages
+> - **Content-based hashing**: Catches duplicates even when different files contain identical text
+> - **Known limitation**: Nested content duplication (H2 containing H3 subsections) is out of scope; documented as technical debt
+---
 
 ### Story 2.3: Implement `extract` Command
 
@@ -391,7 +435,7 @@ _Status_: ✅ COMPLETE (2025-10-23)
 > [!note] **Technical Lead Feedback**: CLI Design Decision
 > The `extract` command is a separate command (not a flag on `validate`) because extraction is a distinct operation with different inputs (requires --output), different outputs (aggregated content vs validation report), and different workflow (validation is an internal prerequisite step, as shown in the ContentExtractor Workflow diagram).
 
-_Depends On_: [Story 2.2: Implement Content Retrieval in ContentExtractor](#Story%202.2%20Implement%20Content%20Retrieval%20in%20ContentExtractor)
+_Depends On_: [Story 2.2a: Implement Content Deduplication for ExtractionResults](#Story%202.2a%20Implement%20Content%20Deduplication%20for%20ExtractionResults)
 _Functional Requirements_: [[#^FR6|FR6]], [[#^FR7|FR7]] (updated: dedicated command vs flag)
 _Architecture Workflow Reference_: [ContentExtractor Workflow: Component Interaction Diagram](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
 _User Story Link_: [us2.3-implement-extract-command](user-stories/us2.3-implement-extract-command/us2.3-implement-extract-command.md)
