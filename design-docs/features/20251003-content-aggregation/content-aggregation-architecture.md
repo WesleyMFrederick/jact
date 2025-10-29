@@ -235,8 +235,8 @@ The facade exposes query methods that return transformed/filtered data from the 
 - **Technology:**
   - `Node.js` class
   - ESM modules
-- **Technology Status:** ✅ Implemented (US2.2 Complete - 2025-10-23), 🔄 Enhanced (US2.2a In Progress - 2025-10-25)
-- **Description:** Orchestrates content extraction and deduplication workflow for linked documents. Validates source files via `CitationValidator` to discover links, filters out internal links (scope='internal') before processing (US2.2 AC15), analyzes link eligibility using Strategy Pattern, retrieves content from target documents via `ParsedDocument` facade methods, and deduplicates extracted content using SHA-256 content-based hashing (US2.2a). Returns `ExtractionResult` object with indexed content structure that minimizes token usage by storing identical content only once.
+- **Technology Status:** ✅ Implemented (US2.2 Complete - 2025-10-23), ✅ Enhanced (US2.2a Complete - 2025-10-28)
+- **Description:** Orchestrates content extraction and deduplication workflow for linked documents. Validates source files via `CitationValidator` to discover links, filters out internal links (scope='internal') before processing (US2.2 AC15), analyzes link eligibility using Strategy Pattern, retrieves content from target documents via `ParsedDocument` facade methods, and deduplicates extracted content using SHA-256 content-based hashing (US2.2a). Returns `OutgoingLinksExtractedContent` object with indexed content structure that minimizes token usage by storing identical content only once.
 - **Implementation Guide**: [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 
 ##### Interactions
@@ -247,27 +247,10 @@ The facade exposes query methods that return transformed/filtered data from the 
 - _analyzes eligibility_ using injected `ExtractionStrategy` chain to filter links by precedence rules (synchronous).
 
 ##### Boundaries
-- The component's responsibilities are: (1) orchestrating validation enrichment workflow to discover links, (2) analyzing extraction eligibility via Strategy Pattern, (3) extracting content from target documents via `ParsedDocument` facade methods, (4) deduplicating extracted content using content-based hashing, and (5) aggregating results into `ExtractionResult` structure for CLI output.
+- The component's responsibilities are: (1) orchestrating validation enrichment workflow to discover links, (2) analyzing extraction eligibility via Strategy Pattern, (3) extracting content from target documents via `ParsedDocument` facade methods, (4) deduplicating extracted content using content-based hashing, and (5) aggregating results into `OutgoingLinksExtractedContent` structure for CLI output.
 - It is **not** responsible for parsing markdown (delegated to `MarkdownParser`) or navigating parser output structures (delegated to `ParsedDocument` facade).
 - It is **not** responsible for reading files from disk (delegated to `ParsedFileCache`).
 - It is **not** responsible for final output formatting or file writing (delegated to `CLI Orchestrator`).
-
-##### Input Public Contract
-1. A **`ParsedFileCache` interface**, provided at instantiation via constructor injection.
-2. A **`CitationValidator` interface**, provided at instantiation via constructor injection.
-3. An **`eligibilityStrategies` array**, provided at instantiation containing `ExtractionStrategy` implementations in precedence order.
-4. A **`sourceFilePath`** (string), provided to `extractLinksContent()` method specifying the source markdown file containing citations.
-5. A **`cliFlags`** (object), provided to `extractLinksContent()` method containing command-line options (e.g., `{ fullFiles: true }`).
-
-##### Output Public Contract
-The `extractLinksContent()` method returns a `Promise` that resolves with an **`ExtractionResult`** object (US2.2a). This is the ONLY public output contract. The structure contains:
-- `contentIndex` (object): Maps contentId (SHA-256 hash) to unique content entries with `content`, `contentLength`, and `sources` array
-- `links` (array): Link references with `contentId`, `sourceLine`, `sourceColumn`, `linkText`, `status`, and optional `decisionReason`/`reason`
-- `stats` (object): Aggregate statistics including `totalLinks`, `uniqueContent`, `duplicateContentDetected`, `tokensSaved`, and `compressionRatio`
-
-**Design Note**: The component internally produces intermediate extraction attempts (stored in `_LinkExtractionAttempt[]` array) during processing but immediately transforms them via internal deduplication before returning. The intermediate flat array format is an implementation detail, not a public contract. Deduplication is the default behavior, not an optional variant.
-
-See [ExtractionResult schema](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Content%20Deduplication%20Strategy) for complete specification.
 
 ### `validate` Command Component Sequence Diagram
 
@@ -492,7 +475,7 @@ tools/citation-manager/
 
 ### ContentExtractor File Structure
 
-**Current Implementation** (US2.2 Complete):
+**Current Implementation** (US2.2a Complete):
 
 ```text
 tools/citation-manager/
@@ -500,9 +483,10 @@ tools/citation-manager/
     ├── core/
     │   └── ContentExtractor/
     │       ├── ContentExtractor.js              # Main orchestrator class (thin wrapper)
-    │       ├── extractLinksContent.js           # Content extraction operation
-    │       ├── analyzeEligibility.js            # Eligibility analysis operation
-    │       ├── normalizeAnchor.js               # Anchor normalization utilities
+    │       ├── extractLinksContent.js           # PRIMARY operation: extraction workflow with inline deduplication
+    │       ├── generateContentId.js             # Utility: SHA-256 content-based hashing
+    │       ├── analyzeEligibility.js            # Supporting operation: eligibility analysis
+    │       ├── normalizeAnchor.js               # Utility: anchor normalization
     │       └── eligibilityStrategies/           # Strategy pattern implementations
     │           ├── ExtractionStrategy.js
     │           ├── StopMarkerStrategy.js
@@ -516,8 +500,10 @@ tools/citation-manager/
 **Architecture Decisions Implemented:**
 - **Action-Based File Organization**: `extractLinksContent.js` follows verb-noun naming convention
 - **Utility Extraction**: `normalizeAnchor.js` created with `normalizeBlockId()` and `decodeUrlAnchor()` utilities
+- **Content-Based Hashing**: `generateContentId.js` provides SHA-256 hashing for deduplication (US2.2a)
 - **Thin Orchestrator**: `ContentExtractor.js` delegates to operation files, maintains minimal surface area
 - **Dependency Injection**: Constructor accepts `eligibilityStrategies`, `parsedFileCache`, and `citationValidator`
+- **Inline Deduplication**: Single-pass processing builds deduplicated output structure (US2.2a)
 
 **Key Changes Post-US1.5**:
 - **ParsedFileCache.js**: New component providing in-memory cache of parsed file objects
@@ -956,7 +942,7 @@ npm run citation:base-paths <file-path> -- --format json
 
 ## Document Status
 
-**Last Updated**: 2025-10-23
+**Last Updated**: 2025-10-28
 **Version**: 0.2 (Draft)
 **Next Steps**:
 - ✓ Complete US1.4a test migration to Vitest (DONE)

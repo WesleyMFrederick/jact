@@ -11,7 +11,7 @@ Without a dedicated CLI command, users cannot leverage the content extraction wo
 
 Implement an `extract` command in the citation-manager CLI that orchestrates the complete content extraction workflow: validation → eligibility analysis → content retrieval → aggregation. The command follows the existing CLI patterns established by the `validate` command, using factory-based component instantiation, option parsing for scope and flags, and structured output formatting.
 
-The command returns raw ExtractionResult arrays as JSON to stdout (per US2.3 AC7), with validation errors reported to stderr. Exit codes follow CI/CD conventions: 0 for any successful extraction, non-zero only when all extractions fail.
+The command returns raw OutgoingLinksExtractedContent arrays as JSON to stdout (per US2.3 AC7), with validation errors reported to stderr. Exit codes follow CI/CD conventions: 0 for any successful extraction, non-zero only when all extractions fail.
 
 ---
 
@@ -55,13 +55,13 @@ program
     try {
       // Call ContentExtractor.extractLinksContent() (US2.2 AC2)
       // This internally calls citationValidator.validateFile() (US2.2 AC3)
-      const extractionResults = await manager.contentExtractor.extractLinksContent(
+      const OutgoingLinksExtractedContents = await manager.contentExtractor.extractLinksContent(
         file,
         { fullFiles: options.fullFiles } // CLI flags object
       )
 
       // --- 4. Report Validation Errors to stderr (US2.3 AC5) ---
-      const validationErrors = extractionResults.filter(result =>
+      const validationErrors = OutgoingLinksExtractedContents.filter(result =>
         result.status === 'skipped' &&
         result.failureDetails?.reason?.startsWith('Link failed validation')
       )
@@ -74,12 +74,12 @@ program
         console.error("") // Blank line for readability
       }
 
-      // --- 5. Output ExtractionResult Array to stdout (US2.3 AC7) ---
+      // --- 5. Output OutgoingLinksExtractedContent Array to stdout (US2.3 AC7) ---
       // Raw JSON output for programmatic consumption
-      console.log(JSON.stringify(extractionResults, null, 2))
+      console.log(JSON.stringify(OutgoingLinksExtractedContents, null, 2))
 
       // --- 6. Exit Code Logic (US2.3 AC7, AC8) ---
-      const hasSuccessfulExtraction = extractionResults.some(result => result.status === 'success')
+      const hasSuccessfulExtraction = OutgoingLinksExtractedContents.some(result => result.status === 'success')
 
       if (hasSuccessfulExtraction) {
         process.exit(0) // At least one link extracted successfully
@@ -193,7 +193,7 @@ The CLI separates validation errors (stderr) from extraction results (stdout) to
 ```typescript
 // --- Validation Error Reporting (stderr) ---
 // US2.3 AC5: Report validation errors clearly
-const validationErrors = extractionResults.filter(result =>
+const validationErrors = OutgoingLinksExtractedContents.filter(result =>
   result.status === 'skipped' &&
   result.failureDetails?.reason?.startsWith('Link failed validation')
 )
@@ -201,7 +201,7 @@ const validationErrors = extractionResults.filter(result =>
 if (validationErrors.length > 0) {
   console.error("\nVALIDATION ERRORS:") // Human-readable header
   for (const error of validationErrors) {
-    // Extract line number and reason from ExtractionResult
+    // Extract line number and reason from OutgoingLinksExtractedContent
     console.error(`  Line ${error.sourceLink.line}: ${error.failureDetails.reason}`)
     // Example output: "Line 42: Link failed validation: Target file does not exist"
   }
@@ -209,15 +209,15 @@ if (validationErrors.length > 0) {
 }
 
 // --- Extraction Results (stdout) ---
-// US2.3 AC7: Output raw ExtractionResult array as JSON
-console.log(JSON.stringify(extractionResults, null, 2))
+// US2.3 AC7: Output raw OutgoingLinksExtractedContent array as JSON
+console.log(JSON.stringify(OutgoingLinksExtractedContents, null, 2))
 ```
 
-**Rationale**: Separation ensures `extract file.md > output.json` captures only ExtractionResult data, while users still see validation warnings in the terminal.
+**Rationale**: Separation ensures `extract file.md > output.json` captures only OutgoingLinksExtractedContent data, while users still see validation warnings in the terminal.
 
 ### JSON Output Formatting
 
-The command outputs the complete ExtractionResult array as valid JSON to stdout, enabling programmatic consumption and future pipeline integration:
+The command outputs the complete OutgoingLinksExtractedContent array as valid JSON to stdout, enabling programmatic consumption and future pipeline integration:
 
 **Output Structure**:
 
@@ -276,7 +276,7 @@ The command outputs the complete ExtractionResult array as valid JSON to stdout,
 ```
 
 **Output Characteristics**:
-- Each array element is a complete ExtractionResult (sourceLink + status + details)
+- Each array element is a complete OutgoingLinksExtractedContent (sourceLink + status + details)
 - sourceLink preserves complete LinkObject for debugging and context
 - status discriminates between 'success', 'skipped', 'error'
 - successDetails present only when status === 'success'
@@ -291,7 +291,7 @@ Exit codes follow CI/CD conventions for pipeline integration:
 ```typescript
 // US2.3 AC7: Exit 0 if any successful extraction
 // US2.3 AC8: Exit non-zero if all fail
-const hasSuccessfulExtraction = extractionResults.some(result =>
+const hasSuccessfulExtraction = OutgoingLinksExtractedContents.some(result =>
   result.status === 'success'
 )
 
@@ -353,7 +353,7 @@ class ExtractCommand {
 
     // Return structured output (command pattern)
     return {
-      extractionResults: results,
+      OutgoingLinksExtractedContents: results,
       validationErrors: this.extractValidationErrors(results),
       exitCode: this.determineExitCode(results)
     }
@@ -375,10 +375,10 @@ class ExtractCommand {
 // CLI action handler becomes thin wrapper
 .action(async (file, options) => {
   const command = new ExtractCommand(manager.contentExtractor, manager.fileCache)
-  const { extractionResults, validationErrors, exitCode } = await command.execute(file, options)
+  const { OutgoingLinksExtractedContents, validationErrors, exitCode } = await command.execute(file, options)
 
   // Handle output and exit
-  formatAndOutput(extractionResults, validationErrors)
+  formatAndOutput(OutgoingLinksExtractedContents, validationErrors)
   process.exit(exitCode)
 })
 ```
@@ -401,24 +401,24 @@ class ExtractCommand {
 /**
  * Output formatter interface for extensibility
  */
-class ExtractionResultFormatter {
-  format(extractionResults, options) {
+class OutgoingLinksExtractedContentFormatter {
+  format(OutgoingLinksExtractedContents, options) {
     // Override in subclasses
   }
 }
 
-class JSONFormatter extends ExtractionResultFormatter {
-  format(extractionResults, options) {
-    return JSON.stringify(extractionResults, null, 2)
+class JSONFormatter extends OutgoingLinksExtractedContentFormatter {
+  format(OutgoingLinksExtractedContents, options) {
+    return JSON.stringify(OutgoingLinksExtractedContents, null, 2)
   }
 }
 
-class MarkdownFormatter extends ExtractionResultFormatter {
-  format(extractionResults, options) {
+class MarkdownFormatter extends OutgoingLinksExtractedContentFormatter {
+  format(OutgoingLinksExtractedContents, options) {
     // Future: Format as structured markdown document
     // with headers identifying source files/sections
     const lines = []
-    for (const result of extractionResults) {
+    for (const result of OutgoingLinksExtractedContents) {
       if (result.status === 'success') {
         lines.push(`## ${result.sourceLink.fullMatch}`)
         lines.push(result.successDetails.extractedContent)
@@ -434,7 +434,7 @@ const formatter = options.format === 'json'
   ? new JSONFormatter()
   : new MarkdownFormatter()
 
-console.log(formatter.format(extractionResults, options))
+console.log(formatter.format(OutgoingLinksExtractedContents, options))
 ```
 
 **Deferred Scope Note**: Output formatting beyond raw JSON (markdown headers, file writing, `--output` option) has been explicitly deferred. See [Content Extractor Implementation Guide - Future Work](Content%20Extractor%20Implementation%20Guide.md#Future%20Work) for details.
@@ -497,7 +497,7 @@ The CLI acts as a thin orchestration layer, delegating all extraction logic to t
 const contentExtractor = createContentExtractor(parsedFileCache, validator, strategies)
 
 // CLI calls single orchestration method (US2.3 AC4)
-const extractionResults = await contentExtractor.extractLinksContent(
+const OutgoingLinksExtractedContents = await contentExtractor.extractLinksContent(
   sourceFilePath,
   { fullFiles: options.fullFiles } // CLI flags → cliFlags object
 )
@@ -506,7 +506,7 @@ const extractionResults = await contentExtractor.extractLinksContent(
 // 1. Calls validator.validateFile() to get enriched links (US2.2 AC3)
 // 2. Filters by eligibility using strategy chain (US2.2 AC4)
 // 3. Retrieves content from target documents via parsedFileCache (US2.2 AC5-7)
-// 4. Returns array of ExtractionResult objects (US2.2 AC9)
+// 4. Returns array of OutgoingLinksExtractedContent objects (US2.2 AC9)
 
 // CLI handles final I/O (validation errors to stderr, results to stdout)
 ```
@@ -529,7 +529,7 @@ ContentExtractor.extractLinksContent(sourceFilePath, cliFlags)
     ├─ Strategy chain → filter eligible links
     └─ ParsedFileCache → retrieve content from target documents
     ↓
-ExtractionResult[] (returned to CLI)
+OutgoingLinksExtractedContent[] (returned to CLI)
     ↓
 CLI Output Formatting (JSON to stdout, errors to stderr)
     ↓
@@ -558,7 +558,7 @@ VALIDATION ERRORS:
 
 **Exit Code**: 0 if other links succeed, 1 if all fail
 
-**Example ExtractionResult**:
+**Example OutgoingLinksExtractedContent**:
 
 ```json
 {
@@ -580,7 +580,7 @@ VALIDATION ERRORS:
 
 **Exit Code**: 0 if other links succeed, 1 if all skipped
 
-**Example ExtractionResult**:
+**Example OutgoingLinksExtractedContent**:
 
 ```json
 {
@@ -604,7 +604,7 @@ VALIDATION ERRORS:
 
 **Exit Code**: 0 if other links succeed, 1 if all fail
 
-**Example ExtractionResult**:
+**Example OutgoingLinksExtractedContent**:
 
 ```json
 {
@@ -706,9 +706,9 @@ describe('extract command - CLI integration', () => {
     const result = await runExtractCommand(sourceFile, { scope: 'test/fixtures' })
 
     // Verify: Parse JSON output
-    const extractionResults = JSON.parse(result.stdout)
-    expect(extractionResults).toBeInstanceOf(Array)
-    expect(extractionResults[0]).toMatchObject({
+    const OutgoingLinksExtractedContents = JSON.parse(result.stdout)
+    expect(OutgoingLinksExtractedContents).toBeInstanceOf(Array)
+    expect(OutgoingLinksExtractedContents[0]).toMatchObject({
       sourceLink: expect.objectContaining({
         fullMatch: '[Architecture](./architecture.md#component-diagram)',
         anchorType: 'header'
@@ -733,8 +733,8 @@ describe('extract command - CLI integration', () => {
     const result = await runExtractCommand(sourceFile)
 
     // Verify: Link skipped with eligibility reason
-    const extractionResults = JSON.parse(result.stdout)
-    expect(extractionResults[0]).toMatchObject({
+    const OutgoingLinksExtractedContents = JSON.parse(result.stdout)
+    expect(OutgoingLinksExtractedContents[0]).toMatchObject({
       status: 'skipped',
       failureDetails: {
         reason: expect.stringContaining('Full-file links require --full-files flag')
@@ -753,8 +753,8 @@ describe('extract command - CLI integration', () => {
     const result = await runExtractCommand(sourceFile, { fullFiles: true })
 
     // Verify: Link extracted successfully
-    const extractionResults = JSON.parse(result.stdout)
-    expect(extractionResults[0]).toMatchObject({
+    const OutgoingLinksExtractedContents = JSON.parse(result.stdout)
+    expect(OutgoingLinksExtractedContents[0]).toMatchObject({
       status: 'success',
       successDetails: {
         decisionReason: expect.stringContaining('CLI flag --full-files'),
@@ -781,8 +781,8 @@ describe('extract command - CLI integration', () => {
     expect(result.stdout).toContain('Link failed validation: Target file does not exist')
 
     // Verify: Valid link still extracted
-    const extractionResults = JSON.parse(result.stdout.split('\n').filter(line => line.startsWith('[')).join(''))
-    const successResults = extractionResults.filter(r => r.status === 'success')
+    const OutgoingLinksExtractedContents = JSON.parse(result.stdout.split('\n').filter(line => line.startsWith('[')).join(''))
+    const successResults = OutgoingLinksExtractedContents.filter(r => r.status === 'success')
     expect(successResults.length).toBeGreaterThan(0)
 
     // Verify: Exit code 0 because at least one link succeeded
@@ -815,8 +815,8 @@ describe('extract command - CLI integration', () => {
     })
 
     // Verify: Smart resolution finds file in nested directory
-    const extractionResults = JSON.parse(result.stdout)
-    expect(extractionResults[0]).toMatchObject({
+    const OutgoingLinksExtractedContents = JSON.parse(result.stdout)
+    expect(OutgoingLinksExtractedContents[0]).toMatchObject({
       status: 'success',
       successDetails: expect.objectContaining({
         extractedContent: expect.any(String)
@@ -898,9 +898,9 @@ describe('ExtractCommand - unit tests', () => {
 
 ### Future Enhancement: Streaming Output for Large Extractions
 
-**Context**: Current implementation buffers entire ExtractionResult array in memory before outputting.
+**Context**: Current implementation buffers entire OutgoingLinksExtractedContent array in memory before outputting.
 
-**Future Improvement**: Stream ExtractionResult objects as newline-delimited JSON (NDJSON) for memory efficiency:
+**Future Improvement**: Stream OutgoingLinksExtractedContent objects as newline-delimited JSON (NDJSON) for memory efficiency:
 
 ```typescript
 // Current: Buffer entire array

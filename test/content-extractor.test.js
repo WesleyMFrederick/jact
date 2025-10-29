@@ -72,7 +72,7 @@ describe("ContentExtractor", () => {
 		expect(extractor.eligibilityStrategies).toBe(mockStrategies);
 	});
 
-	it("should provide extractLinksContent method returning Promise of ExtractionResult array", async () => {
+	it("should provide extractLinksContent method returning Promise of OutgoingLinksExtractedContent", async () => {
 		// Given: ContentExtractor with mock dependencies
 		const mockCache = {
 			resolveParsedFile: async () => ({
@@ -92,8 +92,10 @@ describe("ContentExtractor", () => {
 			fullFiles: false,
 		});
 
-		// Then: Returns array of ExtractionResult objects
-		expect(Array.isArray(result)).toBe(true);
+		// Then: Returns OutgoingLinksExtractedContent object
+		expect(result).toHaveProperty("extractedContentBlocks");
+		expect(result).toHaveProperty("outgoingLinksReport");
+		expect(result).toHaveProperty("stats");
 	});
 
 	it("should execute complete workflow: validation → eligibility → extraction", async () => {
@@ -105,9 +107,10 @@ describe("ContentExtractor", () => {
 		const extractor = createContentExtractor();
 
 		// When: extractLinksContent executed WITHOUT --full-files flag
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Results array contains mix of success/skipped/error statuses
 		// (AC15: internal links filtered out, only cross-document links remain)
@@ -121,7 +124,10 @@ describe("ContentExtractor", () => {
 		);
 		expect(sectionResult).toBeDefined();
 		expect(sectionResult.status).toBe("success");
-		expect(sectionResult.successDetails.extractedContent).toContain(
+		expect(sectionResult.contentId).toBeDefined();
+		const sectionContent =
+			output.extractedContentBlocks[sectionResult.contentId];
+		expect(sectionContent.content).toContain(
 			"This is the content that should be extracted",
 		);
 
@@ -133,7 +139,9 @@ describe("ContentExtractor", () => {
 		);
 		expect(blockResult).toBeDefined();
 		expect(blockResult.status).toBe("success");
-		expect(blockResult.successDetails.extractedContent).toContain(
+		expect(blockResult.contentId).toBeDefined();
+		const blockContent = output.extractedContentBlocks[blockResult.contentId];
+		expect(blockContent.content).toContain(
 			"This is a block reference that can be extracted.",
 		);
 
@@ -160,9 +168,10 @@ describe("ContentExtractor", () => {
 		const extractor = createContentExtractor();
 
 		// When: extractLinksContent executed WITH --full-files flag
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: true,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Full-file link should be extracted successfully
 		const fullFileResult = results.find(
@@ -172,6 +181,9 @@ describe("ContentExtractor", () => {
 		);
 		expect(fullFileResult).toBeDefined();
 		expect(fullFileResult.status).toBe("success");
-		expect(fullFileResult.successDetails.extractedContent).toContain("# Target Document");
+		expect(fullFileResult.contentId).toBeDefined();
+		const fullFileContent =
+			output.extractedContentBlocks[fullFileResult.contentId];
+		expect(fullFileContent.content).toContain("# Target Document");
 	});
 });

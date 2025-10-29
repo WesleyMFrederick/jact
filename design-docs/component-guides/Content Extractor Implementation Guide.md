@@ -1,188 +1,62 @@
 <!-- markdownlint-disable MD025 -->
+<!-- markdownlint-disable  -->
 # Content Extractor Implementation Guide
 
-## Problem
+This document expands on [ContentExtractor component definition](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ContentExtractor) from Level 3 architecture.
 
-The content extraction workflow requires solving two distinct code-level problems:
+## Document Sequence
+Better Sequence:
 
-### Extraction Eligibility Problem
+  1. Purpose and Scope → "Why does this exist?"
+  2. Component Workflow → "What does it orchestrate?" (the sequence diagram)
+  3. Public Contracts → "How do I use it?" (constructor, methods, schemas)
+  4. Architecture Patterns → "Why is it designed this way?"
+  5. Implementation Details → Deep dives (algorithms, pseudocode)
 
-Without a structured approach to implementing the extraction eligibility rules from [FR10](../features/20251003-content-aggregation/content-aggregation-prd.md#^FR10), developers would naturally implement the precedence logic as a **monolithic function with nested if/else chains**. This creates critical problems:
+  Reasoning:
 
-1. **Rules become untestable in isolation** - Precedence logic tightly couples to the orchestrator, preventing independent testing of individual rules
-2. **Closed to extension** - Adding new markdown flavors or user-configurable rules requires modifying the core function, violating the Open/Closed Principle
-3. **Implicit precedence order** - Rule hierarchy is buried in control flow structure rather than explicit in the architecture
-4. **Intertwined rule logic** - Each rule's implementation is tangled with others, preventing reuse and increasing regression risk
+  The workflow diagram tells the orchestration story:
+- Shows validation → eligibility → extraction → deduplication flow
+- Illustrates SOURCE vs TARGET document distinction
+- Reveals the Strategy Pattern and Validation Enrichment in action
+- Provides mental model BEFORE seeing method signatures
 
-### Content Retrieval Problem
+  After seeing "ContentExtractor calls CitationValidator, then loops through links calling ParsedDocument methods," the contract extractLinksContent(sourceFilePath, cliFlags): Promise\<ExtractionResult\> makes immediate sense.
 
-Without a centralized component to orchestrate content retrieval, every consumer would duplicate the **extraction dispatch logic**: determining which `ParsedDocument` method to call (`extractSection()`, `extractBlock()`, `extractFullContent()`), handling different return types, packaging results with metadata, and managing extraction errors. This duplication creates **maintenance burden** (changes to extraction logic require updates across all consumers) and **inconsistent error handling** (each consumer implements its own approach to missing sections or invalid anchors).
+  Without the workflow first, readers see schemas like OutgoingLinksExtractedContent and have to mentally reconstruct how that structure gets built.
 
-## Solution
+Revised Public Contracts Section Flow (Reusable Template):
 
-The **`Content Extractor`** component is the central service for content aggregation. It encapsulates two primary responsibilities: **`ExtractionEligibility`** (determining _what_ to fetch using the Strategy Pattern) and **`ContentRetrieval`** (fetching the content chunk via the **`ParsedDocument`** facade). It returns **`ExtractionResult`** objects back to the CLI for final output.
-
----
-## Structure
-
-The `Content Extractor` is a single component that uses the **Strategy Pattern** internally to manage eligibility rules. The component orchestrates the complete extraction workflow: **validation** (via internal `CitationValidator` call to discover links), **eligibility analysis** (via the strategy chain), and **content retrieval** (via the ParsedDocument facade).
-
-**Input Contract**: The component receives a `sourceFilePath` from the CLI. The CLI orchestrator validates the source file first to discover all LinkObjects with their source and target paths. These pre-validated links are then used internally by ContentExtractor for eligibility analysis and content extraction. The source file path is extracted from the LinkObject array and validated for consistency (all links share the same `link.source.path.absolute` value).
-
-```mermaid
-classDiagram
-    direction LR
-
-    class CLIOrchestrator {
-        +executeExtractCommand()
-    }
-
-    class ContentExtractor {
-        -parsedFileCache: ParsedFileCacheInterface
-        -citationValidator: CitationValidator
-        -eligibilityStrategies: ExtractionStrategy[]
-        +extractLinksContent(sourceFilePath: string, cliFlags: Object): Promise~ExtractionResult[]~
-    }
-
-    
+  1. Instantiation → Constructor signature, DI pattern, factory function usage, dependency defaults
+  2. Primary Operations → Main methods with signatures, parameters, return types
+  3. Output Contracts → Detailed schemas of what operations return
+  4. Error Handling → Status values, error message formats, failure scenarios
   
+## Purpose and Scope
 
-   class ParsedFileCache {
-        <<interface>>
-        +resolveParsedFile(filePath: string): Promise~ParsedDocument~
-    }
+The **`ContentExtractor`** component is responsible for:
 
-    class ParsedDocument {
-        <<facade>>
-        +getLinks(): array
-        +extractSection(headingText: string): string
-        +extractBlock(anchorId: string): string
-        +extractFullContent(): string
-    }
-  
-  class ExtractionStrategy {
-    <<interface>>
-        %% +getMarker(): string|null
-        +getDecision(link: string, cliFlags: Object): Decision|null
-    }
-  
-  namespace Strategies {
-    class Strategy {
-     +getDecision(link: string, cliFlags: Object): Decision|null
-    }
-  
-    class Note {
-     <<note>>
-     Implements custom extraction logic. Strategies include:
-     . - StopMarkerStrategy
-     . - ForceMarkerStrategy
-     . - SectionLinkStrategy
-     . - CliFlagStrategy
-    }
-    
-  }
-  
-    class ExtractionResult {
-        +sourceLink: LinkObject
-        +status: string
-        +successDetails: object
-        +failureDetails: object
-    }
-  
-  
-  
-    CLIOrchestrator --> ContentExtractor : calls
-    
-    ContentExtractor ..> ParsedFileCache : depends on
-    ParsedFileCache --> ParsedDocument : returns
-    ContentExtractor ..> ParsedDocument : calls methods on
-    
-    ContentExtractor ..> ExtractionStrategy : depends & calls methods on
-    ExtractionStrategy <|-- Strategy : implements
+- Orchestrating the complete content extraction workflow from source files containing citations
+- Orchestrating validation workflow via [**`Citation Validator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator) to discover and validate cross-document links
+- Analyzing link eligibility using the **Strategy Pattern** with configurable precedence rules
+- Retrieving content from target documents via ParsedDocument [**`ParsedDocument.Content Extraction`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md#Content%20Extraction) facade methods
+- Deduplicating extracted content using SHA-256 content-based hashing
+- Aggregating results into `OutgoingLinksExtractedContent` structure for CLI output
 
-    ContentExtractor --> ExtractionResult : returns
-```
+The component is **NOT** responsible for:
 
-1. **ExtractionStrategy**: Base interface defining the contract for eligibility rule strategies (`getDecision(link, cliFlags)`)
-2. **StopMarkerStrategy, ForceMarkerStrategy, SectionLinkStrategy, CliFlagStrategy**: Concrete strategy implementations executed in precedence order
-3. **ParsedFileCache**: The dependency used to retrieve ParsedDocument instances
-4. **ParsedDocument**: The facade providing content extraction methods (`extractSection()`, `extractBlock()`, `extractFullContent()`)
-5. **ExtractionResult**: The result object returned for each link containing status, source link reference, and either success details (extracted content + decision reason) or failure details (error reason)
-6. **ContentExtractor**: The class that orchestrates eligibility analysis and content retrieval
+- Parsing markdown (delegated to [**`Markdown Parser`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Markdown%20Parser))
+- Navigating parser output structures (delegated to [**`ParsedDocument`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedDocument) facade)
+- Reading files from disk (delegated to [**`ParsedFileCache`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedFileCache))
+- Final output formatting or file writing (delegated to [**`CLI Orchestrator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.CLI%20Orchestrator))
+
+This component operates as the orchestration layer for the `extract` command, sitting between the CLI and lower-level components (CitationValidator, ParsedFileCache, ParsedDocument). It transforms a source markdown file containing citations into a deduplicated `OutgoingLinksExtractedContent` object optimized for LLM consumption.
 
 ---
 
-## Public Contracts
+## Component Workflow
 
-The component's interface is designed as a single execution point to hide internal complexity and ensure the CLI remains thin and focused on application orchestration.
-
-### Input Contract
-
-**Dependencies (injected via constructor):**
-1. **`ParsedFileCache`**: For retrieving parsed documents
-2. **`CitationValidator`**: For validating citations before extraction
-3. **`eligibilityStrategies`**: Array of strategy objects for eligibility rules
-
-**Public Method: `extractLinksContent(sourceFilePath, cliFlags)`**
-1. **`sourceFilePath`** (string): Absolute path to the source markdown file containing citations
-2. **`cliFlags`** (object): Command-line options (e.g., `{ fullFiles: true }`) to be evaluated by the eligibility strategies
-
-### Output Contract
-
-The `extractLinksContent()` method returns a `Promise` that resolves with an **`ExtractionResult`** object. This is the ONLY public output contract for the ContentExtractor component.
-
-**Complete Schema**: See [ExtractionResult (Public Output Contract)](#ExtractionResult%20(Public%20Output%20Contract)) in Content Deduplication Strategy section
-
-**Design Rationale**:
-- **Primary goal**: Minimize token usage for LLM context packages via content deduplication
-- **No backward compatibility**: Epic 2 is cohesive unit; intermediate format never exposed publicly
-- **Content-based hashing**: Detects duplicates even when different files contain identical text
-- **Single source of truth**: Each unique content piece stored once, referenced by multiple links
-- **Deduplication is default**: Content deduplication is standard behavior, not an optional variant
-- **Names as Contracts**: `ExtractionResult` describes WHAT (extraction results), not HOW (deduplicated)
-
-**Internal Implementation Detail**: The extraction workflow internally produces intermediate extraction attempts (stored in `_LinkExtractionAttempt[]` array) during processing, but these are immediately transformed via internal `_deduplicateExtractionResults()` function before returning. See [`_LinkExtractionAttempt` schema](#_LinkExtractionAttempt%20(Internal%20Intermediate%20Format)).
-
-**Final Output**: The CLI receives the deduplicated structure and outputs it as JSON to stdout (per US2.3 AC7). File writing and formatted output are deferred to future work.
-
----
-
-## File Structure
-
-Following [Action-Based File Organization](../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition) principles, operations are extracted to separate files following the **"Files Transform States"** pattern:
-
-```text
-tools/citation-manager/
-└── src/
-    ├── core/
-    │   └── ContentExtractor/                           // Component folder (TitleCase per coding standards)
-    │       ├── ContentExtractor.js                    // Thin orchestrator class (entry point)
-    │       ├── extractLinksContent.js                 // PRIMARY operation: content extraction workflow (verb-noun)
-    │       ├── analyzeEligibility.js                  // Supporting operation: eligibility analysis (verb-noun)
-    │       ├── deduplicateExtractionResults.js        // Supporting operation: content deduplication via hashing (verb-noun)
-    │       ├── normalizeAnchor.js                     // Utility helpers: anchor normalization (verb-noun)
-    │       └── eligibilityStrategies/                 // Strategy pattern implementations
-    │           ├── ExtractionStrategy.js             // Base interface for all eligibility rules
-    │           ├── StopMarkerStrategy.js             // Concrete rule: %%stop-extract-link%%
-    │           ├── ForceMarkerStrategy.js            // Concrete rule: %%extract-link%%
-    │           ├── SectionLinkStrategy.js            // Concrete rule: Anchor-based links eligible by default
-    │           └── CliFlagStrategy.js                // Concrete rule: --full-files flag evaluation
-    │
-    └── factories/
-        └── componentFactory.js                        // createContentExtractor() factory with DI wiring
-```
-
-**File Organization Rationale**:
-- **ContentExtractor.js**: Thin class wrapper for DI/factory pattern, delegates to operation functions
-- **extractLinksContent.js**: Primary operation orchestrating validation → eligibility → retrieval → deduplication workflow
-- **analyzeEligibility.js**: Supporting operation implementing strategy chain pattern
-- **deduplicateExtractionResults.js**: Supporting operation implementing content-based hashing for deduplication
-- **normalizeAnchor.js**: Utility functions for anchor normalization (`decodeUrlAnchor`, `normalizeBlockId`)
-
-_Source_: [Action-Based File Organization](../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition), [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns)
-
----
-## ContentExtractor Workflow: Component Interaction Diagram  
+### ContentExtractor Workflow: Component Interaction
 
 ```mermaid
 sequenceDiagram
@@ -193,359 +67,586 @@ sequenceDiagram
     participant ParsedCache as ParsedFileCache
     participant Parser as MarkdownParser
 
-
     User->>CLI: extract <file> --scope <dir>
     note over CLI: Instantiates ContentExtractor via factory
 
     CLI->>+Extractor: extractLinksContent(sourceFilePath, cliFlags)
 
-    note over Extractor: 0. Validation & Link Discovery (Validation Enrichment Pattern)
+    note over Extractor: 0. Validation & Link Discovery
     Extractor->>+Validator: validateFile(sourceFilePath)
     Validator->>+ParsedCache: resolveParsedFile(sourceFilePath)
     ParsedCache->>+Parser: parseFile(filePath)
-    Parser->>Parser: Detect links using marked.js + regex patterns
+    Parser->>Parser: Detect links using marked.js + regex
     Parser-->>-ParsedCache: MarkdownParser.Output.DataContract
     ParsedCache->>ParsedCache: Wrap in ParsedDocument facade
     ParsedCache-->>-Validator: ParsedDocument (SOURCE document)
     Validator->>Validator: Validate links, add validation metadata
     Validator-->>-Extractor: { summary, links: EnrichedLinkObject[] }
-    note over Extractor: Links enriched with validation metadata only
 
     note over Extractor: 1. Eligibility Analysis (Strategy Pattern)
-    Extractor->>Extractor: Filter eligible links using strategy chain<br/>Checks link.anchorType and CLI flags
+    Extractor->>Extractor: Filter eligible links using strategy chain
 
     note over Extractor: 2. Content Retrieval Loop (TARGET documents)
     loop FOR EACH: eligible Link
-        note over Extractor: Extract from TARGET document at link.target.path
         Extractor->>+ParsedCache: resolveParsedFile(link.target.path.absolute)
         ParsedCache-->>-Extractor: ParsedDocument (TARGET document facade)
-        Extractor->>Extractor: Extract content using ParsedDocument.extract*() methods
-        note over Extractor: Creates ExtractionResult with status and details
+        Extractor->>Extractor: Extract content using ParsedDocument methods
     end
 
-    Extractor-->>-CLI: Return array of ExtractionResult objects
-    CLI->>User: Output JSON to stdout (Final I/O)
+    note over Extractor: 3. Deduplication (SHA-256 hashing)
+    Extractor->>Extractor: Transform to OutgoingLinksExtractedContent with contentIndex
+
+    Extractor-->>-CLI: Return OutgoingLinksExtractedContent object
+    CLI->>User: Output JSON to stdout
 ```
 
-### Workflow Characteristics
-
-- **Single Service Interface**: The core operation is executed via a **single, high-level call** to the `Content Extractor` component: `extractLinksContent(sourceFilePath, cliFlags)`. This abstracts the entire multi-step process from the CLI.
-- **Validation Enrichment Pattern**: The `Content Extractor` calls `CitationValidator.validateFile()` once and receives **enriched links with validation metadata** directly in the response: `{ summary, links: EnrichedLinkObject[] }`. Each link contains its validation status, eliminating the need for separate validation result structures or redundant calls to retrieve links.
-- **Zero Redundant Calls**: The validator internally uses `ParsedFileCache` to get the SOURCE document. ContentExtractor receives enriched links directly from the validator with no separate call needed to retrieve links. Only TARGET documents require additional `ParsedFileCache` calls during content extraction.
-- **Single Data Flow**: Links flow through a progressive enhancement pipeline: parse → validate → enrich → filter → extract. Validation metadata lives on the `LinkObject.validation` property, creating zero data duplication and a single source of truth.
-- **Source vs Target Document Distinction**: The workflow operates on two document types:
-  - **SOURCE document**: The file containing citations (e.g., `context-package.md`). Retrieved once by validator, enriched links returned to ContentExtractor.
-  - **TARGET documents**: Files referenced by citations (e.g., `architecture.md`, `prd.md`). Retrieved in the extraction loop via `link.target.path.absolute` for content extraction.
-- **Encapsulated Logic**: The `Content Extractor` internally manages the complex control flow, performing **Link Eligibility Analysis** (via Strategy Pattern) and the **Content Retrieval Loop** (via ParsedDocument facade calls to TARGET documents).
-- **Performance Optimization**: The `ParsedFileCache` guarantees each unique file is parsed at most once per command execution. This applies to both the SOURCE document (parsed during validation) and all TARGET documents (parsed during extraction loop).
-- **Complexity Abstraction**: Content retrieval from TARGET documents is handled by declarative calls to the `ParsedDocument` facade's methods (`extractSection()`, `extractBlock()`, `extractFullContent()`). The facade hides the underlying token-walking or line-lookup mechanics.
-- **Aggregation Point**: The `Content Extractor` aggregates **`ExtractionResult`** objects (each containing extraction status, source link reference, and either success or failure details) into a single array before returning to the CLI.
-- **Final I/O**: The `CLI Orchestrator` performs the final I/O operation: outputting the array of `ExtractionResult` objects as JSON to stdout (per US2.3 AC7). File writing and formatted output are deferred to future work.
-- **Asynchronous Flow**: The core content retrieval operations remain **asynchronous** (`Promise`-based) to accommodate the file I/O operations necessary during cache misses.
+**Workflow Characteristics**:
+- Single service interface abstracts multi-step process from CLI
+- Validation Enrichment Pattern: [**`Citation Validator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator) returns enriched links directly
+- Performance: [**`ParsedFileCache`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedFileCache%20Implementation%20Guide.md#Output%20Contract) ensures each file parsed at most once
+- Source vs Target: **SOURCE** file contains citations, **TARGET** files provide content
+- Deduplication: Internal transformation before returning to CLI
 
 ---
-## `ContentExtractor` Main Methods
 
-### `ContentExtractor.extractLinksContent()`
+## Public Contracts
 
-**Pseudocode:**
+### Component Creation
 
-```ts
-/**
- * Orchestrates the extraction of content referenced by eligible links within a source file.
- * Implements the workflow defined in US2.2.
- */
-class ContentExtractor is
-  private field parsedFileCache: ParsedFileCache
-  private field citationValidator: CitationValidator
-  private field eligibilityStrategies: array of ExtractionStrategy
+#### Constructor Signature
+**File**: `src/core/ContentExtractor/ContentExtractor.js`
 
-  /**
-   * Constructor with dependency injection (US2.2 AC1).
-   */
-  constructor ContentExtractor(parsedFileCache, citationValidator, eligibilityStrategies) is
-    this.parsedFileCache = parsedFileCache
-    this.citationValidator = citationValidator
-    this.eligibilityStrategies = eligibilityStrategies
-
-  /**
-   * Analyzes link eligibility using the configured strategy chain.
-   * (Existing method from US2.1)
-   */
-  public method analyzeEligibility(link: LinkObject, cliFlags: object): EligibilityDecision is
-    // Implementation uses analyzeEligibility function and this.eligibilityStrategies
-    return analyzeEligibility(link, cliFlags, this.eligibilityStrategies)
-
-  /**
-   * Main orchestration method (US2.2 AC2).
-   * Validates source file, filters by eligibility, fetches target documents,
-   * normalizes anchors, calls appropriate extraction methods, and aggregates results.
-   * Returns a promise resolving to an array of ExtractionResult objects (US2.2 AC8, AC9).
-   */
-  public async method extractLinksContent(sourceFilePath: string, cliFlags: object): Promise<array of ExtractionResult> is
-    // --- Step 1: Validate Source File & Get Enriched Links ---
-    // Call injected CitationValidator to get enriched links (US2.2 AC3)
-    field validationResult = await this.citationValidator.validateFile(sourceFilePath)
-
-    // --- Step 1b: Filter Internal Links (US2.2 AC15) ---
-    // Internal links are excluded from extraction processing
-    field crossDocumentLinks = validationResult.links.filter(link => link.scope != 'internal')
-
-    // --- Step 2: Process Each Link and Build Results ---
-    field allResults = []
-
-    for (field link in crossDocumentLinks) do
-      // --- 2a: Check Validation Status ---
-      // Skip links that failed validation (US2.2 AC4)
-      if (link.validation.status == 'error') then
-        allResults.push({
-          sourceLink: link,
-          status: 'skipped',
-          failureDetails: {
-            reason: `Link failed validation: ${link.validation.error}`
-          }
-        })
-        continue
-
-      // --- 2b: Analyze Eligibility ---
-      field decision = this.analyzeEligibility(link, cliFlags)
-
-      if (!decision.eligible) then
-        allResults.push({
-          sourceLink: link,
-          status: 'skipped',
-          failureDetails: {
-            reason: `Link not eligible for extraction: ${decision.reason}`
-          }
-        })
-        continue
-
-      // --- 2c: Determine Target Document ---
-      // All links are cross-document after AC15 filter
-      field targetDoc = null
-      try
-        if (link.target.path.absolute) then
-          // Fetch target document via cache (US2.2 AC5)
-          targetDoc = await this.parsedFileCache.resolveParsedFile(link.target.path.absolute)
-        else
-          // No resolvable target path
-          throw new Error('No resolvable target path')
-      catch (error) is
-        // Target file missing or un-parsable
-        allResults.push({
-          sourceLink: link,
-          status: 'error',
-          failureDetails: {
-            reason: `Cannot read target file: ${link.target.path.absolute || 'unknown'}`
-          }
-        })
-        continue
-
-      // --- 2d: Extract Content Based on Anchor Type ---
-      field content = null
-      try
-        if (link.anchorType == 'header') then
-          // Normalization (ADR-CE02): Decode URL anchor (US2.2 AC5)
-          field decodedAnchor = this.decodeUrlAnchor(link.target.anchor)
-          content = targetDoc.extractSection(decodedAnchor)
-
-        else if (link.anchorType == 'block') then
-          // Normalization (ADR-CE02): Remove '^' prefix (US2.2 AC6)
-          field blockId = this.normalizeBlockId(link.target.anchor)
-          content = targetDoc.extractBlock(blockId)
-
-        else if (link.anchorType == null) then
-          // Full file extraction (US2.2 AC7)
-          content = targetDoc.extractFullContent()
-
-        // --- 2e: Create Success Result ---
-        if (content != null) then
-          allResults.push({
-            sourceLink: link,
-            status: 'success',
-            successDetails: {
-              decisionReason: decision.reason,
-              extractedContent: content
-            }
-          })
-        else
-          // Content extraction returned null
-          allResults.push({
-            sourceLink: link,
-            status: 'error',
-            failureDetails: {
-              reason: 'Content extraction returned null'
-            }
-          })
-
-      catch (error) is
-        // Extraction method failed (e.g., anchor not found)
-        field anchorType = link.anchorType || 'file'
-        field anchorValue = link.target.anchor || link.target.path.absolute
-        allResults.push({
-          sourceLink: link,
-          status: 'error',
-          failureDetails: {
-            reason: `${anchorType} anchor not found: ${anchorValue}`
-          }
-        })
-
-    return allResults
-
-  // --- Helper Methods ---
-
-  /**
-   * Removes the '^' prefix from block anchor strings.
-   * (As defined in ADR-CE02)
-   */
-  private method normalizeBlockId(anchor: string | null): string | null is
-    if (anchor != null && anchor.startsWith('^')) then
-      return anchor.substring(1)
-    return anchor
-
-  /**
-   * Decodes URL-encoded characters in anchor strings (e.g., %20 -> space).
-   * (As defined in ADR-CE02)
-   */
-  private method decodeUrlAnchor(anchor: string | null): string | null is
-    if (anchor != null) then
-      try
-        return decodeURIComponent(anchor)
-      catch (e) is
-        // Handle potential decoding errors gracefully
-        return anchor // Return original anchor if decoding fails
-    return anchor
-
-end class // ContentExtractor
+```typescript
+class ContentExtractor {
+  constructor(
+    parsedFileCache: ParsedFileCache,
+    citationValidator: CitationValidator,
+    eligibilityStrategies: ExtractionStrategy[]
+  )
+}
 ```
 
----
-## Data Schemas
+**Dependencies**:
+- [**`ParsedFileCache`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedFileCache): Retrieves ParsedDocument instances for target files
+- [**`Citation Validator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator): Validates source file and discovers links with enrichment
+- `eligibilityStrategies`: Array of strategy objects in precedence order
 
-### `_LinkExtractionAttempt` (Internal Intermediate Format)
+#### Factory Function
 
-**Visibility**: Private implementation detail, not exposed in public API
+**File**: `src/factories/componentFactory.js`
 
-This intermediate structure is produced during the extraction loop before deduplication. Each attempt represents one link's extraction outcome.
+```typescript
+createContentExtractor(
+  parsedFileCache?: ParsedFileCache,
+  citationValidator?: CitationValidator,
+  strategies?: ExtractionStrategy[]
+): ContentExtractor
+```
+
+**Factory Pattern Benefits**:
+- Encapsulates dependency wiring complexity
+- Provides production-ready defaults when no overrides specified
+- Enables dependency injection for testing (mock caches, validators, strategies)
+- Defines explicit strategy precedence order
+
+**Default Strategy Precedence** (highest to lowest priority):
+1. `StopMarkerStrategy` - Blocks extraction when `%%stop-extract-link%%` present
+2. `ForceMarkerStrategy` - Forces extraction when `%%force-extract%%` present
+3. `SectionLinkStrategy` - Anchors (sections/blocks) eligible by default
+4. `CliFlagStrategy` - Respects `--full-files` flag for full-file links
+
+### Primary Methods
+
+#### extractLinksContent()
+**File**: `src/core/ContentExtractor/extractLinksContent.js`
+
+**Signature**:
+
+```typescript
+async extractLinksContent(
+  sourceFilePath: string,
+  cliFlags: { fullFiles?: boolean }
+): Promise<OutgoingLinksExtractedContent>
+```
+
+**Parameters**:
+- `sourceFilePath`: Absolute path to source markdown file containing citations
+- `cliFlags`: Command-line options evaluated by eligibility strategies
+
+**Returns**: Promise resolving to [**`OutgoingLinksExtractedContent`**](#OutgoingLinksExtractedContent%20Schema)
+
+### Output Contracts
+
+#### OutgoingLinksExtractedContent Schema
+The output structure uses an indexed format to minimize token usage through content deduplication. This structure is built incrementally during the extraction workflow via inline deduplication (see Phase 4 in main workflow pseudocode).
 
 ```javascript
-/**
- * INTERNAL: Intermediate extraction attempt structure.
- * This is transformed into ExtractionResult via _deduplicateExtractionResults().
- * NOT part of the public API.
- */
-type _LinkExtractionAttempt = {
-  /**
-   * The original, complete LinkObject from the MarkdownParser that was processed.
-   * Provides full context about the link itself (source, target, line, column, anchor, etc.).
-   */
-  sourceLink: LinkObject;
-
-  /**
-   * The status of the extraction attempt for this link.
-   * - 'success': Content was successfully extracted.
-   * - 'skipped': Extraction was skipped (e.g., link failed validation, was ineligible).
-   * - 'error': An error occurred during the extraction process itself (e.g., target file readable but anchor not found).
-   */
-  status: "success" | "skipped" | "error";
-
-  /**
-   * Contains the successfully extracted content and the reason for eligibility.
-   * *Only present if status is 'success'.*
-   */
-  successDetails?: {
-    /** The justification from the eligibility strategy. */
-    decisionReason: string;
-    /** The raw extracted string content. */
-    extractedContent: string;
-  };
-
-  /**
-   * Contains the reason why extraction was skipped or failed.
-   * *Only present if status is 'skipped' or 'error'.*
-   */
-  failureDetails?: {
-    /** A message explaining why extraction was skipped (validation failure, ineligibility) or why it failed (extraction error). */
-    reason: string;
-  };
-};
-```
-
-### `ContentExtractor.analyzeEligibility`
-
-#### 1. `LinkObject` Interface (Input)
-
-This is the primary data construct for determining eligibility. While the full `LinkObject` produced by the `MarkdownParser` is large, the `ContentExtractor`'s strategies only depend on a small, specific interface (or "shape") of that object. This adheres to the [**Dependency Abstraction** principle](../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction), as the strategies don't need to know about the entire parser, only this minimal data contract.
-
-```ts
-// The minimal interface of a LinkObject consumed by the strategies
 {
-  /**
-   * The type of anchor, if any.
-   * Strategies use this to determine if a link is a "section link."
-   *
-   */
-  anchorType: 'header' | 'block' | null,
+  /** Index mapping contentId to unique content blocks extracted from target files. */
+  extractedContentBlocks: {
 
-  /**
-   * The post-link marker, if any.
-   * Strategies use this to override default behavior.
-   *
-   */
-  extractionMarker: {
-    innerText: 'force-extract' | 'stop-extract-link' | string
-  } | null
+    /** contentId is a Hash */
+    [contentId: string]: {
+      content: string, // The extracted markdown content (stored once).
+      contentLength: number, // Character count of the unique content block.
+
+      /** Array of all original locations (path#anchor) where this exact content block was found. */
+      contentOrigins: Array<{
+        path: string, // Absolute path or URL containing the content.
+        anchor: string | null, // Anchor fragment (#header, ^block) in that location, or null if full file/resource.
+        anchorType: "header" | "block" | null // Type of anchor ("header", "block", or null).
+      }>
+    }
+  },
+
+  /** Report detailing the processing status for each outgoing citation link from the specified source file. */
+  outgoingLinksReport: {
+    sourceFilePath: string, // Absolute path to the source file containing the processed links.
+
+    /** Array detailing the status and content mapping for each processed link. */
+    processedLinks: Array<{
+      contentId: string | null, // Hash reference to extractedContentBlocks entry, or null if skipped/error.
+      sourceLine: number, // 1-based line number of the link in the source file.
+      sourceColumn: number, // 0-based column position of the link in the source file.
+      linkText: string, // Display text from the original markdown link.
+      linkTargetPathRaw: string | null, // Raw path string (e.g., "../file.md", "#internal-anchor") from the original link.
+      linkTargetAnchor: string | null, // Anchor string (e.g., "header-name", "^block-id") from the original link, or null.
+      linkExtractionEligibilityReason?: string, // The reason why this link was deemed eligible for extraction attempt (e.g., "Section links eligible by default", "Force marker overrides defaults"). Present if eligibility check passed.
+      extractionStatus: "success" | "skipped" | "error", // The final status of the extraction attempt.
+      extractionFailureReason?: string // Explanation for non-success status ('skipped' or 'error'). (e.g., "Link failed validation", "Target file not found", "Anchor not found"). Not present if status is 'success'.
+    }>
+  },
+
+  /** Aggregate statistics summarizing the extraction and deduplication results. */
+  stats: {
+    totalLinks: number, // Total number of citation links processed from the source document.
+    uniqueContent: number, // Count of unique content blocks stored in extractedContentBlocks.
+    duplicateContentDetected: number, // Number of citation links that referenced content already found (duplicates).
+    tokensSaved: number, // Estimated character count saved by deduplication.
+    compressionRatio: number // Ratio of saved characters to the hypothetical total size if not deduplicated.
+  }
 }
 ```
 
-#### 2. `CliFlags` Object (Input)
+**Design Notes**:
+- Deduplication is default behavior, not optional variant
+- No backward compatibility: `OutgoingLinksExtractedContent` is the only public contract
+- Single-pass inline approach: no intermediate arrays or separate deduplication step
 
-This is a simple data object that provides runtime context from the command line, allowing users to override default behavior.
+### Error Handling
 
-JavaScript
+#### Extraction Status Values
 
-```ts
-{
-  /**
-   * Flag to force extraction of full-file links (those with anchorType: null).
-   *
-   */
-  fullFiles: boolean
-}
+**Property**:  `OutgoingLinksExtractedContent.outgoingLinksReport.processedLinks[].extractionStatus`
+
+- `"success"`: Content extracted successfully
+- `"skipped"`: Expected conditions (validation failure, ineligibility rules)
+- `"error"`: Unexpected runtime problems (missing files, missing anchors)
+
+#### Failure Reason Formats
+
+**Property**: `OutgoingLinksExtractedContent.outgoingLinksReport.processedLinks[].extractionFailureReason`
+
+This field is present when `extractionStatus` is `"skipped"` or `"error"`:
+
+**Skipped Status Reasons**:
+- Validation failure: `"Link failed validation: {link.validation.error}"`
+- Ineligibility: `"Link not eligible for extraction: {decision.reason}"`
+
+**Error Status Reasons**:
+- Target file error: `"Cannot read target file: {absolutePath}"`
+- Section not found: `"header anchor not found: {anchorValue}"`
+- Block not found: `"block anchor not found: {anchorValue}"`
+
+---
+## Architecture Patterns
+
+### Strategy Pattern
+
+**File**: `src/core/ContentExtractor/eligibilityStrategies/`
+
+Encapsulates eligibility rules as interchangeable strategy objects evaluated in precedence order.
+
+**Implementation**:
+- Each strategy implements `getDecision(link, cliFlags): Decision | null`
+- Strategies return `{ eligible: boolean, reason: string }` or `null` to pass to next Strategy
+- Array order defines precedence: Stop → Force → Section → CliFlag
+
+**Benefits**:
+- Rules testable in isolation
+- Open/Closed Principle: extend without modifying orchestrator
+- Explicit precedence via array position
+
+### Chain of Responsibility
+
+**File**: `src/core/ContentExtractor/analyzeEligibility.js`
+
+Each strategy handles the eligibility decision or passes to the next strategy in the chain.
+
+**Implementation**:
+- `analyzeEligibility()` iterates through strategy array
+- First strategy returning non-null decision wins
+- Default fallback: ineligible if no strategy matches
+
+**Benefits**:
+- Decouples sender (ContentExtractor) from receiver (concrete strategies)
+- Dynamic chain modification via strategy array injection
+
+### Dependency Injection
+
+**File**: `src/core/ContentExtractor/ContentExtractor.js`
+
+Dependencies provided via constructor parameters for testability and loose coupling.
+
+**Benefits**:
+- Enables mock injection for unit testing
+- Loose coupling: depends on interfaces, not concrete implementations
+- Explicit dependencies visible in constructor
+
+---
+
+## File Organization
+
+**Component Files** (Action-Based Organization):
+
+```text
+tools/citation-manager/src/core/ContentExtractor/
+├── ContentExtractor.js                 # Thin orchestrator class (entry point)
+├── extractLinksContent.js              # PRIMARY operation: extraction workflow with inline deduplication
+├── analyzeEligibility.js               # Supporting operation: strategy chain
+├── normalizeAnchor.js                  # Utility: anchor normalization
+└── eligibilityStrategies/
+    ├── ExtractionStrategy.js           # Base interface
+    ├── StopMarkerStrategy.js
+    ├── ForceMarkerStrategy.js
+    ├── SectionLinkStrategy.js
+    └── CliFlagStrategy.js
 ```
 
-#### 3. `EligibilityDecision` Object (Output)
+**Factory Pattern**:
 
-This is the clean, simple, and authoritative data model that the `ContentExtractor` _produces_. Every strategy must return this object (or `null` to pass to the next strategy).
-
-```ts
-{
-  /**
-   * The final boolean decision.
-   */
-  eligible: boolean,
-
-  /**
-   * The justification from the specific strategy that made the final decision.
-   *
-   */
-  reason: string
-}
+```text
+tools/citation-manager/src/factories/
+└── componentFactory.js                 # createContentExtractor() with DI
 ```
 
 ---
 
-## Content Deduplication Strategy
+## Implementation Details
 
-### Purpose
+### Class Diagram
 
-The Content Deduplication Strategy minimizes token usage in LLM context packages by storing identical extracted content only once. When multiple links reference the same target or when different files contain identical content, the system uses content-based hashing to detect duplicates and create an indexed structure that eliminates redundancy.
+```mermaid
+%%{init: {"classDiagram": {"defaultRenderer": "elk"} }}%%
 
-### Algorithm: Content-Based Hashing
+classDiagram
+    direction LR
+
+    class CLIOrchestrator {
+        <<Commander.js app>>
+    }
+
+    class ContentExtractor {
+        -parsedFileCache: ParsedFileCache
+        -citationValidator: CitationValidator
+        -eligibilityStrategies: ExtractionStrategy[]
+        +extractLinksContent(sourceFilePath, cliFlags): Promise~OutgoingLinksExtractedContent~
+    }
+
+    class ParsedFileCache {
+        <<interface>>
+        +resolveParsedFile(filePath): Promise~ParsedDocument~
+    }
+
+    class CitationValidator {
+        +validateFile(sourceFilePath): Promise~ValidationResult~
+    }
+
+    class ParsedDocument {
+        <<facade>>
+        +extractSection(headingText): string
+        +extractBlock(anchorId): string
+        +extractFullContent(): string
+    }
+
+    class ExtractionStrategy {
+        <<interface>>
+        +getDecision(link, cliFlags): Decision|null
+    }
+
+    namespace Strategies {
+        class ConcreteStrategies {
+            <<implementations>>
+            StopMarkerStrategy
+            ForceMarkerStrategy
+            SectionLinkStrategy
+            CliFlagStrategy
+        }
+    }
+
+    class OutgoingLinksExtractedContent {
+        +extractedContentBlocks: Object
+        +outgoingLinksReport: Object
+        +stats: Object
+    }
+
+    CLIOrchestrator --> ContentExtractor : calls
+    ContentExtractor ..> ParsedFileCache : depends on
+    ContentExtractor ..> CitationValidator : depends on
+    ParsedFileCache --> ParsedDocument : returns
+    ContentExtractor ..> ParsedDocument : uses
+    ContentExtractor ..> ExtractionStrategy : depends on
+    ExtractionStrategy <|-- ConcreteStrategies : implements
+    ContentExtractor --> OutgoingLinksExtractedContent : returns
+```
+
+### Main Workflow: extractLinksContent()
+**File**: `src/core/ContentExtractor/extractLinksContent.js`
+
+High-level orchestration pseudocode showing the extraction pipeline phases:
+
+```typescript
+async function extractLinksContent(sourceFilePath, cliFlags): Promise<OutgoingLinksExtractedContent> {
+
+  // PHASE 0: Validation & Link Discovery
+  // Integration: CitationValidator parses source and enriches links with validation metadata
+  validationResult = await citationValidator.validateFile(sourceFilePath)
+  enrichedLinks = validationResult.links
+
+  // Pattern: Initialize output contract structure that will be built incrementally
+  const result: OutgoingLinksExtractedContent = {
+    extractedContentBlocks: {},
+    outgoingLinksReport: {
+      sourceFilePath: sourceFilePath,
+      processedLinks: []
+    },
+    stats: {
+      totalLinks: 0,
+      uniqueContent: 0,
+      duplicateContentDetected: 0,
+      tokensSaved: 0,
+      compressionRatio: 0
+    }
+  };
+
+  // PHASE 1: Scope Filtering
+  // Pattern: Use filter to exclude internal links before per-link processing
+  crossDocumentLinks = enrichedLinks.filter(link => link.scope !== 'internal')
+
+  // PHASE 2: Parallel Extraction with Inline Deduplication
+  // Performance: Map pattern enables parallel I/O operations for file reads
+  // Pattern: Single-pass processing builds both extractedContentBlocks and processedLinks simultaneously
+  const extractionResults = await Promise.all(
+    crossDocumentLinks.map(async (link) => {
+
+      // Decision: Record validation failures with 'skipped' status
+      if (link.validation.status === 'error') {
+        return {
+          link,
+          status: 'skipped',
+          reason: `Link failed validation: ${link.validation.error}`
+        };
+      }
+
+      // Pattern: Strategy chain determines eligibility (Stop → Force → Section → CliFlag)
+      // Integration: Call analyzeEligibility with strategy array
+      const eligibilityDecision = analyzeEligibility(link, cliFlags, strategies);
+
+      if (!eligibilityDecision.eligible) {
+        return {
+          link,
+          status: 'skipped',
+          reason: `Link not eligible: ${eligibilityDecision.reason}`
+        };
+      }
+
+      // PHASE 3: Content Retrieval (per eligible link)
+      try {
+        // Integration: Fetch target ParsedDocument from ParsedFileCache
+        const targetParsedDocument = await parsedFileCache.resolveParsedFile(link.target.path);
+
+        // Decision: Dispatch based on anchor type
+        // Boundary: Normalize anchors before calling ParsedDocument facade methods
+        let content;
+        if (anchorType === 'header') {
+          content = targetParsedDocument.extractSection(decodedAnchor, headingLevel);
+        } else if (anchorType === 'block') {
+          content = targetParsedDocument.extractBlock(normalizedBlockId);
+        } else {
+          content = targetParsedDocument.extractFullContent();
+        }
+
+        return {
+          link,
+          status: 'success',
+          content,
+          eligibilityReason: eligibilityDecision.reason
+        };
+
+      } catch (error) {
+        // Error handling: Capture extraction failures
+        return {
+          link,
+          status: 'error',
+          reason: error.message
+        };
+      }
+    })
+  );
+
+  // PHASE 4: Build Output Contract with Inline Deduplication
+  // Pattern: Single pass through results builds both indexed content and report
+  for (const extraction of extractionResults) {
+    result.stats.totalLinks++;
+
+    if (extraction.status === 'success') {
+      // Pattern: Content-based hashing for deduplication
+      const contentId = generateContentId(extraction.content);
+
+      if (!result.extractedContentBlocks[contentId]) {
+        // First occurrence: Create new content block entry
+        result.extractedContentBlocks[contentId] = {
+          content: extraction.content,
+          contentLength: extraction.content.length,
+          contentOrigins: [{
+            path: extraction.link.target.path.absolute,
+            anchor: extraction.link.target.anchor,
+            anchorType: extraction.link.anchorType
+          }]
+        };
+        result.stats.uniqueContent++;
+      } else {
+        // Duplicate detected: Add origin to existing content block
+        result.extractedContentBlocks[contentId].contentOrigins.push({
+          path: extraction.link.target.path.absolute,
+          anchor: extraction.link.target.anchor,
+          anchorType: extraction.link.anchorType
+        });
+        result.stats.duplicateContentDetected++;
+        result.stats.tokensSaved += extraction.content.length;
+      }
+
+      // Add processedLink entry referencing the content block
+      result.outgoingLinksReport.processedLinks.push({
+        contentId,
+        sourceLine: extraction.link.position.line,
+        sourceColumn: extraction.link.position.column,
+        linkText: extraction.link.text,
+        linkTargetPathRaw: extraction.link.target.pathRaw,
+        linkTargetAnchor: extraction.link.target.anchor,
+        linkExtractionEligibilityReason: extraction.eligibilityReason,
+        extractionStatus: 'success'
+      });
+
+    } else {
+      // Skipped or error: Add processedLink entry without content
+      result.outgoingLinksReport.processedLinks.push({
+        contentId: null,
+        sourceLine: extraction.link.position.line,
+        sourceColumn: extraction.link.position.column,
+        linkText: extraction.link.text,
+        linkTargetPathRaw: extraction.link.target.pathRaw,
+        linkTargetAnchor: extraction.link.target.anchor,
+        extractionStatus: extraction.status,
+        extractionFailureReason: extraction.reason
+      });
+    }
+  }
+
+  // Calculate final compression ratio
+  const totalContentSize = Object.values(result.extractedContentBlocks)
+    .reduce((sum, block) => sum + block.contentLength, 0);
+  result.stats.compressionRatio =
+    result.stats.tokensSaved / (totalContentSize + result.stats.tokensSaved);
+
+  return result;
+}
+
+/**
+ * Generate content-based hash for deduplication.
+ * Pattern: SHA-256 hashing enables automatic duplicate detection
+ */
+function generateContentId(content: string): string {
+  return crypto.createHash('sha256')
+    .update(content)
+    .digest('hex')
+    .substring(0, 16);
+}
+```
+
+**Workflow Characteristics**:
+- **Single service interface**: Multiple internal phases hidden behind one public method
+- **Validation enrichment**: Links arrive pre-validated with metadata from CitationValidator
+- **Scope filtering**: Internal links excluded before processing via filter pattern
+- **Strategy-based eligibility**: Chain of Responsibility pattern determines extraction eligibility
+- **Anchor normalization**: URL decoding and prefix removal before ParsedDocument calls
+- **Error isolation**: Individual link failures don't stop processing of remaining links
+- **Content deduplication**: SHA-256 hashing detects identical content across targets, inline single-pass approach (US2.2a)
+
+### Anchor Normalization Helpers
+**File**: `src/core/ContentExtractor/normalizeAnchor.js`
+
+These utility functions prepare anchor strings for ParsedDocument extraction methods:
+
+```typescript
+/**
+ * Decode URL-encoded characters in anchor strings.
+ * Integration: Converts LinkObject anchor format to ParsedDocument expected format
+ * Pattern: Called before extractSection() to handle spaces and special chars
+ */
+function decodeUrlAnchor(anchor: string | null): string | null {
+  if (anchor === null) return null;
+
+  try {
+    // Boundary: URL decode %20 → space, %23 → #, etc.
+    return decodeURIComponent(anchor);
+  } catch (error) {
+    // Error handling: Return original if decode fails (malformed encoding)
+    return anchor;
+  }
+}
+
+/**
+ * Remove '^' prefix from block anchor IDs.
+ * Integration: Converts LinkObject block format to ParsedDocument expected format
+ * Pattern: Called before extractBlock() to strip Obsidian block syntax
+ */
+function normalizeBlockId(anchor: string | null): string | null {
+  if (anchor === null) return null;
+
+  // Pattern: Strip leading '^' from block references
+  if (anchor.startsWith('^')) {
+    return anchor.substring(1);
+  }
+
+  return anchor;
+}
+```
+
+**Usage in extractLinksContent**:
+```typescript
+// Before calling ParsedDocument methods
+if (anchorType === 'header') {
+  const decodedAnchor = decodeUrlAnchor(link.target.anchor);
+  content = targetDoc.extractSection(decodedAnchor, headingLevel);
+} else if (anchorType === 'block') {
+  const blockId = normalizeBlockId(link.target.anchor);
+  content = targetDoc.extractBlock(blockId);
+}
+```
+
+**Design Rationale** ([ADR-CE02: Anchor Normalization Location](#ADR-CE02%20Anchor%20Normalization%20Location)):
+- Keeps ParsedDocument API clean (expects normalized inputs)
+- Decouples ParsedDocument from LinkObject format details
+- Consolidates adaptation logic in ContentExtractor orchestrator
+
+### Content Deduplication Strategy
+
+### Content-Based Hashing Strategy
 
 **Approach**: Generate SHA-256 hash of extracted content string to create unique contentId.
 
-**Key Generation**:
+**Hash Generation**:
 
 ```javascript
 function generateContentId(extractedContent) {
@@ -553,933 +654,335 @@ function generateContentId(extractedContent) {
   return crypto.createHash('sha256')
     .update(extractedContent)
     .digest('hex')
-    .substring(0, 16); // Truncate to 16 chars for readability
+    .substring(0, 16); // Truncate to 16 chars
 }
 ```
 
-**Benefits of Content-Based Approach**:
+**Benefits**:
 - Catches duplicates even when different files contain identical text
-- Automatic cache invalidation when content changes (different hash)
+- Automatic cache invalidation when content changes
 - Deterministic: same content always produces same ID
-- Collision risk negligible (SHA-256 has 2^64 possible values for 16 hex chars)
+- Collision risk negligible (SHA-256 with 16 chars = 2^64 values)
 
-**Trade-offs**:
-- Whitespace-sensitive: minor formatting differences create different hashes (acceptable for MVP)
-- Cannot detect partial matches (e.g., H3 content as substring of H2 extraction)
+**Trade-offs Accepted**:
+- Whitespace-sensitive (minor formatting differences create different hashes)
+- Cannot detect partial matches (H3 as substring of H2)
 
-### `ExtractionResult` (Public Output Contract)
+### Eligibility Analysis Implementation
 
-**Visibility**: Public API - THE ONLY format returned by `extractLinksContent()`
-
-The output structure uses an indexed format to minimize token usage through content deduplication. This is the final, deduplicated format after internal transformation of `_LinkExtractionAttempt[]` array.
-
-```javascript
-{
-  /**
-   * Content index mapping contentId (SHA-256 hash) to unique content.
-   * Each entry stores content once with metadata about all sources.
-   */
-  contentIndex: {
-    [contentId: string]: {
-      /** The extracted markdown content (stored once) */
-      content: string,
-
-      /** Character count of content (for stats calculation) */
-      contentLength: number,
-
-      /** Array of all source locations that produced this identical content */
-      sources: Array<{
-        /** Absolute path to target file */
-        targetFile: string,
-
-        /** Anchor fragment (with # or ^ prefix) or null for full-file */
-        anchor: string | null,
-
-        /** Type of anchor: "header", "block", or null */
-        anchorType: "header" | "block" | null
-      }>
-    }
-  },
-
-  /**
-   * Array of link references pointing to content via contentId.
-   * Preserves source location and extraction metadata.
-   */
-  links: Array<{
-    /** Hash reference to contentIndex entry, or null for skipped/error links */
-    contentId: string | null,
-
-    /** 1-based line number in source file */
-    sourceLine: number,
-
-    /** 0-based column position in source file */
-    sourceColumn: number,
-
-    /** Display text from original markdown link */
-    linkText: string,
-
-    /** Status of extraction: "success", "skipped", or "error" */
-    status: "success" | "skipped" | "error",
-
-    /** Eligibility decision reason (present when status === "success") */
-    decisionReason?: string,
-
-    /** Failure explanation (present when status !== "success") */
-    reason?: string
-  }>,
-
-  /**
-   * Aggregate statistics about deduplication effectiveness
-   */
-  stats: {
-    /** Total number of links processed */
-    totalLinks: number,
-
-    /** Count of unique content entries in contentIndex */
-    uniqueContent: number,
-
-    /** Count of links referencing duplicate content */
-    duplicateContentDetected: number,
-
-    /** Sum of character counts for deduplicated content */
-    tokensSaved: number,
-
-    /** Ratio of tokens saved to total content size (0.0 to 1.0) */
-    compressionRatio: number
-  }
-}
-```
-
-### Deduplication Workflow
-
-The deduplication operation transforms intermediate extraction attempts into the final `ExtractionResult`:
+### Strategy Chain Execution
 
 ```typescript
-/**
- * Transform flat array of intermediate extraction attempts into deduplicated indexed structure.
- * Implements content-based hashing to detect and eliminate duplicate content.
- * This is an internal operation; the intermediate array format is not exposed publicly.
- */
-function _deduplicateExtractionResults(attempts: _LinkExtractionAttempt[]): ExtractionResult is
-  field contentIndex = {}
-  field links = []
-  field totalSaved = 0
+function analyzeEligibility(
+  link: LinkObject,
+  cliFlags: Object,
+  strategies: ExtractionStrategy[]
+): EligibilityDecision {
 
-  // Process each extraction result
-  for (field result in results) do
-    if (result.status == 'success') then
-      // Generate content hash
-      field contentId = generateContentId(result.successDetails.extractedContent)
+  for (const strategy of strategies) {
+    const decision = strategy.getDecision(link, cliFlags)
 
-      // Check if content already exists in index
-      if (!contentIndex[contentId]) then
-        // First occurrence: store content with source metadata
-        contentIndex[contentId] = {
-          content: result.successDetails.extractedContent,
-          contentLength: result.successDetails.extractedContent.length,
-          sources: [{
-            targetFile: result.sourceLink.target.path.absolute,
-            anchor: result.sourceLink.target.anchor,
-            anchorType: result.sourceLink.anchorType
-          }]
-        }
-      else
-        // Duplicate detected: add source to existing entry, track savings
-        contentIndex[contentId].sources.push({
-          targetFile: result.sourceLink.target.path.absolute,
-          anchor: result.sourceLink.target.anchor,
-          anchorType: result.sourceLink.anchorType
-        })
-        totalSaved += result.successDetails.extractedContent.length
+    if (decision !== null) {
+      // First strategy to return decision wins
+      return decision
+    }
+  }
 
-      // Create link reference
-      links.push({
-        contentId: contentId,
-        sourceLine: result.sourceLink.line,
-        sourceColumn: result.sourceLink.column,
-        linkText: result.sourceLink.text,
-        status: 'success',
-        decisionReason: result.successDetails.decisionReason
-      })
-    else
-      // Preserve skipped/error results without content
-      links.push({
-        contentId: null,
-        sourceLine: result.sourceLink.line,
-        sourceColumn: result.sourceLink.column,
-        linkText: result.sourceLink.text,
-        status: result.status,
-        reason: result.failureDetails.reason
-      })
-
-  // Calculate statistics
-  field uniqueCount = Object.keys(contentIndex).length
-  field duplicateCount = results.filter(r => r.status === 'success').length - uniqueCount
-  field totalContentSize = Object.values(contentIndex).reduce((sum, entry) => sum + entry.contentLength, 0)
-
+  // Default fallback: ineligible
   return {
-    contentIndex: contentIndex,
-    links: links,
-    stats: {
-      totalLinks: results.length,
-      uniqueContent: uniqueCount,
-      duplicateContentDetected: duplicateCount,
-      tokensSaved: totalSaved,
-      compressionRatio: totalSaved / (totalContentSize + totalSaved)
-    }
+    eligible: false,
+    reason: 'No strategy matched - defaulting to ineligible'
   }
-end function
-```
-
-### Integration with ContentExtractor
-
-The `extractLinksContent()` method applies deduplication as the final step before returning:
-
-```typescript
-class ContentExtractor is
-  // ... existing methods ...
-
-  public async method extractLinksContent(sourceFilePath: string, cliFlags: object): Promise<ExtractionResult> is
-    // Phase 1-3: Validation, filtering, content extraction
-    field attempts = []
-    // ... existing extraction logic produces _LinkExtractionAttempt[] ...
-
-    // Phase 4: Deduplication (internal transformation)
-    return _deduplicateExtractionResults(attempts)
-  end method
-end class
-```
-
-**Architecture Notes**:
-- **No backward compatibility**: Intermediate flat array format never exposed; Epic 2 is cohesive unit
-- **Primary goal**: Minimize token usage for LLM context packages
-- **Operation file**: Deduplication logic lives in `deduplicateExtractionResults.js` per Action-Based File Organization
-- **Factory pattern**: Factory creates ContentExtractor with deduplication enabled by default
-- **Names as Contracts**: Public contract is `ExtractionResult`, deduplication is default behavior not optional variant
-
----
-
----
-## Error Handling Specification
-
-The `ContentExtractor` produces `ExtractionResult` objects with three possible status values: `'success'`, `'skipped'`, and `'error'`. This section defines the specific error messages used in `failureDetails.reason` for different failure scenarios, ensuring consistent error reporting across the system.
-
-### Status: 'skipped'
-
-Links are marked as `'skipped'` when they cannot be extracted due to validation failures or eligibility rules, but this is expected behavior rather than an error condition.
-
-**Validation Failure:**
-- **Condition**: `link.validation.status === 'error'`
-- **Reason Format**: `"Link failed validation: {link.validation.error}"`
-- **Example**: `"Link failed validation: Target file does not exist"`
-
-**Ineligibility:**
-- **Condition**: `decision.eligible === false` (from Strategy Pattern)
-- **Reason Format**: `"Link not eligible for extraction: {decision.reason}"`
-- **Example**: `"Link not eligible for extraction: Full-file links require --full-files flag"`
-
-### Status: 'error'
-
-Links are marked as `'error'` when extraction fails due to runtime errors or missing content, indicating an unexpected problem that should be investigated.
-
-**Target File Read Failure:**
-- **Condition**: `parsedFileCache.resolveParsedFile()` throws error
-- **Reason Format**: `"Cannot read target file: {link.target.path.absolute || 'unknown'}"`
-- **Example**: `"Cannot read target file: /path/to/missing-file.md"`
-
-**Section Not Found:**
-- **Condition**: `targetDoc.extractSection()` throws error for header anchor
-- **Reason Format**: `"header anchor not found: {decodedAnchor}"`
-- **Example**: `"header anchor not found: Installation Guide"`
-
-**Block Not Found:**
-- **Condition**: `targetDoc.extractBlock()` throws error for block anchor
-- **Reason Format**: `"block anchor not found: {blockId}"`
-- **Example**: `"block anchor not found: definition-123"`
-
-**Null Content Returned:**
-- **Condition**: Extraction method returns `null` instead of throwing
-- **Reason Format**: `"Content extraction returned null"`
-- **Example**: `"Content extraction returned null"`
-
-**No Resolvable Target:**
-- **Condition**: Link has no `target.path.absolute` value
-- **Reason Format**: `"Cannot read target file: unknown"`
-- **Example**: Used for defensive handling of invalid link objects
-
-### Implementation Notes
-
-1. **Error Message Construction**: The pseudocode shows dynamic error message construction using template literals to include contextual information (file paths, anchor values, validation errors)
-
-2. **Status vs Error Distinction**:
-   - Use `'skipped'` for expected conditions (validation failures, eligibility rules)
-   - Use `'error'` for unexpected runtime problems (missing files, missing anchors, null returns)
-
-3. **User Story References**:
-   - US2.2 AC4: Validation error filtering and skipping
-   - US2.3 AC5: Error reporting to stderr for user visibility
-   - US2.3 AC6: Extraction continues despite individual link failures
-
-4. **Debugging Support**: Error messages include specific values (file paths, anchor text) to enable rapid diagnosis without additional logging infrastructure
-
----
-## Factory Implement Pattern
-
-```javascript
-/**
- * Create content extractor with full dependencies
- *
- * @param {ParsedFileCache|null} [parsedFileCache=null] - Optional cache override for testing and dependency injection flexibility
- * @param {CitationValidator|null} [validator=null] - Optional validator override for testing and dependency injection flexibility
- * @param {ExtractionStrategy[]|null} [strategies=null] - Optional strategy override for testing or custom extraction rules
- * @returns {ContentExtractor} Fully configured ContentExtractor instance that orchestrates extraction workflow and returns ExtractionResult objects
- */
-export function createContentExtractor(
-  parsedFileCache = null,
-  validator = null,
-  strategies = null
-) {
-  const _parsedFileCache = parsedFileCache || createParsedFileCache();
-  const _validator = validator || createCitationValidator();
-  const _strategies = strategies || [
-    new StopMarkerStrategy(),
-    new ForceMarkerStrategy(),
-    new SectionLinkStrategy(),
-    new CliFlagStrategy(),
-  ];
-
-  return new ContentExtractor(_parsedFileCache, _validator, _strategies);
 }
 ```
 
-**Pattern Benefits:**
-- Encapsulates strategy instantiation and explicit precedence ordering
-- Enables integration testing with real strategies in isolated configurations
-- Supports extensibility through custom extraction strategies (e.g., implementing HTML comment-based markers like `<!-- extract-link -->` or `<!-- stop-extract -->` for different markdown flavors, custom markers for specific documentation systems, or user-defined extraction rules)
-- Provides production-ready defaults with optional dependency injection
-- Follows workspace factory pattern from `createCitationValidator()`
+**Strategy Precedence** (array order defines priority):
+1. Stop marker overrides all other rules
+2. Force marker overrides defaults and CLI flags
+3. Section links eligible by default
+4. CLI flags control full-file extraction
 
-### Extraction Marker Detection: MVP Hardcoded Approach
-
-**MVP Implementation**: MarkdownParser hardcodes detection of `%% %%` and `<!-- -->` delimiters after links. The parser scans the remainder of each line after detecting a link and extracts any marker found.
-
-**Architecture Flow (MVP):**
-1. **Parser detects link**: Finds markdown or wiki link on a line
-2. **Parser scans for markers**: Checks remainder of line for `%%...%%` or `<!--...-->` patterns
-3. **Parser extracts marker data**: Captures both full marker and inner text
-4. **LinkObject enriched**: `extractionMarker: { fullMatch, innerText }` added to LinkObject
-5. **Strategies check inner text**: Each strategy checks `link.extractionMarker?.innerText` against expected values
-
-**LinkObject.extractionMarker Structure:**
-
-```typescript
-extractionMarker: {
-  fullMatch: string,   // Complete marker as found: '%%force-extract%%' or '<!-- extract-link -->'
-  innerText: string    // Text between delimiters: 'force-extract' or 'extract-link'
-} | null               // null if no marker found on line
-```
-
-**Markdown Examples:**
-
-| Markdown Syntax | extractionMarker Value | Strategy Checks |
-|-----------------|------------------------|-----------------|
-| `[link](path.md)%%force-extract%%` | `{ fullMatch: '%%force-extract%%', innerText: 'force-extract' }` | `innerText === 'force-extract'` |
-| `[link](path.md) %%stop-extract-link%%` | `{ fullMatch: '%%stop-extract-link%%', innerText: 'stop-extract-link' }` | `innerText === 'stop-extract-link'` |
-| `[link](path.md)<!-- extract-link -->` | `{ fullMatch: '<!-- extract-link -->', innerText: 'extract-link' }` | `innerText === 'extract-link'` |
-| `[link](path.md)` | `null` | Strategy returns null (pass to next) |
-
-**Strategy Implementation Examples:**
+### Example Strategy Implementation
 
 ```javascript
-// StopMarkerStrategy - Prevents extraction when marker present
 class StopMarkerStrategy {
   getDecision(link, cliFlags) {
     if (link.extractionMarker?.innerText === 'stop-extract-link') {
-      return { eligible: false, reason: 'Stop marker prevents extraction' };
+      return {
+        eligible: false,
+        reason: 'Stop marker prevents extraction'
+      }
     }
-    return null;
-  }
-}
-
-// ForceMarkerStrategy - Forces extraction regardless of other rules
-class ForceMarkerStrategy {
-  getDecision(link, cliFlags) {
-    if (link.extractionMarker?.innerText === 'force-extract') {
-      return { eligible: true, reason: 'Force marker overrides defaults' };
-    }
-    return null;
-  }
-}
-
-// SectionLinkStrategy - Checks if link has anchor (section/block reference)
-class SectionLinkStrategy {
-  getDecision(link, cliFlags) {
-    if (link.anchorType !== null) {  // Has anchor = section/block link
-      return { eligible: true, reason: 'Section links eligible by default' };
-    }
-    return null;
-  }
-}
-
-// CliFlagStrategy - Checks CLI flags for extraction override
-class CliFlagStrategy {
-  getDecision(link, cliFlags) {
-    if (cliFlags.fullFiles === true) {
-      return { eligible: true, reason: 'CLI flag --full-files forces extraction' };
-    }
-    return null;
+    return null; // Pass to next strategy
   }
 }
 ```
 
-**MarkdownParser Responsibilities:**
-1. Receive marker patterns array from ParsedFileCache/CitationValidator
-2. After detecting link, scan remainder of line for any registered marker
-3. Auto-detect delimiter style: `%% text %%` or `<!-- text -->`
-4. Extract inner text (content between delimiters)
-5. Set `link.extractionMarker = { fullMatch, innerText }` or `null`
-6. Handle whitespace tolerance (optional spaces between link and marker)
+### LinkObject Interface (Input)
 
-**MVP Technical Debt:**
-
-For MVP, MarkdownParser **hardcodes** detection of `%% %%` and `<!-- -->` delimiters after links. This creates coupling between the parser (generic markdown processing) and the content extraction feature. See [MarkdownParser Technical Debt: Issue 5 - Hardcoded Extraction Marker Detection](Markdown%20Parser%20Implementation%20Guide.md#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20(MVP%20Tech%20Debt)) for full analysis and future extensibility approach.
-
-**Future Enhancement:** Parser will accept custom annotation detectors as configuration, eliminating coupling and enabling feature-specific marker registration without parser modifications. `ContentExtractor` will define content extraction markers: [Issue 1: Strategy-Defined Extraction Markers (Future Enhancement)](#Issue%201%20Strategy-Defined%20Extraction%20Markers%20(Future%20Enhancement))
-
----
-## Related Files
-- [Pseudocode - Abstraction Levels](../../../../design-docs/Psuedocode%20Style%20Guide.md#Abstraction%20Levels)
-- [Architecture - Baseline](../../../../design-docs/Architecture%20-%20Baseline.md)
-- [ParsedFileCache Implementation Guide](../../../../../resume-coach/design-docs/examples/component-guides/ParsedFileCache%20Implementation%20Guide.md)
-- [ParsedDocument Implementation Guide](ParsedDocument%20Implementation%20Guide.md)
-- [us2.1-implement-extraction-eligibility-strategy-pattern](../features/20251003-content-aggregation/user-stories/us2.1-implement-extraction-eligibility-strategy-pattern/us2.1-implement-extraction-eligibility-strategy-pattern.md)
-
----
-
-# Whiteboard
-
----
-# Future Work
-
-## Output Formatting and Persistence
-
-The initial implementation of the `extract` command (US2.3) focuses on orchestrating the content extraction workflow and returning the raw array of `ExtractionResult` objects, output as JSON to stdout. The design and implementation of user-facing output formatting (e.g., structured markdown, inline replacement) and persistence options (e.g., writing to a specified file via `--output`) have been explicitly deferred.
-
-This deferred scope includes functionality originally described in US2.3 Acceptance Criteria AC5 (markdown header formatting), AC6 (writing to output file), AC7 (file-based success message), and the `--output` option in AC2.
-
-The requirements for the final output format and persistence will be defined in a future user story after evaluating the utility of the raw extracted content for the primary LLM context-gathering use case.
-
----
-
-# Architectural Decision Records
-
-## ADR-CE02: Anchor Normalization Location for Extraction
-
-- **Status:** Proposed
-- **Date:** 2025-10-22
-- **Context:**
-  - The `LinkObject` provided by `MarkdownParser` contains `target.anchor` which may be URL-encoded (e.g., `%20` for spaces in headers) or prefixed with `^` (for block anchors).
-  - The `ParsedDocument.extractSection` method expects the raw, decoded heading text to find the corresponding token.
-  - The `ParsedDocument.extractBlock` method expects the block ID _without_ the `^` prefix.
-  - A decision is needed on _where_ to perform the necessary normalization (URL decoding for sections, `^` removal for blocks).
-- **Decision:**
-  - Anchor normalization **SHALL** occur within the orchestrating method (`ContentExtractor.extractLinksContent`).
-  - This method will decode URL-encoded anchors _before_ calling `ParsedDocument.extractSection`.
-  - This method will remove the `^` prefix from block anchors _before_ calling `ParsedDocument.extractBlock`.
-  - The `ParsedDocument` extraction methods (`extractSection`, `extractBlock`) **SHALL** expect clean, normalized inputs (raw heading text, block ID without prefix).
-- **Consequences:**
-  - **Pros:**
-    - Keeps the `ParsedDocument` API clean and focused on its core responsibility: extracting content based on exact identifiers (**Single Responsibility**, **Clear Contracts**).
-    - Decouples the `ParsedDocument` implementation from the specific formats used in `LinkObject.target.anchor` (**Dependency Abstraction**).
-    - Consolidates the adaptation logic within the orchestrator, which is already responsible for mediating between the `LinkObject` contract and the `ParsedDocument` API.
-  - **Cons:**
-    - Adds minor normalization logic (URL decoding, prefix stripping) to the `ContentExtractor.extractLinksContent` method.
-    - The orchestrator needs to be aware of the potential need for normalization based on `link.anchorType`.
-
-## Validation Enrichment Pattern
-
-**Decision Date**: 2025-10-17
-**Status**: Recommended for Implementation
-
-### Problem: Massive Data Duplication
-
-The current architectural approach creates separate data structures for parser output (`LinkObject`) and validation results (`ValidationResult`), leading to 80% data duplication:
-
-**LinkObject** (from MarkdownParser):
+**Minimal Interface** consumed by eligibility strategies:
 
 ```typescript
 {
-  linkType: "markdown",      // ← Duplicated in ValidationResult
-  line: 42,                   // ← Duplicated
-  column: 5,                  // ← Duplicated
-  fullMatch: "[text](file)",  // ← Duplicated as "citation"
-  target: { path: "file.md", anchor: "#section" },
-  // ... other structural data
-}
-```
-
-**ValidationResult.results[0]** (from CitationValidator):
-
-```typescript
-{
-  line: 42,                   // ← Duplicate
-  column: 5,                  // ← Duplicate
-  citation: "[text](file)",   // ← Duplicate (fullMatch)
-  linkType: "markdown",       // ← Duplicate
-  status: "error",            // ← UNIQUE (only 3-4 fields are new!)
-  error: "Anchor not found",  // ← UNIQUE
-  suggestion: "#similar"      // ← UNIQUE
-}
-```
-
-**Impact**:
-- Memory overhead (storing same data twice)
-- Redundant `getLinks()` calls (validator fetches, extractor fetches again)
-- Architectural messiness (data flow passes same information multiple times)
-
-### Recommended Solution: Hybrid Validation Enrichment
-
-Validation metadata should live **on the LinkObject** itself, eliminating duplication while preserving separation of concerns for summary reporting.
-
-#### Enhanced LinkObject Schema
-
-```typescript
-interface LinkObject {
-  // Original parser data (unchanged)
-  linkType: "markdown" | "wiki",
-  scope: "cross-document" | "internal",
-  target: { path, anchor },
-  line: number,
-  column: number,
-  fullMatch: string,
-
-  // Validation metadata (added AFTER validation)
-  validation?: {
-    status: "valid" | "warning" | "error",
-    error?: string,           // Only when status = "error"
-    suggestion?: string,      // Only when status = "error" | "warning"
-    pathConversion?: object   // Only when relevant
-  }
-}
-```
-
-#### ValidationResult Schema (Summary Only)
-
-```typescript
-interface ValidationResult {
-  summary: {
-    total: number,
-    valid: number,
-    warnings: number,
-    errors: number
+  anchorType: 'header' | 'block' | null,
+  extractionMarker: {
+    innerText: 'force-extract' | 'stop-extract-link' | string
+  } | null,
+  target: {
+    path: { absolute: string },
+    anchor: string | null
   },
-  links: LinkObject[]  // Return enriched links (no duplication!)
-}
-```
-
-#### Implementation Pattern
-
-```typescript
-class CitationValidator {
-  async validateFile(filePath): ValidationResult {
-    const parsed = await this.parsedFileCache.resolveParsedFile(filePath)
-    const links = parsed.getLinks()
-
-    // Enrich each link with validation metadata
-    for (const link of links) {
-      const result = await this.validateSingleLink(link)
-      link.validation = {
-        status: result.status,
-        error: result.error,
-        suggestion: result.suggestion
-      }
-    }
-
-    // Return summary + enriched links (no duplication!)
-    return {
-      summary: this.generateSummary(links),
-      links: links
-    }
-  }
-}
-```
-
-#### ContentExtractor Usage
-
-```typescript
-class ContentExtractor {
-  async extractLinksContent(sourceFilePath, cliFlags) {
-    // Step 1: Validate and get enriched links
-    const { summary, links } = await this.citationValidator.validateFile(sourceFilePath)
-
-    if (summary.errors > 0) {
-      throw new Error("Cannot extract from file with broken citations")
-    }
-
-    // Step 2: Process all links and create ExtractionResult objects
-    const results = []
-    for (const link of links) {
-      // Skip validation errors
-      if (link.validation.status === "error") {
-        results.push({
-          sourceLink: link,
-          status: 'skipped',
-          failureDetails: { reason: `Validation failed: ${link.validation.error}` }
-        })
-        continue
-      }
-
-      // Check eligibility
-      const decision = this.analyzeEligibility(link, cliFlags)
-      if (!decision.eligible) {
-        results.push({
-          sourceLink: link,
-          status: 'skipped',
-          failureDetails: { reason: `Not eligible: ${decision.reason}` }
-        })
-        continue
-      }
-
-      // Extract content
-      try {
-        const targetDoc = await this.parsedFileCache.resolveParsedFile(link.target.path.absolute)
-        const content = this.extractContent(targetDoc, link)
-        results.push({
-          sourceLink: link,
-          status: 'success',
-          successDetails: {
-            decisionReason: decision.reason,
-            extractedContent: content
-          }
-        })
-      } catch (error) {
-        results.push({
-          sourceLink: link,
-          status: 'error',
-          failureDetails: { reason: `Extraction failed: ${error.message}` }
-        })
-      }
-    }
-
-    return results
-  }
-}
-```
-
-### Benefits
-
-1. **Zero Duplication**: Validation data stored once on LinkObject (50% memory reduction)
-2. **Single Data Flow**: One object passes through pipeline (parse → validate → filter → extract)
-3. **No Redundant Calls**: Validator returns enriched links; extractor uses them directly
-4. **Natural Lifecycle**: Progressive enhancement pattern (base data + validation metadata)
-5. **Separation Preserved**: Summary stays separate for CLI reporting needs
-
-### Type Safety (Preventing Illegal States)
-
-Use TypeScript discriminated unions to prevent invalid states:
-
-```typescript
-// Base link (from parser - unvalidated)
-interface UnvalidatedLinkObject {
-  linkType: "markdown" | "wiki",
-  target: { path, anchor },
-  line: number,
-  column: number,
-  // No validation field = explicitly unvalidated
-}
-
-// After validation
-interface ValidatedLinkObject extends UnvalidatedLinkObject {
   validation: {
-    status: "valid" | "warning" | "error",
-    error?: string,
-    suggestion?: string
-  }
-}
-
-type LinkObject = UnvalidatedLinkObject | ValidatedLinkObject
-
-// Type guard
-function isValidated(link: LinkObject): link is ValidatedLinkObject {
-  return 'validation' in link
-}
-
-// Usage with type safety
-for (const link of links) {
-  if (isValidated(link) && link.validation.status === "error") {
-    console.log(link.validation.error)  // TypeScript knows this exists
+    status: 'valid' | 'warning' | 'error',
+    error?: string
   }
 }
 ```
-
-### Migration Impact
-
-**Files Requiring Updates**:
-1. `CitationValidator.js` - Return `{ summary, links }` instead of separate validation results
-2. `ContentExtractor.js` - Use enriched links from validator (remove redundant `getLinks()`)
-3. `MarkdownParser.js` - LinkObject schema unchanged (validation field added post-parse)
-4. `citation-manager.js` CLI - Handle enriched links for display/reporting
-5. Type definitions - Add discriminated union types for validated vs unvalidated links
-
-**Backward Compatibility**: Breaking change requiring coordinated update across validator → extractor → CLI
-
-### Implementation Priority
-
-**Timing**: Implement during US2.1 (Extraction Eligibility) to avoid architectural refactoring later
-**Risk**: Medium (requires coordinated changes across 3+ components)
-**Value**: High (eliminates fundamental duplication, cleaner architecture for Epic 2)
-
-### Impacted Documentation
-
-The following design documents require updates to reflect the Validation Enrichment Pattern:
-
-**Component Guides (Direct Impact)**:
-1. `CitationValidator Implementation Guide.md` - Output contract changes from separate ValidationResult to enriched LinkObjects
-2. `Content Extractor Implementation Guide.md` - Input contract changes to receive enriched links directly from validator
-3. `Markdown Parser Implementation Guide.md` - Clarify that `validation` property is added post-parse, not by parser
-
-**Architecture Documents (Direct Impact)**:
-4. `content-aggregation-architecture.md` - Data flow between validator → extractor changes
-~~5. `Architecture.md` - Component contracts and data models require updates~~
-
-**Feature Documents (Direct Impact)**:
-6. `content-aggregation-prd.md` - Validation output format specification changes
-~~7. `content-aggregation-architecture-whiteboard.md` - Contains the ADR itself, may need workflow updates~~
-
-**User Stories (Implementation Impact)**:
-8. `us2.1-implement-extraction-eligibility-strategy-pattern.md` - ADR states "implement during US2.1"
-9. `us1.7-implement-parsed-document-facade.md` - May affect facade's interaction with enriched links
-10. `us1.5-implement-cache-for-parsed-files.md` - Cache may need to handle enriched LinkObjects
-
-**Total**: 10 documents requiring updates to reflect the Validation Enrichment Pattern
 
 ---
 
-# `ContentExtractor` Component Technical Debt
+## Testing Strategy
 
-## Issue 1: Nested Content Duplication Detection (Deferred - US2.2a)
+The ContentExtractor component follows the workspace testing principle of **"Real Systems, Fake Fixtures"** - tests use real component instances with static test fixtures, avoiding mocks of application components.
 
-**Current Limitation**: The content deduplication strategy uses content-based hashing (SHA-256) to detect identical extracted content. However, it cannot detect when one piece of content is a substring of another, which occurs in the following scenario:
+### Unit Tests
 
-**Scenario**: H2 Section Containing H3 Subsections
-- **Link A** extracts an H2 section: `## Architecture`
-- **Link B** directly targets an H3 within that section: `### Component Design`
-- The H2 extraction includes all nested H3 content
-- The H3 extraction contains only the subsection content
-- **Result**: Both extractions stored separately in contentIndex despite H3 being substring of H2
+**Utility Functions**:
+- Anchor normalization utilities (`normalizeBlockId`, `decodeUrlAnchor`)
+  - Caret prefix removal for block references
+  - URL decoding for encoded anchors
+  - Null handling and graceful fallback for malformed encoding
+- Content ID generation (`generateContentId`)
+  - SHA-256 hash generation from content strings
+  - Truncation to 16 hexadecimal characters
+  - Deterministic output for identical inputs
 
-**Example**:
+**Eligibility Analysis**:
+- Strategy chain execution (`analyzeEligibility`)
+  - First non-null decision wins
+  - Precedence order respected (Stop → Force → Section → CliFlag)
+  - Fallback to ineligible when no strategies match
+  - Default ineligibility behavior
 
-```markdown
-## Architecture
-This section describes the architecture.
+**Individual Strategy Tests**:
+- Each strategy tested in isolation with mock link and CLI flag objects
+- Stop marker strategy blocks extraction when marker present
+- Force marker strategy enables extraction when marker present
+- Section link strategy enables extraction for anchored links by default
+- CLI flag strategy respects `--full-files` flag for full-file links
+- Null returns when strategy conditions not met (pass to next in chain)
 
-### Component Design
-Components follow these patterns...
+### Integration Tests
 
-### Data Flow
-Data flows through these stages...
-```
+**Component Collaboration**:
+- ContentExtractor orchestration with real ParsedFileCache, CitationValidator, ParsedDocument
+- Validation enrichment workflow (validation metadata flows through pipeline)
+- Cache integration (ParsedFileCache ensures single parse per target file)
+- Factory pattern integration (createContentExtractor with dependency injection)
 
-**Link Behavior**:
-- `[architecture](doc.md#Architecture)` → Extracts entire H2 section (includes both H3s)
-- `[components](doc.md#Component%20Design)` → Extracts only H3 subsection
+**Extraction Workflow Tests**:
+- Complete workflow execution: validation → eligibility → extraction → aggregation
+- Section extraction with real ParsedDocument facade
+  - Anchor normalization (URL decoding before extraction)
+  - Section content retrieval via `extractSection()`
+  - Content boundary detection (nested sections handled correctly)
+- Block extraction with real ParsedDocument facade
+  - Caret prefix removal before extraction
+  - Block content retrieval via `extractBlock()`
+  - Single-line extraction accuracy
+- Full-file extraction with real ParsedDocument facade
+  - Entire content retrieval via `extractFullContent()`
+  - No anchor normalization required
 
-**Current Behavior**: Two separate contentIndex entries created:
-- ContentId A: Full H2 content (large)
-- ContentId B: H3 subset (small, duplicate of portion of A)
+**Eligibility Precedence Tests**:
+- Marker precedence over CLI flags
+- Marker precedence over default behaviors
+- Multi-strategy interaction patterns
+- Complex precedence scenarios (stop marker on section link, force marker on full-file link)
 
-**Desired Future Behavior**: Detect that ContentId B is substring of ContentId A and either:
-1. Reference offset/range within ContentId A
-2. Store only ContentId A, mark ContentId B as derived
-3. Provide substring relationship in stats
+**Error Handling Tests**:
+- Validation errors result in skipped status
+- Missing target files result in error status with descriptive reasons
+- Missing anchors result in error status with descriptive reasons
+- Individual link failures don't block processing of remaining links
+- Internal links filtered before processing (scope='internal' excluded)
+
+### Deduplication Tests (US2.2a)
+
+**Hash Generation**:
+- Identical content produces identical hashes
+- Different content produces different hashes
+- Hash determinism (same input always produces same hash)
+- Hash truncation to 16 characters
+
+**Duplicate Detection**:
+- Multiple links extracting identical content stored once
+- Content index maps content IDs to deduplicated blocks
+- Content origins array tracks all source locations
+- First occurrence creates index entry, subsequent occurrences add origins
+
+**Statistics Calculation**:
+- Total links count accurate
+- Unique content count matches index size
+- Duplicate content detected count accurate
+- Tokens saved calculation (sum of deduplicated content lengths)
+- Compression ratio calculation correct
+
+**Output Structure**:
+- Processed links reference content via content ID
+- Skipped/error links have null content ID with failure reasons
+- All link metadata preserved (line, column, text, eligibility reason, status)
+- Stats object populated with aggregate counts
+
+### Acceptance Criteria Tests
+
+**US2.1 Tests** (Extraction Eligibility):
+- Default behaviors validated (section eligible, full-file ineligible without flag)
+- Marker overrides validated (force-extract, stop-extract-link)
+- CLI flag behavior validated (--full-files enables full-file extraction)
+- Strategy pattern implementation validated (each rule encapsulated)
+
+**US2.2 Tests** (Content Retrieval):
+- Validation enrichment consumed correctly
+- Eligibility filtering excludes invalid and ineligible links
+- Section extraction normalizes anchors correctly
+- Block extraction normalizes anchors correctly
+- Full-file extraction retrieves complete content
+- Internal link filtering (scope='internal' excluded)
+- Output structure matches contract (array of extraction results)
+
+**US2.2a Tests** (Deduplication):
+- Content-based hashing using SHA-256
+- Output structure organizes into three logical groups
+- Multiple identical extractions deduplicated correctly
+- Statistics include compression ratio
+- Intermediate structures remain internal (not exposed in public API)
+
+### End-to-End Tests
+
+**Complete Pipeline Validation**:
+- Source file with mixed link types (section, block, full-file, internal)
+- Marker-based overrides in real fixtures
+- Validation errors handled gracefully
+- Cache efficiency demonstrated (target files parsed once)
+- Output contract complete and correct
+
+**Test Principles Applied**:
+- BDD structure: Given-When-Then comments in all tests
+- Real Systems: No mocking of application components
+- Fake Fixtures: Static markdown files in test/fixtures directory
+- Integration over isolation: Prefer testing component collaboration
+- Acceptance criteria traceability: Tests reference US/AC numbers
+
+---
+
+## Architectural Decisions
+
+### ADR-CE01: Content-Based Hashing (Not Identity-Based)
+
+**Status**: Accepted (2025-10-25)
+
+**Context**: Need to deduplicate extracted content to minimize LLM token usage.
+
+**Decision**: Use SHA-256 hash of extracted content string as contentId, not `targetFile + anchor` identity.
+
+**Rationale**:
+- Catches duplicates even when different files contain identical text
+- Content-driven: same text = same hash regardless of source
+- Automatic detection without manual tracking
+- Collision risk negligible (2^64 possible values)
+
+**Consequences**:
+- ✅ More duplicates detected than identity-based approach
+- ✅ Automatic invalidation when content changes
+- ⚠️ Whitespace-sensitive (acceptable for MVP)
+- ⚠️ Cannot detect partial matches (documented limitation)
+
+### ADR-CE02: Anchor Normalization Location
+
+**Status**: Accepted (2025-10-22)
+
+**Context**: LinkObject contains URL-encoded anchors (`%20` for spaces) and `^` prefixes for blocks. ParsedDocument expects clean inputs.
+
+**Decision**: Perform normalization in `ContentExtractor.extractLinksContent()` before calling ParsedDocument methods.
+
+**Rationale**:
+- Keeps ParsedDocument API clean (Single Responsibility)
+- Decouples ParsedDocument from LinkObject format details (Dependency Abstraction)
+- Consolidates adaptation logic in orchestrator
+
+**Implementation**:
+- `decodeUrlAnchor()`: URL-decode before `extractSection()`
+- `normalizeBlockId()`: Remove `^` prefix before `extractBlock()`
+
+### ADR-CE03: Default Deduplication (No Backward Compatibility)
+
+**Status**: Accepted (2025-10-25)
+
+**Context**: Should deduplication be optional or default behavior?
+
+**Decision**: `OutgoingLinksExtractedContent` with deduplicated structure is THE ONLY public contract.
+
+**Rationale**:
+- Primary goal: minimize token usage (deduplication must be default)
+- Epic 2 cohesion: entire epic ships together, no incremental API stability needed
+- Simplicity: single output contract reduces complexity
+- Names as Contracts: `OutgoingLinksExtractedContent` describes WHAT (extracted content from outgoing links), not HOW (deduplicated)
+
+**Consequences**:
+- ✅ Optimized output by default
+- ✅ Single API surface to maintain
+- ⚠️ Breaking change if flat format exposed (mitigated: intermediate format never public)
+
+---
+
+## Known Limitations & Technical Debt
+
+### Issue 1: Nested Content Duplication Detection (Deferred)
+
+**Description**: Cannot detect when H3 subsection content is substring of parent H2 extraction.
+
+**Scenario**:
+- Link A extracts H2 section (includes nested H3 subsections)
+- Link B directly targets one H3 within that H2
+- Result: Two entries in contentIndex despite H3 being substring of H2
+
+**Impact**: 5-10% additional token usage in documents with many nested subsection links.
 
 **Why Deferred**:
-- Substring detection adds significant complexity (O(n²) comparisons or suffix tree construction)
-- Edge case handling (multiple overlapping substrings, partial matches)
-- MVP goal is exact duplicate detection, not partial content analysis
+- Substring detection requires O(n²) comparisons or suffix trees
+- MVP goal is exact duplicate detection
 - Token savings from exact duplicates provides majority of value
 
-**Workaround for MVP**: Accept that nested content creates separate entries. Document in stats that some duplicated content may exist within larger extractions.
+**Workaround**: Users should prefer linking to higher-level sections when context needed.
 
-**Mitigation Strategy**: Users should prefer linking to higher-level sections when context is needed, avoiding granular subsection links when parent section provides sufficient context.
+**Status**: Documented technical debt, low priority
+**Discovery**: 2025-10-25 during US2.2a design
 
-**Discovery Date**: 2025-10-25
-**Discovered During**: US2.2a design brainstorming
-**Priority**: Low (edge case, minimal impact on primary goal of token reduction)
-**Estimated Impact**: 5-10% additional token usage in documents with many nested subsection links
+### Issue 2: Strategy-Defined Extraction Markers (Future Enhancement)
+
+**Current Limitation**: Extraction markers (`%%force-extract%%`, `%%stop-extract-link%%`) hardcoded in MarkdownParser. Strategies cannot define custom markers.
+
+**Future Approach**: Strategies define markers via `getMarker()` method, ContentExtractor collects and passes to MarkdownParser.
+
+**Benefits**:
+- Strategies own their markers (co-location)
+- No parser modifications for new markers
+- Custom user strategies enabled
+
+**Status**: Deferred to future enhancement
+**Related**: [MarkdownParser Issue 5 - Hardcoded Extraction Marker Detection](Markdown%20Parser%20Implementation%20Guide.md#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20(MVP%20Tech%20Debt))
+
+---
+
+## Related Documentation
+
+- [Content Aggregation PRD - US2.2a](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%202.2a%20Implement%20Content%20Deduplication%20for%20ExtractionResults)
+- [Content Aggregation Architecture - Level 3 Component](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ContentExtractor)
+- [ParsedDocument Implementation Guide](ParsedDocument%20Implementation%20Guide.md)
+- [ParsedFileCache Implementation Guide](ParsedFileCache%20Implementation%20Guide.md)
+- [US2.2: Content Retrieval](../features/20251003-content-aggregation/user-stories/us2.2-implement-content-retrieval/us2.2-implement-content-retrieval.md)
+- [US2.2a Design Plan](../features/20251003-content-aggregation/user-stories/us2.2a-implement-content-deduplication/us2.2a-implement-content-deduplication-design-plan.md)
 
 ---
 
-## Issue 2: Strategy-Defined Extraction Markers (Future Enhancement)
-
-**Current MVP Limitation**: Extraction markers (`%%force-extract%%`, `%%stop-extract-link%%`) are hardcoded in MarkdownParser. Strategies cannot define custom markers, limiting extensibility for new markdown flavors or user-defined rules.
-
-**MVP Implementation (Current State)**:
-
-```javascript
-// Strategies check hardcoded marker values
-class ForceMarkerStrategy {
-  getDecision(link, cliFlags) {
-    // Can only check for markers that MarkdownParser already knows about
-    if (link.extractionMarker?.innerText === 'force-extract') {
-      return { eligible: true, reason: 'Force extraction marker' };
-    }
-    return null;
-  }
-}
-
-// MarkdownParser hardcodes: /\s*(%%(.+?)%%|<!--\s*(.+?)\s*-->)/
-```
-
-### Future Enhancement: Strategy Registration Pattern
-
-Strategies will define their marker patterns via `getMarker()` method, which ContentExtractor collects and passes to MarkdownParser during parsing.
-
-**Strategy Interface Update**:
-
-```javascript
-class ExtractionStrategy {
-  /**
-   * Define the extraction marker this strategy responds to
-   * @returns {string|null} Full marker string (e.g., '%%force-extract%%') or null if no marker
-   */
-  getMarker() {
-    return null; // Default: no marker
-  }
-
-  /**
-   * Evaluate eligibility based on link properties and CLI flags
-   * @param {LinkObject} link - Enriched link with extractionMarker property
-   * @param {Object} cliFlags - CLI flags
-   * @returns {Decision|null} Eligibility decision or null to pass to next strategy
-   */
-  getDecision(link, cliFlags) {
-    // Strategy logic
-  }
-}
-```
-
-**Concrete Strategy Implementation**:
-
-```javascript
-class ForceMarkerStrategy {
-  getMarker() {
-    return '%%force-extract%%';  // Strategy defines its marker
-  }
-
-  getDecision(link, cliFlags) {
-    // Check if parser found this strategy's marker
-    if (link.extractionMarker?.innerText === 'force-extract') {
-      return { eligible: true, reason: 'Force extraction marker' };
-    }
-    return null;
-  }
-}
-
-class StopMarkerStrategy {
-  getMarker() {
-    return '%%stop-extract-link%%';
-  }
-
-  getDecision(link, cliFlags) {
-    if (link.extractionMarker?.innerText === 'stop-extract-link') {
-      return { eligible: false, reason: 'Stop extraction marker' };
-    }
-    return null;
-  }
-}
-
-// Custom HTML comment strategy (user-defined)
-class HtmlForceMarkerStrategy {
-  getMarker() {
-    return '<!-- force-extract -->';  // Custom marker
-  }
-
-  getDecision(link, cliFlags) {
-    if (link.extractionMarker?.innerText === 'force-extract') {
-      return { eligible: true, reason: 'HTML comment forces extraction' };
-    }
-    return null;
-  }
-}
-```
-
-**ContentExtractor Orchestration**:
-
-```javascript
-class ContentExtractor {
-  constructor(strategies, parsedFileCache, citationValidator) {
-    this.strategies = strategies;
-    this.parsedFileCache = parsedFileCache;
-    this.citationValidator = citationValidator;
-  }
-
-  async extractLinksContent(sourceFilePath, cliFlags) {
-    // Collect marker patterns from all strategies
-    const markerPatterns = this.strategies
-      .map(strategy => strategy.getMarker())
-      .filter(marker => marker !== null);
-    // Result: ['%%force-extract%%', '%%stop-extract-link%%', '<!-- force-extract -->']
-
-    // Pass markers to validator, which forwards to parser
-    const { summary, links } = await this.citationValidator.validateFile(
-      sourceFilePath,
-      { markerPatterns }  // Future: validator passes to parser
-    );
-
-    // Rest of extraction logic...
-  }
-}
-```
-
-**MarkdownParser Integration** (requires parser extensibility - see [MarkdownParser Issue 5](Markdown%20Parser%20Implementation%20Guide.md#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20(MVP%20Tech%20Debt))):
-
-```javascript
-class MarkdownParser {
-  parseFile(filePath, options = {}) {
-    const { markerPatterns = [] } = options;
-
-    // Build regex from strategy-provided patterns
-    const markerRegex = this.buildMarkerRegex(markerPatterns);
-
-    // Scan for markers after links using strategy-defined patterns
-    const extractionMarkerMatch = remainingLine.match(markerRegex);
-    if (extractionMarkerMatch) {
-      linkObject.extractionMarker = {
-        fullMatch: extractionMarkerMatch[0],
-        innerText: this.extractInnerText(extractionMarkerMatch[0])
-      };
-    }
-  }
-
-  buildMarkerRegex(patterns) {
-    if (patterns.length === 0) {
-      // Fallback to hardcoded MVP patterns
-      return /\s*(%%(.+?)%%|<!--\s*(.+?)\s*-->)/;
-    }
-    // Build regex from strategy patterns (escape special chars, build alternation)
-    // Implementation details TBD
-  }
-}
-```
-
-**Benefits of Future Approach**:
-- ✅ **Strategies own their markers**: Marker definition co-located with decision logic
-- ✅ **No parser modifications for new markers**: Parser accepts patterns as configuration
-- ✅ **Custom user strategies**: Users can define `<!-- custom-marker -->` or other formats
-- ✅ **Clear contract**: `getMarker()` returns marker, `getDecision()` checks for it
-- ✅ **Backward compatible**: Null marker = strategy doesn't use markers (CLI flags, anchor types)
-
-**Implementation Dependencies**:
-1. **MarkdownParser extensibility** - Parser must accept custom annotation patterns (see MarkdownParser Issue 5)
-2. **CitationValidator marker forwarding** - Validator must pass markerPatterns to parser
-3. **Strategy interface update** - Add `getMarker()` to ExtractionStrategy interface
-4. **Factory pattern update** - Collect markers from strategies before instantiation
-
-**Discovery Date**: 2025-10-20
-**Discovered During**: ContentExtractor implementation guide development
-**Priority**: Medium (enables extensibility for custom markdown flavors; not blocking MVP)
-**Related Tech Debt**: [MarkdownParser Issue 5 - Hardcoded Extraction Marker Detection](Markdown%20Parser%20Implementation%20Guide.md#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20(MVP%20Tech%20Debt))
-
----

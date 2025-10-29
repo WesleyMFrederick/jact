@@ -57,8 +57,9 @@ This feature directly supports the CC Workflows vision by:
 | 2025-10-07 | 2.2     | Mark US1.5 as COMPLETE, update Technical Lead Feedback sections: Parser data contract RESOLVED (US1.5 Phase 1), US1.5 caching feedback IMPLEMENTED, Epic 2 feedback remains active for Stories 2.2-2.3             | Application Tech Lead                     |
 | 2025-10-19 | 2.3     | Mark US1.8 as COMPLETE - Validation Enrichment Pattern successfully implemented, all acceptance criteria validated, zero regressions confirmed (121/123 tests passing, 2 pre-existing failures unrelated to US1.8) | Application Tech Lead (Claude Sonnet 4.5) |
 | 2025-10-23 | 2.4     | Mark US2.2 as COMPLETE - Content retrieval implemented with ParsedDocument facade integration, zero regressions confirmed                                                                                          | Application Tech Lead (Claude Sonnet 4.5) |
-| 2025-10-23 | 2.5     | Add US2.2 AC15 - Filter out internal links (scope='internal') before processing to exclude them from ExtractionResult array                                                                                        | Application Tech Lead (Claude Sonnet 4.5) |
+| 2025-10-23 | 2.5     | Add US2.2 AC15 - Filter out internal links (scope='internal') before processing to exclude them from OutgoingLinksExtractedContent array                                                                                        | Application Tech Lead (Claude Sonnet 4.5) |
 | 2025-10-25 | 2.6     | Add US2.2a - Implement content deduplication using SHA-256 hashing to minimize token usage in LLM context. No backward compatibility required (Epic 2 cohesive unit)                                               | Application Tech Lead (Claude Sonnet 4.5) |
+| 2025-10-28 | 2.7     | Mark US2.2a as COMPLETE - Content deduplication via SHA-256 hashing, three-group output structure, compression statistics                                                                                           | Application Tech Lead (Claude Sonnet 4.5) |
 
 ---
 
@@ -332,14 +333,14 @@ _Status_: ✅ COMPLETE (2025-10-21)
 5. GIVEN an eligible link points to a section (`anchorType: "header"`), WHEN content retrieval executes, THEN the component SHALL use `parsedFileCache.resolveParsedFile()` to get the TARGET document, **normalize the anchor by URL-decoding it**, and call `parsedDoc.extractSection()` **with the decoded anchor text** to retrieve section content. ^US2-2AC5
 6. GIVEN an eligible link points to a block (`anchorType: "block"`), WHEN content retrieval executes, THEN the component SHALL **normalize the anchor by removing any leading `^` character** and call `parsedDoc.extractBlock()` **with the normalized block ID** to retrieve block content. ^US2-2AC6
 7. GIVEN an eligible link points to a full file (anchorType: null), WHEN content retrieval executes, THEN the component SHALL call `parsedDoc.extractFullContent()` to retrieve the entire file content. ^US2-2AC7
-8. WHEN content extraction is attempted for an eligible link, THEN the `extractLinksContent` method SHALL produce an `ExtractionResult` object for that link within its returned array. Each `ExtractionResult` SHALL contain the `sourceLink` (`LinkObject`), a `status` ('success', 'skipped', or 'error'), and either `successDetails` (with `decisionReason` and `extractedContent` if status is 'success') or `failureDetails` (with a `reason` string if status is 'skipped' or 'error'). ^US2-2AC8
-9. The `extractLinksContent()` method SHALL return a Promise resolving to an `array of ExtractionResult` objects. ^US2-2AC9
+8. WHEN content extraction is attempted for an eligible link, THEN the `extractLinksContent` method SHALL produce an `OutgoingLinksExtractedContent` object for that link within its returned array. Each `OutgoingLinksExtractedContent` SHALL contain the `sourceLink` (`LinkObject`), a `status` ('success', 'skipped', or 'error'), and either `successDetails` (with `decisionReason` and `extractedContent` if status is 'success') or `failureDetails` (with a `reason` string if status is 'skipped' or 'error'). ^US2-2AC8
+9. The `extractLinksContent()` method SHALL return a Promise resolving to an `array of OutgoingLinksExtractedContent` objects. ^US2-2AC9
 10. The `createContentExtractor()` factory function SHALL be updated to accept and inject `parsedFileCache` and `citationValidator` dependencies with optional override parameters for testing. ^US2-2AC10
 11. GIVEN the content retrieval implementation is complete, WHEN integration tests execute, THEN they SHALL validate the complete workflow using real **`ParsedFileCache`**, **`CitationValidator`**, and **ParsedDocument** instances per the "Real Systems, Fake Fixtures" principle. ^US2-2AC11
 12. GIVEN the complete ContentExtractor implementation, WHEN the full test suite executes, THEN all US2.1 tests (35+ tests) SHALL continue passing with zero regressions. ^US2-2AC12
 13. The `ParsedDocument.extractSection(headingText)` method SHALL be fully implemented using a 3-phase algorithm: (1) flatten token tree via recursive walk to locate target heading, (2) find section boundary by locating next same-or-higher level heading, (3) reconstruct content from token.raw properties. The method SHALL return the complete section content as a string, or null if heading not found. ^US2-2AC13
 14. The `ParsedDocument.extractBlock(anchorId)` method SHALL be fully implemented to find the block anchor by ID in the anchors array, validate the line index is within bounds, and extract the single line containing the block anchor. The method SHALL return the line content as a string, or null if block anchor not found or line index invalid. ^US2-2AC14
-15. GIVEN enriched links are returned from validation, WHEN `extractLinksContent()` processes links, THEN the component SHALL filter out links where `link.scope === 'internal'` before entering the processing loop, excluding them from the returned ExtractionResult array. ^US2-2AC15
+15. GIVEN enriched links are returned from validation, WHEN `extractLinksContent()` processes links, THEN the component SHALL filter out links where `link.scope === 'internal'` before entering the processing loop, excluding them from the returned OutgoingLinksExtractedContent array. ^US2-2AC15
 
 **Architecture Notes:**
 - AC13-AC14 are prerequisites for AC5-AC7: extraction methods must be implemented before ContentExtractor can retrieve content
@@ -348,7 +349,7 @@ _Status_: ✅ COMPLETE (2025-10-21)
 - Single service interface abstracts multi-step workflow from CLI
 
 _Depends On_: [Story 2.1: Implement Extraction Eligibility using Strategy Pattern](#Story%202.1%20Implement%20Extraction%20Eligibility%20using%20Strategy%20Pattern)
-_Enables_: [Story 2.2a: Implement Content Deduplication for ExtractionResults](#Story%202.2a%20Implement%20Content%20Deduplication%20for%20ExtractionResults)
+_Enables_: [Story 2.2a: Implement Content Deduplication for OutgoingLinksExtractedContents](#Story%202.2a%20Implement%20Content%20Deduplication%20for%20OutgoingLinksExtractedContents)
 _Functional Requirements_: [[#^FR5|FR5]], [[#^FR6|FR6]]
 _Non-Functional Requirements_: [[#^NFR5|NFR5]] (ParsedFileCache ensures single parse per file)
 _Architecture Reference_:
@@ -360,7 +361,7 @@ _Status_: ✅ COMPLETE (2025-10-23)
 
 ---
 
-### Story 2.2a: Implement Content Deduplication for ExtractionResults
+### Story 2.2a: Implement Content Deduplication for OutgoingLinksExtractedContents
 
 **As a** developer creating context packages for AI,
 **I want** the ContentExtractor to deduplicate identical extracted content using content-based hashing,
@@ -368,29 +369,24 @@ _Status_: ✅ COMPLETE (2025-10-23)
 
 #### Story 2.2a Acceptance Criteria
 
-1. The `ContentExtractor` SHALL internally deduplicate extracted content as part of the `extractLinksContent()` workflow, transforming intermediate extraction attempts into an optimized `ExtractionResult` structure. ^US2-2aAC1
-2. GIVEN an intermediate extraction attempt contains successfully extracted content, WHEN deduplication executes, THEN the system SHALL generate a content identifier using SHA-256 hashing of the `extractedContent` string, truncated to the first 16 hexadecimal characters. ^US2-2aAC2
-3. The `ExtractionResult` structure SHALL contain three top-level properties: `contentIndex` (object mapping contentId to content data), `links` (array of link references), and `stats` (aggregate statistics). ^US2-2aAC3
-4. GIVEN multiple intermediate extraction attempts contain identical `extractedContent` values, WHEN deduplication executes, THEN the content SHALL be stored once in `contentIndex` with all source metadata tracked in a `sources` array. ^US2-2aAC4
-5. Each entry in `contentIndex` SHALL include: `content` (extracted text), `contentLength` (character count), and `sources` (array of objects containing `targetFile`, `anchor`, `anchorType` for all links that produced this content). ^US2-2aAC5
-6. Each entry in the `links` array SHALL reference content via `contentId` and SHALL include: `sourceLine`, `sourceColumn`, `linkText`, `decisionReason`, and `status` from the intermediate extraction attempt. ^US2-2aAC6
-7. GIVEN deduplication is complete, WHEN the `stats` object is populated, THEN it SHALL include: `totalLinks` (count of all processed links), `uniqueContent` (count of contentIndex entries), `duplicateContentDetected` (links referencing duplicate content), and `tokensSaved` (sum of deduplicated content lengths). ^US2-2aAC7
-8. GIVEN an intermediate extraction attempt has `status: "skipped"` or `status: "error"`, WHEN deduplication processes it, THEN the link SHALL be included in the `links` array with `contentId: null` and `reason` from `failureDetails`. ^US2-2aAC8
-9. The `extractLinksContent()` method SHALL return `ExtractionResult` with deduplicated content structure as the only public output format. The intermediate flat array format is an internal implementation detail. ^US2-2aAC9
-10. GIVEN the deduplication implementation is complete, WHEN integration tests execute, THEN they SHALL validate correct hash generation, duplicate detection, stats calculation, and preservation of all link metadata. ^US2-2aAC10
+1. The ContentExtractor SHALL deduplicate extracted content internally during the extraction workflow, returning an optimized output structure that stores identical content only once. ^US2-2aAC1
+2. GIVEN extracted content is successfully retrieved, THEN the system SHALL generate a content identifier using SHA-256 hashing of the content string, truncated to the first 16 hexadecimal characters. ^US2-2aAC2
+3. The output structure SHALL organize extracted content into three logical groups: an index mapping content IDs to deduplicated content blocks, a report of processed links with their extraction outcomes, and aggregate statistics summarizing the results. ^US2-2aAC3
+4. GIVEN multiple links extract identical content, THEN the content SHALL be stored once with all source locations tracked in an array that records the file path, anchor, and anchor type for each occurrence. ^US2-2aAC4
+5. Each deduplicated content entry SHALL include the extracted text, its character count, and metadata about all source locations that produced this content (including target file paths, anchors, and anchor types). ^US2-2aAC5
+6. Each processed link entry SHALL reference its extracted content via content ID and SHALL include source location metadata (line number, column number, link text, eligibility reason, and extraction status). ^US2-2aAC6
+7. The output statistics SHALL include counts of total processed links, unique content blocks, duplicate content detected, estimated tokens saved through deduplication, and compression ratio achieved. ^US2-2aAC7
+8. GIVEN a link extraction attempt fails or is skipped, THEN the link SHALL be included in the processed links report with a null content reference and a reason explaining the failure. ^US2-2aAC8
+9. The extractLinksContent() method SHALL return deduplicated output as the only public contract format. Any intermediate non-deduplicated structures are internal implementation details. ^US2-2aAC9
+10. GIVEN the deduplication implementation is complete, WHEN integration tests execute, THEN they SHALL validate correct hash generation, duplicate detection, statistics calculation, and preservation of all link metadata. ^US2-2aAC10
 
 _Depends On_: [Story 2.2: Implement Content Retrieval in ContentExtractor](#Story%202.2%20Implement%20Content%20Retrieval%20in%20ContentExtractor)
 _Enables_: [Story 2.3: Implement `extract` Command](#Story%202.3%20Implement%20extract%20Command)
 _Functional Requirements_: [[#^FR11|FR11]] (Content deduplication)
 _Non-Functional Requirements_: [[#^NFR7|NFR7]] (Token usage optimization)
-_Architecture Reference_:
-- [Content Extractor Implementation Guide - Content Deduplication Strategy](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Content%20Deduplication%20Strategy)
-- [US2.2a Design Plan](user-stories/us2.2a-implement-content-deduplication/us2.2a-implement-content-deduplication-design-plan.md)
-
-_Status_: Pending
-
-> [!info] **Architecture Decision: Names as Contracts**
-> Per **Names as Contracts** principle, the public contract remains `ExtractionResult` (not `DeduplicatedExtractionResult`). Deduplication is the default behavior of `extractLinksContent()`, not an optional variant. The intermediate flat array format used during processing is an internal implementation detail with a private name (`_LinkExtractionAttempt`).
+_Status_: ✅ COMPLETE (2025-10-28)
+#### Story 2.2a Impacted Components
+- [Citation Manager.ContentExtractor](content-aggregation-architecture.md#Citation%20Manager.ContentExtractor) %% force-extract %%
 
 > [!warning] **Technical Lead Architecture Notes**
 > **No backward compatibility**: Epic 2 is a cohesive unit; flat array format is replaced entirely
@@ -413,13 +409,13 @@ _Status_: Pending
    - `--full-files`: Enable extraction of full-file links without markers (optional, default: false)
    ^US2-3AC2
 3. WHEN the `extract` command executes, THEN it SHALL instantiate `ContentExtractor` via the `createContentExtractor()` factory with default production dependencies (parsedFileCache, citationValidator, eligibilityStrategies). ^US2-3AC3
-4. The command SHALL call `contentExtractor.extractLinksContent(sourceFilePath, cliFlags)` and receive the `array of ExtractionResult` objects. ^US2-3AC4
+4. The command SHALL call `contentExtractor.extractLinksContent(sourceFilePath, cliFlags)` and receive the `array of OutgoingLinksExtractedContent` objects. ^US2-3AC4
 5. GIVEN the `extract` command executes, WHEN validation errors or warnings are encountered, THEN they SHALL be reported to the user (e.g., to stderr) clearly indicating which citations have issues. ^US2-3AC5
 6. GIVEN validation has been reported, WHEN the command proceeds to content extraction, THEN it SHALL skip any links marked with `validation.status === "error"` and extract content only for valid or eligible links. ^US2-3AC6
-7. GIVEN extraction has completed successfully with results, WHEN output is ready, THEN the command SHALL output the raw `array of ExtractionResult` objects (e.g., as valid JSON to stdout), detailing the outcome (`status`, `successDetails` or `failureDetails`) for each processed link. The command SHALL exit with status code 0 if at least one link resulted in `status: 'success'`, even if other links resulted in `skipped` or `error`. It SHALL exit non-zero only if no links resulted in successful extraction. ^US2-3AC7
+7. GIVEN extraction has completed successfully with results, WHEN output is ready, THEN the command SHALL output the raw `array of OutgoingLinksExtractedContent` objects (e.g., as valid JSON to stdout), detailing the outcome (`status`, `successDetails` or `failureDetails`) for each processed link. The command SHALL exit with status code 0 if at least one link resulted in `status: 'success'`, even if other links resulted in `skipped` or `error`. It SHALL exit non-zero only if no links resulted in successful extraction. ^US2-3AC7
 8. GIVEN extraction fails completely (source file not found, no eligible content to extract, or severe validation errors prevent any extraction), WHEN this condition is detected, THEN the command SHALL exit with a non-zero status code to signal failure. ^US2-3AC8
 9. The `extract` command SHALL preserve all existing `validate` command functionality, maintaining backward compatibility with current validation workflows. ^US2-3AC9
-10. GIVEN the `extract` command is implemented, WHEN CLI integration tests execute with real fixture files, THEN they SHALL validate the complete end-to-end workflow from source file → validation → eligibility → extraction → successful output of the raw `ExtractionResult` array (e.g., as valid JSON to stdout). ^US2-3AC10
+10. GIVEN the `extract` command is implemented, WHEN CLI integration tests execute with real fixture files, THEN they SHALL validate the complete end-to-end workflow from source file → validation → eligibility → extraction → successful output of the raw `OutgoingLinksExtractedContent` array (e.g., as valid JSON to stdout). ^US2-3AC10
 11. The citation-manager help text SHALL document the new `extract` command with usage examples showing common workflows. ^US2-3AC11
 
 **Deferred Scope Note:** Output formatting (originally AC5), file writing (originally AC6, AC7), and the `--output` option (originally AC2) have been deferred. See the 'Future Work' section in the [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Future%20Work) for details.
@@ -435,7 +431,7 @@ _Status_: Pending
 > [!note] **Technical Lead Feedback**: CLI Design Decision
 > The `extract` command is a separate command (not a flag on `validate`) because extraction is a distinct operation with different inputs (requires --output), different outputs (aggregated content vs validation report), and different workflow (validation is an internal prerequisite step, as shown in the ContentExtractor Workflow diagram).
 
-_Depends On_: [Story 2.2a: Implement Content Deduplication for ExtractionResults](#Story%202.2a%20Implement%20Content%20Deduplication%20for%20ExtractionResults)
+_Depends On_: [Story 2.2a: Implement Content Deduplication for OutgoingLinksExtractedContents](#Story%202.2a%20Implement%20Content%20Deduplication%20for%20OutgoingLinksExtractedContents)
 _Functional Requirements_: [[#^FR6|FR6]], [[#^FR7|FR7]] (updated: dedicated command vs flag)
 _Architecture Workflow Reference_: [ContentExtractor Workflow: Component Interaction Diagram](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
 _User Story Link_: [us2.3-implement-extract-command](user-stories/us2.3-implement-extract-command/us2.3-implement-extract-command.md)

@@ -74,7 +74,7 @@ npm run citation:extract <file-path> [-- --options]
 - `ParsedDocument` - Extracts sections, blocks, and full content
 
 **Output**:
-- JSON array of `ExtractionResult` objects to stdout
+- JSON array of `OutgoingLinksExtractedContent` objects to stdout
 - Error messages to stderr (extraction continues despite individual failures)
 - Exit code: 0 (success), 1 (error)
 
@@ -361,7 +361,7 @@ const results = await extractor.extractLinksContent(file, options);
 console.log(JSON.stringify(results, null, 2));
 ```
 
-**Error Handling**: Individual link failures produce `ExtractionResult` objects with `status: 'error'`, allowing batch processing to continue
+**Error Handling**: Individual link failures produce `OutgoingLinksExtractedContent` objects with `status: 'error'`, allowing batch processing to continue
 
 **Integration Point**: See [CLI Integration in Content Extractor Guide](Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
 
@@ -460,7 +460,7 @@ const results = await extractor.extractLinksContent(sourceFilePath, cliFlags);
 1. Validate source file via `CitationValidator` (returns enriched LinkObjects)
 2. Filter eligible links using strategy chain
 3. Extract content from target documents via `ParsedDocument` facade
-4. Aggregate `ExtractionResult` objects with status and details
+4. Aggregate `OutgoingLinksExtractedContent` objects with status and details
 
 **CLI Responsibility**: Final I/O only (output JSON to stdout, errors to stderr)
 

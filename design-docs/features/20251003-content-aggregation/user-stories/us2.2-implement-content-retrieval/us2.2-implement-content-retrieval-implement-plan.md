@@ -4,7 +4,7 @@
 
 **Goal:** Extend ContentExtractor to orchestrate complete extraction workflow: validation → eligibility → content retrieval → aggregation
 
-**Architecture:** ContentExtractor accepts ParsedFileCache and CitationValidator dependencies via constructor, internally calls validator to discover enriched links, filters by eligibility using existing strategy chain from US2.1, retrieves content from target documents via ParsedDocument facade methods (extractSection/extractBlock/extractFullContent), and returns ExtractionResult array with status/details for each link.
+**Architecture:** ContentExtractor accepts ParsedFileCache and CitationValidator dependencies via constructor, internally calls validator to discover enriched links, filters by eligibility using existing strategy chain from US2.1, retrieves content from target documents via ParsedDocument facade methods (extractSection/extractBlock/extractFullContent), and returns OutgoingLinksExtractedContent array with status/details for each link.
 
 **Tech Stack:** Node.js ESM, Vitest, existing citation-manager components (CitationValidator, ParsedFileCache, ParsedDocument)
 
@@ -255,14 +255,14 @@ Create primary operation file that orchestrates validation → eligibility → c
 Create test in `tools/citation-manager/test/content-extractor.test.js`:
 
 ```javascript
-it("should provide extractLinksContent method returning Promise of ExtractionResult array", async () => {
+it("should provide extractLinksContent method returning Promise of OutgoingLinksExtractedContent array", async () => {
  // Given: ContentExtractor with real dependencies via factory
  const extractor = CREATE_CONTENT_EXTRACTOR_VIA_FACTORY
 
  // When: extractLinksContent called with source file and flags
  const result = await extractor.extractLinksContent('source-file.md', { fullFiles: false })
 
- // Then: Returns array of ExtractionResult objects
+ // Then: Returns array of OutgoingLinksExtractedContent objects
  expect(Array.isArray(result)).toBe(true)
  // Validation: Each result has required structure
  IF result.length > 0 THEN
@@ -369,7 +369,7 @@ FOR EACH link IN enrichedLinks DO
    failureDetails: { reason: `Extraction failed: ${error.message}` }
   })
 
-// AC9: Return Promise<ExtractionResult[]>
+// AC9: Return Promise<OutgoingLinksExtractedContent[]>
 RETURN results
 ```
 
@@ -449,7 +449,7 @@ Expected: PASS (validates AC3-AC9)
 
 ```bash
 git add tools/citation-manager/src/core/ContentExtractor/extractLinksContent.js tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js tools/citation-manager/test/content-extractor.test.js tools/citation-manager/test/fixtures/us2.2/
-git checkpoint "claude-sonnet-4-5" "task-3-extract-links-content" "Create extractLinksContent.js as primary operation file (verb-noun naming). Orchestrates validation → eligibility → content retrieval workflow. Internally calls CitationValidator.validateFile() to get enriched links. Filters by validation status and eligibility using strategy chain. Extracts content via ParsedDocument methods (extractSection/extractBlock/extractFullContent). Returns ExtractionResult array with success/skipped/error statuses. Add delegation method in ContentExtractor.js (thin wrapper pattern). Add comprehensive workflow tests with mixed link types. Follows Action-Based File Organization (operation extraction). US2.2 AC2, AC3, AC4, AC5, AC6, AC7, AC8, AC9"
+git checkpoint "claude-sonnet-4-5" "task-3-extract-links-content" "Create extractLinksContent.js as primary operation file (verb-noun naming). Orchestrates validation → eligibility → content retrieval workflow. Internally calls CitationValidator.validateFile() to get enriched links. Filters by validation status and eligibility using strategy chain. Extracts content via ParsedDocument methods (extractSection/extractBlock/extractFullContent). Returns OutgoingLinksExtractedContent array with success/skipped/error statuses. Add delegation method in ContentExtractor.js (thin wrapper pattern). Add comprehensive workflow tests with mixed link types. Follows Action-Based File Organization (operation extraction). US2.2 AC2, AC3, AC4, AC5, AC6, AC7, AC8, AC9"
 ```
 
 ---
@@ -698,7 +698,7 @@ describe("US2.2 Acceptance Criteria Validation", () => {
  });
 
  it("AC2: should provide extractLinksContent public method", async () => {
-  // Validate method exists and returns Promise<ExtractionResult[]>
+  // Validate method exists and returns Promise<OutgoingLinksExtractedContent[]>
  });
 
  it("AC3: should internally call citationValidator.validateFile", async () => {
@@ -721,11 +721,11 @@ describe("US2.2 Acceptance Criteria Validation", () => {
   // Validate parsedDoc.extractFullContent()
  });
 
- it("AC8: should return ExtractionResult with correct structure", async () => {
+ it("AC8: should return OutgoingLinksExtractedContent with correct structure", async () => {
   // Validate { sourceLink, status, successDetails/failureDetails }
  });
 
- it("AC9: should return Promise resolving to ExtractionResult array", async () => {
+ it("AC9: should return Promise resolving to OutgoingLinksExtractedContent array", async () => {
   // Validate return type
  });
 
@@ -865,7 +865,7 @@ Edit `Content Extractor Implementation Guide.md`:
 
 1. **Validate Public Contracts section**:
    - Verify `extractLinksContent(sourceFilePath, cliFlags)` signature matches implementation
-   - Confirm `ExtractionResult` structure matches actual return type
+   - Confirm `OutgoingLinksExtractedContent` structure matches actual return type
    - Update dependency injection parameters if changed
 
 2. **Update File Structure section**:
@@ -923,8 +923,8 @@ Complete implementation of US2.2 with all 12 acceptance criteria:
 - AC5: Extracts section content with URL-decoded anchors
 - AC6: Extracts block content with normalized anchors (^ prefix removed)
 - AC7: Extracts full file content
-- AC8: Returns ExtractionResult with sourceLink, status, and details
-- AC9: Returns Promise<ExtractionResult[]>
+- AC8: Returns OutgoingLinksExtractedContent with sourceLink, status, and details
+- AC9: Returns Promise<OutgoingLinksExtractedContent[]>
 - AC10: Factory wires all dependencies correctly
 - AC11: Integration tests use real components (no mocks)
 - AC12: Zero regressions - all US2.1 tests pass

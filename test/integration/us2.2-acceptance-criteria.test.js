@@ -34,7 +34,7 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		// Given: ContentExtractor instance
 		const extractor = createContentExtractor();
 
-		// Then: Method exists and returns Promise<ExtractionResult[]>
+		// Then: Method exists and returns Promise<OutgoingLinksExtractedContent>
 		expect(extractor.extractLinksContent).toBeDefined();
 		expect(typeof extractor.extractLinksContent).toBe("function");
 
@@ -45,9 +45,11 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		// Then: Returns Promise
 		expect(result).toBeInstanceOf(Promise);
 
-		// Then: Promise resolves to ExtractionResult array
+		// Then: Promise resolves to OutgoingLinksExtractedContent object
 		const results = await result;
-		expect(Array.isArray(results)).toBe(true);
+		expect(results).toHaveProperty('extractedContentBlocks');
+		expect(results).toHaveProperty('outgoingLinksReport');
+		expect(results).toHaveProperty('stats');
 	});
 
 	it("AC3: should internally call citationValidator.validateFile", async () => {
@@ -56,7 +58,8 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
 
 		// When: extractLinksContent is called
-		const results = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const output = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Results contain enriched links with validation metadata
 		expect(results.length).toBeGreaterThan(0);
@@ -75,7 +78,8 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
 
 		// When: extractLinksContent is called without fullFiles flag
-		const results = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const output = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Links with validation errors are skipped
 		const errorLinks = results.filter(r =>
@@ -102,7 +106,8 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
 
 		// When: extractLinksContent is called
-		const results = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const output = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Section link with URL-encoded anchor is processed
 		const sectionLink = results.find(r =>
@@ -112,7 +117,10 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 		expect(sectionLink).toBeDefined();
 		expect(sectionLink.status).toBe("success");
-		expect(sectionLink.successDetails.extractedContent).toContain("This is the content");
+		// Content is now in extractedContentBlocks, verify via contentId
+		expect(sectionLink.contentId).toBeDefined();
+		const contentBlock = output.extractedContentBlocks[sectionLink.contentId];
+		expect(contentBlock.content).toContain("This is the content");
 	});
 
 	it("AC6: should extract block content with normalized anchor", async () => {
@@ -121,7 +129,8 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
 
 		// When: extractLinksContent is called
-		const results = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const output = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Block link with '^' prefix is processed (normalized internally)
 		const blockLink = results.find(r =>
@@ -131,7 +140,10 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 		expect(blockLink).toBeDefined();
 		expect(blockLink.status).toBe("success");
-		expect(blockLink.successDetails.extractedContent).toContain("This is a block reference");
+		// Content is now in extractedContentBlocks, verify via contentId
+		expect(blockLink.contentId).toBeDefined();
+		const contentBlock = output.extractedContentBlocks[blockLink.contentId];
+		expect(contentBlock.content).toContain("This is a block reference");
 	});
 
 	it("AC7: should extract full file content", async () => {
@@ -140,7 +152,8 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
 
 		// When: extractLinksContent is called with fullFiles flag
-		const results = await extractor.extractLinksContent(sourceFile, { fullFiles: true });
+		const output = await extractor.extractLinksContent(sourceFile, { fullFiles: true });
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Full file link successfully extracted
 		const fullFileLink = results.find(r =>
@@ -150,8 +163,11 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 		expect(fullFileLink).toBeDefined();
 		expect(fullFileLink.status).toBe("success");
-		expect(fullFileLink.successDetails.extractedContent).toContain("Target Document");
-		expect(fullFileLink.successDetails.extractedContent).toContain("Section to Extract");
+		// Content is now in extractedContentBlocks, verify via contentId
+		expect(fullFileLink.contentId).toBeDefined();
+		const contentBlock = output.extractedContentBlocks[fullFileLink.contentId];
+		expect(contentBlock.content).toContain("Target Document");
+		expect(contentBlock.content).toContain("Section to Extract");
 	});
 
 	it("AC8: should return ExtractionResult with correct structure", async () => {
@@ -160,7 +176,8 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
 
 		// When: extractLinksContent is called
-		const results = await extractor.extractLinksContent(sourceFile, { fullFiles: true });
+		const output = await extractor.extractLinksContent(sourceFile, { fullFiles: true });
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Each result has correct structure
 		for (const result of results) {
@@ -169,12 +186,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 			expect(result).toHaveProperty("status");
 			expect(["success", "skipped", "error"]).toContain(result.status);
 
-			// Success results have successDetails with decisionReason and extractedContent
+			// Success results have contentId and eligibilityReason
 			if (result.status === "success") {
-				expect(result).toHaveProperty("successDetails");
-				expect(result.successDetails).toHaveProperty("decisionReason");
-				expect(result.successDetails).toHaveProperty("extractedContent");
-				expect(typeof result.successDetails.extractedContent).toBe("string");
+				expect(result).toHaveProperty("contentId");
+				expect(result).toHaveProperty("eligibilityReason");
+				expect(typeof result.contentId).toBe("string");
+				// Verify content exists in extractedContentBlocks
+				expect(output.extractedContentBlocks[result.contentId]).toBeDefined();
+				expect(typeof output.extractedContentBlocks[result.contentId].content).toBe("string");
 			}
 
 			// Failure results have failureDetails with reason
@@ -197,13 +216,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		// Then: Returns Promise
 		expect(result).toBeInstanceOf(Promise);
 
-		// Then: Promise resolves to array of ExtractionResult objects
-		const results = await result;
-		expect(Array.isArray(results)).toBe(true);
-		expect(results.length).toBeGreaterThan(0);
+		// Then: Promise resolves to OutgoingLinksExtractedContent object with processedLinks array
+		const output = await result;
+		expect(output).toHaveProperty("outgoingLinksReport");
+		expect(Array.isArray(output.outgoingLinksReport.processedLinks)).toBe(true);
+		expect(output.outgoingLinksReport.processedLinks.length).toBeGreaterThan(0);
 
 		// Validate each element is an ExtractionResult
-		for (const item of results) {
+		for (const item of output.outgoingLinksReport.processedLinks) {
 			expect(item).toHaveProperty("sourceLink");
 			expect(item).toHaveProperty("status");
 		}
@@ -233,7 +253,8 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
 
 		// When: Complete workflow executes with real components
-		const results = await extractor.extractLinksContent(sourceFile, { fullFiles: true });
+		const output = await extractor.extractLinksContent(sourceFile, { fullFiles: true });
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Real ParsedFileCache used (file parsing and caching)
 		expect(extractor.parsedFileCache).toBeInstanceOf(ParsedFileCache);
@@ -351,7 +372,8 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
 
 		// When: extractLinksContent is called
-		const results = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const output = await extractor.extractLinksContent(sourceFile, { fullFiles: false });
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Internal links (scope === 'internal') should NOT appear in results
 		const internalLinks = results.filter(r => r.sourceLink.scope === "internal");

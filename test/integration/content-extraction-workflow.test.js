@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { createContentExtractor } from "../../src/factories/componentFactory.js";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { createContentExtractor } from "../../src/factories/componentFactory.js";
 
 /**
  * Integration tests for Content Extraction Workflow
@@ -21,9 +21,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Complete workflow executes
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Results contain expected extraction outcomes
 		expect(results.length).toBeGreaterThan(0);
@@ -44,9 +45,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Extract content with section links
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Section link returns success with extracted content
 		const sectionResult = results.find(
@@ -58,7 +60,9 @@ describe("Content Extraction Workflow Integration", () => {
 
 		expect(sectionResult).toBeDefined();
 		expect(sectionResult.status).toBe("success");
-		expect(sectionResult.successDetails.extractedContent).toContain(
+		expect(sectionResult.contentId).toBeDefined();
+		const contentBlock = output.extractedContentBlocks[sectionResult.contentId];
+		expect(contentBlock.content).toContain(
 			"This is the content that should be extracted",
 		);
 	});
@@ -72,9 +76,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Extract content with block links
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Block link returns success with extracted content
 		const blockResult = results.find(
@@ -86,12 +91,12 @@ describe("Content Extraction Workflow Integration", () => {
 
 		expect(blockResult).toBeDefined();
 		expect(blockResult.status).toBe("success");
-		expect(blockResult.successDetails.extractedContent).toContain(
+		expect(blockResult.contentId).toBeDefined();
+		const blockContent = output.extractedContentBlocks[blockResult.contentId];
+		expect(blockContent.content).toContain(
 			"This is a block reference that can be extracted.",
 		);
-		expect(blockResult.successDetails.extractedContent).toContain(
-			"^block-ref-1",
-		);
+		expect(blockContent.content).toContain("^block-ref-1");
 	});
 
 	it("should skip full file link when fullFiles flag disabled", async () => {
@@ -103,9 +108,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Extract content with fullFiles=false
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Full file link is skipped due to eligibility
 		const fullFileResult = results.find(
@@ -128,9 +134,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Extract content with fullFiles=true
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: true,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Full file link successfully extracted
 		const fullFileResult = results.find(
@@ -142,15 +149,12 @@ describe("Content Extraction Workflow Integration", () => {
 
 		expect(fullFileResult).toBeDefined();
 		expect(fullFileResult.status).toBe("success");
-		expect(fullFileResult.successDetails.extractedContent).toContain(
-			"# Target Document",
-		);
-		expect(fullFileResult.successDetails.extractedContent).toContain(
-			"Section to Extract",
-		);
-		expect(fullFileResult.successDetails.extractedContent).toContain(
-			"^block-ref-1",
-		);
+		expect(fullFileResult.contentId).toBeDefined();
+		const fullFileContent =
+			output.extractedContentBlocks[fullFileResult.contentId];
+		expect(fullFileContent.content).toContain("# Target Document");
+		expect(fullFileContent.content).toContain("Section to Extract");
+		expect(fullFileContent.content).toContain("^block-ref-1");
 	});
 
 	it("should handle validation errors gracefully", async () => {
@@ -162,9 +166,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Extract content from file with errors
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Validation errors result in skipped status
 		const errorResults = results.filter(
@@ -185,9 +190,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Extract content (multiple links reference target-doc.md)
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Multiple attempts to extract from same target document
 		// Validates ParsedFileCache prevents re-parsing same file
@@ -209,9 +215,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Extract content
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Each result has correct structure
 		for (const result of results) {
@@ -220,9 +227,11 @@ describe("Content Extraction Workflow Integration", () => {
 			expect(["success", "skipped", "error"]).toContain(result.status);
 
 			if (result.status === "success") {
-				expect(result).toHaveProperty("successDetails");
-				expect(result.successDetails).toHaveProperty("extractedContent");
-				expect(result.successDetails).toHaveProperty("decisionReason");
+				expect(result).toHaveProperty("contentId");
+				expect(result).toHaveProperty("eligibilityReason");
+				expect(typeof result.contentId).toBe("string");
+				// Verify content exists in extractedContentBlocks
+				expect(output.extractedContentBlocks[result.contentId]).toBeDefined();
 			} else {
 				expect(result).toHaveProperty("failureDetails");
 				expect(result.failureDetails).toHaveProperty("reason");
@@ -239,9 +248,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Extract content
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: true,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Results contain enriched link metadata from validator
 		const successResult = results.find((r) => r.status === "success");
@@ -262,9 +272,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		// When: Complete workflow executes
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Workflow phases are validated through result patterns
 		// Phase 1: Validation (all links have validation metadata)
@@ -282,20 +293,24 @@ describe("Content Extraction Workflow Integration", () => {
 		).toBe(true);
 
 		// Phase 3: Content retrieval (attempts extraction for eligible links)
-		expect(
-			results.some((r) => ["success", "error"].includes(r.status)),
-		).toBe(true);
+		expect(results.some((r) => ["success", "error"].includes(r.status))).toBe(
+			true,
+		);
 	});
 
 	it("should extract actual content for sections, blocks, and full files", async () => {
 		// Given: Real components via factory (no mocks)
 		const extractor = createContentExtractor();
-		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
+		const sourceFile = join(
+			__dirname,
+			"../fixtures/us2.2/mixed-links-source.md",
+		);
 
 		// When: Complete workflow executes
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: false,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Results contain actual extracted content (not null/errors)
 		expect(results.length).toBeGreaterThan(0);
@@ -309,15 +324,12 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 		expect(sectionResult).toBeDefined();
 		expect(sectionResult.status).toBe("success");
-		expect(sectionResult.successDetails.extractedContent).toContain(
-			"## Section to Extract",
-		);
-		expect(sectionResult.successDetails.extractedContent).toContain(
-			"Key points",
-		);
-		expect(sectionResult.successDetails.extractedContent).toContain(
-			"### Nested Subsection",
-		);
+		expect(sectionResult.contentId).toBeDefined();
+		const sectionContent =
+			output.extractedContentBlocks[sectionResult.contentId];
+		expect(sectionContent.content).toContain("## Section to Extract");
+		expect(sectionContent.content).toContain("Key points");
+		expect(sectionContent.content).toContain("### Nested Subsection");
 
 		// Validation: Block link extracted with actual content
 		const blockResult = results.find(
@@ -328,12 +340,10 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 		expect(blockResult).toBeDefined();
 		expect(blockResult.status).toBe("success");
-		expect(blockResult.successDetails.extractedContent).toContain(
-			"This is a block reference",
-		);
-		expect(blockResult.successDetails.extractedContent).toContain(
-			"^block-ref-1",
-		);
+		expect(blockResult.contentId).toBeDefined();
+		const blockContent2 = output.extractedContentBlocks[blockResult.contentId];
+		expect(blockContent2.content).toContain("This is a block reference");
+		expect(blockContent2.content).toContain("^block-ref-1");
 
 		// Validation: Full-file link skipped (no --full-files flag)
 		const fullFileResult = results.find(
@@ -348,12 +358,16 @@ describe("Content Extraction Workflow Integration", () => {
 	it("should extract full file content when --full-files flag enabled", async () => {
 		// Given: ContentExtractor with --full-files flag
 		const extractor = createContentExtractor();
-		const sourceFile = join(__dirname, "../fixtures/us2.2/mixed-links-source.md");
+		const sourceFile = join(
+			__dirname,
+			"../fixtures/us2.2/mixed-links-source.md",
+		);
 
 		// When: Execute with fullFiles flag
-		const results = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractor.extractLinksContent(sourceFile, {
 			fullFiles: true,
 		});
+		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Full-file link extracted successfully
 		const fullFileResult = results.find(
@@ -363,14 +377,11 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 		expect(fullFileResult).toBeDefined();
 		expect(fullFileResult.status).toBe("success");
-		expect(fullFileResult.successDetails.extractedContent).toContain(
-			"# Target Document",
-		);
-		expect(fullFileResult.successDetails.extractedContent).toContain(
-			"Section to Extract",
-		);
-		expect(fullFileResult.successDetails.extractedContent).toContain(
-			"^block-ref-1",
-		);
+		expect(fullFileResult.contentId).toBeDefined();
+		const fullFileContent2 =
+			output.extractedContentBlocks[fullFileResult.contentId];
+		expect(fullFileContent2.content).toContain("# Target Document");
+		expect(fullFileContent2.content).toContain("Section to Extract");
+		expect(fullFileContent2.content).toContain("^block-ref-1");
 	});
 });
