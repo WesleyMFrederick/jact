@@ -31,7 +31,9 @@ describe("Content Deduplication - Basic Logic", () => {
 
 		// Then: Identical content stored once (deduplication confirmed)
 		// Given: Test fixture has 3 links extracting same content
-		const contentIds = Object.keys(result.extractedContentBlocks);
+		const contentIds = Object.keys(result.extractedContentBlocks).filter(
+			(key) => !key.startsWith("_"),
+		);
 
 		// Verification: Single content block despite multiple links
 		// Decision: Count unique content blocks vs total links
@@ -57,7 +59,7 @@ describe("Content Deduplication - Index Structure", () => {
 
 		// Then: Each index entry has complete structure
 		// Verification: All required fields present per AC5
-		const contentIds = Object.keys(result.extractedContentBlocks);
+		const contentIds = Object.keys(result.extractedContentBlocks).filter(key => !key.startsWith('_'));
 		expect(contentIds.length).toBeGreaterThan(0);
 
 		const firstBlock = result.extractedContentBlocks[contentIds[0]];
@@ -119,7 +121,9 @@ describe("Content Deduplication - Statistics: Unique Content", () => {
 
 		// Then: uniqueContent equals number of keys in extractedContentBlocks
 		// Verification: Unique count matches index size (AC7)
-		const uniqueCount = Object.keys(result.extractedContentBlocks).length;
+		const uniqueCount = Object.keys(result.extractedContentBlocks).filter(
+			(key) => !key.startsWith("_"),
+		).length;
 		expect(result.stats.uniqueContent).toBe(uniqueCount);
 
 		// Given: 3 links extracting identical content = 1 unique
@@ -216,7 +220,7 @@ describe("Content Deduplication - Statistics: Tokens Saved", () => {
 
 		// Then: tokensSaved equals sum of duplicate content lengths
 		// Pattern: If content is 100 chars and appears 3 times, saved = 200 (2 duplicates × 100)
-		const contentIds = Object.keys(result.extractedContentBlocks);
+		const contentIds = Object.keys(result.extractedContentBlocks).filter(key => !key.startsWith('_'));
 		const contentBlock = result.extractedContentBlocks[contentIds[0]];
 		const expectedSaved =
 			contentBlock.contentLength * result.stats.duplicateContentDetected;
@@ -243,9 +247,11 @@ describe("Content Deduplication - Statistics: Compression Ratio", () => {
 
 		// Then: Calculate expected compression ratio
 		// Pattern: Sum all contentLength values in extractedContentBlocks
-		const totalContentSize = Object.values(
+		const totalContentSize = Object.entries(
 			result.extractedContentBlocks,
-		).reduce((sum, block) => sum + block.contentLength, 0);
+		)
+			.filter(([key]) => !key.startsWith("_"))
+			.reduce((sum, [, block]) => sum + block.contentLength, 0);
 		const tokensSaved = result.stats.tokensSaved;
 
 		// Verification: Compression ratio formula (AC7)
@@ -399,10 +405,9 @@ describe("US2.2a Acceptance - Compression Ratio", () => {
 		expect(result.stats).toHaveProperty("compressionRatio");
 
 		// Verification: Ratio calculated per formula: saved / (total + saved)
-		const totalSize = Object.values(result.extractedContentBlocks).reduce(
-			(sum, block) => sum + block.contentLength,
-			0,
-		);
+		const totalSize = Object.entries(result.extractedContentBlocks)
+			.filter(([key]) => !key.startsWith("_"))
+			.reduce((sum, [, block]) => sum + block.contentLength, 0);
 		const saved = result.stats.tokensSaved;
 		const expectedRatio = saved / (totalSize + saved);
 
@@ -466,7 +471,9 @@ describe("US2.2a Acceptance - SHA-256 Content Hashing", () => {
 
 		// Then: Content deduplicated despite different file paths
 		// Verification: Content-based hashing, not identity-based (AC2)
-		const contentIds = Object.keys(result.extractedContentBlocks);
+		const contentIds = Object.keys(result.extractedContentBlocks).filter(
+			(key) => !key.startsWith("_"),
+		);
 
 		// Given: 2 different files with identical section content
 		const processedCount = result.outgoingLinksReport.processedLinks.filter(
@@ -504,8 +511,12 @@ describe("Content Deduplication - Edge Cases", () => {
 		expect(result.stats.compressionRatio).toBe(0);
 		expect(Number.isNaN(result.stats.compressionRatio)).toBe(false);
 
-		// Verification: No content extracted
-		expect(Object.keys(result.extractedContentBlocks).length).toBe(0);
+		// Verification: No content extracted (only metadata fields)
+		expect(
+			Object.keys(result.extractedContentBlocks).filter(
+				(key) => !key.startsWith("_"),
+			).length,
+		).toBe(0);
 		expect(result.stats.tokensSaved).toBe(0);
 		expect(result.stats.uniqueContent).toBe(0);
 	});
@@ -535,7 +546,9 @@ describe("US2.2a Acceptance - Complete Pipeline", () => {
 		expect(result).toHaveProperty("stats");
 
 		// Verification: Deduplication working (AC1, AC4)
-		const uniqueBlocks = Object.keys(result.extractedContentBlocks).length;
+		const uniqueBlocks = Object.keys(result.extractedContentBlocks).filter(
+			(key) => !key.startsWith("_"),
+		).length;
 		const totalLinks = result.stats.totalLinks;
 		expect(uniqueBlocks).toBeLessThan(totalLinks); // Deduplication occurred
 
@@ -546,7 +559,7 @@ describe("US2.2a Acceptance - Complete Pipeline", () => {
 		expect(result.stats.compressionRatio).toBeGreaterThan(0);
 
 		// Verification: Content blocks exist in extractedContentBlocks (AC5)
-		const firstBlockId = Object.keys(result.extractedContentBlocks)[0];
+		const firstBlockId = Object.keys(result.extractedContentBlocks).filter(key => !key.startsWith('_'))[0];
 		const firstBlock = result.extractedContentBlocks[firstBlockId];
 		expect(firstBlock).toHaveProperty("content");
 		expect(firstBlock).toHaveProperty("contentLength");

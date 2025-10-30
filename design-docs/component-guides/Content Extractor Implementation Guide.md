@@ -191,6 +191,12 @@ The output structure uses an indexed format to minimize token usage through cont
   /** Index mapping contentId to unique content blocks extracted from target files. */
   extractedContentBlocks: {
 
+    /** Reserved metadata field: total JSON size of extractedContentBlocks object.
+     * Used by CLI to check against BASH_MAX_OUTPUT_LENGTH before displaying output.
+     * Calculated as JSON.stringify(extractedContentBlocks).length before adding this field.
+     * Actual final size ~30-40 chars larger (acceptable for threshold checking). */
+    _totalContentCharacterLength: number,
+
     /** contentId is a Hash */
     [contentId: string]: {
       content: string, // The extracted markdown content (stored once).

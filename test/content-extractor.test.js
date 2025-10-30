@@ -1,7 +1,7 @@
 // tools/citation-manager/test/content-extractor.test.js
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ContentExtractor } from "../src/core/ContentExtractor/ContentExtractor.js";
 import { SectionLinkStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
 import { StopMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
@@ -185,5 +185,182 @@ describe("ContentExtractor", () => {
 		const fullFileContent =
 			output.extractedContentBlocks[fullFileResult.contentId];
 		expect(fullFileContent.content).toContain("# Target Document");
+	});
+
+	describe("_totalContentCharacterLength metadata field", () => {
+		it("should include _totalContentCharacterLength field in extractedContentBlocks", async () => {
+			// Given: Source file with content links
+			const sourceFile = path.join(
+				__dirname,
+				"fixtures/us2.2/mixed-links-source.md",
+			);
+			const extractor = createContentExtractor();
+
+			// When: extractLinksContent executed
+			const output = await extractor.extractLinksContent(sourceFile, {
+				fullFiles: false,
+			});
+
+			// Then: _totalContentCharacterLength field exists in extractedContentBlocks
+			expect(output.extractedContentBlocks).toHaveProperty(
+				"_totalContentCharacterLength",
+			);
+		});
+
+		it("should have _totalContentCharacterLength as numeric and positive", async () => {
+			// Given: Source file with content links
+			const sourceFile = path.join(
+				__dirname,
+				"fixtures/us2.2/mixed-links-source.md",
+			);
+			const extractor = createContentExtractor();
+
+			// When: extractLinksContent executed
+			const output = await extractor.extractLinksContent(sourceFile, {
+				fullFiles: false,
+			});
+
+			// Then: Field value is numeric and positive
+			const fieldValue = output.extractedContentBlocks._totalContentCharacterLength;
+			expect(typeof fieldValue).toBe("number");
+			expect(fieldValue).toBeGreaterThan(0);
+			expect(Number.isInteger(fieldValue)).toBe(true);
+		});
+
+		it("should approximate actual JSON size within 30-50 characters", async () => {
+			// Given: Source file with content links
+			const sourceFile = path.join(
+				__dirname,
+				"fixtures/us2.2/mixed-links-source.md",
+			);
+			const extractor = createContentExtractor();
+
+			// When: extractLinksContent executed
+			const output = await extractor.extractLinksContent(sourceFile, {
+				fullFiles: false,
+			});
+
+			// Then: Field value approximates actual JSON size within acceptable margin
+			const reportedSize = output.extractedContentBlocks._totalContentCharacterLength;
+			const actualSize = JSON.stringify(output.extractedContentBlocks).length;
+			const difference = actualSize - reportedSize;
+
+			// The reported size should be smaller than actual (calculated before adding field)
+			expect(difference).toBeGreaterThan(0);
+			// The difference should be within 30-50 characters
+			expect(difference).toBeGreaterThanOrEqual(30);
+			expect(difference).toBeLessThanOrEqual(50);
+		});
+
+		it("should return _totalContentCharacterLength of 2 for empty extraction", async () => {
+			// Given: Source file with no eligible links
+			const mockCache = {
+				resolveParsedFile: async () => ({
+					extractFullContent: () => "content",
+				}),
+			};
+			const mockValidator = { validateFile: async () => ({ links: [] }) };
+			const strategies = [];
+			const extractor = new ContentExtractor(
+				strategies,
+				mockCache,
+				mockValidator,
+			);
+
+			// When: extractLinksContent called with no links
+			const output = await extractor.extractLinksContent("source-file.md", {
+				fullFiles: false,
+			});
+
+			// Then: _totalContentCharacterLength equals 2 (empty object "{}")
+			expect(output.extractedContentBlocks._totalContentCharacterLength).toBe(2);
+		});
+
+		it("should calculate _totalContentCharacterLength within acceptable margin", async () => {
+			// Given: Multiple content blocks for realistic size calculation
+			const enrichedLinks = [
+				{
+					scope: "cross-document",
+					anchorType: "header",
+					validation: { status: "valid" },
+					target: {
+						path: { absolute: "/test/fixtures/multi.md" },
+						anchor: "Section One",
+					},
+					fullMatch: "[[multi.md#Section One]]",
+					line: 1,
+					column: 0,
+				},
+				{
+					scope: "cross-document",
+					anchorType: "header",
+					validation: { status: "valid" },
+					target: {
+						path: { absolute: "/test/fixtures/multi.md" },
+						anchor: "Section Two",
+					},
+					fullMatch: "[[multi.md#Section Two]]",
+					line: 2,
+					column: 0,
+				},
+			];
+
+			const mockParsedFileCache = {
+				resolveParsedFile: vi.fn().mockResolvedValue({
+					extractSection: (anchor) => {
+						if (anchor === "Section One") return "Content for section one";
+						if (anchor === "Section Two") return "Content for section two";
+					},
+				}),
+			};
+
+			const mockStrategies = [
+				{
+					getDecision: () => ({ eligible: true, reason: "Test eligible" }),
+				},
+			];
+
+			const extractor = new ContentExtractor(
+				mockStrategies,
+				mockParsedFileCache,
+				null,
+			);
+
+			// When: Extract content
+			const result = await extractor.extractContent(enrichedLinks, {});
+
+			// Then: Calculate actual final JSON size
+			const actualJsonSize = JSON.stringify(
+				result.extractedContentBlocks,
+			).length;
+			const reportedSize =
+				result.extractedContentBlocks._totalContentCharacterLength;
+
+			// Reported size should be less than actual (doesn't include the field itself)
+			expect(reportedSize).toBeLessThan(actualJsonSize);
+
+			// Difference should be ~30-50 characters (the field overhead)
+			const difference = actualJsonSize - reportedSize;
+			expect(difference).toBeGreaterThanOrEqual(20);
+			expect(difference).toBeLessThanOrEqual(60);
+		});
+
+		it("should place _totalContentCharacterLength as first key (AC3: diagnostic visibility)", async () => {
+			// Given: Source file with content links
+			const sourceFile = path.join(
+				__dirname,
+				"fixtures/us2.2/mixed-links-source.md",
+			);
+			const extractor = createContentExtractor();
+
+			// When: extractLinksContent executed
+			const output = await extractor.extractLinksContent(sourceFile, {
+				fullFiles: false,
+			});
+
+			// Then: _totalContentCharacterLength appears as first key in extractedContentBlocks
+			const keys = Object.keys(output.extractedContentBlocks);
+			expect(keys[0]).toBe("_totalContentCharacterLength");
+		});
 	});
 });

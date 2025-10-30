@@ -90,16 +90,18 @@ This feature directly supports the CC Workflows vision by:
 > _Resolution_: Parser Output Contract schema validated and documented via [US1.5 Phase 1](user-stories/us1.5-implement-cache-for-parsed-files/us1.5-implement-cache-for-parsed-files.md#Phase%201%20MarkdownParser.Output.DataContract%20Validation%20&%20Documentation). Base schema includes `{ filePath, content, tokens, links, headings, anchors }` with LinkObject and AnchorObject structures.
 > _Resolution Date_: 2025-10-07
 > _Epic 2 Note_: Base schema sufficient for ContentExtractor. May require minor extensions for content extraction metadata if Story 2.1 analysis identifies gaps.
-<!-- -->
-> [!warning] **Technical Lead Feedback**: Parser-extractor interaction model design required (Epic 2)
-> _Architecture Impact_: The interaction model between the parser and the new extractor component needs to be designed, including the specific data structures they will use to communicate.
-> _Status_: Active - Required before Story 2.2 implementation
-> _Relevant Architecture Principles_: [black-box-interfaces](../../../../../design-docs/Architecture%20Principles.md#^black-box-interfaces), [data-model-first](../../../../../design-docs/Architecture%20Principles.md#^data-model-first), [single-responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility)
-<!-- -->
-> [!warning] **Technical Lead Feedback**: CLI interface design decision needed (Epic 2)
-> _Architecture Impact_: Research and a design decision are needed to confirm if adding a feature flag to the `validate` command is the correct long-term CLI interface, or if a new, dedicated `extract` command would be more intuitive and extensible.
-> _Status_: Active - Required before Story 2.3 implementation
-> _Relevant Architecture Principles_: [simplicity-first](../../../../../design-docs/Architecture%20Principles.md#^simplicity-first), [follow-conventions](../../../../../design-docs/Architecture%20Principles.md#^follow-conventions), [immediate-understanding](../../../../../design-docs/Architecture%20Principles.md#^immediate-understanding), [extension-over-modification](../../../../../design-docs/Architecture%20Principles.md#^extension-over-modification)
+
+> [!success] **Technical Lead Feedback**: Parser-extractor interaction model ✅ MOSTLY RESOLVED
+> _Resolution_: Facade pattern successfully implemented with ParsedDocument providing black-box interface over MarkdownParser.Output.DataContract. ContentExtractor interacts exclusively through facade methods (extractSection, extractBlock, extractFullContent). Architecture principles (black-box-interfaces, data-model-first, single-responsibility) validated through code analysis.
+> _Resolution Date_: 2025-10-30
+> _Known Issue_: One facade violation in extractLinksContent.js:95-97 accessing `_data.headings` directly. Fix pending: remove heading level lookup and rely on extractSection's internal Phase 0 lookup.
+> _Architecture Impact Realized_: Clean separation with MarkdownParser → ParsedDocument facade → ContentExtractor. ParsedFileCache wraps all parser output before exposure to consumers.
+
+> [!success] **Technical Lead Feedback**: CLI interface design ✅ RESOLVED
+> _Resolution_: Dedicated `extract` command implemented with subcommand architecture (`extract links`, `extract header`). Commander.js pattern provides clear semantic separation, extensibility, and intuitive interface. All four architecture principles validated.
+> _Resolution Date_: 2025-10-30
+> _Implementation_: citation-manager.js:810-890 implements parent command with subcommands. Strategy pattern + Factory pattern enable extension without CLI modification.
+> _Architecture Impact Realized_: Validation and extraction cleanly separated. Subcommand pattern allows incremental feature additions (extract file, extract blocks) without modifying core commands.
 
 ---
 

@@ -1,3 +1,4 @@
+
 // tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js
 import { analyzeEligibility } from "./analyzeEligibility.js";
 import { extractLinksContent as extractLinksContentOp } from "./extractLinksContent.js";
@@ -203,6 +204,13 @@ export class ContentExtractor {
 					? (1 - actualTokens / totalPotentialTokens) * 100
 					: 0;
 		}
+
+		// Add JSON size metadata for output length checking (AC3: metadata first for diagnostic visibility)
+		const jsonSize = JSON.stringify(deduplicatedOutput.extractedContentBlocks).length;
+		deduplicatedOutput.extractedContentBlocks = {
+			_totalContentCharacterLength: jsonSize,
+			...deduplicatedOutput.extractedContentBlocks
+		};
 
 		return deduplicatedOutput;
 	}

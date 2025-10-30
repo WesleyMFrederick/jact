@@ -91,17 +91,11 @@ export async function extractLinksContent(
 			if (link.anchorType === "header") {
 				// AC5: Section
 				const decodedAnchor = decodeUrlAnchor(link.target.anchor);
-				// Find the heading level from the target document's headings
-				const heading = targetDoc._data.headings.find(
-					(h) => h.text === decodedAnchor,
-				);
-				if (!heading) {
+				// extractSection handles heading level lookup internally (Phase 0)
+				extractedContent = targetDoc.extractSection(decodedAnchor);
+				if (!extractedContent) {
 					throw new Error(`Heading not found: ${decodedAnchor}`);
 				}
-				extractedContent = targetDoc.extractSection(
-					decodedAnchor,
-					heading.level,
-				);
 			} else if (link.anchorType === "block") {
 				// AC6: Block
 				const normalizedAnchor = normalizeBlockId(link.target.anchor);
@@ -157,6 +151,13 @@ export async function extractLinksContent(
 			? 0
 			: deduplicatedOutput.stats.tokensSaved /
 				(totalContentSize + deduplicatedOutput.stats.tokensSaved);
+
+	// Add JSON size metadata for output length checking (AC3: metadata first for diagnostic visibility)
+	const jsonSize = JSON.stringify(deduplicatedOutput.extractedContentBlocks).length;
+	deduplicatedOutput.extractedContentBlocks = {
+		_totalContentCharacterLength: jsonSize,
+		...deduplicatedOutput.extractedContentBlocks
+	};
 
 	// Decision: Return deduplicated output as only public contract (AC9)
 	return deduplicatedOutput;

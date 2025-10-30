@@ -33,7 +33,7 @@ Worktree: `../cc-workflows-us2.3/`
 
 ---
 
-## Task 1: LinkObjectFactory - createHeaderLink() Basic Structure
+## Task 1 - LinkObjectFactory - createHeaderLink() Basic Structure
 
 ### Files
 - `tools/citation-manager/src/factories/LinkObjectFactory.js` (CREATE)
@@ -140,7 +140,7 @@ Use `create-git-commit` skill to create commit
 
 ---
 
-## Task 2: LinkObjectFactory - createHeaderLink() Path Normalization
+## Task 2 - LinkObjectFactory - createHeaderLink() Path Normalization
 
 ### Files
 - `tools/citation-manager/test/unit/factories/link-object-factory.test.js` (MODIFY)
@@ -218,7 +218,7 @@ Use `create-git-commit` skill
 
 ---
 
-## Task 3: LinkObjectFactory - createFileLink() Basic Structure
+## Task 3 - LinkObjectFactory - createFileLink() Basic Structure
 
 ### Files
 - `tools/citation-manager/test/unit/factories/link-object-factory.test.js` (MODIFY)
