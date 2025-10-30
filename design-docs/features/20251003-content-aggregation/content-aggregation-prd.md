@@ -519,8 +519,9 @@ _User Story Link_:
 _Status_: Pending
 
 #### Required Reading
-- [CLI Orchestrator Implementation Guide](../../component-guides/CLI%20Orchestrator%20Implementation%20Guide.md)
-- [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
+- [Extract Header Command Contract (US2.4)](../../component-guides/CLI%20Orchestrator%20Implementation%20Guide.md#Extract%20Header%20Command%20Contract%20(US2.4))
+- [Extract Header Command Psuedocode (US2.4)](../../component-guides/CLI%20Orchestrator%20Implementation%20Guide.md#Extract%20Header%20Command%20Psuedocode%20(US2.4))
+- [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md) %% force-extract %%
 - [Epic 2 Whiteboard - LinkObjectFactory](#LinkObjectFactory%20(Level%204%20Code%20Detail%20of%20CLI%20Orchestrator))
 - [Citation Validator.Public Contracts](../../component-guides/CitationValidator%20Implementation%20Guide.md#Public%20Contracts)
 - [Architecture Guidance: Directory and Naming Conventions](../../../../../design-docs/Architecture%20-%20Baseline.md#Level%204%20Code)

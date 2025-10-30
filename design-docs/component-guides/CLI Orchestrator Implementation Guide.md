@@ -240,7 +240,7 @@ Exit Codes:
   1  No eligible links or all extractions failed
 ```
 
-#### Extract Header Command (US2.4)
+#### Extract Header Command Contract (US2.4)
 
 ```bash
 citation-manager extract header <target-file> "<header-name>" [options]
@@ -540,7 +540,7 @@ class CitationManager is
       process.exitCode = 1
 ```
 
-### Extract Header Command (US2.4)
+### Extract Header Command Psuedocode (US2.4)
 
 ```tsx
   // Extracts specific header content from target file

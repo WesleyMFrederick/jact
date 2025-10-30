@@ -70,3 +70,23 @@ describe('CitationManager - extractLinks() Phase 3', () => {
     consoleSpy.mockRestore();
   });
 });
+
+describe('CitationManager - extractHeader()', () => {
+  it('should orchestrate synthetic link creation, validation, and extraction', async () => {
+    // Fixture: Use US2.3 plan as realistic test document
+    const targetFile = join(process.cwd(), 'tools/citation-manager/design-docs/features/20251003-content-aggregation/user-stories/us2.3-implement-extract-links-subcommand/us2.3-implement-extract-links-subcommand-implement-plan.md');
+    const headerName = 'Task 1: LinkObjectFactory - createHeaderLink() Basic Structure';
+
+    // Given: CitationManager with real components
+    const manager = new CitationManager();
+
+    // When: Extract specific header from target file
+    const result = await manager.extractHeader(targetFile, headerName, {});
+
+    // Then: Result contains extracted content for specified header
+    // Verification: OutgoingLinksExtractedContent structure returned
+    expect(result).toHaveProperty('extractedContentBlocks');
+    expect(result).toHaveProperty('outgoingLinksReport');
+    expect(result.stats.uniqueContent).toBeGreaterThan(0);
+  });
+});

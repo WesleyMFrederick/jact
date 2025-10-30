@@ -30,6 +30,7 @@ import {
 	createMarkdownParser,
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
+import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 
 /**
  * Main application class for citation management operations
@@ -324,6 +325,85 @@ export class CitationManager {
 
 		} catch (error) {
 			console.error('ERROR:', error.message);
+			process.exitCode = 2;
+		}
+	}
+
+	/**
+	 * Extract specific header content from target file using synthetic link pattern.
+	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 *
+	 * Pattern: Four-phase orchestration workflow
+	 * 1. Create synthetic LinkObject via factory
+	 * 2. Validate synthetic link via validator
+	 * 3. Extract content via extractor (if valid)
+	 * 4. Return OutgoingLinksExtractedContent structure
+	 *
+	 * @param {string} targetFile - Path to markdown file containing header
+	 * @param {string} headerName - Exact header text to extract
+	 * @param {Object} options - CLI options (scope)
+	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 */
+	async extractHeader(targetFile, headerName, options) {
+		try {
+			// Decision: Build file cache if --scope provided
+			if (options.scope) {
+				await this.fileCache.buildCache(options.scope);
+			}
+
+			// --- Phase 1: Synthetic Link Creation ---
+			// Pattern: Use factory to create unvalidated LinkObject from CLI parameters
+			const factory = new LinkObjectFactory();
+			const syntheticLink = factory.createHeaderLink(targetFile, headerName);
+
+			// --- Phase 2: Validation ---
+			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
+			// Integration: CitationValidator returns validation result
+			const validationResult = await this.validator.validateSingleCitation(syntheticLink, targetFile);
+
+			// Extract validation metadata from result
+			const validation = {
+				status: validationResult.status,
+			};
+
+			if (validationResult.error) {
+				validation.error = validationResult.error;
+			}
+
+			if (validationResult.suggestion) {
+				validation.suggestion = validationResult.suggestion;
+			}
+
+			if (validationResult.pathConversion) {
+				validation.pathConversion = validationResult.pathConversion;
+			}
+
+			// Add validation property to link object
+			syntheticLink.validation = validation;
+
+			// Decision: Check validation status before extraction (error handling)
+			if (syntheticLink.validation.status === "error") {
+				// Boundary: Error output to stderr
+				console.error("Validation failed:", syntheticLink.validation.error);
+				if (syntheticLink.validation.suggestion) {
+					console.error("Suggestion:", syntheticLink.validation.suggestion);
+				}
+				process.exitCode = 1;
+				return;
+			}
+
+			// --- Phase 3: Extraction ---
+			// Pattern: Extract content from validated link
+			// Integration: ContentExtractor processes single-link array
+			const result = await this.contentExtractor.extractContent([syntheticLink], options);
+
+			// --- Phase 4: Return ---
+			// Decision: Return result for CLI to output (CLI handles stdout)
+			return result;
+
+		} catch (error) {
+			// Decision: System errors use exit code 2
+			console.error("ERROR:", error.message);
 			process.exitCode = 2;
 		}
 	}
@@ -757,6 +837,53 @@ extractCmd
 		try {
 			await manager.extractLinks(sourceFile, options);
 		} catch (error) {
+			console.error("ERROR:", error.message);
+			process.exitCode = 2;
+		}
+	});
+
+extractCmd
+	.command("header")
+	.description("Extract specific header content from target file")
+	.argument("<target-file>", "Markdown file to extract from")
+	.argument("<header-name>", "Exact header text to extract")
+	.option("--scope <folder>", "Limit file resolution scope")
+	.addHelpText("after", `
+Examples:
+  # Extract specific section from design document
+  $ citation-manager extract header plan.md "Task 1: Implementation"
+
+  # Extract with scope limiting
+  $ citation-manager extract header docs/guide.md "Overview" --scope ./docs
+
+Exit Codes:
+  0  Header extracted successfully
+  1  Header not found or validation failed
+  2  System error (file not found, permission denied)
+
+Notes:
+  - Header name must match exactly (case-sensitive)
+  - Extracts complete section until next same-level heading
+  - Output is JSON OutgoingLinksExtractedContent structure
+  `)
+	.action(async (targetFile, headerName, options) => {
+		// Integration: Create CitationManager instance
+		const manager = new CitationManager();
+
+		try {
+			// Pattern: Delegate to CitationManager orchestration method
+			const result = await manager.extractHeader(targetFile, headerName, options);
+
+			// Decision: Output JSON to stdout if extraction succeeded
+			if (result) {
+				// Boundary: JSON output to stdout
+				console.log(JSON.stringify(result, null, 2));
+				process.exitCode = 0;
+			}
+			// Note: Error exit codes set by extractHeader() method
+
+		} catch (error) {
+			// Decision: Unexpected errors use exit code 2
 			console.error("ERROR:", error.message);
 			process.exitCode = 2;
 		}
