@@ -163,7 +163,7 @@ This header exists and should be fixable.
 		const targetFile = join(tmpdir(), "test-target.md");
 
 		writeFileSync(testFile, testContent);
-		writeFileSync(targetContent, targetContent);
+		writeFileSync(targetFile, targetContent);
 
 		try {
 			// Run auto-fix
