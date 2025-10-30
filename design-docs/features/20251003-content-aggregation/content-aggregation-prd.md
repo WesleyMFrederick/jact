@@ -479,7 +479,7 @@ _Status_: ✅ COMPLETE (2025-10-30)
 
 ---
 
-### Story 2.4: Implement `extract header` Subcommand
+### Story 2.4 Implement `extract header` Subcommand
 
 **As a** developer creating context packages for AI,
 **I want** a new `extract header` subcommand that extracts content from a specific header in a target file,
@@ -532,7 +532,7 @@ _Status_: Pending
 
 ---
 
-### Story 2.5: Implement `extract file` Subcommand
+### Story 2.5 - Implement `extract file` Subcommand
 
 **As a** developer creating context packages for AI,
 **I want** a subcommand to extract an entire file's content directly,
@@ -557,7 +557,7 @@ The CLI implements synthetic link creation for full-file extraction using LinkOb
 
 The synthetic LinkObject contains: `{ linkType, scope, anchorType: null, target: { path }, validation: null }`. The `fullFiles: true` flag reuses existing CliFlagStrategy without hardcoding extraction markers in CLI. See [Epic 2 Whiteboard - LinkObjectFactory](#LinkObjectFactory%20(Level%204%20Code%20Detail%20of%20CLI%20Orchestrator)) for factory contracts.
 
-> [!warning] **Technical Lead Feedback**: Implementation Approach for extract file
+> [!note] **Technical Lead Feedback**: Implementation Approach for extract file
 >
 > **Suggested Approach**: Create synthetic link structure with `anchorType: null` and pass `{ fullFiles: true }` flag to ContentExtractor. This enables extraction through existing CliFlagStrategy without introducing marker coupling.
 >
@@ -571,7 +571,7 @@ _Status_: Pending
 
 ---
 
-### Story 2.6: Add Comprehensive Help Documentation to CLI Commands
+### Story 2.6 Add Comprehensive Help Documentation to CLI Commands
 
 **As a** user of the citation-manager CLI,
 **I want** comprehensive help documentation for each command,
