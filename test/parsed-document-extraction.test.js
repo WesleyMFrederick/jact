@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import ParsedDocument from '../src/ParsedDocument.js';
+import { MarkdownParser } from '../src/MarkdownParser.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 describe('ParsedDocument Content Extraction', () => {
   describe('extractSection', () => {
@@ -62,6 +69,23 @@ describe('ParsedDocument Content Extraction', () => {
       // Then: Includes all content to end of file
       expect(section).toContain('## Last');
       expect(section).toContain('Final content');
+    });
+
+    it('should extract section by heading text only without level parameter', async () => {
+      // Given: Real-world document parsed with MarkdownParser
+      const fixturePath = join(__dirname, 'fixtures', 'content-aggregation-prd.md');
+      const parser = new MarkdownParser({ readFileSync });
+      const parserOutput = await parser.parseFile(fixturePath);
+      const doc = new ParsedDocument(parserOutput);
+
+      // When: Extract section using only heading text (no level parameter)
+      const section = doc.extractSection('Overview (tl;dr)');
+
+      // Then: Should extract the correct section
+      expect(section).not.toBeNull();
+      expect(section).toContain('## Overview (tl;dr)');
+      expect(section).toContain('Citation Manager'); // Content from the section
+      expect(section).not.toContain('## Goals'); // Next level 2 section
     });
   });
 

@@ -19,12 +19,12 @@ The `CitationValidator` is a class that depends on the `ParsedFileCache` (for re
 ```mermaid
 classDiagram
     direction LR
-  
+
     class CitationValidator {
         -parsedFileCache: ParsedFileCacheInterface
         -fileCache: FileCacheInterface
         +validateFile(filePath: string): Promise~ValidationResult~
-        -validateSingleLink(link: Link): Promise~object~
+        +validateSingleCitation(link: LinkObject): Promise~EnrichedLinkObject~
         -validateAnchorExists(link: Link): Promise~object~
     }
 
@@ -127,8 +127,38 @@ The component's constructor accepts two dependencies:
 1. An implementation of a [`ParsedFileCache interface`](ParsedFileCache%20Implementation%20Guide.md#Public%20Contracts) that returns `ParsedDocument` facade instances
 2. An implementation of a [`FileCache interface`](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.File%20Cache)
 
-The primary public method, `validateFile()`, accepts one argument:
-1. **`filePath`** (string): The absolute path to the source markdown file to validate.
+#### Public Method: `validateFile(filePath)`
+
+The primary public method for validating all citations in a source document.
+
+**Input:**
+- **`filePath`** (string): The absolute path to the source markdown file to validate
+
+**Output:**
+- **ValidationResult** (`{ summary, links }`): Enriched links with aggregate summary statistics
+
+#### Public Method: `validateSingleCitation(link, contextFile?)`
+
+Public method for validating a single LinkObject. Added to support CLI Orchestrator's synthetic link validation workflow in Epic 2 (extract header/file commands).
+
+**Input:**
+- **`link`** (LinkObject): Unvalidated LinkObject (synthetic or discovered by parser)
+  - Can be created by LinkObjectFactory for `extract header/file` commands
+  - Can be from parser output for normal validation workflows
+- **`contextFile`** (string, optional): Source file context for path resolution
+
+**Output:**
+- **EnrichedLinkObject**: The input LinkObject with added `validation` property containing:
+  - `status`: "valid" | "warning" | "error"
+  - `error?`: Error message (when status is error/warning)
+  - `suggestion?`: Suggested fix (when available)
+  - `pathConversion?`: Path conversion metadata (when applicable)
+
+**Usage:**
+- Called by CLI Orchestrator to validate synthetic links created by LinkObjectFactory
+- Enables `extract header <target-file> "<header>"` command to validate header existence before extraction
+- Enables `extract file <target-file>` command to validate file existence before extraction
+- Enriches link in place using same validation logic as `validateFile()`
 
 ### Output Contract
 
@@ -234,6 +264,15 @@ class CitationValidator is
         summary.errors++
 
     return summary
+
+  // Public method for validating a single LinkObject (Epic 2)
+  // Used by CLI Orchestrator for synthetic link validation in extract header/file commands
+  public async method validateSingleCitation(link: LinkObject, contextFile?: string): Promise<EnrichedLinkObject> is
+    // Pattern: Reuse enrichment logic from validateFile workflow
+    await this.enrichLinkWithValidation(link)
+
+    // Enrichment: Link now has validation property added in place
+    return link  // Return enriched LinkObject
 ```
 
 ## `CitationValidator.ValidationResult.Output.DataContract` JSON Schema
@@ -622,3 +661,95 @@ Implement comprehensive URL encoding/decoding handling in anchor validation:
 **Priority**: Medium (affects validation accuracy, but workaround exists)
 
 **Estimated Effort**: 4-6 hours (anchor matching logic update + comprehensive test coverage)
+
+---
+
+### Issue 4: Same-Document Anchor Links Not Recognized as Valid Pattern
+
+**Status**: Identified (2025-10-29) - To Be Fixed
+
+**Current Problem**:
+The citation validator does not recognize same-document anchor links (pattern: `[text](#anchor)`) as a valid citation pattern. This causes false positives when validating C4 architecture documents that use internal component cross-references.
+
+**Example Failure**:
+
+```markdown
+#### Citation Manager.CLI Orchestrator
+...delegates to [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor)
+
+#### Citation Manager.ContentExtractor
+...
+```
+
+**Error Output**:
+
+```text
+Line 91: [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor)
+└─ Unknown citation pattern
+└─ Suggestion: Use one of: cross-document [text](file.md#anchor), caret ^FR1, or wiki-style [[#anchor|text]]
+```
+
+**Currently Recognized Patterns**:
+1. Cross-document links: `[text](file.md#anchor)`
+2. Caret syntax: `^FR1`
+3. Wiki-style: `[[#anchor|text]]`
+
+**Missing Pattern**:
+4. Same-document anchor links: `[text](#anchor)`
+- Standard markdown syntax for internal document navigation
+- Used throughout C4 architecture docs for component cross-references
+- Link text can contain any markdown formatting: `**bold**`, `` `code` ``, combined formatting
+- Anchor IDs follow Obsidian/markdown conventions: spaces as `%20`, periods, underscores, hyphens allowed
+
+**Root Cause**:
+The `MarkdownParser` link classification logic (CitationValidator.js) only checks for:
+- File path present → cross-document
+- No file path + anchor present → currently unhandled (triggers "unknown pattern" error)
+
+**Impact**:
+- **High**: Causes 20 false positive validation errors in architecture documents
+- **User Experience**: Developers cannot validate architecture docs without getting critical errors
+- **Workaround**: Currently none - valid internal links flagged as invalid
+- **Scope**: Affects all same-document anchor references in architecture documentation
+
+**Resolution Strategy**:
+
+1. **Update Link Pattern Recognition**:
+   - Extend `MarkdownParser` to recognize `[text](#anchor)` pattern
+   - Add `scope: "internal-anchor"` classification for same-document references
+   - Differentiate from wiki-style `[[#anchor]]` syntax
+
+2. **Add Same-Document Anchor Validation**:
+   - Check anchor exists in source document (not target document)
+   - Use `ParsedDocument.hasAnchor()` on source file's parsed data
+   - Support URL-encoded anchor IDs (`#Citation%20Manager.ContentExtractor`)
+
+3. **Extend Test Coverage**:
+   - Add fixtures with same-document anchor links
+   - Test various link text formatting: bold, code, combined
+   - Test anchor ID variations: spaces, periods, special characters
+   - Verify validation correctly identifies broken vs valid internal anchors
+
+4. **Update Documentation**:
+   - Add same-document pattern to recognized citation types
+   - Document scope classification: `internal-anchor` vs `internal` vs `cross-document`
+   - Update error messages to include same-document pattern in suggestions
+
+**Affected Code Locations**:
+- `MarkdownParser.js` - Link pattern classification needs same-document detection
+- `CitationValidator.js` - Validation logic needs internal-anchor handling
+- Test fixtures - Need coverage for same-document anchor links with various formatting
+- Error messages - Need to include `[text](#anchor)` in pattern suggestions
+
+**Resolution Criteria**:
+- Same-document anchor links validate correctly: `[text](#anchor)`
+- Link text formatting preserved: `[**\`Component\`**](#anchor)` recognized
+- Anchor existence validated against source document (not target)
+- Zero false positives for valid internal component cross-references
+- Test coverage for all link text formatting variations
+
+**Priority**: High (blocks architecture document validation)
+
+**Estimated Effort**: 6-8 hours (pattern recognition update + validation logic + comprehensive test coverage)
+
+**Related Issues**: Issue 3 (URL encoding) - resolution should coordinate to handle encoded anchors in same-document links

@@ -9,7 +9,8 @@
 		"citation-manager": "./src/citation-manager.js"
 	},
 	"scripts": {
-		"test": "vitest",
+		"test": "vitest run",
+		"test:watch": "vitest",
 		"start": "node src/citation-manager.js"
 	},
 	"keywords": ["citation", "validator", "markdown", "obsidian"],

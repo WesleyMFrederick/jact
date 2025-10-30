@@ -99,6 +99,7 @@ describe("Path Conversion Suggestion Integration", () => {
 				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}" --format json`,
 				{
 					cwd: __dirname,
+					captureStderr: false, // JSON output - don't mix stderr warnings
 				},
 			);
 

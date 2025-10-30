@@ -36,64 +36,68 @@ Revised Public Contracts Section Flow (Reusable Template):
 
 The **`ContentExtractor`** component is responsible for:
 
-- Orchestrating the complete content extraction workflow from source files containing citations
-- Orchestrating validation workflow via [**`Citation Validator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator) to discover and validate cross-document links
+- Orchestrating the complete content extraction workflow from pre-validated links
 - Analyzing link eligibility using the **Strategy Pattern** with configurable precedence rules
-- Retrieving content from target documents via ParsedDocument [**`ParsedDocument.Content Extraction`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md#Content%20Extraction) facade methods
+- Retrieving content from target documents via [**`ParsedDocument.Content Extraction`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md#Content%20Extraction) facade methods
 - Deduplicating extracted content using SHA-256 content-based hashing
 - Aggregating results into `OutgoingLinksExtractedContent` structure for CLI output
 
 The component is **NOT** responsible for:
 
+- Link discovery or validation (expects pre-validated links from [**`CLI Orchestrator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.CLI%20Orchestrator))
 - Parsing markdown (delegated to [**`Markdown Parser`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Markdown%20Parser))
 - Navigating parser output structures (delegated to [**`ParsedDocument`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedDocument) facade)
 - Reading files from disk (delegated to [**`ParsedFileCache`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedFileCache))
 - Final output formatting or file writing (delegated to [**`CLI Orchestrator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.CLI%20Orchestrator))
 
-This component operates as the orchestration layer for the `extract` command, sitting between the CLI and lower-level components (CitationValidator, ParsedFileCache, ParsedDocument). It transforms a source markdown file containing citations into a deduplicated `OutgoingLinksExtractedContent` object optimized for LLM consumption.
+This component operates as the extraction orchestration layer, sitting between the CLI and lower-level components (ParsedFileCache, ParsedDocument). It receives enriched LinkObjects from the CLI (after validation) and transforms them into a deduplicated `OutgoingLinksExtractedContent` object optimized for LLM consumption.
 
 ---
 
 ## Component Workflow
 
-### ContentExtractor Workflow: Component Interaction
+### ContentExtractor Workflow Component Interaction
+
+**Note**: This diagram shows the `extract links` workflow. For `extract header/file` subcommands, Phase 0 differs: CLI creates synthetic link via LinkObjectFactory and calls `validator.validateSingleCitation()` instead of `validateFile()`. Phases 1-3 are identical across all extract subcommands.
 
 ```mermaid
 sequenceDiagram
     actor User
     participant CLI as CLI Orchestrator
-    participant Extractor as Content Extractor
     participant Validator as Citation Validator
+    participant Extractor as Content Extractor
     participant ParsedCache as ParsedFileCache
     participant Parser as MarkdownParser
 
-    User->>CLI: extract <file> --scope <dir>
-    note over CLI: Instantiates ContentExtractor via factory
+    User->>CLI: extract [subcommand] <file> [options]
+    note over CLI: Instantiates Validator and ContentExtractor via factory
 
-    CLI->>+Extractor: extractLinksContent(sourceFilePath, cliFlags)
-
-    note over Extractor: 0. Validation & Link Discovery
-    Extractor->>+Validator: validateFile(sourceFilePath)
-    Validator->>+ParsedCache: resolveParsedFile(sourceFilePath)
+    note over CLI: Phase 0: Link Discovery & Validation (varies by subcommand)
+    note over CLI: extract links: validateFile() discovers links<br/>extract header/file: creates synthetic link, calls validateSingleCitation()
+    CLI->>+Validator: validateFile(sourceFilePath) OR validateSingleCitation(syntheticLink)
+    Validator->>+ParsedCache: resolveParsedFile(sourceFilePath or targetFilePath)
     ParsedCache->>+Parser: parseFile(filePath)
     Parser->>Parser: Detect links using marked.js + regex
     Parser-->>-ParsedCache: MarkdownParser.Output.DataContract
     ParsedCache->>ParsedCache: Wrap in ParsedDocument facade
-    ParsedCache-->>-Validator: ParsedDocument (SOURCE document)
+    ParsedCache-->>-Validator: ParsedDocument (SOURCE or TARGET document)
     Validator->>Validator: Validate links, add validation metadata
-    Validator-->>-Extractor: { summary, links: EnrichedLinkObject[] }
+    Validator-->>-CLI: { summary, links: EnrichedLinkObject[] } OR single EnrichedLinkObject
 
-    note over Extractor: 1. Eligibility Analysis (Strategy Pattern)
+    note over CLI: CLI passes pre-validated links to extractor (same for all subcommands)
+    CLI->>+Extractor: extractContent(enrichedLinks, cliFlags)
+
+    note over Extractor: Phase 1: Eligibility Analysis (Strategy Pattern)
     Extractor->>Extractor: Filter eligible links using strategy chain
 
-    note over Extractor: 2. Content Retrieval Loop (TARGET documents)
+    note over Extractor: Phase 2: Content Retrieval Loop (TARGET documents)
     loop FOR EACH: eligible Link
         Extractor->>+ParsedCache: resolveParsedFile(link.target.path.absolute)
         ParsedCache-->>-Extractor: ParsedDocument (TARGET document facade)
         Extractor->>Extractor: Extract content using ParsedDocument methods
     end
 
-    note over Extractor: 3. Deduplication (SHA-256 hashing)
+    note over Extractor: Phase 3: Deduplication (SHA-256 hashing)
     Extractor->>Extractor: Transform to OutgoingLinksExtractedContent with contentIndex
 
     Extractor-->>-CLI: Return OutgoingLinksExtractedContent object
@@ -101,10 +105,11 @@ sequenceDiagram
 ```
 
 **Workflow Characteristics**:
-- Single service interface abstracts multi-step process from CLI
-- Validation Enrichment Pattern: [**`Citation Validator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator) returns enriched links directly
+- CLI orchestrates validation before extraction (separation of concerns)
+- Validation Enrichment Pattern: [**`Citation Validator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator) returns enriched links to CLI
+- ContentExtractor receives pre-validated links and focuses on extraction workflow
 - Performance: [**`ParsedFileCache`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedFileCache%20Implementation%20Guide.md#Output%20Contract) ensures each file parsed at most once
-- Source vs Target: **SOURCE** file contains citations, **TARGET** files provide content
+- Source vs Target: **SOURCE** file contains citations (validated by CLI), **TARGET** files provide content (retrieved by Extractor)
 - Deduplication: Internal transformation before returning to CLI
 
 ---
@@ -120,7 +125,6 @@ sequenceDiagram
 class ContentExtractor {
   constructor(
     parsedFileCache: ParsedFileCache,
-    citationValidator: CitationValidator,
     eligibilityStrategies: ExtractionStrategy[]
   )
 }
@@ -128,8 +132,9 @@ class ContentExtractor {
 
 **Dependencies**:
 - [**`ParsedFileCache`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedFileCache): Retrieves ParsedDocument instances for target files
-- [**`Citation Validator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator): Validates source file and discovers links with enrichment
 - `eligibilityStrategies`: Array of strategy objects in precedence order
+
+**Architecture Note**: ContentExtractor operates on pre-validated LinkObjects provided by the caller (typically CLI Orchestrator after validation step). Link discovery and validation are external concerns handled by the CLI before calling the extractor.
 
 #### Factory Function
 
@@ -138,7 +143,6 @@ class ContentExtractor {
 ```typescript
 createContentExtractor(
   parsedFileCache?: ParsedFileCache,
-  citationValidator?: CitationValidator,
   strategies?: ExtractionStrategy[]
 ): ContentExtractor
 ```
@@ -146,7 +150,7 @@ createContentExtractor(
 **Factory Pattern Benefits**:
 - Encapsulates dependency wiring complexity
 - Provides production-ready defaults when no overrides specified
-- Enables dependency injection for testing (mock caches, validators, strategies)
+- Enables dependency injection for testing (mock caches, strategies)
 - Defines explicit strategy precedence order
 
 **Default Strategy Precedence** (highest to lowest priority):
@@ -157,23 +161,25 @@ createContentExtractor(
 
 ### Primary Methods
 
-#### extractLinksContent()
-**File**: `src/core/ContentExtractor/extractLinksContent.js`
+#### extractContent()
+**File**: `src/core/ContentExtractor/extractContent.js`
 
 **Signature**:
 
 ```typescript
-async extractLinksContent(
-  sourceFilePath: string,
+async extractContent(
+  enrichedLinks: EnrichedLinkObject[],
   cliFlags: { fullFiles?: boolean }
 ): Promise<OutgoingLinksExtractedContent>
 ```
 
 **Parameters**:
-- `sourceFilePath`: Absolute path to source markdown file containing citations
+- `enrichedLinks`: Array of pre-validated LinkObjects with validation metadata (provided by CLI after calling CitationValidator)
 - `cliFlags`: Command-line options evaluated by eligibility strategies
 
 **Returns**: Promise resolving to [**`OutgoingLinksExtractedContent`**](#OutgoingLinksExtractedContent%20Schema)
+
+**Architecture Note**: This method expects links that have already been discovered and validated by the CLI Orchestrator. The extractor focuses solely on eligibility analysis, content retrieval, and deduplication.
 
 ### Output Contracts
 
@@ -189,13 +195,10 @@ The output structure uses an indexed format to minimize token usage through cont
     [contentId: string]: {
       content: string, // The extracted markdown content (stored once).
       contentLength: number, // Character count of the unique content block.
-
-      /** Array of all original locations (path#anchor) where this exact content block was found. */
-      contentOrigins: Array<{
-        path: string, // Absolute path or URL containing the content.
-        anchor: string | null, // Anchor fragment (#header, ^block) in that location, or null if full file/resource.
-        anchorType: "header" | "block" | null // Type of anchor ("header", "block", or null).
-      }>
+      sourceLinks: Array<{
+        rawSourceLink: string, // Original link text from source document (e.g., "[[file.md#anchor]]").
+        sourceLine: number // 1-based line number where link appeared in source document.
+      }> // All source document links that extracted this content (tracks duplicates).
     }
   },
 
@@ -232,6 +235,7 @@ The output structure uses an indexed format to minimize token usage through cont
 - Deduplication is default behavior, not optional variant
 - No backward compatibility: `OutgoingLinksExtractedContent` is the only public contract
 - Single-pass inline approach: no intermediate arrays or separate deduplication step
+- Source information for each content block is available via `outgoingLinksReport.processedLinks` array (filter by `contentId` to find all links that extracted a specific content block)
 
 ### Error Handling
 
@@ -312,7 +316,7 @@ Dependencies provided via constructor parameters for testability and loose coupl
 ```text
 tools/citation-manager/src/core/ContentExtractor/
 ├── ContentExtractor.js                 # Thin orchestrator class (entry point)
-├── extractLinksContent.js              # PRIMARY operation: extraction workflow with inline deduplication
+├── extractContent.js                   # PRIMARY operation: extraction workflow with inline deduplication
 ├── analyzeEligibility.js               # Supporting operation: strategy chain
 ├── normalizeAnchor.js                  # Utility: anchor normalization
 └── eligibilityStrategies/
@@ -348,9 +352,8 @@ classDiagram
 
     class ContentExtractor {
         -parsedFileCache: ParsedFileCache
-        -citationValidator: CitationValidator
         -eligibilityStrategies: ExtractionStrategy[]
-        +extractLinksContent(sourceFilePath, cliFlags): Promise~OutgoingLinksExtractedContent~
+        +extractContent(enrichedLinks, cliFlags): Promise~OutgoingLinksExtractedContent~
     }
 
     class ParsedFileCache {
@@ -390,9 +393,9 @@ classDiagram
         +stats: Object
     }
 
-    CLIOrchestrator --> ContentExtractor : calls
+    CLIOrchestrator --> CitationValidator : calls for validation
+    CLIOrchestrator --> ContentExtractor : calls with enriched links
     ContentExtractor ..> ParsedFileCache : depends on
-    ContentExtractor ..> CitationValidator : depends on
     ParsedFileCache --> ParsedDocument : returns
     ContentExtractor ..> ParsedDocument : uses
     ContentExtractor ..> ExtractionStrategy : depends on
@@ -400,24 +403,22 @@ classDiagram
     ContentExtractor --> OutgoingLinksExtractedContent : returns
 ```
 
-### Main Workflow: extractLinksContent()
-**File**: `src/core/ContentExtractor/extractLinksContent.js`
+### Main Workflow: extractContent()
+**File**: `src/core/ContentExtractor/extractContent.js`
 
 High-level orchestration pseudocode showing the extraction pipeline phases:
 
 ```typescript
-async function extractLinksContent(sourceFilePath, cliFlags): Promise<OutgoingLinksExtractedContent> {
+async function extractContent(enrichedLinks, cliFlags): Promise<OutgoingLinksExtractedContent> {
 
-  // PHASE 0: Validation & Link Discovery
-  // Integration: CitationValidator parses source and enriches links with validation metadata
-  validationResult = await citationValidator.validateFile(sourceFilePath)
-  enrichedLinks = validationResult.links
+  // Boundary: Receives pre-validated enriched links from CLI (after validation step)
+  // Links arrive with validation metadata already populated
 
   // Pattern: Initialize output contract structure that will be built incrementally
   const result: OutgoingLinksExtractedContent = {
     extractedContentBlocks: {},
     outgoingLinksReport: {
-      sourceFilePath: sourceFilePath,
+      sourceFilePath: enrichedLinks[0]?.source?.path || '', // Extract from link metadata
       processedLinks: []
     },
     stats: {
@@ -507,21 +508,11 @@ async function extractLinksContent(sourceFilePath, cliFlags): Promise<OutgoingLi
         // First occurrence: Create new content block entry
         result.extractedContentBlocks[contentId] = {
           content: extraction.content,
-          contentLength: extraction.content.length,
-          contentOrigins: [{
-            path: extraction.link.target.path.absolute,
-            anchor: extraction.link.target.anchor,
-            anchorType: extraction.link.anchorType
-          }]
+          contentLength: extraction.content.length
         };
         result.stats.uniqueContent++;
       } else {
-        // Duplicate detected: Add origin to existing content block
-        result.extractedContentBlocks[contentId].contentOrigins.push({
-          path: extraction.link.target.path.absolute,
-          anchor: extraction.link.target.anchor,
-          anchorType: extraction.link.anchorType
-        });
+        // Duplicate detected: Track for statistics
         result.stats.duplicateContentDetected++;
         result.stats.tokensSaved += extraction.content.length;
       }
@@ -972,6 +963,33 @@ The ContentExtractor component follows the workspace testing principle of **"Rea
 
 **Status**: Deferred to future enhancement
 **Related**: [MarkdownParser Issue 5 - Hardcoded Extraction Marker Detection](Markdown%20Parser%20Implementation%20Guide.md#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20(MVP%20Tech%20Debt))
+
+### Issue 3: Deferred US2.3 CLI Features (Future Enhancement)
+
+**Description**: Output formatting, file writing, and --output option deferred from US2.3 acceptance criteria.
+
+**Deferred Features**:
+- **Output Formatting (AC5)**: `--format` option for json/markdown/summary output styles
+- **File Writing (AC6, AC7)**: `--output <file>` flag with optional `--append` mode
+- **Output Option (AC2)**: Unified output destination control (stdout vs file)
+
+**Current Behavior**: MVP outputs JSON to stdout only. Users pipe output to files using shell redirection (`>`).
+
+**Why Deferred**:
+- MVP prioritizes core extraction workflow over output convenience features
+- Shell redirection covers majority of file output use cases
+- Formatting can be added without breaking extraction logic
+- Append mode requires careful JSON array boundary handling
+
+**Future Implementation Path**:
+1. Implement basic `--output <file>` for write-to-file
+2. Add `--append` modifier for append mode with JSON merging
+3. Add `--format` option for alternative output styles (markdown, summary, table)
+4. Ensure backward compatibility (stdout JSON remains default)
+
+**Status**: Documented for future Epic 2 iterations or separate enhancement epic
+**Deferral Date**: 2025-10-28 (US2.3 scope reduction)
+**Reference**: [Content Aggregation PRD line 416](../features/20251003-content-aggregation/content-aggregation-prd.md)
 
 ---
 

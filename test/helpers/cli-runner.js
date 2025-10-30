@@ -13,6 +13,7 @@ import { join } from "node:path";
  *
  * @param {string} command - Command to execute (e.g., "node script.js arg1 arg2")
  * @param {object} options - spawn options
+ * @param {boolean} options.captureStderr - If false, only capture stdout (for JSON output); if true, merge stderr into stdout (default: true)
  * @returns {string} Command output (stdout)
  * @throws {Error} Error with stdout and stderr properties when command fails
  */
@@ -20,14 +21,20 @@ export function runCLI(command, options = {}) {
 	// Create temporary file for output capture
 	const tempFile = join(tmpdir(), `cli-output-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`);
 
+	const { captureStderr = true, ...spawnOptions } = options;
+
 	const defaultOptions = {
 		encoding: "utf8",
-		...options,
+		...spawnOptions,
 	};
 
 	try {
 		// Execute command with shell redirection to avoid stdio buffering limits
-		const result = spawnSync("sh", ["-c", `${command} > "${tempFile}" 2>&1`], defaultOptions);
+		// For JSON output, only capture stdout to avoid mixing warnings/errors
+		const redirectCmd = captureStderr
+			? `${command} > "${tempFile}" 2>&1`
+			: `${command} > "${tempFile}"`;
+		const result = spawnSync("sh", ["-c", redirectCmd], defaultOptions);
 
 		// Read output from temporary file
 		const output = readFileSync(tempFile, "utf8");

@@ -41,7 +41,7 @@ describe("Content Deduplication - Basic Logic", () => {
 });
 
 describe("Content Deduplication - Index Structure", () => {
-	it("should create index entries with content, contentLength, and contentOrigins", async () => {
+	it("should create index entries with content and contentLength", async () => {
 		// Given: Source with extractable links
 		const extractor = createContentExtractor();
 		const sourceFile = join(
@@ -69,10 +69,6 @@ describe("Content Deduplication - Index Structure", () => {
 		// Verification: ContentLength field present (character count)
 		expect(firstBlock).toHaveProperty("contentLength");
 		expect(firstBlock.contentLength).toBe(firstBlock.content.length);
-
-		// Verification: ContentOrigins array present (source metadata)
-		expect(firstBlock).toHaveProperty("contentOrigins");
-		expect(Array.isArray(firstBlock.contentOrigins)).toBe(true);
 	});
 });
 
@@ -129,39 +125,6 @@ describe("Content Deduplication - Statistics: Unique Content", () => {
 		// Given: 3 links extracting identical content = 1 unique
 		expect(result.stats.uniqueContent).toBe(1);
 		expect(result.stats.totalLinks).toBe(3);
-	});
-});
-
-describe("Content Deduplication - Content Origins", () => {
-	it("should track all source locations in contentOrigins array", async () => {
-		// Fixture: File with 3 links extracting identical content
-		// Research: Create fixture with duplicate section extractions
-		const extractor = createContentExtractor();
-		const sourceFile = join(
-			fixturesDir,
-			"us2.2a",
-			"duplicate-content-source.md",
-		);
-
-		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
-			fullFiles: false,
-		});
-
-		// Then: Single content block with 3 source locations
-		const contentIds = Object.keys(result.extractedContentBlocks);
-		expect(contentIds.length).toBe(1); // Only 1 unique content
-
-		const contentBlock = result.extractedContentBlocks[contentIds[0]];
-
-		// Verification: contentOrigins array has entry for each source
-		expect(contentBlock.contentOrigins).toHaveLength(3);
-
-		// Verification: Each origin has complete metadata (AC5)
-		const firstOrigin = contentBlock.contentOrigins[0];
-		expect(firstOrigin).toHaveProperty("targetPath");
-		expect(firstOrigin).toHaveProperty("targetAnchor");
-		expect(firstOrigin).toHaveProperty("targetAnchorType");
 	});
 });
 
@@ -512,14 +475,15 @@ describe("US2.2a Acceptance - SHA-256 Content Hashing", () => {
 		expect(processedCount).toBe(2); // 2 links processed
 		expect(contentIds.length).toBe(1); // But only 1 unique content block
 
-		// Verification: contentOrigins tracks both different source files
+		// Verification: Both links reference the same contentId (cross-file deduplication)
 		const contentBlock = result.extractedContentBlocks[contentIds[0]];
-		expect(contentBlock.contentOrigins).toHaveLength(2);
+		const successLinks = result.outgoingLinksReport.processedLinks.filter(
+			(link) => link.status === "success",
+		);
+		expect(successLinks).toHaveLength(2);
 
 		// Pattern: Different targetPath values prove cross-file deduplication
-		const paths = contentBlock.contentOrigins.map(
-			(origin) => origin.targetPath,
-		);
+		const paths = successLinks.map((link) => link.sourceLink.target.path.absolute);
 		expect(new Set(paths).size).toBe(2); // 2 different file paths
 	});
 });
@@ -581,11 +545,11 @@ describe("US2.2a Acceptance - Complete Pipeline", () => {
 		expect(result.stats.tokensSaved).toBeGreaterThan(0);
 		expect(result.stats.compressionRatio).toBeGreaterThan(0);
 
-		// Verification: Content origins tracking (AC5)
+		// Verification: Content blocks exist in extractedContentBlocks (AC5)
 		const firstBlockId = Object.keys(result.extractedContentBlocks)[0];
 		const firstBlock = result.extractedContentBlocks[firstBlockId];
-		expect(firstBlock.contentOrigins).toBeInstanceOf(Array);
-		expect(firstBlock.contentOrigins.length).toBeGreaterThan(0);
+		expect(firstBlock).toHaveProperty("content");
+		expect(firstBlock).toHaveProperty("contentLength");
 
 		// Verification: Mixed statuses present (AC6, AC8)
 		const statuses = result.outgoingLinksReport.processedLinks.map(

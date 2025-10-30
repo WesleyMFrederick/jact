@@ -399,7 +399,6 @@ export class CitationValidator {
 									citation,
 									status,
 									combinedMessage,
-									null,
 									anchorExists.suggestion,
 								);
 							}
@@ -489,7 +488,6 @@ export class CitationValidator {
 					citation,
 					status,
 					combinedMessage,
-					null,
 					anchorExists.suggestion,
 				);
 			}
@@ -640,6 +638,18 @@ export class CitationValidator {
 				return { valid: true, matchedAs: flexibleMatch.matchType };
 			}
 
+			// Check if this is a kebab-case anchor that should use raw header format
+			const obsidianBetterSuggestion = this.suggestObsidianBetterFormat(
+				anchor,
+				targetParsedDoc._data.anchors,
+			);
+			if (obsidianBetterSuggestion) {
+				return {
+					valid: false,
+					suggestion: `Use raw header format for better Obsidian compatibility: #${obsidianBetterSuggestion}`,
+				};
+			}
+
 			// Generate suggestions for similar anchors using facade method
 			const suggestions = targetParsedDoc.findSimilarAnchors(anchor);
 
@@ -749,24 +759,20 @@ export class CitationValidator {
 	}
 
 	suggestObsidianBetterFormat(usedAnchor, availableAnchors) {
-		// Check if the used anchor is kebab-case and has a raw header equivalent
+		// Check if the used anchor is kebab-case and a raw header equivalent exists
+		// Convert each header to kebab-case to check if it matches the used anchor
 		for (const anchorObj of availableAnchors) {
-			// Skip if this is the exact anchor being used
-			if (anchorObj.id === usedAnchor) {
-				// Check if there's a corresponding raw header with same rawText
-				const rawHeaderEquivalent = availableAnchors.find(
-					(a) =>
-						a.anchorType === "header" &&
-						a.id === anchorObj.rawText &&
-						a.id !== usedAnchor,
-				);
-
-				if (rawHeaderEquivalent) {
-					// URL encode the raw header for proper anchor format
-					return encodeURIComponent(rawHeaderEquivalent.id).replace(
-						/'/g,
-						"%27",
-					);
+			if (anchorObj.anchorType === "header") {
+				// Convert header text to kebab-case to check for match
+				const kebabCase = anchorObj.rawText.toLowerCase().replace(/\s+/g, '-');
+				if (kebabCase === usedAnchor) {
+					// Found a header whose kebab-case matches the used anchor
+					// Suggest the URL-encoded raw text format instead
+					const suggestion = encodeURIComponent(anchorObj.id).replace(/'/g, "%27");
+					// Only suggest if it's different from what's being used
+					if (suggestion !== usedAnchor) {
+						return suggestion;
+					}
 				}
 			}
 		}

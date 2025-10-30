@@ -74,17 +74,26 @@ class ParsedDocument {
 	}
 
 	/**
-	 * Extract section content by heading text and level
+	 * Extract section content by heading text and optional level
 	 *
-	 * Uses 3-phase algorithm: (1) flatten token tree and locate target heading,
+	 * Uses 3-phase algorithm: (0) look up heading level if not provided,
+	 * (1) flatten token tree and locate target heading,
 	 * (2) find section boundary (next same-or-higher level heading),
 	 * (3) reconstruct content from token.raw properties.
 	 *
 	 * @param {string} headingText - Exact heading text to find (case-sensitive)
-	 * @param {number} headingLevel - Heading level (1-6, where 1 is #, 2 is ##, etc.)
+	 * @param {number} [headingLevel] - Optional heading level (1-6). If not provided, looked up from headings array
 	 * @returns {string|null} Section content string or null if not found
 	 */
 	extractSection(headingText, headingLevel) {
+		// Phase 0: Look up heading level if not provided
+		let targetLevel = headingLevel;
+		if (targetLevel === undefined) {
+			const headingMeta = this._data.headings.find(h => h.text === headingText);
+			if (!headingMeta) return null;
+			targetLevel = headingMeta.level !== undefined ? headingMeta.level : headingMeta.depth;
+		}
+
 		// Phase 1: Flatten token tree and locate target heading
 		const orderedTokens = [];
 		let targetIndex = -1;
@@ -97,7 +106,7 @@ class ParsedDocument {
 				// Found our target heading?
 				if (token.type === "heading" &&
 					token.text === headingText &&
-					token.depth === headingLevel) {
+					token.depth === targetLevel) {
 					targetIndex = currentIndex;
 				}
 

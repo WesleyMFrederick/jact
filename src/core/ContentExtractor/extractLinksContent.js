@@ -32,7 +32,7 @@ export async function extractLinksContent(
 	// PHASE 2: Initialize Deduplicated Structure
 	// Pattern: Inline deduplication - build indexed structure during extraction
 	const deduplicatedOutput = {
-		extractedContentBlocks: {}, // contentId → { content, contentLength, contentOrigins[] }
+		extractedContentBlocks: {}, // contentId → { content, contentLength }
 		outgoingLinksReport: {
 			processedLinks: [], // Array of { sourceLink, contentId, status, ... }
 		},
@@ -93,7 +93,7 @@ export async function extractLinksContent(
 				const decodedAnchor = decodeUrlAnchor(link.target.anchor);
 				// Find the heading level from the target document's headings
 				const heading = targetDoc._data.headings.find(
-					(h) => h.text === decodedAnchor || h.slug === decodedAnchor,
+					(h) => h.text === decodedAnchor,
 				);
 				if (!heading) {
 					throw new Error(`Heading not found: ${decodedAnchor}`);
@@ -121,7 +121,6 @@ export async function extractLinksContent(
 				deduplicatedOutput.extractedContentBlocks[contentId] = {
 					content: extractedContent,
 					contentLength: extractedContent.length,
-					contentOrigins: [], // Will track all sources for this content
 				};
 				deduplicatedOutput.stats.uniqueContent++;
 			} else {
@@ -129,13 +128,6 @@ export async function extractLinksContent(
 				deduplicatedOutput.stats.duplicateContentDetected++;
 				deduplicatedOutput.stats.tokensSaved += extractedContent.length;
 			}
-
-			// Pattern: Always add source location to contentOrigins array
-			deduplicatedOutput.extractedContentBlocks[contentId].contentOrigins.push({
-				targetPath: link.target.path.absolute,
-				targetAnchor: link.target.anchor,
-				targetAnchorType: link.anchorType,
-			});
 
 			// Pattern: Add processed link with content ID reference
 			deduplicatedOutput.outgoingLinksReport.processedLinks.push({

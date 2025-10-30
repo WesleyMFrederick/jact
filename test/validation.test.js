@@ -156,6 +156,7 @@ describe("Citation Manager Integration Tests", () => {
 				`node "${citationManagerPath}" validate "${testFile}" --lines 13-14 --scope "${scopeFolder}" --format json`,
 				{
 					cwd: __dirname,
+					captureStderr: false, // JSON output - don't mix stderr warnings
 				},
 			);
 

@@ -430,7 +430,7 @@ export class MarkdownParser {
 		if (match) {
 			return {
 				fullMatch: match[1], // Full marker with delimiters
-				innerText: match[2] || match[3], // Text between delimiters
+				innerText: (match[2] || match[3]).trim(), // Text between delimiters (trimmed)
 			};
 		}
 

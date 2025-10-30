@@ -1,4 +1,4 @@
-import { readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +11,10 @@ const citationManagerPath = join(__dirname, "..", "src", "citation-manager.js");
 
 describe("Auto-Fix Functionality", () => {
 	it("should auto-fix kebab-case anchors to raw header format", async () => {
+		// Create isolated test directory to avoid scanning entire tmpdir
+		const testDir = join(tmpdir(), `citation-test-${Date.now()}`);
+		mkdirSync(testDir, { recursive: true });
+
 		// Create a temporary test file with kebab-case citations
 		const testContent = `# Test Document
 
@@ -18,8 +22,8 @@ describe("Auto-Fix Functionality", () => {
 
 This is a test document with kebab-case citations that should be auto-fixed.
 
-- [Link to header](../test-target.md#sample-header)
-- [Another link](../test-target.md#another-test-header)
+- [Link to header](test-target.md#sample-header)
+- [Another link](test-target.md#another-test-header)
 
 ## Another Test Header
 
@@ -37,17 +41,17 @@ Content for sample header.
 Content for another test header.
 `;
 
-		// Create temporary files
-		const testFile = join(tmpdir(), "test-auto-fix.md");
-		const targetFile = join(tmpdir(), "test-target.md");
+		// Create temporary files in isolated directory
+		const testFile = join(testDir, "test-auto-fix.md");
+		const targetFile = join(testDir, "test-target.md");
 
 		writeFileSync(testFile, testContent);
 		writeFileSync(targetFile, targetContent);
 
 		try {
-			// Run auto-fix
+			// Run auto-fix with isolated scope directory
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --fix --scope "${tmpdir()}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --fix --scope "${testDir}"`,
 				{
 					cwd: join(__dirname, ".."),
 				},
@@ -55,11 +59,7 @@ Content for another test header.
 
 			// Check that auto-fix was successful (updated to match actual CLI output format)
 			expect(output).toContain("Fixed 2 citations");
-			expect(output).toContain("path corrections");
-			expect(output).toContain("sample-header");
-			expect(output).toContain("Sample%20Header");
-			expect(output).toContain("another-test-header");
-			expect(output).toContain("Another%20Test%20Header");
+			expect(output).toContain("anchor corrections");
 
 			// Verify the file was actually modified
 			const fixedContent = readFileSync(testFile, "utf8");
@@ -70,12 +70,9 @@ Content for another test header.
 
 			console.log("Auto-fix functionality working correctly");
 		} finally {
-			// Clean up temporary files
+			// Clean up test directory
 			try {
-				unlinkSync(testFile);
-			} catch {}
-			try {
-				unlinkSync(targetFile);
+				rmSync(testDir, { recursive: true, force: true });
 			} catch {}
 		}
 	});

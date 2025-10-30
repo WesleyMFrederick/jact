@@ -17,6 +17,7 @@ describe("Story File Validation with Scope", () => {
 				`node "${citationManagerPath}" validate "${storyFile}" --scope "${scopeDir}" --format json`,
 				{
 					cwd: join(__dirname, ".."),
+					captureStderr: false, // JSON output - don't mix stderr warnings
 				},
 			);
 

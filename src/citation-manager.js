@@ -25,6 +25,7 @@
 import { Command } from "commander";
 import {
 	createCitationValidator,
+	createContentExtractor,
 	createFileCache,
 	createMarkdownParser,
 	createParsedFileCache,
@@ -37,7 +38,7 @@ import {
  * fixing, AST inspection, and path extraction. Handles CLI output formatting and
  * error reporting.
  */
-class CitationManager {
+export class CitationManager {
 	/**
 	 * Initialize citation manager with all required components
 	 *
@@ -50,6 +51,11 @@ class CitationManager {
 		this.validator = createCitationValidator(
 			this.parsedFileCache,
 			this.fileCache,
+		);
+
+		// Integration: Add ContentExtractor via factory
+		this.contentExtractor = createContentExtractor(
+			this.parsedFileCache,  // Share cache with validator
 		);
 	}
 
@@ -265,6 +271,61 @@ class CitationManager {
 	// Format validation results as JSON
 	formatAsJSON(result) {
 		return JSON.stringify(result, null, 2);
+	}
+
+	/**
+	 * Extract content from links in source document
+	 *
+	 * Pattern: Three-phase orchestration workflow
+	 * Integration: Coordinates validator → extractor → output
+	 *
+	 * @param {string} sourceFile - Path to markdown file containing citations
+	 * @param {Object} options - CLI options (scope, fullFiles)
+	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 */
+	async extractLinks(sourceFile, options) {
+		try {
+			// Decision: Build file cache if --scope provided
+			if (options.scope) {
+				this.fileCache.buildCache(options.scope);
+			}
+
+			// Phase 1: Link Discovery & Validation
+			// Pattern: Delegate to validator for link discovery and enrichment
+			const validationResult = await this.validator.validateFile(sourceFile);
+			const enrichedLinks = validationResult.links;
+
+			// Decision: Report validation errors to stderr
+			if (validationResult.summary.errors > 0) {
+				console.error('Validation errors found:');
+				const errors = enrichedLinks.filter(l => l.validation.status === 'error');
+				for (const link of errors) {
+					console.error(`  Line ${link.line}: ${link.validation.error}`);
+				}
+			}
+
+			// Phase 2: Content Extraction
+			// Pattern: Pass pre-validated enriched links to extractor
+			const extractionResult = await this.contentExtractor.extractContent(
+				enrichedLinks,
+				{ fullFiles: options.fullFiles }  // Pass CLI flags to strategies
+			);
+
+			// Phase 3: Output
+			// Boundary: Output JSON to stdout
+			console.log(JSON.stringify(extractionResult, null, 2));
+
+			// Decision: Exit code based on extraction success
+			if (extractionResult.stats.uniqueContent > 0) {
+				process.exitCode = 0;
+			} else {
+				process.exitCode = 1;
+			}
+
+		} catch (error) {
+			console.error('ERROR:', error.message);
+			process.exitCode = 2;
+		}
 	}
 
 	/**
@@ -666,4 +727,42 @@ program
 		}
 	});
 
-program.parse();
+// Pattern: Extract command with links subcommand
+const extractCmd = program
+	.command("extract")
+	.description("Extract content from citations");
+
+extractCmd
+	.command("links <source-file>")
+	.description("Extract content from all links in source document\n\n" +
+		"Workflow:\n" +
+		"  Phase 1: Validate and discover all links in source file\n" +
+		"  Phase 2: Extract content from eligible links\n" +
+		"  Phase 3: Output deduplicated JSON structure\n\n" +
+		"Examples:\n" +
+		"  $ citation-manager extract links docs/design.md\n" +
+		"  $ citation-manager extract links docs/design.md --full-files\n" +
+		"  $ citation-manager extract links docs/design.md --scope ./docs\n\n" +
+		"Exit Codes:\n" +
+		"  0  At least one link extracted successfully\n" +
+		"  1  No eligible links or all extractions failed\n" +
+		"  2  System error (file not found, permission denied)")
+	.option("--scope <folder>", "Limit file resolution to folder")
+	.option("--format <type>", "Output format (reserved for future)", "json")
+	.option("--full-files", "Enable full-file link extraction (default: sections only)")
+	.action(async (sourceFile, options) => {
+		// Pattern: Delegate to CitationManager orchestrator
+		const manager = new CitationManager();
+
+		try {
+			await manager.extractLinks(sourceFile, options);
+		} catch (error) {
+			console.error("ERROR:", error.message);
+			process.exitCode = 2;
+		}
+	});
+
+// Only run CLI if this file is executed directly (not imported)
+if (import.meta.url === `file://${process.argv[1]}`) {
+	program.parse();
+}

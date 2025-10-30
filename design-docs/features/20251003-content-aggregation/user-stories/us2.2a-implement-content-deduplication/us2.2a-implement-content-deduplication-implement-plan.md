@@ -271,7 +271,7 @@ export async function extractLinksContent(
   // --- Phase 2: Initialize Deduplicated Structure ---
   // Pattern: Inline deduplication - build indexed structure during extraction
   const deduplicatedOutput = {
-    extractedContentBlocks: {},  // contentId → { content, contentLength, contentOrigins[] }
+    extractedContentBlocks: {},  // contentId → { content, contentLength }
     outgoingLinksReport: {
       processedLinks: []  // Array of { sourceLink, contentId, status, ... }
     },
@@ -314,21 +314,13 @@ export async function extractLinksContent(
         // Decision: First occurrence - create new index entry
         extractedContentBlocks[contentId] = {
           content: extractedContent,
-          contentLength: extractedContent.length,
-          contentOrigins: []  // Will track all sources for this content
+          contentLength: extractedContent.length
         };
         deduplicatedOutput.stats.uniqueContent++;
       ELSE
         // Decision: Duplicate detected - track for statistics
         deduplicatedOutput.stats.duplicateContentDetected++;
         deduplicatedOutput.stats.tokensSaved += extractedContent.length;
-
-      // Pattern: Always add source location to contentOrigins array
-      /* extractedContentBlocks[contentId].contentOrigins.push({
-        targetPath: link.target.path.absolute,
-        targetAnchor: link.target.anchor,
-        targetAnchorType: link.anchorType
-      }) */;
 
       // Pattern: Add processed link with content ID reference
       /* outgoingLinksReport.processedLinks.push({
@@ -378,7 +370,7 @@ Add to `content-deduplication.test.js`:
 
 ```javascript
 describe("Content Deduplication - Index Structure", () => {
-  it("should create index entries with content, contentLength, and contentOrigins", async () => {
+  it("should create index entries with content and contentLength", async () => {
     // Given: Source with extractable links
     const extractor = /* createContentExtractor() */;
     const sourceFile = /* resolve fixture */;
@@ -400,10 +392,6 @@ describe("Content Deduplication - Index Structure", () => {
     // Verification: ContentLength field present (character count)
     expect(firstBlock).toHaveProperty('contentLength');
     expect(firstBlock.contentLength).toBe(firstBlock.content.length);
-
-    // Verification: ContentOrigins array present (source metadata)
-    expect(firstBlock).toHaveProperty('contentOrigins');
-    expect(Array.isArray(firstBlock.contentOrigins)).toBe(true);
   });
 });
 ```
@@ -430,22 +418,22 @@ Use `create-git-commit` skill to create a commit
 
 ---
 
-## Task 6: Content Origins Tracking
+## Task 6: Source Tracking via ProcessedLinks
 
 ### Files
 - `tools/citation-manager/test/integration/ContentExtractor/content-deduplication.test.js` (MODIFY)
 - `tools/citation-manager/test/fixtures/us2.2a/duplicate-content-source.md` (CREATE)
 
 ### Purpose
-Validate contentOrigins array accumulates all source locations for deduplicated content (US2.2a AC4, AC5).
+Validate that source information for deduplicated content can be retrieved via processedLinks array (US2.2a AC4, AC5).
 
-### Step 1: Write failing test for content origins tracking
+### Step 1: Write failing test for source tracking
 
 Add to `content-deduplication.test.js`:
 
 ```javascript
-describe("Content Deduplication - Content Origins", () => {
-  it("should track all source locations in contentOrigins array", async () => {
+describe("Content Deduplication - Source Tracking", () => {
+  it("should track all source links that reference deduplicated content", async () => {
     // Fixture: File with 3 links extracting identical content
     // Research: Create fixture with duplicate section extractions
     const extractor = /* createContentExtractor() */;
@@ -454,20 +442,23 @@ describe("Content Deduplication - Content Origins", () => {
     // When: Extract content
     const result = /* await extractor.extractLinksContent(sourceFile, {}) */;
 
-    // Then: Single content block with 3 source locations
+    // Then: Single content block with multiple links referencing it
     const contentIds = /* Object.keys(result.extractedContentBlocks) */;
     expect(contentIds.length).toBe(1);  // Only 1 unique content
 
-    const contentBlock = /* result.extractedContentBlocks[contentIds[0]] */;
+    const sharedContentId = contentIds[0];
 
-    // Verification: contentOrigins array has entry for each source
-    expect(contentBlock.contentOrigins).toHaveLength(3);
+    // Verification: Multiple processedLinks reference the same contentId
+    const linksForContent = result.outgoingLinksReport.processedLinks.filter(
+      link => link.contentId === sharedContentId
+    );
+    expect(linksForContent).toHaveLength(3);
 
-    // Verification: Each origin has complete metadata (AC5)
-    const firstOrigin = contentBlock.contentOrigins[0];
-    expect(firstOrigin).toHaveProperty('targetPath');
-    expect(firstOrigin).toHaveProperty('targetAnchor');
-    expect(firstOrigin).toHaveProperty('targetAnchorType');
+    // Verification: Each link preserves source metadata (AC5)
+    const firstLink = linksForContent[0];
+    expect(firstLink).toHaveProperty('linkTargetPathRaw');
+    expect(firstLink).toHaveProperty('linkTargetAnchor');
+    expect(firstLink).toHaveProperty('sourceLine');
   });
 });
 ```
@@ -476,9 +467,9 @@ describe("Content Deduplication - Content Origins", () => {
 
 Run: `npm test -- content-deduplication.test.js`
 
-Expected: FAIL - contentOrigins not accumulating correctly or fixture missing
+Expected: FAIL - Test fixture missing or processedLinks not tracking correctly
 
-### Step 3: Create test fixture and verify origins tracking
+### Step 3: Create test fixture and verify source tracking
 
 Create `tools/citation-manager/test/fixtures/us2.2a/duplicate-content-source.md`:
 
@@ -490,15 +481,15 @@ Link 2: [[target-doc.md#Duplicate Section]]
 Link 3: [[target-doc.md#Duplicate Section]]
 ```
 
-Verify implementation accumulates origins in Task 4 code.
+Verify implementation tracks all links in processedLinks array from Task 4 code.
 
 ### Step 4: Run test to verify it passes
 
 Run: `npm test -- content-deduplication.test.js`
 
-Expected: PASS (validates AC4, AC5 origin tracking)
+Expected: PASS (validates AC4, AC5 source tracking via processedLinks)
 
-### Step 5: Create commit for origins tracking
+### Step 5: Create commit for source tracking
 
 Use `create-git-commit` skill to create a commit
 
@@ -1121,12 +1112,15 @@ describe("US2.2a Acceptance - SHA-256 Content Hashing", () => {
     expect(processedCount).toBe(2);  // 2 links processed
     expect(contentIds.length).toBe(1);  // But only 1 unique content block
 
-    // Verification: contentOrigins tracks both different source files
-    const contentBlock = /* result.extractedContentBlocks[contentIds[0]] */;
-    expect(contentBlock.contentOrigins).toHaveLength(2);
+    // Verification: processedLinks tracks both different source files
+    const sharedContentId = contentIds[0];
+    const linksForContent = result.outgoingLinksReport.processedLinks.filter(
+      link => link.contentId === sharedContentId
+    );
+    expect(linksForContent).toHaveLength(2);
 
-    // Pattern: Different targetPath values prove cross-file deduplication
-    const paths = /* map contentOrigins to targetPath */;
+    // Pattern: Different linkTargetPathRaw values prove cross-file deduplication
+    const paths = /* map linksForContent to linkTargetPathRaw */;
     expect(new Set(paths).size).toBe(2);  // 2 different file paths
   });
 });
@@ -1331,10 +1325,12 @@ describe("US2.2a Acceptance - Complete Pipeline", () => {
     expect(result.stats.tokensSaved).toBeGreaterThan(0);
     expect(result.stats.compressionRatio).toBeGreaterThan(0);
 
-    // Verification: Content origins tracking (AC5)
-    const firstBlock = /* result.extractedContentBlocks[Object.keys(...)[0]] */;
-    expect(firstBlock.contentOrigins).toBeInstanceOf(Array);
-    expect(firstBlock.contentOrigins.length).toBeGreaterThan(0);
+    // Verification: Source tracking via processedLinks (AC5)
+    const firstContentId = /* Object.keys(result.extractedContentBlocks)[0] */;
+    const linksForContent = result.outgoingLinksReport.processedLinks.filter(
+      link => link.contentId === firstContentId
+    );
+    expect(linksForContent.length).toBeGreaterThan(0);
 
     // Verification: Mixed statuses present (AC6, AC8)
     const statuses = /* map processedLinks to status */;
@@ -1628,8 +1624,8 @@ US2.2a COMPLETE"
 2. ✅ Hash collision avoidance (different content → different hash) → commit
 3. ✅ Hash format (16 hex chars) → commit
 4. ✅ Basic deduplication logic (inline index building) → commit
-5. ✅ Content index structure (content, contentLength, contentOrigins) → commit
-6. ✅ Content origins tracking (accumulate all sources) → commit
+5. ✅ Content index structure (content, contentLength) → commit
+6. ✅ Source tracking via processedLinks (filter by contentId) → commit
 7. ✅ ContentId references (success vs null) → commit
 8. ✅ Total links count statistics → commit
 9. ✅ Unique content count statistics → commit
