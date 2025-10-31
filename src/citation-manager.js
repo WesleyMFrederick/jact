@@ -458,6 +458,15 @@ export class CitationManager {
 			// Add validation property to link object
 			syntheticLink.validation = validation;
 
+			// Decision: Apply path conversion if validator found file via cache
+			// Pattern: Validator suggests recommended path when file found in different location
+			if (validationResult.pathConversion && validationResult.pathConversion.recommended) {
+				// Update target path to use cache-resolved absolute path
+				const { resolve } = await import("node:path");
+				const absolutePath = resolve(validationResult.pathConversion.recommended);
+				syntheticLink.target.path.absolute = absolutePath;
+			}
+
 			// Decision: Check validation status before extraction (error handling)
 			if (syntheticLink.validation.status === "error") {
 				// Boundary: Error output to stderr

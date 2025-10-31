@@ -60,3 +60,25 @@ describe("CLI extract file subcommand - Error Handling", () => {
     }
   });
 });
+
+describe("CLI extract file subcommand - Scope Option", () => {
+  it("should respect scope option for file resolution", async () => {
+    // Given: File exists in scoped directory
+    const scopedDir = join(FIXTURES_DIR, "scoped");
+    const fileName = "nested-file.md"; // Relative filename only
+
+    // When: Execute with scope option
+    const { stdout } = await execAsync(
+      `node "${CLI_PATH}" extract file "${fileName}" --scope "${scopedDir}"`
+    );
+
+    // Then: File is found and content extracted
+    const result = JSON.parse(stdout);
+    expect(result.stats.uniqueContent).toBe(1);
+
+    const contentIds = Object.keys(result.extractedContentBlocks)
+      .filter(k => k !== "_totalContentCharacterLength");
+    const contentBlock = result.extractedContentBlocks[contentIds[0]];
+    expect(contentBlock.content).toContain("Nested File");
+  });
+});
