@@ -60,6 +60,7 @@ This feature directly supports the CC Workflows vision by:
 | 2025-10-29 | 2.8     | Refactor US2.3 to `extract links` subcommand with generic AC, add US2.4 for `extract header` subcommand, update FR6/FR7 for subcommand architecture, add FR12 for direct content extraction                        | Product Manager (Claude Sonnet 4.5)      |
 | 2025-10-29 | 2.9     | Add US2.3 AC12 for --full-files flag, add US2.5 for extract file subcommand, add US2.6 for CLI help enhancements, add US2.7 for base-paths removal, update FR7 and FR12 for extract file support                | Product Manager (Claude Sonnet 4.5)      |
 | 2025-10-30 | 3.0     | Mark US2.3 as COMPLETE - `extract links` subcommand implemented with comprehensive CLI integration tests, help documentation, and two-phase workflow (267/267 tests passing)                                     | Application Tech Lead (Claude Sonnet 4.5) |
+| 2025-10-30 | 3.1     | Mark US2.5 as COMPLETE - `extract file` subcommand implemented with four-phase orchestration workflow, scope support, path conversion, comprehensive error handling, and help documentation (288/288 tests, 8 new) | Application Tech Lead (Claude Sonnet 4.5) |
 
 ---
 
@@ -567,7 +568,7 @@ The synthetic LinkObject contains: `{ linkType, scope, anchorType: null, target:
 
 _Depends On_: [Story 2.4: Implement `extract header` Subcommand](#Story%202.4%20Implement%20extract%20header%20Subcommand)
 _Functional Requirements_: [[#^FR7|FR7]], [[#^FR12|FR12]]
-_Status_: Pending
+_Status_: ✅ COMPLETE (2025-10-30)
 
 ---
 
