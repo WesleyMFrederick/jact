@@ -181,18 +181,224 @@ Examples:
 
 ---
 
-### 3. `extract` Commands (Already Comprehensive)
+### 3. `extract links` Command (Restructure to Match jq Pattern)
 
-**Current State**: Extract commands (`extract links`, `extract header`, `extract file`) already have comprehensive help with examples, exit codes, and notes.
+**Current State**: Has comprehensive help but uses custom "Workflow" section instead of description paragraph
+**Enhancement**: Restructure to match jq pattern (description → examples → options → exit codes)
 
-**Action**: **No changes required**. Current implementation already exceeds popular tool standards.
+**Current Structure**:
+- Brief description line
+- Workflow section (3 phases)
+- Examples
+- Exit Codes
+- Options
 
-**Verification**: Existing help follows this pattern:
-- ✅ Description
-- ✅ Workflow explanation (where relevant)
-- ✅ Examples with multiple usage patterns
-- ✅ Exit codes
-- ✅ Notes section for advanced usage
+**Target Structure**:
+- Description paragraph (explains what command does)
+- Examples (before options)
+- Options
+- Exit Codes (after options)
+
+**Target Output**:
+
+```text
+Usage: citation-manager extract links [options] <source-file>
+
+citation-manager extract links discovers all citation links in a source
+document, validates them, determines extraction eligibility, and outputs
+deduplicated content from target files. The workflow includes validation,
+eligibility analysis via strategy chain, content retrieval, and SHA-256
+deduplication to minimize token usage.
+
+Examples:
+
+    $ citation-manager extract links docs/design.md
+    $ citation-manager extract links docs/design.md --full-files
+    $ citation-manager extract links docs/design.md --scope ./docs
+    $ citation-manager extract links file.md | jq '.stats.compressionRatio'
+
+Arguments:
+  source-file               markdown file containing citation links
+
+Options:
+  --scope <folder>          limit file resolution to folder
+  --format <type>           output format (reserved for future) (default: "json")
+  --full-files              enable full-file link extraction (default: sections only)
+  -h, --help                display help for command
+
+Exit Codes:
+  0  At least one link extracted successfully
+  1  No eligible links or all extractions failed
+  2  System error (file not found, permission denied)
+```
+
+**Implementation**:
+
+```javascript
+program
+  .command('extract links')
+  .description('Extract content from all links in source document')
+  .argument('<source-file>', 'markdown file containing citation links')
+  .addHelpText('before', `
+citation-manager extract links discovers all citation links in a source
+document, validates them, determines extraction eligibility, and outputs
+deduplicated content from target files. The workflow includes validation,
+eligibility analysis via strategy chain, content retrieval, and SHA-256
+deduplication to minimize token usage.
+
+Examples:
+
+    $ citation-manager extract links docs/design.md
+    $ citation-manager extract links docs/design.md --full-files
+    $ citation-manager extract links docs/design.md --scope ./docs
+    $ citation-manager extract links file.md | jq '.stats.compressionRatio'
+`)
+  .option('--scope <folder>', 'limit file resolution to folder')
+  .option('--format <type>', 'output format (reserved for future)', 'json')
+  .option('--full-files', 'enable full-file link extraction (default: sections only)')
+  .addHelpText('after', `
+Exit Codes:
+  0  At least one link extracted successfully
+  1  No eligible links or all extractions failed
+  2  System error (file not found, permission denied)
+`);
+```
+
+---
+
+### 4. `extract header` Command (Restructure to Match jq Pattern)
+
+**Current State**: Has comprehensive help but needs restructuring to match jq pattern
+**Enhancement**: Restructure with description paragraph before examples
+
+**Target Output**:
+
+```text
+Usage: citation-manager extract header [options] <target-file> <header-name>
+
+citation-manager extract header extracts content from a specific header
+section in a target file without requiring a source document with links.
+Uses synthetic link creation and the same extraction pipeline as extract
+links for consistent behavior.
+
+Examples:
+
+    $ citation-manager extract header plan.md "Task 1: Implementation"
+    $ citation-manager extract header docs/guide.md "Overview" --scope ./docs
+    $ citation-manager extract header file.md "Design" | jq '.extractedContentBlocks'
+
+Arguments:
+  target-file               markdown file to extract from
+  header-name               exact header text to extract
+
+Options:
+  --scope <folder>          limit file resolution scope
+  --format <type>           output format (json) (default: "json")
+  -h, --help                display help for command
+
+Exit Codes:
+  0  Header extracted successfully
+  1  Header not found or validation failed
+  2  System error (file not found, permission denied)
+```
+
+**Implementation**:
+
+```javascript
+program
+  .command('extract header')
+  .description('Extract specific header content from target file')
+  .argument('<target-file>', 'markdown file to extract from')
+  .argument('<header-name>', 'exact header text to extract')
+  .addHelpText('before', `
+citation-manager extract header extracts content from a specific header
+section in a target file without requiring a source document with links.
+Uses synthetic link creation and the same extraction pipeline as extract
+links for consistent behavior.
+
+Examples:
+
+    $ citation-manager extract header plan.md "Task 1: Implementation"
+    $ citation-manager extract header docs/guide.md "Overview" --scope ./docs
+    $ citation-manager extract header file.md "Design" | jq '.extractedContentBlocks'
+`)
+  .option('--scope <folder>', 'limit file resolution scope')
+  .option('--format <type>', 'output format (json)', 'json')
+  .addHelpText('after', `
+Exit Codes:
+  0  Header extracted successfully
+  1  Header not found or validation failed
+  2  System error (file not found, permission denied)
+`);
+```
+
+---
+
+### 5. `extract file` Command (Restructure to Match jq Pattern)
+
+**Current State**: Has comprehensive help but needs restructuring to match jq pattern
+**Enhancement**: Restructure with description paragraph before examples
+
+**Target Output**:
+
+```text
+Usage: citation-manager extract file [options] <target-file>
+
+citation-manager extract file extracts the entire content of a markdown
+file without requiring a source document with links. Creates a synthetic
+full-file link and uses the same extraction and deduplication pipeline
+as extract links for consistent output structure.
+
+Examples:
+
+    $ citation-manager extract file docs/architecture.md
+    $ citation-manager extract file architecture.md --scope ./docs
+    $ citation-manager extract file file.md | jq '.extractedContentBlocks'
+    $ citation-manager extract file file.md | jq '.stats'
+
+Arguments:
+  target-file               markdown file to extract
+
+Options:
+  --scope <folder>          limit file resolution to specified directory
+  --format <type>           output format (json) (default: "json")
+  -h, --help                display help for command
+
+Exit Codes:
+  0  File extracted successfully
+  1  File not found or validation failed
+  2  System error (permission denied, parse error)
+```
+
+**Implementation**:
+
+```javascript
+program
+  .command('extract file')
+  .description('Extract entire file content')
+  .argument('<target-file>', 'markdown file to extract')
+  .addHelpText('before', `
+citation-manager extract file extracts the entire content of a markdown
+file without requiring a source document with links. Creates a synthetic
+full-file link and uses the same extraction and deduplication pipeline
+as extract links for consistent output structure.
+
+Examples:
+
+    $ citation-manager extract file docs/architecture.md
+    $ citation-manager extract file architecture.md --scope ./docs
+    $ citation-manager extract file file.md | jq '.extractedContentBlocks'
+    $ citation-manager extract file file.md | jq '.stats'
+`)
+  .option('--scope <folder>', 'limit file resolution to specified directory')
+  .option('--format <type>', 'output format (json)', 'json')
+  .addHelpText('after', `
+Exit Codes:
+  0  File extracted successfully
+  1  File not found or validation failed
+  2  System error (permission denied, parse error)
+`);
+```
 
 ---
 
@@ -285,15 +491,18 @@ program.configureOutput({
   - [ ] Create `semanticSuggestionMap` constant
   - [ ] Configure `program.configureOutput()` with custom error handler
 
-- [ ] Verify existing extract commands:
-  - [ ] Confirm `extract links --help` output is acceptable
-  - [ ] Confirm `extract header --help` output is acceptable
-  - [ ] Confirm `extract file --help` output is acceptable
-  - [ ] Confirm top-level `extract --help` lists subcommands clearly
+- [ ] Restructure extract commands to match jq pattern:
+  - [ ] Update `extract links` - move description to `.addHelpText('before', ...)`, remove Workflow section
+  - [ ] Update `extract header` - add description paragraph before examples
+  - [ ] Update `extract file` - add description paragraph before examples
+  - [ ] Verify all three follow: description → examples → options → exit codes
 
 - [ ] Testing:
   - [ ] Manual: Run `citation-manager validate --help` and verify output
   - [ ] Manual: Run `citation-manager ast --help` and verify output
+  - [ ] Manual: Run `citation-manager extract links --help` and verify jq-style layout
+  - [ ] Manual: Run `citation-manager extract header --help` and verify jq-style layout
+  - [ ] Manual: Run `citation-manager extract file --help` and verify jq-style layout
   - [ ] Manual: Test suggestion map with invalid commands/options
   - [ ] No automated tests required (help text is presentational)
 
@@ -303,18 +512,18 @@ program.configureOutput({
 
 **AC1**: validate command help includes description, options, examples, exit codes ✅
 **AC2**: ast command help includes description, output structure, use cases ✅
-**AC3**: extract command top-level help lists subcommands (already complete) ✅
-**AC4**: extract subcommands have detailed help (already complete) ✅
+**AC3**: extract command top-level help lists subcommands ✅
+**AC4**: extract subcommands restructured to match jq pattern (description → examples → options → exit codes) ✅
 **AC5**: Standard help flags work for all commands (Commander.js default) ✅
 
 ---
 
 ## Non-Goals
 
-- ❌ Restructuring existing extract command help (already comprehensive)
 - ❌ Creating template helpers or structured objects (YAGNI)
 - ❌ External help files (violates cohesion principle)
 - ❌ Man page generation (not in scope)
+- ❌ Option grouping for extract commands (they have few options, grouping adds noise)
 
 ---
 

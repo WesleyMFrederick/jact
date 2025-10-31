@@ -587,7 +587,8 @@ _Status_: ✅ COMPLETE (2025-10-30)
 5. Help documentation SHALL be accessible via standard help flags (`--help` or `-h`) for each command and subcommand. ^US2-6AC5
 
 _Depends On_: [Story 2.5: Implement `extract file` Subcommand](#Story%202.5%20Implement%20extract%20file%20Subcommand)
-_Status_: Pending
+_Design Plan_: [us2.6-add-comprehensive-help-documentation-design-plan](user-stories/us2.6-add-comprehensive-help-documentation/us2.6-add-comprehensive-help-documentation-design-plan.md)
+_Status_: ✅ COMPLETE (2025-10-31)
 
 ---
 

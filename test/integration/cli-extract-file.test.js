@@ -138,7 +138,7 @@ describe("CLI extract file subcommand - Help Documentation", () => {
     );
 
     // Then: Help output contains description
-    expect(stdout).toContain("Extract entire file content");
+    expect(stdout).toContain("Extract entire markdown file content");
     expect(stdout).toContain("target-file");
     expect(stdout).toContain("--scope");
     expect(stdout).toContain("--format");

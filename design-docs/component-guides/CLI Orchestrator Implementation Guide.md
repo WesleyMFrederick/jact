@@ -22,6 +22,7 @@ The **CLI Orchestrator** (implemented as the `CitationManager` class in `citatio
 - **Factory Pattern**: Component instantiation with DI for testability
 - **Separation of Concerns**: Validator validates, Extractor extracts, CLI coordinates
 - **Fix Logic Exception**: Fix command contains application logic (documented tech debt)
+- **Help Documentation Pattern**: jq-style layout using Commander.js `.addHelpText()` (US2.6)
 
 **Epic 2 Extract Command Architecture:**
 - **extract links**: CLI calls validator.validateFile() → passes enriched links to extractor
@@ -88,6 +89,31 @@ classDiagram
     CitationManager ..> ContentExtractor : calls
     CitationManager ..> LinkObjectFactory : uses (extract header/file)
 ```
+
+### Semantic Suggestion Map
+
+The CLI includes a `semanticSuggestionMap` constant that maps common user mistakes to correct commands/options:
+
+```javascript
+const semanticSuggestionMap = {
+	// Command synonyms
+	check: ['validate'],
+	verify: ['validate'],
+	lint: ['validate'],
+	parse: ['ast'],
+	// ... etc
+};
+```
+
+Custom error handler uses this map via `program.configureOutput()` to provide helpful suggestions:
+
+```text
+$ citation-manager check file.md
+Unknown command 'check'
+Did you mean: validate?
+```
+
+**Design Decision**: Uses Commander.js native error handling hooks rather than custom error classes. Keeps CLI layer thin and focused on presentation.
 
 ---
 

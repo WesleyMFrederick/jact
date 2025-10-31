@@ -799,6 +799,35 @@ export class CitationManager {
 	}
 }
 
+/**
+ * Semantic suggestion map for common user mistakes
+ *
+ * Maps common synonyms and typos to correct commands/options.
+ * Used by custom error handler to provide helpful suggestions.
+ */
+const semanticSuggestionMap = {
+	// Command synonyms
+	check: ['validate'],
+	verify: ['validate'],
+	lint: ['validate'],
+	parse: ['ast'],
+	tree: ['ast'],
+	debug: ['ast'],
+	show: ['ast'],
+
+	// Option synonyms
+	fix: ['--fix'],
+	repair: ['--fix'],
+	correct: ['--fix'],
+	output: ['--format'],
+	json: ['--format json'],
+	range: ['--lines'],
+	folder: ['--scope'],
+	directory: ['--scope'],
+	path: ['--scope'],
+	dir: ['--scope']
+};
+
 const program = new Command();
 
 program
@@ -806,9 +835,27 @@ program
 	.description("Citation validation and management tool for markdown files")
 	.version("1.0.0");
 
+// Configure custom error output with semantic suggestions
+program.configureOutput({
+	outputError: (str, write) => {
+		const match = str.match(/unknown (?:command|option) '([^']+)'/);
+		if (match) {
+			const input = match[1].replace(/^--?/, '');
+			const suggestions = semanticSuggestionMap[input];
+
+			if (suggestions) {
+				write(`Unknown ${match[0].includes('command') ? 'command' : 'option'} '${match[1]}'\n`);
+				write(`Did you mean: ${suggestions.join(', ')}?\n`);
+				return;
+			}
+		}
+		write(str);
+	}
+});
+
 program
 	.command("validate")
-	.description("Validate citations in a markdown file")
+	.description("Validate citations in a markdown file, checking that target files exist and anchors resolve correctly")
 	.argument("<file>", "path to markdown file to validate")
 	.option("--format <type>", "output format (cli, json)", "cli")
 	.option(
@@ -823,6 +870,18 @@ program
 		"--fix",
 		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections",
 	)
+	.addHelpText('after', `
+Examples:
+    $ citation-manager validate docs/design.md
+    $ citation-manager validate file.md --format json
+    $ citation-manager validate file.md --lines 100-200
+    $ citation-manager validate file.md --fix --scope ./docs
+
+Exit Codes:
+  0  All citations valid
+  1  Validation errors found
+  2  System error (file not found, permission denied)
+`)
 	.action(async (file, options) => {
 		const manager = new CitationManager();
 		let result;
@@ -856,8 +915,20 @@ program
 
 program
 	.command("ast")
-	.description("Show AST and extracted data from markdown file")
+	.description("Display markdown AST and citation metadata for debugging")
 	.argument("<file>", "path to markdown file to analyze")
+	.addHelpText('after', `
+Examples:
+    $ citation-manager ast docs/design.md
+    $ citation-manager ast file.md | jq '.links'
+    $ citation-manager ast file.md | jq '.anchors | length'
+
+Output includes:
+  - tokens: Markdown AST from marked.js parser
+  - links: Detected citation links with anchor metadata
+  - headings: Parsed heading structure
+  - anchors: Available anchor points (headers and blocks)
+`)
 	.action(async (file) => {
 		const manager = new CitationManager();
 		const ast = await manager.parser.parseFile(file);
@@ -903,22 +974,22 @@ const extractCmd = program
 
 extractCmd
 	.command("links <source-file>")
-	.description("Extract content from all links in source document\n\n" +
-		"Workflow:\n" +
-		"  Phase 1: Validate and discover all links in source file\n" +
-		"  Phase 2: Extract content from eligible links\n" +
-		"  Phase 3: Output deduplicated JSON structure\n\n" +
-		"Examples:\n" +
-		"  $ citation-manager extract links docs/design.md\n" +
-		"  $ citation-manager extract links docs/design.md --full-files\n" +
-		"  $ citation-manager extract links docs/design.md --scope ./docs\n\n" +
-		"Exit Codes:\n" +
-		"  0  At least one link extracted successfully\n" +
-		"  1  No eligible links or all extractions failed\n" +
-		"  2  System error (file not found, permission denied)")
+	.description("Extract content from all links in source document with validation and deduplication")
 	.option("--scope <folder>", "Limit file resolution to folder")
 	.option("--format <type>", "Output format (reserved for future)", "json")
 	.option("--full-files", "Enable full-file link extraction (default: sections only)")
+	.addHelpText('after', `
+Examples:
+    $ citation-manager extract links docs/design.md
+    $ citation-manager extract links docs/design.md --full-files
+    $ citation-manager extract links docs/design.md --scope ./docs
+    $ citation-manager extract links file.md | jq '.stats.compressionRatio'
+
+Exit Codes:
+  0  At least one link extracted successfully
+  1  No eligible links or all extractions failed
+  2  System error (file not found, permission denied)
+`)
 	.action(async (sourceFile, options) => {
 		// Pattern: Delegate to CitationManager orchestrator
 		const manager = new CitationManager();
@@ -933,28 +1004,22 @@ extractCmd
 
 extractCmd
 	.command("header")
-	.description("Extract specific header content from target file")
+	.description("Extract specific header section content from a target file")
 	.argument("<target-file>", "Markdown file to extract from")
 	.argument("<header-name>", "Exact header text to extract")
 	.option("--scope <folder>", "Limit file resolution scope")
-	.addHelpText("after", `
+	.option("--format <type>", "Output format (json)", "json")
+	.addHelpText('after', `
 Examples:
-  # Extract specific section from design document
-  $ citation-manager extract header plan.md "Task 1: Implementation"
-
-  # Extract with scope limiting
-  $ citation-manager extract header docs/guide.md "Overview" --scope ./docs
+    $ citation-manager extract header plan.md "Task 1: Implementation"
+    $ citation-manager extract header docs/guide.md "Overview" --scope ./docs
+    $ citation-manager extract header file.md "Design" | jq '.extractedContentBlocks'
 
 Exit Codes:
   0  Header extracted successfully
   1  Header not found or validation failed
   2  System error (file not found, permission denied)
-
-Notes:
-  - Header name must match exactly (case-sensitive)
-  - Extracts complete section until next same-level heading
-  - Output is JSON OutgoingLinksExtractedContent structure
-  `)
+`)
 	.action(async (targetFile, headerName, options) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
@@ -980,31 +1045,22 @@ Notes:
 
 extractCmd
 	.command("file")
-	.description("Extract entire file content")
+	.description("Extract entire markdown file content")
 	.argument("<target-file>", "Markdown file to extract")
 	.option("--scope <folder>", "Limit file resolution to specified directory")
 	.option("--format <type>", "Output format (json)", "json")
-	.addHelpText("after", `
+	.addHelpText('after', `
 Examples:
-  # Extract entire file
-  $ citation-manager extract file docs/architecture.md
-
-  # Extract with scope restriction
-  $ citation-manager extract file architecture.md --scope ./docs
-
-  # Pipe to jq for filtering
-  $ citation-manager extract file file.md | jq '.extractedContentBlocks'
+    $ citation-manager extract file docs/architecture.md
+    $ citation-manager extract file architecture.md --scope ./docs
+    $ citation-manager extract file file.md | jq '.extractedContentBlocks'
+    $ citation-manager extract file file.md | jq '.stats'
 
 Exit Codes:
   0  File extracted successfully
   1  File not found or validation failed
   2  System error (permission denied, parse error)
-
-Notes:
-  - Extracts complete file content without requiring source document
-  - Output is JSON OutgoingLinksExtractedContent structure
-  - Use --scope for smart filename resolution in large projects
-  `)
+`)
 	.action(async (targetFile, options) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();

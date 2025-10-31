@@ -21,6 +21,27 @@ The CLI maintains strict separation between **command orchestration** (CLI's res
 
 The CLI exposes five commands, each accessible via `npm run citation:<command>`:
 
+### Help Documentation Pattern
+
+All commands follow a **standardized help layout pattern**:
+
+1. **Usage** - Command syntax (Commander.js automatic)
+2. **Description** - Paragraph explaining what command does (`.description()` method)
+3. **Arguments** - Required/optional arguments (Commander.js automatic)
+4. **Options** - Flags and their descriptions (`.option()` calls)
+5. **Examples** - Real-world usage patterns (`.addHelpText('after', ...)`)
+6. **Exit Codes** - Return codes for automation (`.addHelpText('after', ...)`)
+
+**Rationale**: Clear progression from "what is this" (usage/description) → "what can I configure" (arguments/options) → "how do I use it" (examples) → "what happens when I run it" (exit codes).
+
+**Implementation**: Uses Commander.js native `.addHelpText('after', ...)` method for examples and exit codes. Both sections combined in single call. No custom abstractions or template helpers.
+
+**Key Detail**: `.addHelpText('before', ...)` places text _before_ the Usage line (not before options). To place examples after options, use `.addHelpText('after', ...)`.
+
+**Semantic Suggestions**: Custom error handler provides "Did you mean...?" suggestions for common typos and synonyms (e.g., "check" → "validate", "--folder" → "--scope").
+
+---
+
 ### 1. `validate` - Citation Validation with Auto-Fix
 
 **Purpose**: Validate all citations in a markdown file, optionally fixing broken citations automatically

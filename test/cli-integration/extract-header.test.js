@@ -105,7 +105,7 @@ describe("CLI Help Documentation", () => {
     // Then: Help lists header subcommand
     // Verification: US2.4 AC10 top-level help
     expect(output).toContain("header");
-    expect(output).toContain("Extract specific header content");
+    expect(output).toContain("Extract specific header section content");
   });
 
   it("should show detailed help for extract header subcommand", async () => {
@@ -121,16 +121,12 @@ describe("CLI Help Documentation", () => {
 
     // Then: Examples section included
     expect(output).toContain("Examples:");
-    expect(output).toContain("Extract specific section from design document");
+    expect(output).toContain("citation-manager extract header");
 
     // Then: Exit codes documented
     expect(output).toContain("Exit Codes:");
     expect(output).toContain("0  Header extracted successfully");
     expect(output).toContain("1  Header not found or validation failed");
     expect(output).toContain("2  System error");
-
-    // Then: Important notes included
-    expect(output).toContain("Notes:");
-    expect(output).toContain("Header name must match exactly");
   });
 });
