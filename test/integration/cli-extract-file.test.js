@@ -40,3 +40,23 @@ describe("CLI extract file subcommand - Basic Functionality", () => {
     expect(contentBlock.content).toContain("Section 1");
   });
 });
+
+describe("CLI extract file subcommand - Error Handling", () => {
+  it("should report error when file does not exist", async () => {
+    // Given: Non-existent file path
+    const missingFile = join(FIXTURES_DIR, "does-not-exist.md");
+
+    // When: Execute extract file command (expect failure)
+    try {
+      await execAsync(`node "${CLI_PATH}" extract file "${missingFile}"`);
+      // If we get here, test should fail
+      expect.fail("Command should have failed for missing file");
+    } catch (error) {
+      // Then: Command exits with non-zero code
+      expect(error.code).toBeGreaterThan(0);
+
+      // Then: Error message contains helpful information
+      expect(error.stderr || error.stdout).toContain("File not found");
+    }
+  });
+});
