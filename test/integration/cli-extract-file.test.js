@@ -82,3 +82,48 @@ describe("CLI extract file subcommand - Scope Option", () => {
     expect(contentBlock.content).toContain("Nested File");
   });
 });
+
+describe("CLI extract file subcommand - Exit Codes", () => {
+  it("should exit with code 0 when extraction succeeds", async () => {
+    // Given: Valid markdown file
+    const testFile = join(FIXTURES_DIR, "sample-document.md");
+
+    // When: Execute extract file command
+    const { stdout, stderr } = await execAsync(
+      `node "${CLI_PATH}" extract file "${testFile}"`
+    );
+
+    // Then: Command exits with code 0 (success - implicit in execAsync not throwing)
+    const result = JSON.parse(stdout);
+    expect(result.stats.uniqueContent).toBeGreaterThan(0);
+    expect(stderr).toBe("");
+  });
+
+  it("should exit with non-zero code when file not found", async () => {
+    // Given: Non-existent file
+    const missingFile = join(FIXTURES_DIR, "missing.md");
+
+    // When: Execute extract file command
+    try {
+      await execAsync(`node "${CLI_PATH}" extract file "${missingFile}"`);
+      expect.fail("Should have thrown error");
+    } catch (error) {
+      // Then: Exit code is non-zero (1 or 2)
+      expect(error.code).toBeGreaterThan(0);
+    }
+  });
+
+  it("should exit with code 1 when validation fails", async () => {
+    // Given: Invalid file path that validator rejects
+    const invalidFile = "/tmp/nonexistent-citation-test-file.md";
+
+    // When: Execute extract file command
+    try {
+      await execAsync(`node "${CLI_PATH}" extract file "${invalidFile}"`);
+      expect.fail("Should have thrown error");
+    } catch (error) {
+      // Then: Exit code is 1 (validation error)
+      expect(error.code).toBe(1);
+    }
+  });
+});
