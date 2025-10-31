@@ -127,3 +127,34 @@ describe("CLI extract file subcommand - Exit Codes", () => {
     }
   });
 });
+
+describe("CLI extract file subcommand - Help Documentation", () => {
+  it("should display help text for extract file subcommand", async () => {
+    // Given: Extract file help flag
+
+    // When: Execute help command
+    const { stdout } = await execAsync(
+      `node "${CLI_PATH}" extract file --help`
+    );
+
+    // Then: Help output contains description
+    expect(stdout).toContain("Extract entire file content");
+    expect(stdout).toContain("target-file");
+    expect(stdout).toContain("--scope");
+    expect(stdout).toContain("--format");
+  });
+
+  it("should list extract file in top-level extract help", async () => {
+    // Given: Extract help flag
+
+    // When: Execute extract help
+    const { stdout } = await execAsync(
+      `node "${CLI_PATH}" extract --help`
+    );
+
+    // Then: Extract file subcommand is listed
+    expect(stdout).toContain("file");
+    expect(stdout).toContain("links");
+    expect(stdout).toContain("header");
+  });
+});
