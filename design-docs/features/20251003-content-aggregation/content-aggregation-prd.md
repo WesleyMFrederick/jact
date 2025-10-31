@@ -60,6 +60,7 @@ This feature directly supports the CC Workflows vision by:
 | 2025-10-29 | 2.8     | Refactor US2.3 to `extract links` subcommand with generic AC, add US2.4 for `extract header` subcommand, update FR6/FR7 for subcommand architecture, add FR12 for direct content extraction                        | Product Manager (Claude Sonnet 4.5)      |
 | 2025-10-29 | 2.9     | Add US2.3 AC12 for --full-files flag, add US2.5 for extract file subcommand, add US2.6 for CLI help enhancements, add US2.7 for base-paths removal, update FR7 and FR12 for extract file support                | Product Manager (Claude Sonnet 4.5)      |
 | 2025-10-30 | 3.0     | Mark US2.3 as COMPLETE - `extract links` subcommand implemented with comprehensive CLI integration tests, help documentation, and two-phase workflow (267/267 tests passing)                                     | Application Tech Lead (Claude Sonnet 4.5) |
+| 2025-10-30 | 3.1     | Mark US2.5 as COMPLETE - `extract file` subcommand implemented with four-phase orchestration workflow, scope support, path conversion, comprehensive error handling, and help documentation (288/288 tests, 8 new) | Application Tech Lead (Claude Sonnet 4.5) |
 
 ---
 
@@ -479,7 +480,7 @@ _Status_: ✅ COMPLETE (2025-10-30)
 
 ---
 
-### Story 2.4: Implement `extract header` Subcommand
+### Story 2.4 Implement `extract header` Subcommand
 
 **As a** developer creating context packages for AI,
 **I want** a new `extract header` subcommand that extracts content from a specific header in a target file,
@@ -532,7 +533,7 @@ _Status_: Pending
 
 ---
 
-### Story 2.5: Implement `extract file` Subcommand
+### Story 2.5 - Implement `extract file` Subcommand
 
 **As a** developer creating context packages for AI,
 **I want** a subcommand to extract an entire file's content directly,
@@ -557,7 +558,7 @@ The CLI implements synthetic link creation for full-file extraction using LinkOb
 
 The synthetic LinkObject contains: `{ linkType, scope, anchorType: null, target: { path }, validation: null }`. The `fullFiles: true` flag reuses existing CliFlagStrategy without hardcoding extraction markers in CLI. See [Epic 2 Whiteboard - LinkObjectFactory](#LinkObjectFactory%20(Level%204%20Code%20Detail%20of%20CLI%20Orchestrator)) for factory contracts.
 
-> [!warning] **Technical Lead Feedback**: Implementation Approach for extract file
+> [!note] **Technical Lead Feedback**: Implementation Approach for extract file
 >
 > **Suggested Approach**: Create synthetic link structure with `anchorType: null` and pass `{ fullFiles: true }` flag to ContentExtractor. This enables extraction through existing CliFlagStrategy without introducing marker coupling.
 >
@@ -567,11 +568,11 @@ The synthetic LinkObject contains: `{ linkType, scope, anchorType: null, target:
 
 _Depends On_: [Story 2.4: Implement `extract header` Subcommand](#Story%202.4%20Implement%20extract%20header%20Subcommand)
 _Functional Requirements_: [[#^FR7|FR7]], [[#^FR12|FR12]]
-_Status_: Pending
+_Status_: ✅ COMPLETE (2025-10-30)
 
 ---
 
-### Story 2.6: Add Comprehensive Help Documentation to CLI Commands
+### Story 2.6 Add Comprehensive Help Documentation to CLI Commands
 
 **As a** user of the citation-manager CLI,
 **I want** comprehensive help documentation for each command,

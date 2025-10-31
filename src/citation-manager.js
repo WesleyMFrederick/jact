@@ -409,6 +409,95 @@ export class CitationManager {
 	}
 
 	/**
+	 * Extract entire file content using synthetic link pattern.
+	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 *
+	 * Pattern: Four-phase orchestration workflow
+	 * 1. Create synthetic LinkObject via factory (anchorType: null)
+	 * 2. Validate synthetic link via validator
+	 * 3. Extract content via extractor with fullFiles flag
+	 * 4. Return OutgoingLinksExtractedContent structure
+	 *
+	 * @param {string} targetFile - Path to markdown file to extract
+	 * @param {Object} options - CLI options (scope, format)
+	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 */
+	async extractFile(targetFile, options) {
+		try {
+			// Decision: Build file cache if --scope provided
+			if (options.scope) {
+				await this.fileCache.buildCache(options.scope);
+			}
+
+			// --- Phase 1: Synthetic Link Creation ---
+			// Pattern: Use factory to create unvalidated LinkObject for full file
+			const factory = new LinkObjectFactory();
+			const syntheticLink = factory.createFileLink(targetFile);
+
+			// --- Phase 2: Validation ---
+			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
+			const validationResult = await this.validator.validateSingleCitation(syntheticLink, targetFile);
+
+			// Extract validation metadata from result
+			const validation = {
+				status: validationResult.status,
+			};
+
+			if (validationResult.error) {
+				validation.error = validationResult.error;
+			}
+
+			if (validationResult.suggestion) {
+				validation.suggestion = validationResult.suggestion;
+			}
+
+			if (validationResult.pathConversion) {
+				validation.pathConversion = validationResult.pathConversion;
+			}
+
+			// Add validation property to link object
+			syntheticLink.validation = validation;
+
+			// Decision: Apply path conversion if validator found file via cache
+			// Pattern: Validator suggests recommended path when file found in different location
+			if (validationResult.pathConversion && validationResult.pathConversion.recommended) {
+				// Update target path to use cache-resolved absolute path
+				const { resolve } = await import("node:path");
+				const absolutePath = resolve(validationResult.pathConversion.recommended);
+				syntheticLink.target.path.absolute = absolutePath;
+			}
+
+			// Decision: Check validation status before extraction (error handling)
+			if (syntheticLink.validation.status === "error") {
+				// Boundary: Error output to stderr
+				console.error("Validation failed:", syntheticLink.validation.error);
+				if (syntheticLink.validation.suggestion) {
+					console.error("Suggestion:", syntheticLink.validation.suggestion);
+				}
+				process.exitCode = 1;
+				return;
+			}
+
+			// --- Phase 3: Extraction ---
+			// Decision: Force fullFiles flag for full-file extraction
+			// Pattern: ContentExtractor uses CliFlagStrategy to make link eligible
+			const result = await this.contentExtractor.extractContent(
+				[syntheticLink],
+				{ ...options, fullFiles: true }
+			);
+
+			// --- Phase 4: Return ---
+			// Decision: Return result for CLI to output (CLI handles stdout)
+			return result;
+
+		} catch (error) {
+			// Decision: System errors use exit code 2
+			console.error("ERROR:", error.message);
+			process.exitCode = 2;
+		}
+	}
+
+	/**
 	 * Extract distinct base paths from citations
 	 *
 	 * Parses file and extracts all unique target file paths from citations.
@@ -881,6 +970,56 @@ Notes:
 				process.exitCode = 0;
 			}
 			// Note: Error exit codes set by extractHeader() method
+
+		} catch (error) {
+			// Decision: Unexpected errors use exit code 2
+			console.error("ERROR:", error.message);
+			process.exitCode = 2;
+		}
+	});
+
+extractCmd
+	.command("file")
+	.description("Extract entire file content")
+	.argument("<target-file>", "Markdown file to extract")
+	.option("--scope <folder>", "Limit file resolution to specified directory")
+	.option("--format <type>", "Output format (json)", "json")
+	.addHelpText("after", `
+Examples:
+  # Extract entire file
+  $ citation-manager extract file docs/architecture.md
+
+  # Extract with scope restriction
+  $ citation-manager extract file architecture.md --scope ./docs
+
+  # Pipe to jq for filtering
+  $ citation-manager extract file file.md | jq '.extractedContentBlocks'
+
+Exit Codes:
+  0  File extracted successfully
+  1  File not found or validation failed
+  2  System error (permission denied, parse error)
+
+Notes:
+  - Extracts complete file content without requiring source document
+  - Output is JSON OutgoingLinksExtractedContent structure
+  - Use --scope for smart filename resolution in large projects
+  `)
+	.action(async (targetFile, options) => {
+		// Integration: Create CitationManager instance
+		const manager = new CitationManager();
+
+		try {
+			// Pattern: Delegate to CitationManager orchestration method
+			const result = await manager.extractFile(targetFile, options);
+
+			// Decision: Output JSON to stdout if extraction succeeded
+			if (result) {
+				// Boundary: JSON output to stdout
+				console.log(JSON.stringify(result, null, 2));
+				process.exitCode = 0;
+			}
+			// Note: Error exit codes set by extractFile() method
 
 		} catch (error) {
 			// Decision: Unexpected errors use exit code 2

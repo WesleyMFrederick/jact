@@ -115,6 +115,34 @@ npm run citation:base-paths path/to/file.md -- --format json
 node utility-scripts/citation-links/citation-manager.js base-paths path/to/file.md --format json
 ```
 
+### Extract File Content
+
+Extract entire file content directly without requiring a source document containing links:
+
+```bash
+# Extract complete file content
+node tools/citation-manager/src/citation-manager.js extract file docs/architecture.md
+
+# Extract with scope restriction for filename resolution
+node tools/citation-manager/src/citation-manager.js extract file architecture.md --scope ./docs
+
+# Pipe output to jq for content filtering
+node tools/citation-manager/src/citation-manager.js extract file file.md | jq '.extractedContentBlocks'
+```
+
+**Output Format**: JSON OutgoingLinksExtractedContent structure with deduplicated content blocks
+
+**Exit Codes**:
+- `0`: File extracted successfully
+- `1`: File not found or validation failed
+- `2`: System error (permission denied, parse error)
+
+**Use Cases**:
+- Direct content extraction without creating source documents
+- Building LLM context packages from specific files
+- Automated content aggregation pipelines
+- File content validation and inspection
+
 ### Run Tests
 
 ```bash
