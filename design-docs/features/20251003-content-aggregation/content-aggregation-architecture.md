@@ -86,6 +86,7 @@ graph TB
 - **Technology:** `Node.js` class, `Commander.js` CLI framework, ESM modules
 - **Technology Status:** Production
 - **Description:** CLI entry point orchestrating all citation management operations. Parses commands (`validate`, `ast`, `base-paths`, `fix`, `extract links`, `extract header`, `extract file`), coordinates workflow execution, formats output for CLI/JSON display, and implements auto-fix logic for broken citations and paths. Orchestrates distinct workflows for different extraction modes: **`extract links`** discovers links via validator from source files, while **`extract header`** and **`extract file`** create synthetic links internally for direct content extraction. Delegates to [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor) for all extraction workflows and outputs JSON results to stdout. See [ContentExtractor Workflow diagram](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction) for extraction orchestration patterns.
+- **Implement Guide**: [CLI Orchestrator Implementation Guide](../../component-guides/CLI%20Orchestrator%20Implementation%20Guide.md)
 
 ##### Interactions
 - _creates and coordinates_ [**`Markdown Parser`**](#Citation%20Manager.Markdown%20Parser), [**`File Cache`**](#Citation%20Manager.File%20Cache), [**`ParsedFileCache`**](#Citation%20Manager.ParsedFileCache), [**`ParsedDocument`**](#Citation%20Manager.ParsedDocument), [**`Citation Validator`**](#Citation%20Manager.Citation%20Validator), and [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor) components (synchronous).
@@ -337,6 +338,18 @@ sequenceDiagram
 
 ### `extract` Command Component Sequence Diagram
 ![ContentExtractor Workflow Component Interaction](../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction)
+
+### Facade Pattern at npm Script Level (US2.7)
+
+The base-paths functionality is implemented as a facade at the package.json level rather than in application code. The npm script pipes validate output through jq for path extraction.
+
+**Architectural Decision**: This demonstrates the Adapter pattern at an unconventional level - the package manager layer. Benefits:
+- Preserves user-facing interface (backward compatibility)
+- Eliminates code duplication (single source of truth in validate)
+- Documents migration path (users can see new pattern in package.json)
+- Enables eventual removal if usage declines (localized to package.json)
+
+This pattern is appropriate for deprecation without breaking existing workflows.
 
 ### Auto-Fix Workflow
 

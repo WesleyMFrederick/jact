@@ -61,6 +61,7 @@ This feature directly supports the CC Workflows vision by:
 | 2025-10-29 | 2.9     | Add US2.3 AC12 for --full-files flag, add US2.5 for extract file subcommand, add US2.6 for CLI help enhancements, add US2.7 for base-paths removal, update FR7 and FR12 for extract file support                | Product Manager (Claude Sonnet 4.5)      |
 | 2025-10-30 | 3.0     | Mark US2.3 as COMPLETE - `extract links` subcommand implemented with comprehensive CLI integration tests, help documentation, and two-phase workflow (267/267 tests passing)                                     | Application Tech Lead (Claude Sonnet 4.5) |
 | 2025-10-30 | 3.1     | Mark US2.5 as COMPLETE - `extract file` subcommand implemented with four-phase orchestration workflow, scope support, path conversion, comprehensive error handling, and help documentation (288/288 tests, 8 new) | Application Tech Lead (Claude Sonnet 4.5) |
+| 2025-11-01 | 3.2     | Mark US2.7 as COMPLETE - base-paths command removed, npm script facade pattern implemented, zero regressions confirmed | Application Tech Lead (Claude Sonnet 4.5) |
 
 ---
 
@@ -625,7 +626,7 @@ _Status_: ✅ COMPLETE (2025-10-31)
 
 _Depends On_: None (cleanup of pre-existing functionality)
 _Closes Technical Debt_: Redundant base-paths extraction command
-_Status_: Pending
+_Status_: ✅ COMPLETE (2025-11-01)
 
 ### Epic 2 Whiteboard
 

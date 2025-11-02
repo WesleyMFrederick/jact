@@ -61,48 +61,6 @@ describe("Enhanced Citation Pattern Tests", () => {
 		expect(caretRefs.length).toBeGreaterThanOrEqual(2);
 	});
 
-	it("should extract all base paths from enhanced citation file", async () => {
-		const testFile = join(__dirname, "fixtures", "enhanced-citations.md");
-
-		try {
-			const output = runCLI(
-				`node "${citationManagerPath}" base-paths "${testFile}" --format json`,
-				{
-					cwd: __dirname,
-				},
-			);
-
-			const result = JSON.parse(output);
-
-			// Should extract multiple base paths
-			expect(result.count).toBeGreaterThanOrEqual(6);
-
-			// Should include standard markdown links
-			const hasTestTarget = result.basePaths.some((path) =>
-				path.includes("test-target.md"),
-			);
-			expect(hasTestTarget).toBe(true);
-
-			// Should include cite format paths
-			const hasDesignPrinciples = result.basePaths.some((path) =>
-				path.includes("design-principles.md"),
-			);
-			expect(hasDesignPrinciples).toBe(true);
-
-			// Should include relative paths from cite format
-			const hasArchitecturePatterns = result.basePaths.some((path) =>
-				path.includes("patterns.md"),
-			);
-			expect(hasArchitecturePatterns).toBe(true);
-		} catch (error) {
-			if (error.status !== 0) {
-				console.log("STDOUT:", error.stdout);
-				console.log("STDERR:", error.stderr);
-			}
-			throw new Error(`Base paths extraction failed: ${error.message}`);
-		}
-	});
-
 	it("should handle mixed citation patterns on same line", async () => {
 		const testFile = join(__dirname, "fixtures", "enhanced-citations.md");
 
@@ -188,4 +146,5 @@ describe("Enhanced Citation Pattern Tests", () => {
 		}
 		// If directory reference not detected, that's acceptable - just verify other validations work
 	});
+
 });

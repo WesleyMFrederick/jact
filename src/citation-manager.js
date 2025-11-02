@@ -498,64 +498,6 @@ export class CitationManager {
 	}
 
 	/**
-	 * Extract distinct base paths from citations
-	 *
-	 * Parses file and extracts all unique target file paths from citations.
-	 * Converts relative paths to absolute paths for consistency.
-	 *
-	 * @param {string} filePath - Path to markdown file
-	 * @returns {Promise<Array<string>>} Sorted array of absolute paths
-	 * @throws {Error} If extraction fails
-	 */
-	async extractBasePaths(filePath) {
-		try {
-			const { resolve, dirname, isAbsolute } = await import("node:path");
-			const result = await this.validator.validateFile(filePath);
-
-			const basePaths = new Set();
-			const sourceDir = dirname(filePath);
-
-			for (const link of result.links) {
-				// Extract path from link - prefer target.path.absolute if available
-				let path = null;
-
-				if (link.target && link.target.path && link.target.path.absolute) {
-					// Use pre-resolved absolute path from link object
-					basePaths.add(link.target.path.absolute);
-					continue;
-				}
-
-				// Fallback: extract path from fullMatch for patterns not captured in target
-				// Standard markdown link pattern: [text](path) or [text](path#anchor)
-				const standardMatch = link.fullMatch.match(
-					/\[([^\]]+)\]\(([^)#]+)(?:#[^)]+)?\)/,
-				);
-				if (standardMatch) {
-					path = standardMatch[2];
-				}
-
-				// Citation pattern: [cite: path]
-				const citeMatch = link.fullMatch.match(/\[cite:\s*([^\]]+)\]/);
-				if (citeMatch) {
-					path = citeMatch[1].trim();
-				}
-
-				if (path) {
-					// Convert relative paths to absolute paths
-					const absolutePath = isAbsolute(path)
-						? path
-						: resolve(sourceDir, path);
-					basePaths.add(absolutePath);
-				}
-			}
-
-			return Array.from(basePaths).sort();
-		} catch (error) {
-			throw new Error(`Failed to extract base paths: ${error.message}`);
-		}
-	}
-
-	/**
 	 * Automatically fix citations in markdown file
 	 *
 	 * Applies automatic fixes for:
@@ -933,38 +875,6 @@ Output includes:
 		const manager = new CitationManager();
 		const ast = await manager.parser.parseFile(file);
 		console.log(JSON.stringify(ast, null, 2));
-	});
-
-program
-	.command("base-paths")
-	.description("Extract distinct base paths from citations in a markdown file")
-	.argument("<file>", "path to markdown file to analyze")
-	.option("--format <type>", "output format (cli, json)", "cli")
-	.action(async (file, options) => {
-		try {
-			const manager = new CitationManager();
-			const basePaths = await manager.extractBasePaths(file);
-
-			if (options.format === "json") {
-				console.log(
-					JSON.stringify({ file, basePaths, count: basePaths.length }, null, 2),
-				);
-			} else {
-				console.log("Distinct Base Paths Found:");
-				console.log("========================");
-				console.log("");
-				basePaths.forEach((path, index) => {
-					console.log(`${index + 1}. ${path}`);
-				});
-				console.log("");
-				console.log(
-					`Total: ${basePaths.length} distinct base path${basePaths.length === 1 ? "" : "s"}`,
-				);
-			}
-		} catch (error) {
-			console.error(`ERROR: ${error.message}`);
-			process.exit(1);
-		}
 	});
 
 // Pattern: Extract command with links subcommand

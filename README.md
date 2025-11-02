@@ -102,18 +102,18 @@ npm run citation:ast path/to/file.md
 node utility-scripts/citation-links/citation-manager.js ast path/to/file.md
 ```
 
-### Extract Base Paths
+### Extract Base Paths (Facade Pattern)
+
+The base-paths command is implemented as an npm script facade that wraps the validate command.
 
 ```bash
-# Extract distinct base paths from citations (CLI output)
+# Extract distinct base paths from citations
 npm run citation:base-paths path/to/file.md
-
-# Get JSON output for programmatic use
-npm run citation:base-paths path/to/file.md -- --format json
-
-# Direct CLI usage
-node utility-scripts/citation-links/citation-manager.js base-paths path/to/file.md --format json
 ```
+
+This is equivalent to: `npm run citation:validate path/to/file.md -- --format json | jq -r '.links[] | select(.target.path.absolute) | .target.path.absolute' | sort -u`
+
+**Rationale**: With the Validation Enrichment Pattern (US1.8), LinkObjects include target.path.absolute directly. The facade preserves the convenient interface while eliminating redundant code.
 
 ### Extract File Content
 
