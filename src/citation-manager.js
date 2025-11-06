@@ -995,6 +995,13 @@ Exit Codes:
 	});
 
 // Only run CLI if this file is executed directly (not imported)
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Uses realpathSync to resolve symlinks (e.g., from npm link or node_modules/.bin)
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const realPath = realpathSync(process.argv[1]);
+const realPathAsUrl = pathToFileURL(realPath).href;
+
+if (import.meta.url === realPathAsUrl) {
 	program.parse();
 }
