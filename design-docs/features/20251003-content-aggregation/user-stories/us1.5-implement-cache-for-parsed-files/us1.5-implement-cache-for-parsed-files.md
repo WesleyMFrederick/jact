@@ -182,18 +182,18 @@ class CitationValidator {
 
 ### Design Principles Adherence
 
-This story must adhere to the following [Design Principles](../../../../../../../design-docs/Architecture%20Principles.md):
+This story must adhere to the following [Design Principles](../../../../../../../ARCHITECTURE-PRINCIPLES.md):
 
 **Critical Principles:**
-- [**Single Responsibility**](../../../../../../../design-docs/Architecture%20Principles.md#^single-responsibility) (Modular): ParsedFileCache has exactly one responsibility - managing in-memory lifecycle of parsed file objects
-- [**One Source of Truth**](../../../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth) (Data-First): During a command run, cache becomes authoritative source for any file's parsed object
-- [**Dependency Abstraction**](../../../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction) (Modular): CitationValidator depends on cache abstraction, not concrete MarkdownParser
+- [**Single Responsibility**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility) (Modular): ParsedFileCache has exactly one responsibility - managing in-memory lifecycle of parsed file objects
+- [**One Source of Truth**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth) (Data-First): During a command run, cache becomes authoritative source for any file's parsed object
+- [**Dependency Abstraction**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^dependency-abstraction) (Modular): CitationValidator depends on cache abstraction, not concrete MarkdownParser
 - [**Performance (NFR5)**](../../content-aggregation-prd.md#^NFR5) (Non-Functional): System parses each unique file at most once per command execution
-- [**Simplicity First**](../../../../../../../design-docs/Architecture%20Principles.md#^simplicity-first) (MVP): Map-based in-memory cache, no persistence, no TTL, no eviction - simplest solution that meets requirements
+- [**Simplicity First**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) (MVP): Map-based in-memory cache, no persistence, no TTL, no eviction - simplest solution that meets requirements
 
 **Anti-Patterns to Avoid:**
 - [**Scattered File I/O**](../../content-aggregation-architecture.md#Scattered%20File%20I/O%20Operations): Cache centralizes parser access, reducing scattered file operations
-- [**Hidden Global State**](../../../../../../../design-docs/Architecture%20Principles.md#^hidden-global-state) (Anti-Pattern): Cache explicitly injected as constructor dependency, not hidden global
+- [**Hidden Global State**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^hidden-global-state) (Anti-Pattern): Cache explicitly injected as constructor dependency, not hidden global
 
 **Implementation Guidance:**
 - Cache methods return Promises to support async file I/O

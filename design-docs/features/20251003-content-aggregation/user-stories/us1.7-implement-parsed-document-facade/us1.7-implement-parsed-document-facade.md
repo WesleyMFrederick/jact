@@ -382,17 +382,17 @@ _Source: [Content Aggregation PRD - Technical Lead Feedback](../../content-aggre
 
 - **Prerequisite**: [Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries](../../content-aggregation-prd.md#Story%201.6%20Refactor%20MarkdownParser.Output.DataContract%20-%20Eliminate%20Duplicate%20Anchor%20Entries) complete - Normalized anchor schema with dual ID properties
 - **Enables**: [Story 1.8: Refactor Anchor Validation to Use Strategy Pattern](../../content-aggregation-prd.md#Story%201.8%20Refactor%20Anchor%20Validation%20to%20Use%20Strategy%20Pattern) - ParsedDocument provides stable interface for strategy implementations
-- **Strategic Position**: Facade implementation before Epic 2 ContentExtractor to prevent tight coupling per [Dependency Abstraction](../../../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction) principle
+- **Strategic Position**: Facade implementation before Epic 2 ContentExtractor to prevent tight coupling per [Dependency Abstraction](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^dependency-abstraction) principle
 
 ### Design Principles Adherence
 
-This story must adhere to the following [Design Principles](../../../../../../../design-docs/Architecture%20Principles.md):
+This story must adhere to the following [Design Principles](../../../../../../../ARCHITECTURE-PRINCIPLES.md):
 
 **Critical Principles:**
-- [**Black Box Interfaces**](../../../../../../../design-docs/Architecture%20Principles.md#^black-box-interfaces) (Modular): ParsedDocument hides internal data structure complexity behind clean query methods
-- [**Dependency Abstraction**](../../../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction) (Modular): Consumers depend on ParsedDocument interface, not MarkdownParser.Output.DataContract structure
-- [**Single Responsibility**](../../../../../../../design-docs/Architecture%20Principles.md#^single-responsibility) (Modular): ParsedDocument has single responsibility for parser output navigation
-- [**Extension Over Modification**](../../../../../../../design-docs/Architecture%20Principles.md#^extension-over-modification) (Modular): New query methods can be added without modifying consumers
+- [**Black Box Interfaces**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^black-box-interfaces) (Modular): ParsedDocument hides internal data structure complexity behind clean query methods
+- [**Dependency Abstraction**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^dependency-abstraction) (Modular): Consumers depend on ParsedDocument interface, not MarkdownParser.Output.DataContract structure
+- [**Single Responsibility**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility) (Modular): ParsedDocument has single responsibility for parser output navigation
+- [**Extension Over Modification**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^extension-over-modification) (Modular): New query methods can be added without modifying consumers
 
 **Implementation Guidance:**
 - Use TDD approach: Write facade method tests first (RED), implement methods (GREEN), refactor consumers (REFACTOR)

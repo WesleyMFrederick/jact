@@ -51,7 +51,7 @@ _Non-Functional Requirements_: [[../../content-aggregation-prd.md#^NFR6|NFR6]]
 
 ### US 2.1 Scope
 
-1. **Create** the `ContentExtractor` component structure following [Action-Based File Organization](../../../../../../../design-docs/Architecture%20Principles.md#Action-Based%20File%20Organization)  principles:
+1. **Create** the `ContentExtractor` component structure following [Action-Based File Organization](<../../../../../../../ARCHITECTURE-PRINCIPLES.md#Action-Based File Organization>)  principles:
     - `src/core/ContentExtractor/ContentExtractor.js` - Main component class (Component Entry Point, TitleCase)
     - `src/core/ContentExtractor/analyzeEligibility.js` - Supporting operation implementing strategy pattern (verb-noun, camelCase)
     - `src/core/ContentExtractor/eligibilityStrategies/` directory for strategy classes

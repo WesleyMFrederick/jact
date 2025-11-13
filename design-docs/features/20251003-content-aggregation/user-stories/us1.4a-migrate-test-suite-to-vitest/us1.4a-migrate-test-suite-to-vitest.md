@@ -146,16 +146,16 @@ const citationManagerPath = join(__dirname, "..", "src", "citation-manager.js");
 
 ### Design Principles Adherence
 
-This story must adhere to the following [Design Principles](../../../../../../../design-docs/Architecture%20Principles.md):
+This story must adhere to the following [Design Principles](../../../../../../../ARCHITECTURE-PRINCIPLES.md):
 
 **Critical Principles:**
-- [**Foundation Reuse**](../../../../../../../design-docs/Architecture%20Principles.md#^foundation-reuse) (MVP): Leverage workspace Vitest configuration already validated in US1.1, proven test discovery pattern
-- [**Real Systems, Fake Fixtures**](../../../../../../../design-docs/Architecture%20Principles.md) (Testing): Maintain existing test approach using real file operations with test fixture markdown files, no mocking
-- [**Simplicity First**](../../../../../../../design-docs/Architecture%20Principles.md#^simplicity-first) (MVP): Direct test framework conversion without introducing new test patterns or abstractions
+- [**Foundation Reuse**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^foundation-reuse) (MVP): Leverage workspace Vitest configuration already validated in US1.1, proven test discovery pattern
+- [**Real Systems, Fake Fixtures**](../../../../../../../ARCHITECTURE-PRINCIPLES.md) (Testing): Maintain existing test approach using real file operations with test fixture markdown files, no mocking
+- [**Simplicity First**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) (MVP): Direct test framework conversion without introducing new test patterns or abstractions
 
 **Anti-Patterns to Avoid:**
-- [**Scattered Checks**](../../../../../../../design-docs/Architecture%20Principles.md#^scattered-checks): Keep all tests in single `tools/citation-manager/test/` directory following workspace pattern
-- [**Mocking Real Systems**](../../../../../../../design-docs/Architecture%20Principles.md): Preserve existing integration test approach using `execSync()` and real file operations
+- [**Scattered Checks**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^scattered-checks): Keep all tests in single `tools/citation-manager/test/` directory following workspace pattern
+- [**Mocking Real Systems**](../../../../../../../ARCHITECTURE-PRINCIPLES.md): Preserve existing integration test approach using `execSync()` and real file operations
 
 ### Testing
 

@@ -31,7 +31,7 @@ This captures the clean state before any US2.2 work, allowing easy comparison an
 - `tools/citation-manager/test/normalize-anchor.test.js` (CREATE)
 
 ### Purpose
-Create utility file with exported anchor normalization functions per [ADR-CE02: Anchor Normalization Location for Extraction](../../../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ADR-CE02%20Anchor%20Normalization%20Location%20for%20Extraction) and [Action-Based File Organization](../../../../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition) (utility extraction pattern)
+Create utility file with exported anchor normalization functions per [ADR-CE02: Anchor Normalization Location for Extraction](../../../../component-guides/Content%20Extractor%20Implementation%20Guide.md#ADR-CE02%20Anchor%20Normalization%20Location%20for%20Extraction) and [Action-Based File Organization](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^action-based-file-organization-definition) (utility extraction pattern)
 
 ### Step 1: Write failing test for normalizeBlockId
 
@@ -248,7 +248,7 @@ git checkpoint "claude-sonnet-4-5" "task-2-constructor-di" "Update ContentExtrac
 - `tools/citation-manager/test/fixtures/us2.2/error-links-source.md` (CREATE)
 
 ### Purpose
-Create primary operation file that orchestrates validation → eligibility → content retrieval workflow (US2.2 AC2-AC9). Follows [Action-Based File Organization](../../../../../../../design-docs/Architecture%20Principles.md#^action-based-file-organization-definition) with verb-noun naming
+Create primary operation file that orchestrates validation → eligibility → content retrieval workflow (US2.2 AC2-AC9). Follows [Action-Based File Organization](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^action-based-file-organization-definition) with verb-noun naming
 
 ### Step 1: Write failing test for extractLinksContent signature
 

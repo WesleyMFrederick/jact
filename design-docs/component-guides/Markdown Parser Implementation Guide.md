@@ -103,9 +103,9 @@ tools/citation-manager/
     └── componentFactory.js                            // Factory would instantiate MarkdownParser with DI
 ```
 
-**Technical Debt**: The current monolithic structure violates the project's [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns). See [Issue 5: Monolithic File Structure](#Issue%205%20Monolithic%20File%20Structure%20Violates%20File%20Naming%20Patterns) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Structure).
+**Technical Debt**: The current monolithic structure violates the project's [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>). See [Issue 5: Monolithic File Structure](#Issue%205%20Monolithic%20File%20Structure%20Violates%20File%20Naming%20Patterns) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Structure).
 
-_Source_: [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns)
+_Source_: [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>)
 
 ## Pseudocode
 This pseudocode follows the **MEDIUM-IMPLEMENTATION** abstraction level, showing the core logic and integration points required for implementation.

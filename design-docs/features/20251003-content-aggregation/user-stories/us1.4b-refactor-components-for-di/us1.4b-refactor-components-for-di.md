@@ -37,7 +37,7 @@ _Source: [Story 1.4b Acceptance Criteria](../../content-aggregation-prd.md#Story
 
 **Closes Technical Debt**:
 - [Lack of Dependency Injection](../../content-aggregation-architecture.md#Lack%20of%20Dependency%20Injection): Replaces direct import with DI
-- [Constructor-Based DI Wiring Overhead](<../../../../../../../design-docs/Architecture - Baseline.md#Constructor-Based DI Wiring Overhead>): Replaces manual dependency wiring at every component instantiation with a factory pattern that must explicitly import and pass all dependencies.
+- [Constructor-Based DI Wiring Overhead](<../../../../../../../ARCHITECTURE.md#Constructor-Based DI Wiring Overhead>): Replaces manual dependency wiring at every component instantiation with a factory pattern that must explicitly import and pass all dependencies.
 
 ## Dev Notes
 
@@ -174,16 +174,16 @@ describe('CitationValidator Integration Tests', () => {
 
 ### Design Principles Adherence
 
-This story must adhere to the following [Design Principles](../../../../../../../design-docs/Architecture%20Principles.md):
+This story must adhere to the following [Design Principles](../../../../../../../ARCHITECTURE-PRINCIPLES.md):
 
 **Critical Principles:**
-- [**Explicit Dependencies**](../../../../../../../design-docs/Architecture%20Principles.md) (Testing): Constructor-based DI makes all dependencies explicit and testable
-- [**Real Systems, Fake Fixtures**](../../../../../../../design-docs/Architecture%20Principles.md) (Testing): DI enables integration tests with real file system operations
-- [**Factory Pattern**](../../../../../../../design-docs/Architecture%20Principles.md) (Architecture): Centralized factory functions encapsulate production dependency wiring
+- [**Explicit Dependencies**](../../../../../../../ARCHITECTURE-PRINCIPLES.md) (Testing): Constructor-based DI makes all dependencies explicit and testable
+- [**Real Systems, Fake Fixtures**](../../../../../../../ARCHITECTURE-PRINCIPLES.md) (Testing): DI enables integration tests with real file system operations
+- [**Factory Pattern**](../../../../../../../ARCHITECTURE-PRINCIPLES.md) (Architecture): Centralized factory functions encapsulate production dependency wiring
 
 **Anti-Patterns to Avoid:**
-- [**Hard-Coded Dependencies**](../../../../../../../design-docs/Architecture%20Principles.md): Components must not create dependencies internally
-- [**Excessive Mocking**](../../../../../../../design-docs/Architecture%20Principles.md): Use real dependencies in tests, not mocks
+- [**Hard-Coded Dependencies**](../../../../../../../ARCHITECTURE-PRINCIPLES.md): Components must not create dependencies internally
+- [**Excessive Mocking**](../../../../../../../ARCHITECTURE-PRINCIPLES.md): Use real dependencies in tests, not mocks
 
 ### Testing
 

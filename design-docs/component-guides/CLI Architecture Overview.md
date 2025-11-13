@@ -236,7 +236,7 @@ const manager = new CitationManager();
 // createFileCache(), createCitationValidator()
 ```
 
-**Factory Pattern Benefits** (from [Architecture Principles](../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction)):
+**Factory Pattern Benefits** (from [Architecture Principles](../../../../ARCHITECTURE-PRINCIPLES.md#^dependency-abstraction)):
 - Encapsulates component wiring and dependency injection
 - Enables testing with mock dependencies
 - Provides production-ready defaults
@@ -605,7 +605,7 @@ if (!existsSync(filePath)) {
 
 ## Architecture Principles Applied
 
-The CLI architecture embodies several core principles from [Architecture Principles.md](../../../../design-docs/Architecture%20Principles.md):
+The CLI architecture embodies several core principles from [Architecture Principles.md](../../../../ARCHITECTURE-PRINCIPLES.md):
 
 ### Dependency Abstraction
 ^[cite: ../../../../design-docs/Architecture Principles.md#^dependency-abstraction]
@@ -841,8 +841,8 @@ program
 - [ParsedFileCache Implementation Guide](ParsedFileCache%20Implementation%20Guide.md) - Caching strategy
 - [ParsedDocument Implementation Guide](ParsedDocument%20Implementation%20Guide.md) - Query facade
 - [Markdown Parser Implementation Guide](Markdown%20Parser%20Implementation%20Guide.md) - AST generation
-- [Architecture Principles](../../../../design-docs/Architecture%20Principles.md) - Core design principles
-- [Architecture - Baseline](../../../../design-docs/Architecture%20-%20Baseline.md) - File naming patterns
+- [Architecture Principles](../../../../ARCHITECTURE-PRINCIPLES.md) - Core design principles
+- [Architecture - Baseline](../../../../ARCHITECTURE.md) - File naming patterns
 
 ---
 

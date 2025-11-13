@@ -353,21 +353,21 @@ _Source: [ADR: Validation Enrichment Pattern - Solution](../../../../component-g
 
 - **Prerequisite**: [Story 1.7: Implement ParsedDocument Facade](../../content-aggregation-prd.md#Story%201.7%20Implement%20ParsedDocument%20Facade) complete - ParsedDocument provides stable `getLinks()` interface
 - **Enables**: [Story 2.1: Implement Extraction Eligibility using Strategy Pattern](../../content-aggregation-prd.md#Story%202.1%20Implement%20Extraction%20Eligibility%20using%20Strategy%20Pattern) - Extraction strategies depend on `link.validation.status` being present
-- **Strategic Position**: Validation enrichment before Epic 2 ContentExtractor to eliminate architectural refactoring mid-feature implementation per [Data Model First](../../../../../../../design-docs/Architecture%20Principles.md#^data-model-first) principle
+- **Strategic Position**: Validation enrichment before Epic 2 ContentExtractor to eliminate architectural refactoring mid-feature implementation per [Data Model First](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^data-model-first) principle
 
 ### Design Principles Adherence
 
-This story must adhere to the following [Design Principles](../../../../../../../design-docs/Architecture%20Principles.md):
+This story must adhere to the following [Design Principles](../../../../../../../ARCHITECTURE-PRINCIPLES.md):
 
 **Critical Principles:**
-- [Data Model First](../../../../../../../design-docs/Architecture%20Principles.md#^data-model-first): The primary architectural decision is to refactor the ValidationResult data structure to use enriched LinkObjects BEFORE implementing Epic 2 ContentExtractor features. Ensures downstream components (ContentExtractor) can immediately leverage validation metadata embedded in LinkObjects without correlation logic or repetitive calls. -/clear
-- [One Source of Truth](../../../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth): Validation metadata lives on the LinkObject itself rather than being duplicated in separate ValidationResult arrays. This eliminates 80% data duplication (line, column, citation, linkType fields no longer stored twice) and ensures a single authoritative source for both link structure and validation status.
-- [Single Responsibility](../../../../../../../design-docs/Architecture%20Principles.md#^single-responsibility): The CitationValidator has a single responsibility for enriching LinkObjects with validation metadata. The CLI Orchestrator handles aggregate reporting using the summary object. The ContentExtractor (Epic 2) filters enriched links for extraction eligibility. Each component focuses on its specific concern without overlapping responsibilities.
-- [Progressive Enhancement](../../../../../../../design-docs/Architecture%20Principles.md#^primitive-first-design): LinkObjects follow a progressive enhancement pattern where the MarkdownParser creates the base structure (linkType, scope, target, line, column), and the CitationValidator progressively enhances each object by adding the `validation` property as it flows through the pipeline (parse → validate → filter → extract).
+- [Data Model First](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^data-model-first): The primary architectural decision is to refactor the ValidationResult data structure to use enriched LinkObjects BEFORE implementing Epic 2 ContentExtractor features. Ensures downstream components (ContentExtractor) can immediately leverage validation metadata embedded in LinkObjects without correlation logic or repetitive calls. -/clear
+- [One Source of Truth](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth): Validation metadata lives on the LinkObject itself rather than being duplicated in separate ValidationResult arrays. This eliminates 80% data duplication (line, column, citation, linkType fields no longer stored twice) and ensures a single authoritative source for both link structure and validation status.
+- [Single Responsibility](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility): The CitationValidator has a single responsibility for enriching LinkObjects with validation metadata. The CLI Orchestrator handles aggregate reporting using the summary object. The ContentExtractor (Epic 2) filters enriched links for extraction eligibility. Each component focuses on its specific concern without overlapping responsibilities.
+- [Progressive Enhancement](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^primitive-first-design): LinkObjects follow a progressive enhancement pattern where the MarkdownParser creates the base structure (linkType, scope, target, line, column), and the CitationValidator progressively enhances each object by adding the `validation` property as it flows through the pipeline (parse → validate → filter → extract).
 
 ### Testing
 
-- [CC Workflows Testing Strategy](../../../../../../../design-docs/Architecture%20-%20Baseline.md#Testing%20Strategy)
+- [CC Workflows Testing Strategy](<../../../../../../../ARCHITECTURE.md#Testing Strategy>)
 - [CitationValidator Testing Strategy](../../../../component-guides/CitationValidator%20Implementation%20Guide.md#Testing%20Strategy)
 
 #### Required Test Implementation

@@ -713,13 +713,13 @@ The tool's dependencies, such as `commander` and `marked`, are declared in its l
 
 ## Design Principles Adherence
 
-This tool follows workspace design principles defined in [Architecture Principles](../../../../../design-docs/Architecture%20Principles.md):
+This tool follows workspace design principles defined in [Architecture Principles](../../../../../ARCHITECTURE-PRINCIPLES.md):
 
 **Key Principles**:
-- [**Modular Design**](../../../../../design-docs/Architecture%20Principles.md#Modular%20Design%20Principles): Component-based architecture with clear boundaries
-- [**Deterministic Offloading**](../../../../../design-docs/Architecture%20Principles.md#Deterministic%20Offloading%20Principles): Predictable, mechanical citation processing
-- [**Safety-First**](../../../../../design-docs/Architecture%20Principles.md#Safety-First%20Design%20Patterns): Backup creation before auto-fix, dry-run capability
-- [**Self-Contained Naming**](../../../../../design-docs/Architecture%20Principles.md#Self-Contained%20Naming%20Principles): Descriptive command and component names
+- [**Modular Design**](<../../../../../ARCHITECTURE-PRINCIPLES.md#Modular Design Principles>): Component-based architecture with clear boundaries
+- [**Deterministic Offloading**](<../../../../../ARCHITECTURE-PRINCIPLES.md#Deterministic Offloading Principles>): Predictable, mechanical citation processing
+- [**Safety-First**](<../../../../../ARCHITECTURE-PRINCIPLES.md#Safety-First Design Patterns>): Backup creation before auto-fix, dry-run capability
+- [**Self-Contained Naming**](<../../../../../ARCHITECTURE-PRINCIPLES.md#Self-Contained Naming Principles>): Descriptive command and component names
 
 ---
 
@@ -859,7 +859,7 @@ Refactor CitationValidator helper methods (`suggestObsidianBetterFormat()`, `fin
 - **Scope**: File config adds complexity without proportional user value for initial release
 - **Workaround**: Users can create shell scripts/aliases wrapping CLI commands
 
-**Rationale for Deferring**: Following [simplicity-first](../../../../../design-docs/Architecture%20Principles.md#^simplicity-first) principle - don't build features until user demand demonstrates necessity. The current 3-layer system provides sufficient control for MVP validation.
+**Rationale for Deferring**: Following [simplicity-first](../../../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) principle - don't build features until user demand demonstrates necessity. The current 3-layer system provides sufficient control for MVP validation.
 
 **Resolution Criteria**:
 - User feedback indicates repetitive CLI flag usage is a pain point
@@ -934,7 +934,7 @@ Refactor CitationValidator helper methods (`suggestObsidianBetterFormat()`, `fin
 ---
 ## Related Documentation
 
-- [Architecture Principles](../../../../../design-docs/Architecture%20Principles.md) - Design principles and patterns
+- [Architecture Principles](../../../../../ARCHITECTURE-PRINCIPLES.md) - Design principles and patterns
 - [citation-guidelines](../../../../../agentic-workflows/rules/citation-guidelines.md) - Citation linking guidelines
 
 ---

@@ -194,9 +194,9 @@ _Status_: ✅ COMPLETE (2025-10-07)
 > - **CLI Orchestrator Updates**: Handles async validator methods, factory creates and injects cache into validator
 > - **Public Contracts**: ParsedFileCache provides `resolveParsedFile()` async method, CitationValidator constructor signature changed to accept cache dependency
 > _Architecture Principles Applied_:
-> - [Dependency Abstraction](../../../../../design-docs/Architecture%20Principles.md#^dependency-abstraction): CitationValidator depends on ParsedFileCache abstraction, not concrete MarkdownParser ✅
-> - [Single Responsibility](../../../../../design-docs/Architecture%20Principles.md#^single-responsibility): ParsedFileCache has single responsibility for managing parsed file object lifecycle ✅
-> - [One Source of Truth](../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth): Cache is authoritative source for parsed data during command execution ✅
+> - [Dependency Abstraction](../../../../../ARCHITECTURE-PRINCIPLES.md#^dependency-abstraction): CitationValidator depends on ParsedFileCache abstraction, not concrete MarkdownParser ✅
+> - [Single Responsibility](../../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility): ParsedFileCache has single responsibility for managing parsed file object lifecycle ✅
+> - [One Source of Truth](../../../../../ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth): Cache is authoritative source for parsed data during command execution ✅
 ---
 
 ### Story 1.6: Refactor MarkdownParser.Output.DataContract - Eliminate Duplicate Anchor Entries
@@ -432,7 +432,7 @@ This pattern separates concerns: validator discovers/enriches links, extractor p
 >
 > **Resolution**: Defer direct import refactor for tests; continue using shell redirection workaround (`runCLI` helper) for US2.3 CLI integration testing (AC11). **Resolution Date**: 2025-10-22
 >
-> **Architecture Reference**: [Technical Debt: CLI Subprocess Testing Buffer Limits](../../../../../design-docs/Architecture%20-%20Baseline.md#Technical%20Debt%20CLI%20Subprocess%20Testing%20Buffer%20Limits)
+> **Architecture Reference**: [Technical Debt: CLI Subprocess Testing Buffer Limits](<../../../../../ARCHITECTURE.md#Technical Debt CLI Subprocess Testing Buffer Limits>)
 >
 > **Known Limitation**: Testing the `extract` command via subprocesses (using the `runCLI` helper) relies on shell redirection to bypass stdio buffer limits (~64KB). This adds complexity compared to directly importing and testing CLI functions. The recommended refactor (direct import) is deferred to maintain MVP velocity. Ensure AC11 tests use the `runCLI` helper or similar redirection to handle potentially large output from `extractLinksContent`.
 
@@ -475,9 +475,9 @@ _Status_: ✅ COMPLETE (2025-10-30)
 - [CLI Orchestrator Implementation Guide](../../component-guides/CLI%20Orchestrator%20Implementation%20Guide.md)
 - [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 - [Citation Validator.Public Contracts](../../component-guides/CitationValidator%20Implementation%20Guide.md#Public%20Contracts)
-- [Architecture Guidance: Directory and Naming Conventions](../../../../../design-docs/Architecture%20-%20Baseline.md#Level%204%20Code)
-- [Architecture Guidance: Coding Standards and Conventions](../../../../../design-docs/Architecture%20-%20Baseline.md#Coding%20Standards%20and%20Conventions)
-- [Architecture Guidance: Testing Strategy](../../../../../design-docs/Architecture%20-%20Baseline.md#Testing%20Strategy)
+- [Architecture Guidance: Directory and Naming Conventions](<../../../../../ARCHITECTURE.md#Level 4 Code>)
+- [Architecture Guidance: Coding Standards and Conventions](<../../../../../ARCHITECTURE.md#Coding Standards and Conventions>)
+- [Architecture Guidance: Testing Strategy](<../../../../../ARCHITECTURE.md#Testing Strategy>)
 
 ---
 
@@ -528,9 +528,9 @@ _Status_: Pending
 - [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md) %% force-extract %%
 - [Epic 2 Whiteboard - LinkObjectFactory](#LinkObjectFactory%20(Level%204%20Code%20Detail%20of%20CLI%20Orchestrator))
 - [Citation Validator.Public Contracts](../../component-guides/CitationValidator%20Implementation%20Guide.md#Public%20Contracts)
-- [Architecture Guidance: Directory and Naming Conventions](../../../../../design-docs/Architecture%20-%20Baseline.md#Level%204%20Code)
-- [Architecture Guidance: Coding Standards and Conventions](../../../../../design-docs/Architecture%20-%20Baseline.md#Coding%20Standards%20and%20Conventions)
-- [Architecture Guidance: Testing Strategy](../../../../../design-docs/Architecture%20-%20Baseline.md#Testing%20Strategy)
+- [Architecture Guidance: Directory and Naming Conventions](<../../../../../ARCHITECTURE.md#Level 4 Code>)
+- [Architecture Guidance: Coding Standards and Conventions](<../../../../../ARCHITECTURE.md#Coding Standards and Conventions>)
+- [Architecture Guidance: Testing Strategy](<../../../../../ARCHITECTURE.md#Testing Strategy>)
 
 ---
 

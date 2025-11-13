@@ -163,7 +163,7 @@ Task 3.1 (Refactor ParsedFileCache) will implement facade wrapping, making these
 **Parent Story**: [User Story 1.7: Implement ParsedDocument Facade](../us1.7-implement-parsed-document-facade.md)
 **Parent Subtask**: [Task 1.2](../us1.7-implement-parsed-document-facade.md#^US1-7T1-2)
 **Architectural Sources**: [ParsedFileCache Implementation Guide](../../../../../component-guides/ParsedFileCache%20Implementation%20Guide.md)
-**Design Patterns**: [Architecture Principles](../../../../../../../../design-docs/Architecture%20Principles.md)
+**Design Patterns**: [Architecture Principles](../../../../../../../../ARCHITECTURE-PRINCIPLES.md)
 
 ### Validation Citations
 

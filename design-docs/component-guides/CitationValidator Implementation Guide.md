@@ -116,7 +116,7 @@ tools/citation-manager/
 
 **Current State**: The CitationValidator exists as a single monolithic file containing all validation logic (745+ lines). See [Technical Debt Issue 2](#Issue%202%20Monolithic%20File%20Structure%20Violates%20File%20Naming%20Patterns) for proposed component folder refactoring.
 
-_Source_: [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns)
+_Source_: [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>)
 
 ---
 
@@ -560,7 +560,7 @@ The `ParsedFileCache` stores `{ filePath, content, tokens, links, anchors }`. If
 ### Issue 2: Monolithic File Structure Violates File Naming Patterns
 
 **Current Problem**:
-The `CitationValidator` component is implemented as a single monolithic file at `tools/citation-manager/src/CitationValidator.js` (745+ lines), violating the project's [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns).
+The `CitationValidator` component is implemented as a single monolithic file at `tools/citation-manager/src/CitationValidator.js` (745+ lines), violating the project's [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>).
 
 **File Naming Pattern Violation**:
 - **Current**: Single `CitationValidator.js` file containing all validation logic
@@ -594,8 +594,8 @@ tools/citation-manager/src/
 5. **US1.8 Clarity**: Enrichment logic separated from validation logic
 
 **Alignment with Architecture Principles**:
-- [Single Responsibility](../../../../design-docs/Architecture%20Principles.md#^single-responsibility): Each validator class has one reason to change
-- [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns): Component folder structure with clear separation
+- [Single Responsibility](../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility): Each validator class has one reason to change
+- [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>): Component folder structure with clear separation
 
 **Migration Strategy**:
 - Extract validation methods into separate validator classes
@@ -603,7 +603,7 @@ tools/citation-manager/src/
 - Use Strategy Pattern for validator chain (similar to US2.1 extraction eligibility)
 - Implement during Epic 2 or as standalone refactoring story
 
-_Source_: [File Naming Patterns](../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns)
+_Source_: [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>)
 
 ---
 

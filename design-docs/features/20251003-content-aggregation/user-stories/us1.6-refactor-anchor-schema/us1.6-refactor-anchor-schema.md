@@ -140,7 +140,7 @@ const anchors = [
 
 **Schema Design Decision**:
 - `urlEncodedId` is **always populated**, even when identical to `id`
-- **Rationale**: [Simplicity First](../../../../../../../design-docs/Architecture%20Principles.md#^simplicity-first) principle - uniform data structure over premature optimization (~600 bytes saved per 50 headers not worth conditional logic)
+- **Rationale**: [Simplicity First](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) principle - uniform data structure over premature optimization (~600 bytes saved per 50 headers not worth conditional logic)
 - **Benefits**: No null checks required, clearer intent, consistent structure for all anchors
 
 **CitationValidator Integration** ([[#^US1-6AC3|AC3]]):
@@ -177,19 +177,19 @@ _Source: [Content Aggregation Architecture Whiteboard](../../research/content-ag
 
 - **Prerequisite**: [Story 1.5: Implement a Cache for Parsed File Objects](../../content-aggregation-prd.md#Story%201.5%20Implement%20a%20Cache%20for%20Parsed%20File%20Objects) complete - ParsedFileCache validated with current AnchorObject schema
 - **Enables**: [Story 1.7](../../content-aggregation-prd.md#Story%201.7%20Implement%20ParsedDocument%20Facade) - ParsedDocument facade can consume normalized anchor data
-- **Strategic Position**: Data model refactoring before Strategy Pattern implementation (US1.8) per [Data Model First](../../../../../../../design-docs/Architecture%20Principles.md#^data-model-first) principle
+- **Strategic Position**: Data model refactoring before Strategy Pattern implementation (US1.8) per [Data Model First](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^data-model-first) principle
 
 _Source: [Content Aggregation Architecture Whiteboard - Phase 1](../../research/content-aggregation-architecture-whiteboard.md#Phase%201%20Implement%20US%201.6%20(Refactor%20the%20Anchor%20Schema))_
 
 ### Design Principles Adherence
 
-This story must adhere to the following [Design Principles](../../../../../../../design-docs/Architecture%20Principles.md):
+This story must adhere to the following [Design Principles](../../../../../../../ARCHITECTURE-PRINCIPLES.md):
 
 **Critical Principles:**
-- [**Data Model First**](../../../../../../../design-docs/Architecture%20Principles.md#^data-model-first) (Data-First): Stabilize AnchorObject schema before building Strategy Pattern logic that consumes it (prevents rework in US1.7-1.8)
-- [**Illegal States Unrepresentable**](../../../../../../../design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable) (Data-First): Single AnchorObject per header makes duplicate entries impossible by design
-- [**One Source of Truth**](../../../../../../../design-docs/Architecture%20Principles.md#^one-source-of-truth) (Data-First): Each anchor has exactly one canonical representation with multiple ID formats as properties
-- [**Single Responsibility**](../../../../../../../design-docs/Architecture%20Principles.md#^single-responsibility) (Modular): AnchorObject represents single logical entity with all ID variants as properties
+- [**Data Model First**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^data-model-first) (Data-First): Stabilize AnchorObject schema before building Strategy Pattern logic that consumes it (prevents rework in US1.7-1.8)
+- [**Illegal States Unrepresentable**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^illegal-states-unrepresentable) (Data-First): Single AnchorObject per header makes duplicate entries impossible by design
+- [**One Source of Truth**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth) (Data-First): Each anchor has exactly one canonical representation with multiple ID formats as properties
+- [**Single Responsibility**](../../../../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility) (Modular): AnchorObject represents single logical entity with all ID variants as properties
 
 **Implementation Guidance:**
 - Use TDD approach: Update tests to expect new schema (RED), refactor implementation (GREEN)
