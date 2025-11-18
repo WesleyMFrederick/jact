@@ -1,6 +1,3 @@
 {
-  "enabledMcpjsonServers": [
-    "Context7",
-    "deepwiki"
-  ]
+	"enabledMcpjsonServers": ["Context7", "deepwiki"]
 }

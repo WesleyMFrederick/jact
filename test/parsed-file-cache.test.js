@@ -35,8 +35,8 @@ describe("ParsedFileCache", () => {
 		const links = result.getLinks();
 
 		expect(typeof content).toBe("string");
-		expect(content.length).toBeGreaterThan(0);  // Has actual content
-		expect(Array.isArray(links)).toBe(true);    // Has links array
+		expect(content.length).toBeGreaterThan(0); // Has actual content
+		expect(Array.isArray(links)).toBe(true); // Has links array
 	});
 
 	it("should return cached result on cache hit without re-parsing", async () => {

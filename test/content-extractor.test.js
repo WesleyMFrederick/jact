@@ -221,7 +221,8 @@ describe("ContentExtractor", () => {
 			});
 
 			// Then: Field value is numeric and positive
-			const fieldValue = output.extractedContentBlocks._totalContentCharacterLength;
+			const fieldValue =
+				output.extractedContentBlocks._totalContentCharacterLength;
 			expect(typeof fieldValue).toBe("number");
 			expect(fieldValue).toBeGreaterThan(0);
 			expect(Number.isInteger(fieldValue)).toBe(true);
@@ -241,7 +242,8 @@ describe("ContentExtractor", () => {
 			});
 
 			// Then: Field value approximates actual JSON size within acceptable margin
-			const reportedSize = output.extractedContentBlocks._totalContentCharacterLength;
+			const reportedSize =
+				output.extractedContentBlocks._totalContentCharacterLength;
 			const actualSize = JSON.stringify(output.extractedContentBlocks).length;
 			const difference = actualSize - reportedSize;
 
@@ -273,7 +275,9 @@ describe("ContentExtractor", () => {
 			});
 
 			// Then: _totalContentCharacterLength equals 2 (empty object "{}")
-			expect(output.extractedContentBlocks._totalContentCharacterLength).toBe(2);
+			expect(output.extractedContentBlocks._totalContentCharacterLength).toBe(
+				2,
+			);
 		});
 
 		it("should calculate _totalContentCharacterLength within acceptable margin", async () => {

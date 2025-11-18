@@ -58,8 +58,7 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 		// Then: Valid links enriched with status="valid"
 		const validLink = links.find(
 			(link) =>
-				link.validation.status === "valid" &&
-				link.scope === "cross-document",
+				link.validation.status === "valid" && link.scope === "cross-document",
 		);
 		expect(validLink).toBeDefined();
 		expect(validLink.validation).toBeDefined();

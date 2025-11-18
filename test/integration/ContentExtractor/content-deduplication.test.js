@@ -59,7 +59,9 @@ describe("Content Deduplication - Index Structure", () => {
 
 		// Then: Each index entry has complete structure
 		// Verification: All required fields present per AC5
-		const contentIds = Object.keys(result.extractedContentBlocks).filter(key => !key.startsWith('_'));
+		const contentIds = Object.keys(result.extractedContentBlocks).filter(
+			(key) => !key.startsWith("_"),
+		);
 		expect(contentIds.length).toBeGreaterThan(0);
 
 		const firstBlock = result.extractedContentBlocks[contentIds[0]];
@@ -220,7 +222,9 @@ describe("Content Deduplication - Statistics: Tokens Saved", () => {
 
 		// Then: tokensSaved equals sum of duplicate content lengths
 		// Pattern: If content is 100 chars and appears 3 times, saved = 200 (2 duplicates × 100)
-		const contentIds = Object.keys(result.extractedContentBlocks).filter(key => !key.startsWith('_'));
+		const contentIds = Object.keys(result.extractedContentBlocks).filter(
+			(key) => !key.startsWith("_"),
+		);
 		const contentBlock = result.extractedContentBlocks[contentIds[0]];
 		const expectedSaved =
 			contentBlock.contentLength * result.stats.duplicateContentDetected;
@@ -247,9 +251,7 @@ describe("Content Deduplication - Statistics: Compression Ratio", () => {
 
 		// Then: Calculate expected compression ratio
 		// Pattern: Sum all contentLength values in extractedContentBlocks
-		const totalContentSize = Object.entries(
-			result.extractedContentBlocks,
-		)
+		const totalContentSize = Object.entries(result.extractedContentBlocks)
 			.filter(([key]) => !key.startsWith("_"))
 			.reduce((sum, [, block]) => sum + block.contentLength, 0);
 		const tokensSaved = result.stats.tokensSaved;
@@ -490,7 +492,9 @@ describe("US2.2a Acceptance - SHA-256 Content Hashing", () => {
 		expect(successLinks).toHaveLength(2);
 
 		// Pattern: Different targetPath values prove cross-file deduplication
-		const paths = successLinks.map((link) => link.sourceLink.target.path.absolute);
+		const paths = successLinks.map(
+			(link) => link.sourceLink.target.path.absolute,
+		);
 		expect(new Set(paths).size).toBe(2); // 2 different file paths
 	});
 });
@@ -559,7 +563,9 @@ describe("US2.2a Acceptance - Complete Pipeline", () => {
 		expect(result.stats.compressionRatio).toBeGreaterThan(0);
 
 		// Verification: Content blocks exist in extractedContentBlocks (AC5)
-		const firstBlockId = Object.keys(result.extractedContentBlocks).filter(key => !key.startsWith('_'))[0];
+		const firstBlockId = Object.keys(result.extractedContentBlocks).filter(
+			(key) => !key.startsWith("_"),
+		)[0];
 		const firstBlock = result.extractedContentBlocks[firstBlockId];
 		expect(firstBlock).toHaveProperty("content");
 		expect(firstBlock).toHaveProperty("contentLength");

@@ -327,6 +327,8 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 
 		expect(matchingAnchors.length).toBe(1);
 		expect(matchingAnchors[0].id).toBe(targetHeader);
-		expect(matchingAnchors[0].urlEncodedId).toBe("Story%201.5%20Implement%20Cache");
+		expect(matchingAnchors[0].urlEncodedId).toBe(
+			"Story%201.5%20Implement%20Cache",
+		);
 	});
 });

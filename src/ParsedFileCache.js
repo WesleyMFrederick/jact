@@ -57,8 +57,8 @@ export class ParsedFileCache {
 		const parsePromise = this.parser.parseFile(cacheKey);
 
 		// 4. Wrap parser output in ParsedDocument facade before caching
-		const parsedDocPromise = parsePromise.then(contract =>
-			new ParsedDocument(contract)
+		const parsedDocPromise = parsePromise.then(
+			(contract) => new ParsedDocument(contract),
 		);
 
 		// 5. Store ParsedDocument Promise IMMEDIATELY (prevents duplicate parses)

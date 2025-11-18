@@ -57,7 +57,10 @@ describe("MarkdownParser: Obsidian Block Reference Extraction", () => {
 		// Verify each expected block ID is found
 		for (const expectedId of expectedBlockIds) {
 			const found = blockAnchors.find((anchor) => anchor.id === expectedId);
-			expect(found, `Block reference ^${expectedId} should be extracted`).toBeDefined();
+			expect(
+				found,
+				`Block reference ^${expectedId} should be extracted`,
+			).toBeDefined();
 			expect(found.anchorType).toBe("block");
 			expect(found.fullMatch).toBe(`^${expectedId}`);
 		}
@@ -151,7 +154,7 @@ describe("MarkdownParser: Obsidian Block Reference Extraction", () => {
 		const patterns = {
 			"kebab-case": /^[a-z]+-[a-z-]+$/, // e.g., first-section-intro
 			"single-word": /^[a-z]+\d*$/, // e.g., introduction, section1
-			"numbered": /^[A-Z]+\d+$/, // e.g., FR1, US1
+			numbered: /^[A-Z]+\d+$/, // e.g., FR1, US1
 		};
 
 		// Ensure at least kebab-case patterns are extracted

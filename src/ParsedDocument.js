@@ -33,8 +33,8 @@ class ParsedDocument {
 	 */
 	hasAnchor(anchorId) {
 		// Check both id and urlEncodedId for match
-		return this._data.anchors.some(a =>
-			a.id === anchorId || a.urlEncodedId === anchorId
+		return this._data.anchors.some(
+			(a) => a.id === anchorId || a.urlEncodedId === anchorId,
 		);
 	}
 
@@ -89,9 +89,12 @@ class ParsedDocument {
 		// Phase 0: Look up heading level if not provided
 		let targetLevel = headingLevel;
 		if (targetLevel === undefined) {
-			const headingMeta = this._data.headings.find(h => h.text === headingText);
+			const headingMeta = this._data.headings.find(
+				(h) => h.text === headingText,
+			);
 			if (!headingMeta) return null;
-			targetLevel = headingMeta.level !== undefined ? headingMeta.level : headingMeta.depth;
+			targetLevel =
+				headingMeta.level !== undefined ? headingMeta.level : headingMeta.depth;
 		}
 
 		// Phase 1: Flatten token tree and locate target heading
@@ -104,9 +107,11 @@ class ParsedDocument {
 				orderedTokens.push(token);
 
 				// Found our target heading?
-				if (token.type === "heading" &&
+				if (
+					token.type === "heading" &&
 					token.text === headingText &&
-					token.depth === targetLevel) {
+					token.depth === targetLevel
+				) {
 					targetIndex = currentIndex;
 				}
 
@@ -152,16 +157,16 @@ class ParsedDocument {
 	 */
 	extractBlock(anchorId) {
 		// Find anchor with matching ID and anchorType === "block"
-		const anchor = this._data.anchors.find(a =>
-			a.anchorType === 'block' && a.id === anchorId
+		const anchor = this._data.anchors.find(
+			(a) => a.anchorType === "block" && a.id === anchorId,
 		);
 
 		// Not found? Return null
 		if (!anchor) return null;
 
 		// Split content into lines (anchor.line is 1-based)
-		const lines = this._data.content.split('\n');
-		const lineIndex = anchor.line - 1;  // Convert to 0-based
+		const lines = this._data.content.split("\n");
+		const lineIndex = anchor.line - 1; // Convert to 0-based
 
 		// Validate line index within bounds
 		if (lineIndex < 0 || lineIndex >= lines.length) return null;
@@ -189,11 +194,11 @@ class ParsedDocument {
 	_tokenIncludesChildrenInRaw(tokenType) {
 		// Token types where .raw includes full content (skip recursion)
 		const inclusiveTypes = new Set([
-			'heading',      // "## Title\n" includes inline text
-			'paragraph',    // "Text with **bold**\n" includes inline formatting
-			'text',         // Inline text tokens
-			'code',         // Code blocks include full content
-			'html',         // HTML blocks include full content
+			"heading", // "## Title\n" includes inline text
+			"paragraph", // "Text with **bold**\n" includes inline formatting
+			"text", // Inline text tokens
+			"code", // Code blocks include full content
+			"html", // HTML blocks include full content
 		]);
 
 		return inclusiveTypes.has(tokenType);
@@ -257,7 +262,7 @@ class ParsedDocument {
 		matches.sort((a, b) => b.score - a.score);
 
 		// Return top 5 candidate strings
-		return matches.map(m => m.candidate).slice(0, 5);
+		return matches.map((m) => m.candidate).slice(0, 5);
 	}
 
 	/**
@@ -297,8 +302,8 @@ class ParsedDocument {
 				} else {
 					matrix[i][j] = Math.min(
 						matrix[i - 1][j - 1] + 1, // substitution
-						matrix[i][j - 1] + 1,     // insertion
-						matrix[i - 1][j] + 1      // deletion
+						matrix[i][j - 1] + 1, // insertion
+						matrix[i - 1][j] + 1, // deletion
 					);
 				}
 			}
@@ -309,7 +314,7 @@ class ParsedDocument {
 
 		// Normalize to 0-1 range (1 = identical, 0 = completely different)
 		const maxLength = Math.max(a.length, b.length);
-		return 1 - (distance / maxLength);
+		return 1 - distance / maxLength;
 	}
 }
 

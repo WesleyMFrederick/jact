@@ -1,4 +1,3 @@
-
 // tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js
 import { analyzeEligibility } from "./analyzeEligibility.js";
 import { extractLinksContent as extractLinksContentOp } from "./extractLinksContent.js";
@@ -66,7 +65,9 @@ export class ContentExtractor {
 		// We'll need to refactor to reuse the extraction logic without validation
 		const { analyzeEligibility } = await import("./analyzeEligibility.js");
 		const { generateContentId } = await import("./generateContentId.js");
-		const { decodeUrlAnchor, normalizeBlockId } = await import("./normalizeAnchor.js");
+		const { decodeUrlAnchor, normalizeBlockId } = await import(
+			"./normalizeAnchor.js"
+		);
 
 		// AC15: Filter out internal links before processing
 		const crossDocumentLinks = enrichedLinks.filter(
@@ -127,7 +128,8 @@ export class ContentExtractor {
 			try {
 				// Determine target document (all links are cross-document after AC15 filter)
 				const decodedPath = decodeURIComponent(link.target.path.absolute);
-				const targetDoc = await this.parsedFileCache.resolveParsedFile(decodedPath);
+				const targetDoc =
+					await this.parsedFileCache.resolveParsedFile(decodedPath);
 
 				// Extract content based on anchor type
 				let extractedContent;
@@ -195,10 +197,14 @@ export class ContentExtractor {
 		// Calculate compression ratio
 		if (deduplicatedOutput.stats.totalLinks > 0) {
 			const totalPotentialTokens =
-				(deduplicatedOutput.stats.uniqueContent + deduplicatedOutput.stats.duplicateContentDetected) *
-				(deduplicatedOutput.stats.tokensSaved / Math.max(deduplicatedOutput.stats.duplicateContentDetected, 1));
-			const actualTokens = deduplicatedOutput.stats.uniqueContent *
-				(deduplicatedOutput.stats.tokensSaved / Math.max(deduplicatedOutput.stats.duplicateContentDetected, 1));
+				(deduplicatedOutput.stats.uniqueContent +
+					deduplicatedOutput.stats.duplicateContentDetected) *
+				(deduplicatedOutput.stats.tokensSaved /
+					Math.max(deduplicatedOutput.stats.duplicateContentDetected, 1));
+			const actualTokens =
+				deduplicatedOutput.stats.uniqueContent *
+				(deduplicatedOutput.stats.tokensSaved /
+					Math.max(deduplicatedOutput.stats.duplicateContentDetected, 1));
 			deduplicatedOutput.stats.compressionRatio =
 				deduplicatedOutput.stats.duplicateContentDetected > 0
 					? (1 - actualTokens / totalPotentialTokens) * 100
@@ -206,10 +212,12 @@ export class ContentExtractor {
 		}
 
 		// Add JSON size metadata for output length checking (AC3: metadata first for diagnostic visibility)
-		const jsonSize = JSON.stringify(deduplicatedOutput.extractedContentBlocks).length;
+		const jsonSize = JSON.stringify(
+			deduplicatedOutput.extractedContentBlocks,
+		).length;
 		deduplicatedOutput.extractedContentBlocks = {
 			_totalContentCharacterLength: jsonSize,
-			...deduplicatedOutput.extractedContentBlocks
+			...deduplicatedOutput.extractedContentBlocks,
 		};
 
 		return deduplicatedOutput;

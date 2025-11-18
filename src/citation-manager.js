@@ -56,7 +56,7 @@ export class CitationManager {
 
 		// Integration: Add ContentExtractor via factory
 		this.contentExtractor = createContentExtractor(
-			this.parsedFileCache,  // Share cache with validator
+			this.parsedFileCache, // Share cache with validator
 		);
 	}
 
@@ -149,9 +149,13 @@ export class CitationManager {
 
 		const filteredSummary = {
 			total: filteredLinks.length,
-			valid: filteredLinks.filter((link) => link.validation.status === "valid").length,
-			errors: filteredLinks.filter((link) => link.validation.status === "error").length,
-			warnings: filteredLinks.filter((link) => link.validation.status === "warning").length,
+			valid: filteredLinks.filter((link) => link.validation.status === "valid")
+				.length,
+			errors: filteredLinks.filter((link) => link.validation.status === "error")
+				.length,
+			warnings: filteredLinks.filter(
+				(link) => link.validation.status === "warning",
+			).length,
 		};
 
 		return {
@@ -202,7 +206,9 @@ export class CitationManager {
 				.forEach((link, index) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "error").length - 1;
+						result.links.filter((link) => link.validation.status === "error")
+							.length -
+							1;
 					const prefix = isLast ? "└─" : "├─";
 					lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
 					lines.push(`│  └─ ${link.validation.error}`);
@@ -221,7 +227,9 @@ export class CitationManager {
 				.forEach((link, index) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "warning").length - 1;
+						result.links.filter((link) => link.validation.status === "warning")
+							.length -
+							1;
 					const prefix = isLast ? "└─" : "├─";
 					lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
 					if (link.validation.suggestion) {
@@ -239,7 +247,9 @@ export class CitationManager {
 				.forEach((link, index) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "valid").length - 1;
+						result.links.filter((link) => link.validation.status === "valid")
+							.length -
+							1;
 					const prefix = isLast ? "└─" : "├─";
 					lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
 				});
@@ -298,8 +308,10 @@ export class CitationManager {
 
 			// Decision: Report validation errors to stderr
 			if (validationResult.summary.errors > 0) {
-				console.error('Validation errors found:');
-				const errors = enrichedLinks.filter(l => l.validation.status === 'error');
+				console.error("Validation errors found:");
+				const errors = enrichedLinks.filter(
+					(l) => l.validation.status === "error",
+				);
 				for (const link of errors) {
 					console.error(`  Line ${link.line}: ${link.validation.error}`);
 				}
@@ -309,7 +321,7 @@ export class CitationManager {
 			// Pattern: Pass pre-validated enriched links to extractor
 			const extractionResult = await this.contentExtractor.extractContent(
 				enrichedLinks,
-				{ fullFiles: options.fullFiles }  // Pass CLI flags to strategies
+				{ fullFiles: options.fullFiles }, // Pass CLI flags to strategies
 			);
 
 			// Phase 3: Output
@@ -322,9 +334,8 @@ export class CitationManager {
 			} else {
 				process.exitCode = 1;
 			}
-
 		} catch (error) {
-			console.error('ERROR:', error.message);
+			console.error("ERROR:", error.message);
 			process.exitCode = 2;
 		}
 	}
@@ -359,7 +370,10 @@ export class CitationManager {
 			// --- Phase 2: Validation ---
 			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
 			// Integration: CitationValidator returns validation result
-			const validationResult = await this.validator.validateSingleCitation(syntheticLink, targetFile);
+			const validationResult = await this.validator.validateSingleCitation(
+				syntheticLink,
+				targetFile,
+			);
 
 			// Extract validation metadata from result
 			const validation = {
@@ -395,12 +409,14 @@ export class CitationManager {
 			// --- Phase 3: Extraction ---
 			// Pattern: Extract content from validated link
 			// Integration: ContentExtractor processes single-link array
-			const result = await this.contentExtractor.extractContent([syntheticLink], options);
+			const result = await this.contentExtractor.extractContent(
+				[syntheticLink],
+				options,
+			);
 
 			// --- Phase 4: Return ---
 			// Decision: Return result for CLI to output (CLI handles stdout)
 			return result;
-
 		} catch (error) {
 			// Decision: System errors use exit code 2
 			console.error("ERROR:", error.message);
@@ -436,7 +452,10 @@ export class CitationManager {
 
 			// --- Phase 2: Validation ---
 			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
-			const validationResult = await this.validator.validateSingleCitation(syntheticLink, targetFile);
+			const validationResult = await this.validator.validateSingleCitation(
+				syntheticLink,
+				targetFile,
+			);
 
 			// Extract validation metadata from result
 			const validation = {
@@ -460,10 +479,15 @@ export class CitationManager {
 
 			// Decision: Apply path conversion if validator found file via cache
 			// Pattern: Validator suggests recommended path when file found in different location
-			if (validationResult.pathConversion && validationResult.pathConversion.recommended) {
+			if (
+				validationResult.pathConversion &&
+				validationResult.pathConversion.recommended
+			) {
 				// Update target path to use cache-resolved absolute path
 				const { resolve } = await import("node:path");
-				const absolutePath = resolve(validationResult.pathConversion.recommended);
+				const absolutePath = resolve(
+					validationResult.pathConversion.recommended,
+				);
 				syntheticLink.target.path.absolute = absolutePath;
 			}
 
@@ -483,13 +507,12 @@ export class CitationManager {
 			// Pattern: ContentExtractor uses CliFlagStrategy to make link eligible
 			const result = await this.contentExtractor.extractContent(
 				[syntheticLink],
-				{ ...options, fullFiles: true }
+				{ ...options, fullFiles: true },
 			);
 
 			// --- Phase 4: Return ---
 			// Decision: Return result for CLI to output (CLI handles stdout)
 			return result;
-
 		} catch (error) {
 			// Decision: System errors use exit code 2
 			console.error("ERROR:", error.message);
@@ -535,7 +558,8 @@ export class CitationManager {
 			// Find all fixable issues: warnings (path conversion) and errors (anchor fixes)
 			const fixableLinks = validationResults.links.filter(
 				(link) =>
-					(link.validation.status === "warning" && link.validation.pathConversion) ||
+					(link.validation.status === "warning" &&
+						link.validation.pathConversion) ||
 					(link.validation.status === "error" &&
 						link.validation.suggestion &&
 						(link.validation.suggestion.includes(
@@ -720,7 +744,9 @@ export class CitationManager {
 			link.validation.error.startsWith("Anchor not found") &&
 			link.validation.suggestion.includes("Available headers:")
 		) {
-			const availableHeaders = this.parseAvailableHeaders(link.validation.suggestion);
+			const availableHeaders = this.parseAvailableHeaders(
+				link.validation.suggestion,
+			);
 			const citationMatch = citation.match(/\[([^\]]+)\]\(([^)]+)#([^)]+)\)/);
 
 			if (citationMatch && availableHeaders.length > 0) {
@@ -749,25 +775,25 @@ export class CitationManager {
  */
 const semanticSuggestionMap = {
 	// Command synonyms
-	check: ['validate'],
-	verify: ['validate'],
-	lint: ['validate'],
-	parse: ['ast'],
-	tree: ['ast'],
-	debug: ['ast'],
-	show: ['ast'],
+	check: ["validate"],
+	verify: ["validate"],
+	lint: ["validate"],
+	parse: ["ast"],
+	tree: ["ast"],
+	debug: ["ast"],
+	show: ["ast"],
 
 	// Option synonyms
-	fix: ['--fix'],
-	repair: ['--fix'],
-	correct: ['--fix'],
-	output: ['--format'],
-	json: ['--format json'],
-	range: ['--lines'],
-	folder: ['--scope'],
-	directory: ['--scope'],
-	path: ['--scope'],
-	dir: ['--scope']
+	fix: ["--fix"],
+	repair: ["--fix"],
+	correct: ["--fix"],
+	output: ["--format"],
+	json: ["--format json"],
+	range: ["--lines"],
+	folder: ["--scope"],
+	directory: ["--scope"],
+	path: ["--scope"],
+	dir: ["--scope"],
 };
 
 const program = new Command();
@@ -782,22 +808,26 @@ program.configureOutput({
 	outputError: (str, write) => {
 		const match = str.match(/unknown (?:command|option) '([^']+)'/);
 		if (match) {
-			const input = match[1].replace(/^--?/, '');
+			const input = match[1].replace(/^--?/, "");
 			const suggestions = semanticSuggestionMap[input];
 
 			if (suggestions) {
-				write(`Unknown ${match[0].includes('command') ? 'command' : 'option'} '${match[1]}'\n`);
-				write(`Did you mean: ${suggestions.join(', ')}?\n`);
+				write(
+					`Unknown ${match[0].includes("command") ? "command" : "option"} '${match[1]}'\n`,
+				);
+				write(`Did you mean: ${suggestions.join(", ")}?\n`);
 				return;
 			}
 		}
 		write(str);
-	}
+	},
 });
 
 program
 	.command("validate")
-	.description("Validate citations in a markdown file, checking that target files exist and anchors resolve correctly")
+	.description(
+		"Validate citations in a markdown file, checking that target files exist and anchors resolve correctly",
+	)
 	.argument("<file>", "path to markdown file to validate")
 	.option("--format <type>", "output format (cli, json)", "cli")
 	.option(
@@ -812,7 +842,9 @@ program
 		"--fix",
 		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections",
 	)
-	.addHelpText('after', `
+	.addHelpText(
+		"after",
+		`
 Examples:
     $ citation-manager validate docs/design.md
     $ citation-manager validate file.md --format json
@@ -823,7 +855,8 @@ Exit Codes:
   0  All citations valid
   1  Validation errors found
   2  System error (file not found, permission denied)
-`)
+`,
+	)
 	.action(async (file, options) => {
 		const manager = new CitationManager();
 		let result;
@@ -859,7 +892,9 @@ program
 	.command("ast")
 	.description("Display markdown AST and citation metadata for debugging")
 	.argument("<file>", "path to markdown file to analyze")
-	.addHelpText('after', `
+	.addHelpText(
+		"after",
+		`
 Examples:
     $ citation-manager ast docs/design.md
     $ citation-manager ast file.md | jq '.links'
@@ -870,7 +905,8 @@ Output includes:
   - links: Detected citation links with anchor metadata
   - headings: Parsed heading structure
   - anchors: Available anchor points (headers and blocks)
-`)
+`,
+	)
 	.action(async (file) => {
 		const manager = new CitationManager();
 		const ast = await manager.parser.parseFile(file);
@@ -884,11 +920,18 @@ const extractCmd = program
 
 extractCmd
 	.command("links <source-file>")
-	.description("Extract content from all links in source document with validation and deduplication")
+	.description(
+		"Extract content from all links in source document with validation and deduplication",
+	)
 	.option("--scope <folder>", "Limit file resolution to folder")
 	.option("--format <type>", "Output format (reserved for future)", "json")
-	.option("--full-files", "Enable full-file link extraction (default: sections only)")
-	.addHelpText('after', `
+	.option(
+		"--full-files",
+		"Enable full-file link extraction (default: sections only)",
+	)
+	.addHelpText(
+		"after",
+		`
 Examples:
     $ citation-manager extract links docs/design.md
     $ citation-manager extract links docs/design.md --full-files
@@ -899,7 +942,8 @@ Exit Codes:
   0  At least one link extracted successfully
   1  No eligible links or all extractions failed
   2  System error (file not found, permission denied)
-`)
+`,
+	)
 	.action(async (sourceFile, options) => {
 		// Pattern: Delegate to CitationManager orchestrator
 		const manager = new CitationManager();
@@ -919,7 +963,9 @@ extractCmd
 	.argument("<header-name>", "Exact header text to extract")
 	.option("--scope <folder>", "Limit file resolution scope")
 	.option("--format <type>", "Output format (json)", "json")
-	.addHelpText('after', `
+	.addHelpText(
+		"after",
+		`
 Examples:
     $ citation-manager extract header plan.md "Task 1: Implementation"
     $ citation-manager extract header docs/guide.md "Overview" --scope ./docs
@@ -929,14 +975,19 @@ Exit Codes:
   0  Header extracted successfully
   1  Header not found or validation failed
   2  System error (file not found, permission denied)
-`)
+`,
+	)
 	.action(async (targetFile, headerName, options) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
 
 		try {
 			// Pattern: Delegate to CitationManager orchestration method
-			const result = await manager.extractHeader(targetFile, headerName, options);
+			const result = await manager.extractHeader(
+				targetFile,
+				headerName,
+				options,
+			);
 
 			// Decision: Output JSON to stdout if extraction succeeded
 			if (result) {
@@ -945,7 +996,6 @@ Exit Codes:
 				process.exitCode = 0;
 			}
 			// Note: Error exit codes set by extractHeader() method
-
 		} catch (error) {
 			// Decision: Unexpected errors use exit code 2
 			console.error("ERROR:", error.message);
@@ -959,7 +1009,9 @@ extractCmd
 	.argument("<target-file>", "Markdown file to extract")
 	.option("--scope <folder>", "Limit file resolution to specified directory")
 	.option("--format <type>", "Output format (json)", "json")
-	.addHelpText('after', `
+	.addHelpText(
+		"after",
+		`
 Examples:
     $ citation-manager extract file docs/architecture.md
     $ citation-manager extract file architecture.md --scope ./docs
@@ -970,7 +1022,8 @@ Exit Codes:
   0  File extracted successfully
   1  File not found or validation failed
   2  System error (permission denied, parse error)
-`)
+`,
+	)
 	.action(async (targetFile, options) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
@@ -986,7 +1039,6 @@ Exit Codes:
 				process.exitCode = 0;
 			}
 			// Note: Error exit codes set by extractFile() method
-
 		} catch (error) {
 			// Decision: Unexpected errors use exit code 2
 			console.error("ERROR:", error.message);

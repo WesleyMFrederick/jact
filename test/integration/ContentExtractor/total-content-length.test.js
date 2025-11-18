@@ -16,11 +16,7 @@ describe("ContentExtractor Integration - _totalContentCharacterLength", () => {
 
 	it("should include _totalContentCharacterLength in real extraction", async () => {
 		// Given: Real enriched links from test fixture
-		const sourceFile = join(
-			fixturesDir,
-			"section-extraction",
-			"links.md",
-		);
+		const sourceFile = join(fixturesDir, "section-extraction", "links.md");
 
 		// When: Extract with real cache and parsers
 		const result = await extractor.extractLinksContent(sourceFile, {
@@ -28,12 +24,17 @@ describe("ContentExtractor Integration - _totalContentCharacterLength", () => {
 		});
 
 		// Then: Metadata field exists
-		expect(result.extractedContentBlocks._totalContentCharacterLength).toBeDefined();
-		expect(typeof result.extractedContentBlocks._totalContentCharacterLength).toBe("number");
+		expect(
+			result.extractedContentBlocks._totalContentCharacterLength,
+		).toBeDefined();
+		expect(
+			typeof result.extractedContentBlocks._totalContentCharacterLength,
+		).toBe("number");
 
 		// Verify approximation accuracy
 		const actualSize = JSON.stringify(result.extractedContentBlocks).length;
-		const reportedSize = result.extractedContentBlocks._totalContentCharacterLength;
+		const reportedSize =
+			result.extractedContentBlocks._totalContentCharacterLength;
 		const margin = actualSize - reportedSize;
 
 		expect(margin).toBeGreaterThan(0);

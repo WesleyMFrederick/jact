@@ -88,7 +88,8 @@ describe("Enhanced Citation Pattern Tests", () => {
 		// Should include both pattern types
 		const hasStandardLink = mixedLineCitations.some(
 			(c) =>
-				c.fullMatch.includes("[Standard Link](") && c.scope === "cross-document",
+				c.fullMatch.includes("[Standard Link](") &&
+				c.scope === "cross-document",
 		);
 		const hasCiteFormat = mixedLineCitations.some(
 			(c) => c.fullMatch.includes("[cite:") && c.scope === "cross-document",
@@ -124,7 +125,9 @@ describe("Enhanced Citation Pattern Tests", () => {
 
 		// Should validate file existence - valid links to test-target.md
 		const validLinks = wikiCrossDoc.filter(
-			(c) => c.validation.status === "valid" && c.fullMatch.includes("test-target.md"),
+			(c) =>
+				c.validation.status === "valid" &&
+				c.fullMatch.includes("test-target.md"),
 		);
 		expect(validLinks.length).toBeGreaterThan(0);
 
@@ -146,5 +149,4 @@ describe("Enhanced Citation Pattern Tests", () => {
 		}
 		// If directory reference not detected, that's acceptable - just verify other validations work
 	});
-
 });

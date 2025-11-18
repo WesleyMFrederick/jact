@@ -8,18 +8,18 @@
  * @returns {{ eligible: boolean, reason: string }} Eligibility decision
  */
 export function analyzeEligibility(link, cliFlags, strategies) {
-  // Loop through strategies in precedence order
-  for (const strategy of strategies) {
-    const decision = strategy.getDecision(link, cliFlags);
+	// Loop through strategies in precedence order
+	for (const strategy of strategies) {
+		const decision = strategy.getDecision(link, cliFlags);
 
-    // Return first non-null decision (highest priority wins)
-    if (decision !== null) {
-      return decision;
-    }
-  }
+		// Return first non-null decision (highest priority wins)
+		if (decision !== null) {
+			return decision;
+		}
+	}
 
-  // Fallback if all strategies return null
-  return { eligible: false, reason: 'No strategy matched' };
+	// Fallback if all strategies return null
+	return { eligible: false, reason: "No strategy matched" };
 }
 
 /**
@@ -30,5 +30,5 @@ export function analyzeEligibility(link, cliFlags, strategies) {
  * @returns {Function} Configured analyzer: (link, cliFlags) => decision
  */
 export function createEligibilityAnalyzer(strategies) {
-  return (link, cliFlags) => analyzeEligibility(link, cliFlags, strategies);
+	return (link, cliFlags) => analyzeEligibility(link, cliFlags, strategies);
 }

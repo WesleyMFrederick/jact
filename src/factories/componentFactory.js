@@ -109,5 +109,9 @@ export function createContentExtractor(
 	];
 
 	// Instantiate ContentExtractor with ALL dependencies
-	return new ContentExtractor(_strategies, _parsedFileCache, _citationValidator);
+	return new ContentExtractor(
+		_strategies,
+		_parsedFileCache,
+		_citationValidator,
+	);
 }

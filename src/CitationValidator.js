@@ -764,11 +764,14 @@ export class CitationValidator {
 		for (const anchorObj of availableAnchors) {
 			if (anchorObj.anchorType === "header") {
 				// Convert header text to kebab-case to check for match
-				const kebabCase = anchorObj.rawText.toLowerCase().replace(/\s+/g, '-');
+				const kebabCase = anchorObj.rawText.toLowerCase().replace(/\s+/g, "-");
 				if (kebabCase === usedAnchor) {
 					// Found a header whose kebab-case matches the used anchor
 					// Suggest the URL-encoded raw text format instead
-					const suggestion = encodeURIComponent(anchorObj.id).replace(/'/g, "%27");
+					const suggestion = encodeURIComponent(anchorObj.id).replace(
+						/'/g,
+						"%27",
+					);
 					// Only suggest if it's different from what's being used
 					if (suggestion !== usedAnchor) {
 						return suggestion;

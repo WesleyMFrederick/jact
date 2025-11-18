@@ -28,7 +28,9 @@ describe("Story File Validation with Scope", () => {
 			expect(result.summary.errors).toBeGreaterThan(0);
 
 			// Should detect the 3 intentional broken references
-			const errors = result.links.filter((r) => r.validation.status === "error");
+			const errors = result.links.filter(
+				(r) => r.validation.status === "error",
+			);
 			expect(errors.length).toBeGreaterThanOrEqual(3);
 
 			// Verify at least one valid cross-document reference

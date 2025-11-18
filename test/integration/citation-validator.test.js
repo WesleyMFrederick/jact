@@ -46,7 +46,9 @@ describe("Component Integration", () => {
 			expect(result.summary.total).toBeGreaterThan(0);
 			expect(result.summary.errors).toBeGreaterThan(0);
 			// Verify that errors are properly detected in enriched links
-			const errorLinks = result.links.filter((link) => link.validation.status === "error");
+			const errorLinks = result.links.filter(
+				(link) => link.validation.status === "error",
+			);
 			expect(errorLinks.length).toBe(result.summary.errors);
 			// Verify error messages are populated
 			for (const errorLink of errorLinks) {
@@ -67,7 +69,9 @@ describe("Component Integration", () => {
 			expect(result.summary.total).toBeGreaterThan(0);
 			// Verify cache can resolve valid citations
 			const validLinks = result.links.filter(
-				(link) => link.validation.status === "valid" || link.validation.status === "warning",
+				(link) =>
+					link.validation.status === "valid" ||
+					link.validation.status === "warning",
 			);
 			expect(validLinks.length).toBeGreaterThan(0);
 			// Verify component collaboration through enriched link structure

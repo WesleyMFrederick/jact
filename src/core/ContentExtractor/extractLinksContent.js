@@ -153,10 +153,12 @@ export async function extractLinksContent(
 				(totalContentSize + deduplicatedOutput.stats.tokensSaved);
 
 	// Add JSON size metadata for output length checking (AC3: metadata first for diagnostic visibility)
-	const jsonSize = JSON.stringify(deduplicatedOutput.extractedContentBlocks).length;
+	const jsonSize = JSON.stringify(
+		deduplicatedOutput.extractedContentBlocks,
+	).length;
 	deduplicatedOutput.extractedContentBlocks = {
 		_totalContentCharacterLength: jsonSize,
-		...deduplicatedOutput.extractedContentBlocks
+		...deduplicatedOutput.extractedContentBlocks,
 	};
 
 	// Decision: Return deduplicated output as only public contract (AC9)

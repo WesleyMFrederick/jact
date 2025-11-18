@@ -19,7 +19,10 @@ import { join } from "node:path";
  */
 export function runCLI(command, options = {}) {
 	// Create temporary file for output capture
-	const tempFile = join(tmpdir(), `cli-output-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`);
+	const tempFile = join(
+		tmpdir(),
+		`cli-output-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`,
+	);
 
 	const { captureStderr = true, ...spawnOptions } = options;
 
@@ -53,9 +56,7 @@ export function runCLI(command, options = {}) {
 
 		// If command exited with non-zero status, throw error with output
 		if (result.status !== 0) {
-			const error = new Error(
-				`Command failed with exit code ${result.status}`,
-			);
+			const error = new Error(`Command failed with exit code ${result.status}`);
 			error.stdout = output;
 			error.stderr = "";
 			error.status = result.status;

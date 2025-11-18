@@ -27,8 +27,12 @@ describe("Warning Status Validation Tests", () => {
 			const warningResults = result.links.filter(
 				(r) => r.validation.status === "warning",
 			);
-			const _validResults = result.links.filter((r) => r.validation.status === "valid");
-			const _errorResults = result.links.filter((r) => r.validation.status === "error");
+			const _validResults = result.links.filter(
+				(r) => r.validation.status === "valid",
+			);
+			const _errorResults = result.links.filter(
+				(r) => r.validation.status === "error",
+			);
 
 			// Primary assertion: Should have warning status for cross-directory resolution
 			expect(warningResults.length).toBeGreaterThan(0);

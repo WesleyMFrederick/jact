@@ -1,18 +1,18 @@
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { describe, it, expect } from 'vitest';
-import ParsedDocument from '../src/ParsedDocument.js';
-import { createMarkdownParser } from '../src/factories/componentFactory.js';
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, it, expect } from "vitest";
+import ParsedDocument from "../src/ParsedDocument.js";
+import { createMarkdownParser } from "../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-describe('ParsedDocument Facade', () => {
+describe("ParsedDocument Facade", () => {
 	// 1. Test anchor existence check with dual ID formats
-	it('hasAnchor should validate using both id and urlEncodedId', async () => {
+	it("hasAnchor should validate using both id and urlEncodedId", async () => {
 		// Given: Real parser output from existing fixture
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
+		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 		const parserOutput = await parser.parseFile(testFile);
 		const doc = new ParsedDocument(parserOutput);
 
@@ -27,16 +27,19 @@ describe('ParsedDocument Facade', () => {
 	});
 
 	// 2. Test fuzzy anchor matching for suggestions
-	it('findSimilarAnchors should return sorted suggestions', async () => {
+	it("findSimilarAnchors should return sorted suggestions", async () => {
 		// Given: Real parser output with multiple anchors from fixture
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
+		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 		const parserOutput = await parser.parseFile(testFile);
 		const doc = new ParsedDocument(parserOutput);
 
 		// When: Find similar anchors using partial query from actual anchor
 		const actualAnchor = parserOutput.anchors[0].id;
-		const partialQuery = actualAnchor.substring(0, Math.min(10, actualAnchor.length));
+		const partialQuery = actualAnchor.substring(
+			0,
+			Math.min(10, actualAnchor.length),
+		);
 		const suggestions = doc.findSimilarAnchors(partialQuery);
 
 		// Then: Returns array with top matches sorted by similarity
@@ -47,10 +50,10 @@ describe('ParsedDocument Facade', () => {
 	});
 
 	// 3. Test link query method
-	it('getLinks should return all link objects', async () => {
+	it("getLinks should return all link objects", async () => {
 		// Given: Real parser output with links from fixture
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
+		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 		const parserOutput = await parser.parseFile(testFile);
 		const doc = new ParsedDocument(parserOutput);
 
@@ -64,10 +67,10 @@ describe('ParsedDocument Facade', () => {
 	});
 
 	// 4. Test full content extraction
-	it('extractFullContent should return raw content string', async () => {
+	it("extractFullContent should return raw content string", async () => {
 		// Given: Real parser output with content from fixture
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
+		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 		const parserOutput = await parser.parseFile(testFile);
 		const doc = new ParsedDocument(parserOutput);
 
@@ -76,28 +79,28 @@ describe('ParsedDocument Facade', () => {
 
 		// Then: Returns exact content string from parser
 		expect(content).toBe(parserOutput.content);
-		expect(typeof content).toBe('string');
+		expect(typeof content).toBe("string");
 		expect(content.length).toBeGreaterThan(0);
 	});
 
 	// 5. Test extractSection implementation (US2.2 AC13)
-	it('extractSection should extract section content or return null', async () => {
+	it("extractSection should extract section content or return null", async () => {
 		// Given: ParsedDocument instance from real parser output
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
+		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 		const parserOutput = await parser.parseFile(testFile);
 		const doc = new ParsedDocument(parserOutput);
 
 		// When/Then: Method returns string or null (no longer throws error)
 		const result = doc.extractSection("any", 2);
-		expect(result === null || typeof result === 'string').toBe(true);
+		expect(result === null || typeof result === "string").toBe(true);
 	});
 
 	// 6. Test extractBlock implementation (US2.2 AC14)
-	it('extractBlock should extract block content or return null', async () => {
+	it("extractBlock should extract block content or return null", async () => {
 		// Given: ParsedDocument instance from real parser output
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
+		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 		const parserOutput = await parser.parseFile(testFile);
 		const doc = new ParsedDocument(parserOutput);
 

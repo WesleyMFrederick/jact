@@ -8,7 +8,7 @@
  */
 export function normalizeBlockId(anchor) {
 	// IF anchor is not null AND starts with '^'
-	if (anchor && anchor.startsWith('^')) {
+	if (anchor && anchor.startsWith("^")) {
 		//   RETURN anchor.substring(1)
 		return anchor.substring(1);
 	}

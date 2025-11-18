@@ -90,9 +90,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 
 		// Then: Should return only that specific paragraph
 		expect(block).not.toBeNull();
-		expect(block.content).toContain(
-			"This is the content of the first section",
-		);
+		expect(block.content).toContain("This is the content of the first section");
 		expect(block.content).toContain("^first-section-intro");
 		expect(block.lineNumber).toBe(7);
 		expect(block.anchor.id).toBe("first-section-intro");
@@ -114,7 +112,11 @@ describe("POC: Block Extraction by Anchor ID", () => {
 
 		// When: Parse file and extract second paragraph block
 		const result = await parser.parseFile(testFile);
-		const block = extractBlock(result.content, result.anchors, "important-info");
+		const block = extractBlock(
+			result.content,
+			result.anchors,
+			"important-info",
+		);
 
 		// Then: Should return only that specific paragraph, not the first one
 		expect(block).not.toBeNull();
@@ -302,7 +304,11 @@ describe("POC: Block Extraction by Anchor ID", () => {
 			result.anchors,
 			"first-section-intro",
 		);
-		const block2 = extractBlock(result.content, result.anchors, "mid-paragraph");
+		const block2 = extractBlock(
+			result.content,
+			result.anchors,
+			"mid-paragraph",
+		);
 
 		// Then: Both blocks should be extracted correctly and independently
 		expect(block1).not.toBeNull();
