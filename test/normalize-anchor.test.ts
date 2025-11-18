@@ -7,8 +7,10 @@ import {
 describe("Anchor Normalization Utilities", () => {
 	it("should remove caret prefix from block anchor", () => {
 		// Given: Block anchor with caret '^block-id'
+		const input: string = "^block-id";
+
 		// When: normalizeBlockId called
-		const result = normalizeBlockId("^block-id");
+		const result: string | null = normalizeBlockId(input);
 
 		// Then: Caret prefix removed
 		expect(result).toBe("block-id");
@@ -16,40 +18,58 @@ describe("Anchor Normalization Utilities", () => {
 
 	it("should return null for null block anchor", () => {
 		// Given: null anchor
+		const input: null = null;
+
 		// When: normalizeBlockId called
+		const result: string | null = normalizeBlockId(input);
+
 		// Then: Returns null unchanged
-		expect(normalizeBlockId(null)).toBe(null);
+		expect(result).toBe(null);
 	});
 
 	it("should return unchanged anchor without caret", () => {
 		// Given: Anchor without caret 'no-caret'
+		const input: string = "no-caret";
+
 		// When: normalizeBlockId called
+		const result: string | null = normalizeBlockId(input);
+
 		// Then: Returns unchanged
-		expect(normalizeBlockId("no-caret")).toBe("no-caret");
+		expect(result).toBe("no-caret");
 	});
 });
 
 describe("URL Decoding", () => {
 	it("should decode URL-encoded anchor with spaces", () => {
 		// Given: URL-encoded anchor 'Story%201.7%20Implementation'
+		const input: string = "Story%201.7%20Implementation";
+
 		// When: decodeUrlAnchor called
+		const result: string | null = decodeUrlAnchor(input);
+
 		// Then: Decoded to spaces
-		expect(decodeUrlAnchor("Story%201.7%20Implementation")).toBe(
-			"Story 1.7 Implementation",
-		);
+		expect(result).toBe("Story 1.7 Implementation");
 	});
 
 	it("should return original anchor if decoding fails", () => {
 		// Given: Invalid encoding 'invalid%'
+		const input: string = "invalid%";
+
 		// When: decodeUrlAnchor called with invalid encoding
+		const result: string | null = decodeUrlAnchor(input);
+
 		// Then: Returns original (graceful fallback)
-		expect(decodeUrlAnchor("invalid%")).toBe("invalid%");
+		expect(result).toBe("invalid%");
 	});
 
 	it("should handle null anchor", () => {
 		// Given: null anchor
+		const input: null = null;
+
 		// When: decodeUrlAnchor called
+		const result: string | null = decodeUrlAnchor(input);
+
 		// Then: Returns null
-		expect(decodeUrlAnchor(null)).toBe(null);
+		expect(result).toBe(null);
 	});
 });

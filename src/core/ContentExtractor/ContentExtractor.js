@@ -66,7 +66,7 @@ export class ContentExtractor {
 		const { analyzeEligibility } = await import("./analyzeEligibility.js");
 		const { generateContentId } = await import("./generateContentId.js");
 		const { decodeUrlAnchor, normalizeBlockId } = await import(
-			"./normalizeAnchor.js"
+			"./normalizeAnchor.ts"
 		);
 
 		// AC15: Filter out internal links before processing

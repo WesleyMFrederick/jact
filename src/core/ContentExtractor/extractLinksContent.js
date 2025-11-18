@@ -1,6 +1,6 @@
 import { analyzeEligibility } from "./analyzeEligibility.js";
 import { generateContentId } from "./generateContentId.js";
-import { decodeUrlAnchor, normalizeBlockId } from "./normalizeAnchor.js";
+import { decodeUrlAnchor, normalizeBlockId } from "./normalizeAnchor.ts";
 
 /**
  * Extract content from links in source file with deduplication

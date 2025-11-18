@@ -5,8 +5,10 @@
 
 /**
  * Normalize block anchor by removing '^' prefix
+ * @param anchor - Block ID that may start with ^, or null
+ * @returns Block ID without leading caret, or null if input is null
  */
-export function normalizeBlockId(anchor) {
+export function normalizeBlockId(anchor: string | null): string | null {
 	// IF anchor is not null AND starts with '^'
 	if (anchor && anchor.startsWith("^")) {
 		//   RETURN anchor.substring(1)
@@ -19,8 +21,10 @@ export function normalizeBlockId(anchor) {
 
 /**
  * Decode URL-encoded characters in anchor strings
+ * @param anchor - URL-encoded anchor string, or null
+ * @returns Decoded anchor string, original if decoding fails, or null if input null
  */
-export function decodeUrlAnchor(anchor) {
+export function decodeUrlAnchor(anchor: string | null): string | null {
 	// IF anchor is null
 	if (anchor === null) {
 		//   RETURN null
