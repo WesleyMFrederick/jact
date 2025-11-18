@@ -2,7 +2,7 @@
 
 **Archive Date**: 2025-11-12
 **Status**: OUTDATED DRAFT
-**Current Version**: See [ARCHITECTURE.md](../ARCHITECTURE.md)
+**Current Version**: See [ARCHITECTURE.md](../ARCHITECTURE-Citation-Manager.md)
 
 This document represents an early draft of the Citation Manager architecture created on 2025-10-01 during the initial workspace migration planning. It has been superseded by the actively maintained production architecture document.
 
@@ -14,7 +14,7 @@ This document represents an early draft of the Citation Manager architecture cre
 - Factory pattern for dependency injection
 - 31+ new tests across multiple categories
 
-For current architecture information, please refer to the [current ARCHITECTURE.md](../ARCHITECTURE.md).
+For current architecture information, please refer to the [current ARCHITECTURE.md](../ARCHITECTURE-Citation-Manager.md).
 
 ---
 
