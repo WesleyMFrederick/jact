@@ -1,5 +1,5 @@
 // src/types/validationTypes.ts
-import type { LinkObject, ValidationStatus } from "./citationTypes";
+import type { LinkObject, ValidationStatus } from "./citationTypes.js";
 
 /**
  * Validation result for single citation.

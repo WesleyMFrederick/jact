@@ -1,6 +1,18 @@
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { runCLI } from "../test/helpers/cli-runner.js";
+
+/**
+ * Helper: Detect if running in Vitest test context
+ * Pattern: Environment Detection (Workspace Architecture)
+ * Reference: ARCHITECTURE.md#Process Cleanup and Nested Test Execution
+ * Reference: US1.4a cli-runner.js for safe CLI execution in tests
+ */
+function isInTestContext(): boolean {
+	// biome-ignore lint/complexity/useLiteralKeys: environment variable names must use bracket notation
+	return !!(process.env["VITEST_POOL_ID"] || process.env["VITEST_WORKER_ID"]);
+}
 
 /**
  * Validation checkpoint result for a single check
@@ -143,15 +155,14 @@ function validateExplicitReturnTypes(filePath: string): ValidationResult {
 			/export\s+((?:async\s+)?function|const\s+\w+\s*=\s*(?:async\s*)?\()/g;
 
 		// Find all export statements and check if they have return types
-		let match;
 		const functionsWithoutReturnTypes: string[] = [];
 
-		while ((match = exportFunctionRegex.exec(content)) !== null) {
+		let match: RegExpExecArray | null = exportFunctionRegex.exec(content);
+		while (match !== null) {
 			const startPos = match.index + match[0].length;
 			// Look ahead for return type annotation pattern `: Type` before `{`
 			const nextPart = content.substring(startPos, startPos + 100);
-			const hasReturnType =
-				/^[^{]*:\s*[\w<>[\]|&\s]+\s*[={]/.test(nextPart);
+			const hasReturnType = /^[^{]*:\s*[\w<>[\]|&\s]+\s*[={]/.test(nextPart);
 
 			if (!hasReturnType && !nextPart.includes("=>")) {
 				// For arrow functions, check for => Type pattern
@@ -160,6 +171,7 @@ function validateExplicitReturnTypes(filePath: string): ValidationResult {
 					functionsWithoutReturnTypes.push(match[0].trim());
 				}
 			}
+			match = exportFunctionRegex.exec(content);
 		}
 
 		return {
@@ -204,6 +216,16 @@ function validateStrictNullChecks(filePath: string): ValidationResult {
 }
 
 function validateTestsPassing(filePath: string): ValidationResult {
+	// CRITICAL: Prevent nested Vitest process explosion
+	// Reference: ARCHITECTURE.md#Process Cleanup and Nested Test Execution
+	if (isInTestContext()) {
+		return {
+			checkpoint: "All Tests Pass",
+			passed: true,
+			message: "SKIPPED in test context (prevents nested process explosion)",
+		};
+	}
+
 	// Decision: Find corresponding test file
 	const testFilePath = convertPathToTestFile(filePath);
 
@@ -215,36 +237,56 @@ function validateTestsPassing(filePath: string): ValidationResult {
 		};
 	}
 
-	return {
-		checkpoint: "All Tests Pass",
-		passed: true,
-		message: "Test file exists and syntax valid",
-	};
+	// Integration: Use cli-runner helper (US1.4a) for safe CLI execution
+	// NEVER use execSync directly - always use runCLI() helper
+	try {
+		runCLI(`npm test -- ${testFilePath}`, {
+			cwd: getProjectRoot(),
+		});
+
+		return {
+			checkpoint: "All Tests Pass",
+			passed: true,
+			message: "All tests passed for converted file",
+		};
+	} catch (error) {
+		// Research: Catch test failures
+		const message = error instanceof Error ? error.message : String(error);
+		return {
+			checkpoint: "All Tests Pass",
+			passed: false,
+			message: message.substring(0, 200),
+		};
+	}
 }
 
 function validateConsumerCompatibility(filePath: string): ValidationResult {
-	// Integration: Check if compiled output is properly typed
-	// (Skipping full test suite to avoid circular dependencies in validation)
-	try {
-		// Check if the TypeScript file compiles to valid JavaScript
-		// This validates JavaScript consumer compatibility
-		const distPath = convertPathToDistFile(filePath, ".js");
-		const dtsPath = convertPathToDistFile(filePath, ".d.ts");
+	// CRITICAL: Prevent nested Vitest process explosion
+	// Reference: ARCHITECTURE.md#Process Cleanup and Nested Test Execution
+	if (isInTestContext()) {
+		return {
+			checkpoint: "JavaScript Consumers Work",
+			passed: true,
+			message: "SKIPPED in test context (prevents nested process explosion)",
+		};
+	}
 
-		if (existsSync(distPath) && existsSync(dtsPath)) {
-			return {
-				checkpoint: "JavaScript Consumers Work",
-				passed: true,
-				message: "Compiled outputs exist with type definitions",
-			};
-		}
+	// Integration: Use cli-runner helper (US1.4a) for safe CLI execution
+	// NEVER use execSync directly - always use runCLI() helper
+	try {
+		// Pattern: Execute the full test suite to validate all consumers work
+		// Decision: Full suite ensures JavaScript consumers can use the converted exports
+		runCLI("npm test", {
+			cwd: getProjectRoot(),
+		});
 
 		return {
 			checkpoint: "JavaScript Consumers Work",
-			passed: false,
-			message: "Compiled outputs not found",
+			passed: true,
+			message: "Full test suite passed - JavaScript consumers work",
 		};
 	} catch (error) {
+		// Research: Catch test failures indicating consumer incompatibility
 		const message = error instanceof Error ? error.message : String(error);
 		return {
 			checkpoint: "JavaScript Consumers Work",
@@ -276,17 +318,16 @@ function validateCompiledOutput(filePath: string): ValidationResult {
 				passed: true,
 				message: "Both .js and .d.ts generated",
 			};
-		} else {
-			const missing = [];
-			if (!jsExists) missing.push(".js");
-			if (!dtsExists) missing.push(".d.ts");
-
-			return {
-				checkpoint: "Compiled Output Generated",
-				passed: false,
-				message: `Missing compiled files: ${missing.join(", ")}`,
-			};
 		}
+		const missing = [];
+		if (!jsExists) missing.push(".js");
+		if (!dtsExists) missing.push(".d.ts");
+
+		return {
+			checkpoint: "Compiled Output Generated",
+			passed: false,
+			message: `Missing compiled files: ${missing.join(", ")}`,
+		};
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		return {
@@ -302,30 +343,18 @@ function validateCompiledOutput(filePath: string): ValidationResult {
  * e.g., src/core/file.ts -> test/core/file.test.ts
  */
 function convertPathToTestFile(filePath: string): string {
-	const relativePath = filePath.replace(
-		/.*\/tools\/citation-manager\//,
-		""
-	);
+	const relativePath = filePath.replace(/.*\/tools\/citation-manager\//, "");
 	const withoutExt = relativePath.replace(/\.(ts|js)$/, "");
 	const testPath = withoutExt.replace(/^src\//, "test/");
-	return resolve(
-		getProjectRoot(),
-		`${testPath}.test.ts`
-	);
+	return resolve(getProjectRoot(), `${testPath}.test.ts`);
 }
 
 /**
  * Convert src file path to dist file path
  * e.g., src/core/file.ts -> dist/core/file.js or .d.ts
  */
-function convertPathToDistFile(
-	filePath: string,
-	ext: ".js" | ".d.ts"
-): string {
-	const relativePath = filePath.replace(
-		/.*\/tools\/citation-manager\//,
-		""
-	);
+function convertPathToDistFile(filePath: string, ext: ".js" | ".d.ts"): string {
+	const relativePath = filePath.replace(/.*\/tools\/citation-manager\//, "");
 	const withoutExt = relativePath.replace(/\.(ts|js)$/, "");
 	const distPath = withoutExt.replace(/^src\//, "dist/");
 	return resolve(getProjectRoot(), `${distPath}${ext}`);
@@ -339,4 +368,72 @@ function getProjectRoot(): string {
 	const scriptDir = dirname(resolve(import.meta.url.replace(/^file:\/\//, "")));
 	// Go up to the citation-manager root
 	return dirname(scriptDir);
+}
+
+/**
+ * Format validation results with color coding
+ */
+function formatResults(validation: ConversionValidation): string {
+	const lines: string[] = [];
+	const resetColor = "\x1b[0m";
+
+	lines.push(`\nValidation Results for: ${validation.file}`);
+	lines.push("=".repeat(60));
+
+	for (const result of validation.results) {
+		const status = result.passed ? "✓ PASS" : "✗ FAIL";
+		const statusColor = result.passed ? "\x1b[32m" : "\x1b[31m"; // green or red
+
+		lines.push(`${statusColor}${status}${resetColor} - ${result.checkpoint}`);
+		lines.push(`       ${result.message}`);
+	}
+
+	lines.push("=".repeat(60));
+	const allPassedColor = validation.allPassed ? "\x1b[32m" : "\x1b[31m";
+	lines.push(
+		`${allPassedColor}${validation.allPassed ? "✓ ALL CHECKPOINTS PASSED" : "✗ SOME CHECKPOINTS FAILED"}${resetColor}`,
+	);
+	lines.push("");
+
+	return lines.join("\n");
+}
+
+/**
+ * Main CLI entry point
+ */
+function main(): void {
+	const args = process.argv.slice(2);
+
+	if (args.length === 0) {
+		console.error("Usage: validate-typescript-conversion.ts <file-path>");
+		console.error(
+			"Example: validate-typescript-conversion.ts src/core/ContentExtractor/normalizeAnchor.ts",
+		);
+		process.exit(1);
+	}
+
+	const fileArg = args[0];
+	if (!fileArg) {
+		console.error("Error: file path argument is required");
+		process.exit(1);
+	}
+
+	const filePath = resolve(fileArg);
+	console.log(`\nValidating: ${filePath}`);
+
+	try {
+		const validation = validateConversion(filePath);
+		console.log(formatResults(validation));
+
+		process.exit(validation.allPassed ? 0 : 1);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`\nValidation error: ${message}`);
+		process.exit(1);
+	}
+}
+
+// Only run main if this is the entry point
+if (import.meta.url === `file://${process.argv[1]}`) {
+	main();
 }
