@@ -11,7 +11,8 @@
 	"scripts": {
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"start": "node src/citation-manager.js"
+		"start": "node src/citation-manager.js",
+		"validate:ts-conversion": "node --loader ts-node/esm scripts/validate-typescript-conversion.ts"
 	},
 	"keywords": ["citation", "validator", "markdown", "obsidian"],
 	"author": "",
