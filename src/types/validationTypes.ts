@@ -6,17 +6,17 @@ import type { LinkObject, ValidationStatus } from "./citationTypes";
  * Integration: Returned by CitationValidator for each link.
  */
 export interface CitationValidationResult {
-  /** Link object with validation enrichment */
-  link: LinkObject;
+	/** Link object with validation enrichment */
+	link: LinkObject;
 
-  /** Validation outcome */
-  status: ValidationStatus;
+	/** Validation outcome */
+	status: ValidationStatus;
 
-  /** Human-readable message */
-  message: string;
+	/** Human-readable message */
+	message: string;
 
-  /** Suggested corrections */
-  suggestions: string[];
+	/** Suggested corrections */
+	suggestions: string[];
 }
 
 /**
@@ -24,23 +24,23 @@ export interface CitationValidationResult {
  * Integration: Top-level result from validateFile.
  */
 export interface FileValidationSummary {
-  /** Source file path */
-  filePath: string;
+	/** Source file path */
+	filePath: string;
 
-  /** Total citation count */
-  totalCitations: number;
+	/** Total citation count */
+	totalCitations: number;
 
-  /** Valid citation count */
-  validCount: number;
+	/** Valid citation count */
+	validCount: number;
 
-  /** Warning citation count */
-  warningCount: number;
+	/** Warning citation count */
+	warningCount: number;
 
-  /** Error citation count */
-  errorCount: number;
+	/** Error citation count */
+	errorCount: number;
 
-  /** Individual validation results */
-  results: CitationValidationResult[];
+	/** Individual validation results */
+	results: CitationValidationResult[];
 }
 
 /**
@@ -50,14 +50,14 @@ export interface FileValidationSummary {
  * Decision: Separate states prevent null path access errors.
  */
 export type ResolutionResult =
-  | {
-      found: true;
-      path: string;
-      reason: 'direct' | 'cache';
-    }
-  | {
-      found: false;
-      path: null;
-      reason: 'not_found' | 'duplicate';
-      candidates?: string[];
-    };
+	| {
+			found: true;
+			path: string;
+			reason: "direct" | "cache";
+	  }
+	| {
+			found: false;
+			path: null;
+			reason: "not_found" | "duplicate";
+			candidates?: string[];
+	  };
