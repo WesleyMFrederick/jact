@@ -1,6 +1,7 @@
 # TypeScript Type Organization Patterns
 
-**Purpose:** Document type patterns and organization strategy for citation-manager TypeScript migration.
+**Purpose:** Document type patterns and organization strategy for
+citation-manager TypeScript migration.
 
 **Audience:** Developers converting JavaScript files to TypeScript during Epic 4.
 
@@ -31,7 +32,8 @@ export function normalizeBlockId(anchor: string | null): string | null {
 }
 ```
 
-**Rationale:** Explicit null handling prevents undefined behavior. TypeScript strict null checking catches missing null guards.
+**Rationale:** Explicit null handling prevents undefined behavior.
+TypeScript strict null checking catches missing null guards.
 
 ---
 
@@ -44,10 +46,16 @@ export function normalizeBlockId(anchor: string | null): string | null {
 ```typescript
 export type ResolutionResult =
   | { found: true; path: string; reason: 'direct' | 'cache' }
-  | { found: false; path: null; reason: 'not_found' | 'duplicate'; candidates?: string[] };
+  | {
+      found: false;
+      path: null;
+      reason: 'not_found' | 'duplicate';
+      candidates?: string[]
+    };
 ```
 
-**Rationale:** Discriminated unions make illegal states unrepresentable. TypeScript narrows types in conditional blocks.
+**Rationale:** Discriminated unions make illegal states unrepresentable.
+TypeScript narrows types in conditional blocks.
 
 ---
 
@@ -69,7 +77,8 @@ export function decodeUrlAnchor(anchor: string | null): string | null {
 }
 ```
 
-**Rationale:** Type contract guarantees return type even with errors. Fallback prevents exception propagation.
+**Rationale:** Type contract guarantees return type even with errors.
+Fallback prevents exception propagation.
 
 ---
 
@@ -88,7 +97,8 @@ export function createValidator(
 }
 ```
 
-**Rationale:** Optional parameters document flexibility. TypeScript enforces null checks when accessing optional params.
+**Rationale:** Optional parameters document flexibility. TypeScript
+enforces null checks when accessing optional params.
 
 ---
 
