@@ -256,7 +256,7 @@ Still in JavaScript, ready for proper conversion:
 
 ### 1. Create Lessons Learned Document
 
-***Document***: [lessons-learned](lessons-learned.md)%% force-extract %%
+***Document***: [lessons-learned](lessons-learned.md) %% force-extract %%
 
 Document what went wrong in Epic 4.2-4.5:
 - Created types without reading Component Guides
@@ -267,7 +267,7 @@ Document what went wrong in Epic 4.2-4.5:
 ### 2. Create Fresh TypeScript Migration Plan
 
 Use proper process this time:
-1. **Read Component Guide FIRST** for each component
+1. **Read [Component Guide](../../component-guides/component-guides.md)%% force-extract %% FIRST** for each component
 2. **Extract contracts** via `citation-manager extract links`
 3. **Analyze JavaScript structures** via `git show`
 4. **Create types matching contracts** (no invention)
