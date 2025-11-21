@@ -1,10 +1,12 @@
 # Citation Manager - Tool Architecture
 
-**Critical LLM Initialization Instructions**: When first reading this file, you MUST IMMEDIATELY run citation manager to extract base paths: `npm run citation:base-paths <this-file-path> -- --format json`. Read ALL discovered base path files to gather complete architectural context before proceeding.
+<critical-instruction>
+**Critial LLM Initialization Instructions**: When first reading this file, you MUST IMMEDIATELY run citation manager to extract base paths: `npm run citation:extract:content {{this-file-path}}`
+</critical-instruction>
 
 **Status**: Production
 
-**Parent Architecture**: [CC Workflows Workspace Architecture](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md)
+**Parent Architecture**: [CC Workflows Workspace Architecture](../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md)
 
 ---
 
@@ -60,7 +62,7 @@ graph TB
 
 ## Level 2: Container Context
 
-**Container Classification**: Citation-manager is a **Tool Package Container** within the [CC Workflows Workspace](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Level%202%20Containers) software system.
+**Container Classification**: Citation-manager is a **Tool Package Container** within the [CC Workflows Workspace](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Level 2 Containers>) software system.
 
 **Container Details**:
 - **Name**: Citation Manager
@@ -85,8 +87,8 @@ graph TB
 - **Path(s):** `tools/citation-manager/src/citation-manager.js`
 - **Technology:** `Node.js` class, `Commander.js` CLI framework, ESM modules
 - **Technology Status:** Production
-- **Description:** CLI entry point orchestrating all citation management operations. Parses commands (`validate`, `ast`, `base-paths`, `fix`, `extract links`, `extract header`, `extract file`), coordinates workflow execution, formats output for CLI/JSON display, and implements auto-fix logic for broken citations and paths. Orchestrates distinct workflows for different extraction modes: **`extract links`** discovers links via validator from source files, while **`extract header`** and **`extract file`** create synthetic links internally for direct content extraction. Delegates to [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor) for all extraction workflows and outputs JSON results to stdout. See [ContentExtractor Workflow diagram](component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction) for extraction orchestration patterns.
-- **Implement Guide**: [CLI Orchestrator Implementation Guide](component-guides/CLI%20Orchestrator%20Implementation%20Guide.md)
+- **Description:** CLI entry point orchestrating all citation management operations. Parses commands (`validate`, `ast`, `base-paths`, `fix`, `extract links`, `extract header`, `extract file`), coordinates workflow execution, formats output for CLI/JSON display, and implements auto-fix logic for broken citations and paths. Orchestrates distinct workflows for different extraction modes: **`extract links`** discovers links via validator from source files, while **`extract header`** and **`extract file`** create synthetic links internally for direct content extraction. Delegates to [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor) for all extraction workflows and outputs JSON results to stdout. See [ContentExtractor Workflow diagram](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/Content Extractor Implementation Guide.md#ContentExtractor Workflow Component Interaction>) for extraction orchestration patterns.
+- **Implement Guide**: [CLI Orchestrator Implementation Guide](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/CLI Orchestrator Implementation Guide.md>)
 
 ##### Interactions
 - _creates and coordinates_ [**`Markdown Parser`**](#Citation%20Manager.Markdown%20Parser), [**`File Cache`**](#Citation%20Manager.File%20Cache), [**`ParsedFileCache`**](#Citation%20Manager.ParsedFileCache), [**`ParsedDocument`**](#Citation%20Manager.ParsedDocument), [**`Citation Validator`**](#Citation%20Manager.Citation%20Validator), and [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor) components (synchronous).
@@ -130,7 +132,7 @@ The component's primary responsibility is to orchestrate workflow coordination b
   - ESM modules
 - **Technology Status:** Production
 - **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates single anchor per header with dual ID properties (raw text and URL-encoded) for Obsidian compatibility (US1.6). This component's output (`MarkdownParser.Output.DataContract`) is encapsulated by the `ParsedDocument` facade before being consumed by other components.
-- **Implementation Guide**: [Markdown Parser Implementation Guide](component-guides/Markdown%20Parser%20Implementation%20Guide.md) for the detailed data contract schema and examples
+- **Implementation Guide**: [Markdown Parser Implementation Guide](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/Markdown Parser Implementation Guide.md>) for the detailed data contract schema and examples
 
 ##### Interactions
 - _reads_ markdown files directly from file system (synchronous)
@@ -172,7 +174,7 @@ The component's primary output is from the `resolveFile()` method, which returns
   - ESM modules
 - **Technology Status:** Production
 - **Description:** Validates `Link Objects` by consuming `ParsedDocument` facade instances from the `ParsedFileCache` It classifies citation patterns (caret syntax, cross-document, wiki-style), resolves file paths using multiple strategies (relative paths, symlinks, Obsidian absolute paths, cache lookup), uses `ParsedDocument` query methods to check for target and anchor existence, generates validation results with actionable suggestions.
-- **Implementation Guide**: [CitationValidator Implementation Guide](component-guides/CitationValidator%20Implementation%20Guide.md) for public contracts and data objects
+- **Implementation Guide**: [CitationValidator Implementation Guide](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/CitationValidator Implementation Guide.md>) for public contracts and data objects
 
 ##### Interactions
 - _uses_ the `ParsedFileCache` to retrieve `ParsedDocument` instances for target files (asynchronous).
@@ -194,7 +196,7 @@ The component's primary output is from the `resolveFile()` method, which returns
   - ESM modules
 - **Technology Status:** Implemented
 - **Description:** Maintains an in-memory cache of `ParsedDocument` facade instances for the duration of a single command run. Wraps `MarkdownParser.Output.DataContract` objects in the `ParsedDocument` facade before returning them, ensuring each file is read from disk and parsed by the `MarkdownParser` at most once.
-- **Implementation Guide**: [ParsedFileCache Implementation Guide](component-guides/ParsedFileCache%20Implementation%20Guide.md) for public contracts and data objects
+- **Implementation Guide**: [ParsedFileCache Implementation Guide](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/ParsedFileCache Implementation Guide.md>) for public contracts and data objects
 
 ##### Interactions
 - _is consumed by_ the `CitationValidator` and `ContentExtractor` to retrieve `ParsedDocument` instances (asynchronous).
@@ -219,7 +221,7 @@ The component's primary output is from the `resolveFile()` method, which returns
   - ESM modules
 - **Technology Status:** Implemented (US1.7)
 - **Description:** Facade providing a stable, method-based query interface over `MarkdownParser.Output.DataContract`. Encapsulates internal data structure access and navigation complexity, decoupling consumers from parser internals. Implements anchor query methods (`hasAnchor()`, `findSimilarAnchors()`), link query methods (`getLinks()`), and content extraction methods (`extractFullContent()`, `extractSection()`, `extractBlock()`).
-- **Implementation Guide**: [ParsedDocument Implementation Guide](component-guides/ParsedDocument%20Implementation%20Guide.md)
+- **Implementation Guide**: [ParsedDocument Implementation Guide](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/ParsedDocument Implementation Guide.md>)
 
 ##### Interactions
 - _is created by_ the `ParsedFileCache` when wrapping `MarkdownParser.Output.DataContract` (synchronous).
@@ -249,7 +251,7 @@ The facade exposes query methods that return transformed/filtered data from the 
   - ESM modules
 - **Technology Status:** ✅ Implemented (US2.2 Complete - 2025-10-23), ✅ Enhanced (US2.2a Complete - 2025-10-28)
 - **Description:** Orchestrates content extraction and deduplication workflow for pre-validated links. Receives enriched LinkObjects from CLI (containing validation metadata), filters out internal links (scope='internal') before processing (US2.2 AC15), analyzes link eligibility using Strategy Pattern, retrieves content from target documents via `ParsedDocument` facade methods, and deduplicates extracted content using SHA-256 content-based hashing (US2.2a). Returns `OutgoingLinksExtractedContent` object with indexed content structure that minimizes token usage by storing identical content only once.
-- **Implementation Guide**: [Content Extractor Implementation Guide](component-guides/Content%20Extractor%20Implementation%20Guide.md)
+- **Implementation Guide**: [Content Extractor Implementation Guide](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/Content Extractor Implementation Guide.md>)
 
 ##### Interactions
 - _is consumed by_ the `CLI Orchestrator` via `extractContent(enrichedLinks, cliFlags)` method to perform content aggregation (asynchronous).
@@ -337,7 +339,7 @@ sequenceDiagram
 - **Fix Logic Location**: The `fix` logic remains within the `CLI Orchestrator`, operating on the final validation results.
 
 ### `extract` Command Component Sequence Diagram
-![ContentExtractor Workflow Component Interaction](component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction)
+![ContentExtractor Workflow Component Interaction](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/Content Extractor Implementation Guide.md#ContentExtractor Workflow Component Interaction>)
 
 ### Facade Pattern at npm Script Level (US2.7)
 
@@ -551,7 +553,7 @@ import { CitationValidator } from "./src/CitationValidator.js";
 
 ### Coding Standards
 
-Follows workspace coding standards defined in [Architecture: Coding Standards](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Coding%20Standards%20and%20Conventions):
+Follows workspace coding standards defined in [Architecture: Coding Standards](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Coding Standards and Conventions>):
 
 ---
 
@@ -632,7 +634,7 @@ tools/citation-manager/test/
 - Test AnchorObject structure (`anchorType`, `id`, `urlEncodedId`, `rawText`) - US1.6 dual ID schema
 - Verify enum constraints and required fields
 - Verify single anchor per header with no duplicates (US1.6)
-- Reference: [Markdown Parser Implementation Guide](component-guides/Markdown%20Parser%20Implementation%20Guide.md)
+- Reference: [Markdown Parser Implementation Guide](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/tools/citation-manager/design-docs/component-guides/Markdown Parser Implementation Guide.md>)
 
 **Cache Unit Tests** (6 tests - US1.5):
 - Cache hit/miss behavior
@@ -658,7 +660,7 @@ tools/citation-manager/test/
 
 ### Testing Principles
 
-Follows workspace testing strategy from [Architecture: Testing Strategy](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Testing%20Strategy):
+Follows workspace testing strategy from [Architecture: Testing Strategy](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Testing Strategy>):
 - **MVP-Focused**: Target 0.3:1 to 0.5:1 test-to-code ratio (achieved: 0.4:1)
 - **Integration-Driven**: Real file system operations, no mocking
 - **BDD Structure**: Given-When-Then comment structure required
@@ -705,7 +707,7 @@ it('should parse file only once when multiple links reference it', async () => {
 
 ### Process Management
 
-Citation-manager test suite uses CLI integration testing via `execSync()`, which can leave Vitest worker processes in memory after test completion. See [Workspace Testing Infrastructure - Vitest Process Management](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Vitest%20Process%20Management%20and%20Cleanup) for configuration best practices and cleanup procedures.
+Citation-manager test suite uses CLI integration testing via `execSync()`, which can leave Vitest worker processes in memory after test completion. See [Workspace Testing Infrastructure - Vitest Process Management](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Vitest Process Management and Cleanup>) for configuration best practices and cleanup procedures.
 
 **Quick Cleanup**:
 
@@ -719,18 +721,18 @@ pkill -f "vitest"
 
 | Technology | Version | Purpose | Source |
 |------------|---------|---------|--------|
-| **Node.js** | ≥18.0.0 | Runtime environment | [Workspace Tech Stack](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
+| **Node.js** | ≥18.0.0 | Runtime environment | [Workspace Tech Stack](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology Stack>) |
 | **Commander.js** | ^14.0.1 | CLI command parsing and argument handling | Tool-specific dependency |
 | **marked** | ^15.0.12 | Markdown tokenization and AST generation | Tool-specific dependency |
-| **Vitest** | latest | Testing framework (shared) | [Workspace Tech Stack](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
-| **Biome** | latest | Linting/formatting (shared) | [Workspace Tech Stack](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology%20Stack) |
+| **Vitest** | latest | Testing framework (shared) | [Workspace Tech Stack](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology Stack>) |
+| **Biome** | latest | Linting/formatting (shared) | [Workspace Tech Stack](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Technology Stack>) |
 | **Node.js built-in modules** | native | File I/O (fs), path operations (path), URL utilities (url) | Node.js standard library |
 
 ---
 
 ## Cross-Cutting Concerns
 
-As a tool within the CC Workflows Workspace, the Citation Manager inherits all of its cross-cutting architectural patterns from the [parent system](../../../design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Cross-Cutting%20Concerns).
+As a tool within the CC Workflows Workspace, the Citation Manager inherits all of its cross-cutting architectural patterns from the [parent system](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-architecture.md#Cross-Cutting Concerns>).
 
 ### Code Quality and Consistency
 All source code within the `citation-manager` package must adhere to the shared `biome.json` configuration located at the workspace root. This includes standards for **tab indentation** and **double quotes** for strings.
@@ -745,13 +747,13 @@ The tool's dependencies, such as `commander` and `marked`, are declared in its l
 
 ## Design Principles Adherence
 
-This tool follows workspace design principles defined in [Architecture Principles](../../../ARCHITECTURE-PRINCIPLES.md):
+This tool follows workspace design principles defined in [Architecture Principles](../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/ARCHITECTURE-PRINCIPLES.md):
 
 **Key Principles**:
-- [**Modular Design**](<../../../ARCHITECTURE-PRINCIPLES.md#Modular Design Principles>): Component-based architecture with clear boundaries
-- [**Deterministic Offloading**](<../../../ARCHITECTURE-PRINCIPLES.md#Deterministic Offloading Principles>): Predictable, mechanical citation processing
-- [**Safety-First**](<../../../ARCHITECTURE-PRINCIPLES.md#Safety-First Design Patterns>): Backup creation before auto-fix, dry-run capability
-- [**Self-Contained Naming**](<../../../ARCHITECTURE-PRINCIPLES.md#Self-Contained Naming Principles>): Descriptive command and component names
+- [**Modular Design**](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/ARCHITECTURE-PRINCIPLES.md#Modular Design Principles>): Component-based architecture with clear boundaries
+- [**Deterministic Offloading**](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/ARCHITECTURE-PRINCIPLES.md#Deterministic Offloading Principles>): Predictable, mechanical citation processing
+- [**Safety-First**](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/ARCHITECTURE-PRINCIPLES.md#Safety-First Design Patterns>): Backup creation before auto-fix, dry-run capability
+- [**Self-Contained Naming**](<../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/ARCHITECTURE-PRINCIPLES.md#Self-Contained Naming Principles>): Descriptive command and component names
 
 ---
 
@@ -891,7 +893,7 @@ Refactor CitationValidator helper methods (`suggestObsidianBetterFormat()`, `fin
 - **Scope**: File config adds complexity without proportional user value for initial release
 - **Workaround**: Users can create shell scripts/aliases wrapping CLI commands
 
-**Rationale for Deferring**: Following [simplicity-first](../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) principle - don't build features until user demand demonstrates necessity. The current 3-layer system provides sufficient control for MVP validation.
+**Rationale for Deferring**: Following [simplicity-first](../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/ARCHITECTURE-PRINCIPLES.md#^simplicity-first) principle - don't build features until user demand demonstrates necessity. The current 3-layer system provides sufficient control for MVP validation.
 
 **Resolution Criteria**:
 - User feedback indicates repetitive CLI flag usage is a pain point
@@ -966,8 +968,8 @@ Refactor CitationValidator helper methods (`suggestObsidianBetterFormat()`, `fin
 ---
 ## Related Documentation
 
-- [Architecture Principles](../../../ARCHITECTURE-PRINCIPLES.md) - Design principles and patterns
-- [citation-guidelines](../../../agentic-workflows/rules/citation-guidelines.md) - Citation linking guidelines
+- [Architecture Principles](../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/ARCHITECTURE-PRINCIPLES.md) - Design principles and patterns
+- [citation-guidelines](../../.worktrees/feature/epic4-typescript-systematic-conversion-worktree/agentic-workflows/rules/citation-guidelines.md) - Citation linking guidelines
 
 ---
 ## Whiteboard
