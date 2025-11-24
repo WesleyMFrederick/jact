@@ -97,7 +97,7 @@ This pseudocode follows the **MEDIUM-IMPLEMENTATION** abstraction level, showing
 ```tsx
 // The ParsedFileCache class, responsible for managing the in-memory lifecycle of ParsedDocument instances.
 class ParsedFileCache is
-  private field cache: Map of string to ParsedDocument
+  private field cache: Map of string to Promise<ParsedDocument>
   private field markdownParser: MarkdownParserInterface
 
   // The constructor accepts the MarkdownParser, which it will call on a cache miss.
