@@ -4,7 +4,7 @@
  * Link scope classification for citation validation.
  * Decision: Discriminated union prevents invalid scope values.
  */
-export type LinkScope = 'internal' | 'external';
+export type LinkScope = 'internal' | 'cross-document';
 
 /**
  * Citation validation status.
