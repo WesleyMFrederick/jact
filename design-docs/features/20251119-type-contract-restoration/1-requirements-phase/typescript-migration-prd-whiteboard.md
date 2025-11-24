@@ -169,12 +169,12 @@ From ROLLBACK-PLAN.md, suggested order (smallest to largest):
 
 ## References
 
-- **Rollback Plan**: [Next Steps After Rollback](ROLLBACK-PLAN.md#Next%20Steps%20After%20Rollback)- Complete rollback context and next steps
-- **Lessons Learned**: [lessons-learned.md](lessons-learned.md) %% force-extract %% - Documented failures and prevention checklist
-- **Research Whiteboard**: [typescript-restoration-whiteboard.md](typescript-restoration-whiteboard.md) - Original analysis and audit
-- **Component Guides**: [component-guides](../../component-guides/component-guides.md) %% force-extract %% - Contract specifications
+- **Rollback Plan**: [Next Steps After Rollback](../0-elicit-sense-making-phase/ROLLBACK-PLAN.md#Next%20Steps%20After%20Rollback)- Complete rollback context and next steps
+- **Lessons Learned**: [lessons-learned.md](../0-elicit-sense-making-phase/lessons-learned.md) %% force-extract %% - Documented failures and prevention checklist
+- **Research Whiteboard**: [typescript-restoration-whiteboard.md](../0-elicit-sense-making-phase/typescript-restoration-whiteboard.md) - Original analysis and audit
+- **Component Guides**: [component-guides](../../../component-guides/component-guides.md) %% force-extract %% - Contract specifications
 - **Development Workflow**: [Progressive Disclosure](Development%20Workflow.md#Progressive%20Disclosure:%20Four%20Levels)  [Development Workflow Quick Reference](../../../../../.claude/skills/enforcing-development-workflow/Development%20Workflow%20Quick%20Reference.md) %% force-extract %% - Four-level disclosure process
-- **Architecture Principles**: [Data-First Design](../../../../../ARCHITECTURE-PRINCIPLES.md#Data-First%20Design%20Principles) - Contract preservation foundation
+- **Architecture Principles**: [Data-First Design](../../../../../../ARCHITECTURE-PRINCIPLES.md#Data-First%20Design%20Principles) - Contract preservation foundation
 
 ---
 

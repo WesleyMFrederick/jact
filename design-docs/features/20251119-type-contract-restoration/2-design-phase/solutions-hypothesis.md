@@ -44,6 +44,14 @@ export type LinkScope = 'internal' | 'cross-document';  // Changed from 'externa
 
 **Decision**: ✅ **Adopt 'cross-document'** - aligns with working baseline
 
+**Solution Validation:**
+- [Markdown Parser Implementation Guide - Data Contracts](../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts)
+- `tools/citation-manager/src/MarkdownParser.js:103` (assigns `'cross-document'`)
+- `tools/citation-manager/src/MarkdownParser.js:149` (assigns `'cross-document'`)
+- `tools/citation-manager/src/MarkdownParser.js:202` (assigns `'cross-document'`)
+- `tools/citation-manager/src/MarkdownParser.js:250` (assigns `'cross-document'`)
+- `tools/citation-manager/src/CitationValidator.js:256` (checks `=== 'cross-document'`)
+
 ---
 
 ### Solution 2: Duplicate Type Prevention
@@ -96,6 +104,11 @@ Task: Convert CitationValidator to TypeScript
 - **Catches Epic 4.3 pattern** - Would have caught MarkdownParser internal LinkObject
 
 **Decision**: ✅ **Create validation script** - automate 8-checkpoint framework execution
+
+**Solution Validation:**
+- [research-failure-patterns.md - Root Cause 2](research/research-failure-patterns.md#Root%20Cause%202%20-%20Changed%20Architecture%20Instead%20of%20Typing%20It)
+- [phase2-design-whiteboard.md - POC Validation Approach](phase2-design-whiteboard.md#✅%20POC%20Validation%20Approach%20%28Epic%203%29)
+- `tools/citation-manager/src/types/citationTypes.ts:1-50` (shared type library structure)
 
 > [!note] ADR: Validation Script vs Manual Checkpoint Execution
 > **Context**: CEO doesn't run checkpoints manually—coding agents execute implementation tasks. Needed automated validation approach.
@@ -232,6 +245,14 @@ async enrichLinkWithValidation(link: LinkObject): Promise<EnrichedLinkObject> {
 
 **Decision**: ✅ **Create minimal interfaces** - Strategy, CliFlags, document discriminated union pattern
 
+**Solution Validation:**
+- [Content Extractor Implementation Guide - Strategy Pattern](../../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Strategy%20Pattern)
+- [CitationValidator Implementation Guide - ValidationResult Output Contract](../../../component-guides/CitationValidator%20Implementation%20Guide.md#`CitationValidator.ValidationResult.Output.DataContract`%20JSON%20Schema)
+- `tools/citation-manager/src/core/ContentExtractor/analyzeEligibility.js:13` (strategy.getDecision usage)
+- `tools/citation-manager/src/core/ContentExtractor/extractLinksContent.js:10,19,68` (cliFlags parameter)
+- `tools/citation-manager/src/CitationValidator.js:196` (link.validation enrichment)
+- `tools/citation-manager/src/core/ContentExtractor/eligibilityStrategies/` (5 strategy implementations)
+
 ---
 
 ### Solution 4: Promise Caching Typing Pattern
@@ -279,6 +300,11 @@ export class ParsedFileCache {
 
 **Decision**: ✅ **Document pattern** - include in design as reference example
 
+**Solution Validation:**
+- [ParsedFileCache Implementation Guide](../../../component-guides/ParsedFileCache%20Implementation%20Guide.md)
+- [phase2-design-whiteboard.md - Single-Parse Guarantee](phase2-design-whiteboard.md#3.%20Single-Parse%20Guarantee%20%28ParsedFileCache%29)
+- `tools/citation-manager/src/ParsedFileCache.js:5-50` (Promise caching architecture and Map usage)
+
 ---
 
 ### Solution 5: Type Import Enforcement
@@ -318,6 +344,12 @@ fi
 ```
 
 **Decision**: ✅ **Add to Checkpoint 8** - validate type imports alongside duplicate detection
+
+**Solution Validation:**
+- [research-baseline-code.md - Existing Type Libraries](research/research-baseline-code.md#Existing%20Type%20Libraries)
+- `tools/citation-manager/src/types/citationTypes.ts` (shared LinkObject, ValidationMetadata types)
+- `tools/citation-manager/src/types/validationTypes.ts` (shared result types)
+- `tools/citation-manager/src/types/contentExtractorTypes.ts` (shared extraction types)
 
 ---
 
@@ -362,6 +394,10 @@ interface MarkedToken {
 ```
 
 **Decision**: ✅ **Prefer @types/marked** - use minimal interface only if import fails
+
+**Solution Validation:**
+- [Markdown Parser Implementation Guide - MarkdownParser.Output.DataContract](../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md#MarkdownParser.Output.DataContract:%20How%20Tokens,%20Links,%20and%20Anchors%20Are%20Populated)
+- `tools/citation-manager/src/MarkdownParser.js:58,63` (tokens = marked.lexer(), tokens property in output)
 
 ---
 

@@ -183,9 +183,9 @@ Migration is **complete** when all criteria satisfied:
 
 ### Context Documents
 
-- **Lessons Learned**: [lessons-learned.md](lessons-learned.md) %% force-extract %% - Documented failures from Epic 4.2-4.5
-- **Rollback Plan**: [Next Steps After Rollback](ROLLBACK-PLAN.md#Next%20Steps%20After%20Rollback) - Fresh migration strategy
-- **Whiteboard**: [typescript-migration-prd-whiteboard.md](typescript-migration-prd-whiteboard.md) - PRD creation context and decisions
+- **Lessons Learned**: [lessons-learned.md](0-elicit-sense-making-phase/lessons-learned.md) %% force-extract %% - Documented failures from Epic 4.2-4.5
+- **Rollback Plan**: [Next Steps After Rollback](0-elicit-sense-making-phase/ROLLBACK-PLAN.md#Next%20Steps%20After%20Rollback) - Fresh migration strategy
+- **Whiteboard**: [typescript-migration-prd-whiteboard.md](1-requirements-phase/typescript-migration-prd-whiteboard.md) - PRD creation context and decisions
 - **Development Workflow Quick Reference**: [Development Workflow Quick Reference](../../../../../claude/skills/enforcing-development-workflow/Development%20Workflow%20Quick%20Reference.md)%% force-extract%%
 
 ### Architecture Standards

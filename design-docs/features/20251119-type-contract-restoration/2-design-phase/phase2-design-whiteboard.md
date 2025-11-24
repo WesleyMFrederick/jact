@@ -4,15 +4,17 @@
 **Created**: 2025-01-21
 **Purpose**: Track Research & Design phase activities, findings, and hypothesis evolution as we build THE BRIDGE from generic requirements to system-specific design.
 
+## Critical Instructions When Reading This Document
 <critical-instructions>
-1. Make sure `load-architecture-context` skill has been run and is in conversation context window
-2. Make sure `enforcing-development-workflow` skill has been run and is in conversation context window
-	1. In each chat response, append:
-	   ```text
-	   load-architecture-context: {{n/a | loaded}}
-	   enforcing-development-workflow: {{n/a | loaded}}
-	   phase: {{current development phase}}
-	   ```
+1. **CRITICAL REQUIREMENT**: ALWAYS Create a ToDo List for the steps below:
+ 1. ALWAYS make sure `load-architecture-context` skill has been run and is in conversation context window
+ 2. ALWAYS make sure `enforcing-development-workflow` skill has been run and is in conversation context window
+2. In each chat response, append:
+ ```text
+ load-architecture-context: {{n/a | loaded}}
+ enforcing-development-workflow: {{n/a | loaded}}
+ phase: {{current development phase}}
+ ```
 </critical-instructions>
 
 ---
@@ -22,7 +24,7 @@
 ### ✅ Phase 1 Complete: Requirements (Generic, High-Level)
 - **Question Answered**: WHAT needs to be solved?
 - **Output**:
-  - ✅ Whiteboard (context capture) - [typescript-migration-prd-whiteboard.md](../typescript-migration-prd-whiteboard.md)
+  - ✅ Whiteboard (context capture) - [typescript-migration-prd-whiteboard.md](../1-requirements-phase/typescript-migration-prd-whiteboard.md)
   - ✅ Requirements Document (PRD with FR1-FR6, NFR1-NFR9) - [typescript-migration-prd.md](../typescript-migration-prd.md) %% force-extract %%
 - **Skill Used**: `writing-requirements-documents`
 - **All citations validated**: 30/30 in PRD, 6/6 in whiteboard
@@ -204,20 +206,20 @@ MarkdownParser (leaf) → ParsedDocument → ParsedFileCache
 
 ##### 🏗️ Architecture Patterns
 
-###### 1. **Validation Enrichment Pattern** (US1.8)
+###### 1. Validation Enrichment Pattern (US1.8)
 - **Flow**: MarkdownParser creates LinkObject → CitationValidator adds `validation` property → ContentExtractor consumes
 - **Implementation**: `link.validation = validationMetadata;` (in-place mutation)
 - **Benefits**: Zero duplication, single data flow, natural lifecycle
 
-###### 2. **Facade Pattern** (ParsedDocument)
+###### 2. Facade Pattern (ParsedDocument)
 - Stable query interface decoupling consumers from parser internals
 - Methods: `hasAnchor()`, `findSimilarAnchors()`, `extractSection()`, `extractBlock()`
 
-###### 3. **Single-Parse Guarantee** (ParsedFileCache)
+###### 3. Single-Parse Guarantee (ParsedFileCache)
 - Files parsed once even though both Validator and Extractor need parsed content
 - Promise caching for concurrent request deduplication
 
-###### 4. **Strategy Pattern** (ContentExtractor)
+###### 4. Strategy Pattern (ContentExtractor)
 - Extraction eligibility via injected strategy chain
 - Chain of responsibility with null return for pass-through
 
@@ -535,7 +537,7 @@ grep -r "^interface LinkObject" src/ --exclude-dir=types
 
 **Key Decision**: Expand 7-checkpoint framework to **8 checkpoints** (add type organization validation)
 
-**Document**: [solutions-hypothesis.md](solutions-hypothesis.md)
+**Document**: [solutions-hypothesis.md](solutions-hypothesis.md) %% force-extract %%
 
 ---
 
@@ -633,16 +635,16 @@ grep -r "^interface LinkObject" src/ --exclude-dir=types
 
 ### Phase 1 Outputs
 - **PRD**: [typescript-migration-prd.md](../typescript-migration-prd.md) %% force-extract %% - Generic requirements (FR1-FR6, NFR1-NFR9)
-- **PRD Whiteboard**: [typescript-migration-prd-whiteboard.md](../typescript-migration-prd-whiteboard.md) %% force-extract %% - Phase 1 context and decisions
+- **PRD Whiteboard**: [typescript-migration-prd-whiteboard.md](../1-requirements-phase/typescript-migration-prd-whiteboard.md) %% force-extract %% - Phase 1 context and decisions
 
 ### Context Documents
-- **Lessons Learned**: [lessons-learned.md](../lessons-learned.md) %% force-extract %% - What went wrong in Epic 4.2-4.5
-- **Rollback Plan**: [ROLLBACK-PLAN.md](../ROLLBACK-PLAN.md)  - Baseline and preservation strategy
+- **Lessons Learned**: [lessons-learned.md](../0-elicit-sense-making-phase/lessons-learned.md) %% force-extract %% - What went wrong in Epic 4.2-4.5
+- **Rollback Plan**: [ROLLBACK-PLAN.md](../0-elicit-sense-making-phase/ROLLBACK-PLAN.md)  - Baseline and preservation strategy
 - **Component Guides**: [component-guides](../../../component-guides/component-guides.md) %% force-extract %% - Contract specifications
 
 ### Architecture Standards
 - **Architecture Principles**: [ARCHITECTURE-PRINCIPLES.md](../../../../../../ARCHITECTURE-PRINCIPLES.md) %% force-extract %% - All 9 principle categories
-- **Development Workflow**: [Development Workflow.md](../Development%20Workflow.md#Progressive%20Disclosure:%20Four%20Levels) %% force-extract %% - Progressive disclosure process
+- **Development Workflow**: [Development Workflow.md](../0-elicit-sense-making-phase/Development%20Workflow.md#Progressive%20Disclosure:%20Four%20Levels) %% force-extract %% - Progressive disclosure process
 
 ### Technical Baseline
 - **Baseline Commit**: `1c571e0` - Last known good state (Epic 4.1 complete, 314/314 tests passing)

@@ -23,7 +23,7 @@ Result: **32 test failures, broken integration points, rollback required**.
 
 ## Root Causes of Failure
 
-### Root Cause #1: Defined Types Without Reading Existing Contracts
+### Root Cause 1 - Defined Types Without Reading Existing Contracts
 
 **What Happened**:
 - Team converted CitationValidator to TypeScript
@@ -50,7 +50,7 @@ Result: **32 test failures, broken integration points, rollback required**.
 
 ---
 
-### Root Cause #2: Changed Architecture Instead of Typing It
+### Root Cause 2 - Changed Architecture Instead of Typing It
 
 **What Happened**:
 - Original design: Enrich LinkObjects IN-PLACE with `validation` property
@@ -79,7 +79,7 @@ Result: **32 test failures, broken integration points, rollback required**.
 
 ---
 
-### Root Cause #3: Modified Tests Instead of Fixing Types
+### Root Cause 3 - Modified Tests Instead of Fixing Types
 
 **What Happened**:
 - After changing return structure to `FileValidationSummary`
@@ -107,7 +107,7 @@ Result: **32 test failures, broken integration points, rollback required**.
 
 ---
 
-### Root Cause #4: Didn't Check What Downstream Components Expect
+### Root Cause 4 - Didn't Check What Downstream Components Expect
 
 **What Happened**:
 - CitationValidator returned `FileValidationSummary` with wrong structure
@@ -136,7 +136,7 @@ Result: **32 test failures, broken integration points, rollback required**.
 
 ---
 
-### Root Cause #5: Ignored Duplicate Type Definitions (MarkdownParser)
+### Root Cause 5 - Ignored Duplicate Type Definitions (MarkdownParser)
 
 **What Happened**:
 - Team created shared types in `types/citationTypes.ts`

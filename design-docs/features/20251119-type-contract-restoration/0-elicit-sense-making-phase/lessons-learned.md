@@ -38,7 +38,7 @@ expect(result).toHaveProperty('totalCitations');  // Wrong - should be 'summary.
 **Problem**: Didn't check what other components expected to receive from modified components.
 
 **Evidence**:
-- **Should return** (per [CitationValidator Component Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md#`CitationValidator.ValidationResult.Output.DataContract`%20JSON%20Schema)): `{ summary: {...}, links: EnrichedLinkObject[] }`
+- **Should return** (per [CitationValidator Component Guide](../../../component-guides/CitationValidator%20Implementation%20Guide.md#`CitationValidator.ValidationResult.Output.DataContract`%20JSON%20Schema)): `{ summary: {...}, links: EnrichedLinkObject[] }`
 	- *TypeScript returned*: `FileValidationSummary` with flat structure and `results[]` array
 - **citation-manager.js** expects `validationResult.links`
 	- *Typescript refactor broke* (property doesn't exist)
@@ -52,7 +52,7 @@ expect(result).toHaveProperty('totalCitations');  // Wrong - should be 'summary.
 **Problem**: Skipped reading architectural documentation that specified exact contracts.
 
 **Evidence**:
-- [CitationValidator Component Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md#Public%20Contracts) specifies: `validateFile(): { summary: object, links: EnrichedLinkObject[] }`
+- [CitationValidator Component Guide](../../../component-guides/CitationValidator%20Implementation%20Guide.md#Public%20Contracts) specifies: `validateFile(): { summary: object, links: EnrichedLinkObject[] }`
 - TypeScript created: `FileValidationSummary` with different structure
 - Guide documents enrichment pattern (add `link.validation`), TypeScript created wrapper objects
 
@@ -87,12 +87,12 @@ expect(result).toHaveProperty('totalCitations');  // Wrong - should be 'summary.
 ## Architecture Violations
 
 ### Data-First Design Principle Violated
-- **Principle**: [Refactor representation first](../../../../../ARCHITECTURE-PRINCIPLES.md#^refactor-representation-first) - clean data makes clean code
+- **Principle**: [Refactor representation first](../../../../../../ARCHITECTURE-PRINCIPLES.md#^refactor-representation-first) - clean data makes clean code
 - **Violation**: Changed data representation (wrappers) instead of typing existing clean structure
 - **Impact**: Broke proven enrichment pattern (in-place validation attachment)
 
 ### Single Responsibility Principle Violated
-- **Principle**: [Each component has one clear concern](../../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility)
+- **Principle**: [Each component has one clear concern](../../../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility)
 - **Violation**: CitationValidator now creates wrapper objects (not its job)
 - **Impact**: Consumers must unwrap data, adding unnecessary complexity
 
@@ -172,7 +172,7 @@ citation-manager extract links component-guides/<component>-guide.md  # Validate
 - **Baseline Commit**: `1c571e0` - Last known good state (314/314 tests passing)
 - **Failed Commit**: `53b9ead` - CitationValidator conversion with wrong types
 - **Evidence**: `git show 1c571e0:tools/citation-manager/src/CitationValidator.js` (lines 162-220)
-- **Component Guides**: [component-guides](../../component-guides/component-guides.md) %% force-extract %%
+- **Component Guides**: [component-guides](../../../component-guides/component-guides.md) %% force-extract %%
 - **Audit Doc**: [typescript-type-contract-audit.md](research/typescript-type-contract-audit.md) - Full failure analysis %% force-extract %%
 - **Rollback Plan**: [ROLLBACK-PLAN.md](ROLLBACK-PLAN.md)
-- **Architecture Doc**: [ARCHITECTURE-citation-manager.md](../../ARCHITECTURE-citation-manager.md)
+- **Architecture Doc**: [ARCHITECTURE-citation-manager.md](../../../ARCHITECTURE-Citation-Manager.md)

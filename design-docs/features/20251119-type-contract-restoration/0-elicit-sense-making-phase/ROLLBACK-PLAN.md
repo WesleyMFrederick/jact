@@ -256,7 +256,7 @@ Still in JavaScript, ready for proper conversion:
 
 ### 1. Create Lessons Learned Document
 
-***Document***: [lessons-learned](lessons-learned.md) %% force-extract %%
+***Document***: [lessons-learned](0-elicit-sense-making-phase/lessons-learned.md) %% force-extract %%
 
 Document what went wrong in Epic 4.2-4.5:
 - Created types without reading Component Guides
@@ -267,7 +267,7 @@ Document what went wrong in Epic 4.2-4.5:
 ### 2. Create Fresh TypeScript Migration Plan
 
 Use proper process this time:
-1. **Read [Component Guide](../../component-guides/component-guides.md)%% force-extract %% FIRST** for each component
+1. **Read [Component Guide](../../../component-guides/component-guides.md)%% force-extract %% FIRST** for each component
 2. **Extract contracts** via `citation-manager extract links`
 3. **Analyze JavaScript structures** via `git show`
 4. **Create types matching contracts** (no invention)
@@ -326,7 +326,7 @@ By rolling back to `1c571e0` instead of earlier commits:
 
 - **Research Whiteboard**: [typescript-restoration-whiteboard](typescript-restoration-whiteboard.md) - Comprehensive analysis
 - **Type Audit**: [typescript-type-contract-audit](research/typescript-type-contract-audit.md) - Contract violations documented
-- **Architecture Doc Component Overview**: [Level 3: Components](../../ARCHITECTURE-Citation-Manager.md#Level%203%20Components) - Component Overview
+- **Architecture Doc Component Overview**: [Level 3: Components](../../../ARCHITECTURE-Citation-Manager.md#Level%203%20Components) - Component Overview
 - **Component Guides**: [[component-guides]] - Validation contracts
 
 ---
