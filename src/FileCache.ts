@@ -21,17 +21,22 @@
  * // Returns { found: true, path: '/project/docs/design/architecture.md' }
  */
 export class FileCache {
+	private fs: any;
+	private path: any;
+	private cache: Map<string, string>; // filename -> absolute path
+	private duplicates: Set<string>; // filenames that appear multiple times
+
 	/**
 	 * Initialize cache with file system and path dependencies
 	 *
 	 * @param {Object} fileSystem - Node.js fs module (or mock for testing)
 	 * @param {Object} pathModule - Node.js path module (or mock for testing)
 	 */
-	constructor(fileSystem, pathModule) {
+	constructor(fileSystem: any, pathModule: any) {
 		this.fs = fileSystem;
 		this.path = pathModule;
-		this.cache = new Map(); // filename -> absolute path
-		this.duplicates = new Set(); // filenames that appear multiple times
+		this.cache = new Map<string, string>();
+		this.duplicates = new Set<string>();
 	}
 
 	/**
@@ -44,7 +49,7 @@ export class FileCache {
 	 * @param {string} scopeFolder - Root folder to scan (can be symlink, will be resolved)
 	 * @returns {Object} Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
-	buildCache(scopeFolder) {
+	buildCache(scopeFolder: string) {
 		this.cache.clear();
 		this.duplicates.clear();
 
@@ -78,7 +83,7 @@ export class FileCache {
 	}
 
 	// Recursively scan directory for markdown files
-	scanDirectory(dirPath) {
+	scanDirectory(dirPath: string) {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
 
@@ -96,14 +101,15 @@ export class FileCache {
 			}
 		} catch (error) {
 			// Skip directories we can't read (permissions, etc.)
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.warn(
-				`Warning: Could not read directory ${dirPath}: ${error.message}`,
+				`Warning: Could not read directory ${dirPath}: ${errorMessage}`,
 			);
 		}
 	}
 
 	// Add file to cache or mark as duplicate if filename already exists
-	addToCache(filename, fullPath) {
+	addToCache(filename: string, fullPath: string) {
 		if (this.cache.has(filename)) {
 			// Mark as duplicate
 			this.duplicates.add(filename);
@@ -125,7 +131,7 @@ export class FileCache {
 	 * @param {string} filename - Filename to resolve (with or without .md extension)
 	 * @returns {Object} Result object with { found, path?, reason?, message?, fuzzyMatch?, correctedFilename? }
 	 */
-	resolveFile(filename) {
+	resolveFile(filename: string) {
 		// Check for exact filename match first
 		if (this.cache.has(filename)) {
 			if (this.duplicates.has(filename)) {
@@ -186,7 +192,7 @@ export class FileCache {
 	 * @param {string} filename - Original filename that failed exact match
 	 * @returns {Object|null} Fuzzy match result with { found, path, fuzzyMatch: true, correctedFilename, message } or null
 	 */
-	findFuzzyMatch(filename) {
+	findFuzzyMatch(filename: string) {
 		const allFiles = Array.from(this.cache.keys());
 
 		// Strategy 1: Fix double .md extension (e.g., "file.md.md" → "file.md")
