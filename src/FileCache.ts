@@ -29,6 +29,12 @@ interface FileEntry {
 	isDuplicate: boolean;
 }
 
+interface CacheStatsDetail {
+	totalFiles: number;
+	duplicateCount: number;
+	duplicates: string[];
+}
+
 /**
  * Filename-based cache for smart file resolution
  *
@@ -320,7 +326,7 @@ export class FileCache {
 	}
 
 	// Get cache statistics (total files, duplicates)
-	getCacheStats() {
+	getCacheStats(): CacheStatsDetail {
 		return {
 			totalFiles: this.cache.size,
 			duplicateCount: this.duplicates.size,
