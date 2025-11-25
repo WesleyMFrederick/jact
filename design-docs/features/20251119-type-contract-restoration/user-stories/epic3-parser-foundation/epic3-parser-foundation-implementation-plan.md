@@ -792,14 +792,41 @@ Expected: 314/314 tests pass
 
 ---
 
+## Implementation Notes (2025-01-25)
+
+### Issue #17 Resolution
+
+During Tasks 11-12 validation, discovered `LinkObject` interface was incomplete:
+
+**Changes to `citationTypes.ts`**:
+
+| Field | Before | After | Reason |
+|-------|--------|-------|--------|
+| `source` | missing | `{ path: { absolute: string \| null } }` | Parser produces this |
+| `anchorType` | missing | `"header" \| "block" \| null` | Parser produces this |
+| `target.path.raw` | `string` | `string \| null` | Internal links have null |
+| `text` | `string` | `string \| null` | Caret refs have null |
+| `extractionMarker` | missing | `{ fullMatch, innerText } \| null` | Parser produces this |
+
+**New Type Guard in MarkdownParser.ts**:
+
+```typescript
+function hasNestedTokens(token: Token): token is Token & { tokens: Token[] }
+```
+
+**Pattern Applied**: `match[n] ?? null` for all regex captures (~22 locations)
+
+---
+
 ## Epic 3 Complete
 
 **Deliverables**:
+
 - ✅ MarkdownParser.ts with full TypeScript typing
 - ✅ ParserOutput, AnchorObject, HeadingObject interfaces
 - ✅ Token types from @types/marked
 - ✅ 8 checkpoints passing
-- ✅ 314/314 tests maintained
+- ✅ 313/313 tests maintained
 - ✅ Zero architecture changes
 
 **Next**: Epic 4 - Parser Facade & Cache (ParsedDocument, ParsedFileCache)

@@ -19,33 +19,44 @@ export type ValidationStatus = "valid" | "warning" | "error";
  * Integration: Created by LinkObjectFactory, consumed by CitationValidator.
  *
  * Pattern: Immutable data structure with optional validation enrichment.
+ *
+ * Note: Internal links (scope="internal") have null target.path values
+ * since they reference anchors within the same document, not external files.
  */
 export interface LinkObject {
-	/** Raw markdown syntax as found in source */
-	rawSourceLink: string;
-
 	/** Link syntax type */
 	linkType: "markdown" | "wiki";
 
 	/** Link scope classification */
 	scope: LinkScope;
 
+	/** Anchor type classification (null if no anchor) */
+	anchorType: "header" | "block" | null;
+
+	/** Source file information */
+	source: {
+		path: {
+			/** Absolute path of source file */
+			absolute: string | null;
+		};
+	};
+
 	/** Target resolution */
 	target: {
 		path: {
-			/** Raw path string from markdown */
-			raw: string;
-			/** Absolute file system path (null if unresolved) */
+			/** Raw path string from markdown (null for internal links) */
+			raw: string | null;
+			/** Absolute file system path (null if unresolved or internal) */
 			absolute: string | null;
-			/** Relative path from source file (null if unresolved) */
+			/** Relative path from source file (null if unresolved or internal) */
 			relative: string | null;
 		};
 		/** Header/block anchor (null if no anchor) */
 		anchor: string | null;
 	};
 
-	/** Display text shown in markdown */
-	text: string;
+	/** Display text shown in markdown (null for caret references) */
+	text: string | null;
 
 	/** Complete matched markdown syntax */
 	fullMatch: string;
@@ -55,6 +66,12 @@ export interface LinkObject {
 
 	/** Source file column number (0-based) */
 	column: number;
+
+	/** Extraction marker after link (null if none) */
+	extractionMarker: {
+		fullMatch: string;
+		innerText: string;
+	} | null;
 
 	/** Validation metadata (enriched during validation) */
 	validation?: ValidationMetadata;

@@ -508,6 +508,8 @@ interface OutgoingLinksExtractedContent {
 }
 ```
 
+**Note**: `rawSourceLink` is a ContentExtractor **output** property (mapped from `link.fullMatch`), NOT a LinkObject input property from MarkdownParser. ContentExtractor reads `link.fullMatch` and outputs it as `rawSourceLink` in the extraction result structure.
+
 **Validation**: Already typed, verify usage matches during conversion
 
 **Reference**: [Content Extractor Data Contracts](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
@@ -784,6 +786,36 @@ grep -r "getDecision" src/core/ContentExtractor/eligibilityStrategies/
 
 ---
 
+### Risk 5: Incorrect `rawSourceLink` Property in LinkObject Interface
+
+**Problem**: Epic 4.1 (commit fb1a299) added `rawSourceLink: string` to LinkObject interface, but this property was never part of the MarkdownParser output contract.
+
+**Impact**: TypeScript migration correctly rejects 24 link object constructions in MarkdownParser that don't provide this property.
+
+**Root Cause Analysis**:
+- **Component Guide** (authoritative): LinkObject schema does NOT include `rawSourceLink` in required properties or examples
+- **Baseline JavaScript** (1c571e0): MarkdownParser never provided this property - matches Component Guide
+- **ContentExtractor Usage**: Reads `link.fullMatch` and outputs it as `rawSourceLink` in extraction results
+- **Actual Contract**: `rawSourceLink` belongs to ContentExtractor's **output** format, NOT MarkdownParser's LinkObject input
+
+**Evidence**:
+
+```bash
+# Component Guide shows NO rawSourceLink in LinkObject
+grep "rawSourceLink" "Markdown Parser Implementation Guide.md"
+# Returns: No matches in LinkObject schema or examples
+
+# ContentExtractor maps fullMatch → rawSourceLink
+grep "rawSourceLink" ContentExtractor.js
+# Returns: rawSourceLink: link.fullMatch
+```
+
+**Resolution**: Remove `rawSourceLink` from LinkObject interface in `citationTypes.ts` (Epic 3 Task 11).
+
+**Mitigation**: Trust Component Guides as ground truth. When TypeScript rejects code, validate against Component Guide contracts before assuming interface needs additions.
+
+---
+
 ## Success Metrics
 
 ### Migration Complete When
@@ -835,6 +867,42 @@ npm run build               # Must generate .js + .d.ts
 - **Baseline Commit**: `1c571e0` - Last known good state (314/314 tests)
 - **Lessons Learned**: [lessons-learned.md](0-elicit-sense-making-phase/lessons-learned.md) - Epic 4.2-4.5 failure patterns
 - **Rollback Plan**: [ROLLBACK-PLAN.md](0-elicit-sense-making-phase/ROLLBACK-PLAN.md) - Preservation strategy
+
+---
+
+## Implementation Notes
+
+### Epic 3: MarkdownParser TypeScript Migration (2025-01-25)
+
+**Issue**: GitHub Issue #17 - 29 TypeScript build errors in MarkdownParser.ts
+
+**Root Cause**: Interface definitions were too strict for actual runtime behavior:
+- `LinkObject.target.path.raw` was `string` but internal links produce `null`
+- `LinkObject.text` was `string` but caret references have no display text
+- Missing `source`, `anchorType`, `extractionMarker` fields in interface
+
+**Solution Applied**:
+
+1. **Updated `LinkObject` interface** in `citationTypes.ts`:
+   - Added `source.path.absolute: string | null`
+   - Added `anchorType: "header" | "block" | null`
+   - Changed `target.path.raw` to `string | null` (internal links have no target path)
+   - Changed `text` to `string | null` (caret refs have no text)
+   - Added `extractionMarker` field
+
+2. **Added type guard** for Token narrowing:
+
+   ```typescript
+   function hasNestedTokens(token: Token): token is Token & { tokens: Token[] }
+   ```
+
+3. **Applied `?? null` coercion** to regex capture groups (~22 locations)
+
+4. **Fixed type contract violations** in extractAnchors:
+   - Explicit header anchors now include `urlEncodedId`
+   - Emphasis-marked (block) anchors use `rawText: null` per contract
+
+**Result**: 0 TypeScript errors, 313/313 tests passing
 
 ---
 

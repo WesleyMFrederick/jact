@@ -2,6 +2,11 @@ import type { readFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { marked } from "marked";
 import type { Token } from "marked";
+
+/** Type guard for tokens with nested token arrays */
+function hasNestedTokens(token: Token): token is Token & { tokens: Token[] } {
+	return "tokens" in token && Array.isArray((token as { tokens?: unknown }).tokens);
+}
 import type {
 	AnchorObject,
 	HeadingObject,
@@ -115,12 +120,12 @@ export class MarkdownParser {
 			const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(#([^)]+))?\)/g;
 			let match = linkPattern.exec(line);
 			while (match !== null) {
-				const text = match[1];
-				const rawPath = match[2];
-				const anchor = match[4] || null;
+				const text = match[1] ?? "";
+				const rawPath = match[2] ?? "";
+				const anchor = match[4] ?? null;
 
-				const linkType = "markdown";
-				const scope = "cross-document";
+				const linkType = "markdown" as const;
+				const scope = "cross-document" as const;
 				const anchorType = anchor ? this.determineAnchorType(anchor) : null;
 
 				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
@@ -162,11 +167,11 @@ export class MarkdownParser {
 			const citePattern = /\[cite:\s*([^\]]+)\]/g;
 			match = citePattern.exec(line);
 			while (match !== null) {
-				const rawPath = match[1].trim();
+				const rawPath = (match[1] ?? "").trim();
 				const text = `cite: ${rawPath}`;
 
-				const linkType = "markdown";
-				const scope = "cross-document";
+				const linkType = "markdown" as const;
+				const scope = "cross-document" as const;
 				const anchorType = null;
 
 				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
@@ -208,18 +213,19 @@ export class MarkdownParser {
 			const relativeDocRegex = /\[([^\]]+)\]\(([^)]*\/[^)#]+)(#[^)]+)?\)/g;
 			match = relativeDocRegex.exec(line);
 			while (match !== null) {
-				const filepath = match[2];
+				const filepath = match[2] ?? "";
 				if (
+					filepath &&
 					!filepath.endsWith(".md") &&
 					!filepath.startsWith("http") &&
 					filepath.includes("/")
 				) {
-					const text = match[1];
-					const rawPath = match[2];
+					const text = match[1] ?? "";
+					const rawPath = match[2] ?? "";
 					const anchor = match[3] ? match[3].substring(1) : null;
 
-					const linkType = "markdown";
-					const scope = "cross-document";
+					const linkType = "markdown" as const;
+					const scope = "cross-document" as const;
 					const anchorType = anchor ? this.determineAnchorType(anchor) : null;
 
 					const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
@@ -262,12 +268,12 @@ export class MarkdownParser {
 			const wikiCrossDocRegex = /\[\[([^#\]]+\.md)(#([^\]|]+))?\|([^\]]+)\]\]/g;
 			match = wikiCrossDocRegex.exec(line);
 			while (match !== null) {
-				const rawPath = match[1];
-				const anchor = match[3] || null;
-				const text = match[4];
+				const rawPath = match[1] ?? "";
+				const anchor = match[3] ?? null;
+				const text = match[4] ?? "";
 
-				const linkType = "wiki";
-				const scope = "cross-document";
+				const linkType = "wiki" as const;
+				const scope = "cross-document" as const;
 				const anchorType = anchor ? this.determineAnchorType(anchor) : null;
 
 				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
@@ -309,11 +315,11 @@ export class MarkdownParser {
 			const wikiRegex = /\[\[#([^|]+)\|([^\]]+)\]\]/g;
 			match = wikiRegex.exec(line);
 			while (match !== null) {
-				const anchor = match[1];
-				const text = match[2];
+				const anchor = match[1] ?? "";
+				const text = match[2] ?? "";
 
-				const linkType = "wiki";
-				const scope = "internal";
+				const linkType = "wiki" as const;
+				const scope = "internal" as const;
 				const anchorType = this.determineAnchorType(anchor);
 
 				const wikiLinkObject = {
@@ -350,11 +356,11 @@ export class MarkdownParser {
 			const internalAnchorRegex = /\[([^\]]+)\]\(#([^)]+)\)/g;
 			match = internalAnchorRegex.exec(line);
 			while (match !== null) {
-				const text = match[1];
-				const anchor = match[2];
+				const text = match[1] ?? "";
+				const anchor = match[2] ?? "";
 
-				const linkType = "markdown";
-				const scope = "internal";
+				const linkType = "markdown" as const;
+				const scope = "internal" as const;
 				const anchorType = this.determineAnchorType(anchor);
 
 				const internalAnchorLinkObject = {
@@ -391,11 +397,11 @@ export class MarkdownParser {
 			const caretRegex = /\^([A-Za-z0-9-]+)/g;
 			match = caretRegex.exec(line);
 			while (match !== null) {
-				const anchor = match[1];
+				const anchor = match[1] ?? "";
 
-				const linkType = "markdown";
-				const scope = "internal";
-				const anchorType = "block";
+				const linkType = "markdown" as const;
+				const scope = "internal" as const;
+				const anchorType = "block" as const;
 
 				const caretLinkObject = {
 					linkType: linkType,
@@ -449,8 +455,8 @@ export class MarkdownParser {
 
 		if (match) {
 			return {
-				fullMatch: match[1], // Full marker with delimiters
-				innerText: (match[2] || match[3]).trim(), // Text between delimiters (trimmed)
+				fullMatch: match[1] ?? "", // Full marker with delimiters
+				innerText: (match[2] ?? match[3] ?? "").trim(), // Text between delimiters (trimmed)
 			};
 		}
 
@@ -509,7 +515,7 @@ export class MarkdownParser {
 				}
 
 				// Recursively check nested tokens
-				if (token.tokens) {
+				if (hasNestedTokens(token)) {
 					extractFromTokens(token.tokens);
 				}
 			}
@@ -549,7 +555,7 @@ export class MarkdownParser {
 			if (obsidianMatch) {
 				anchors.push({
 					anchorType: "block",
-					id: obsidianMatch[1],
+					id: obsidianMatch[1] ?? "",
 					rawText: null,
 					fullMatch: obsidianMatch[0],
 					line: index + 1,
@@ -566,7 +572,7 @@ export class MarkdownParser {
 				if (!isObsidianBlock) {
 					anchors.push({
 						anchorType: "block",
-						id: match[1],
+						id: match[1] ?? "",
 						rawText: null,
 						fullMatch: match[0],
 						line: index + 1,
@@ -580,10 +586,11 @@ export class MarkdownParser {
 			const emphasisRegex = /==\*\*([^*]+)\*\*==/g;
 			match = emphasisRegex.exec(line);
 			while (match !== null) {
+				const emphasisText = match[1] ?? "";
 				anchors.push({
 					anchorType: "block",
-					id: `==**${match[1]}**==`,
-					rawText: match[1],
+					id: `==**${emphasisText}**==`,
+					rawText: null, // Block anchors have null rawText per type contract
 					fullMatch: match[0],
 					line: index + 1,
 					column: match.index,
@@ -595,7 +602,7 @@ export class MarkdownParser {
 			const headerRegex = /^(#+)\s+(.+)$/;
 			const headerMatch = line.match(headerRegex);
 			if (headerMatch) {
-				const headerText = headerMatch[2];
+				const headerText = headerMatch[2] ?? "";
 
 				// Check for explicit anchor ID like {#anchor-id}
 				const explicitAnchorRegex = /^(.+?)\s*\{#([^}]+)\}$/;
@@ -603,10 +610,12 @@ export class MarkdownParser {
 
 				if (explicitMatch) {
 					// Use explicit anchor ID
+					const explicitId = explicitMatch[2] ?? "";
 					anchors.push({
 						anchorType: "header",
-						id: explicitMatch[2],
-						rawText: explicitMatch[1].trim(),
+						id: explicitId,
+						urlEncodedId: explicitId, // Explicit IDs are already URL-safe
+						rawText: (explicitMatch[1] ?? "").trim(),
 						fullMatch: headerMatch[0],
 						line: index + 1,
 						column: 0,

@@ -19,7 +19,7 @@ npx tsc --noEmit || {
 # Checkpoint 5: Tests Pass (314/314)
 echo ""
 echo "✓ Checkpoint 5: Tests Pass..."
-npm test || {
+npm test 2>/dev/null || {
   echo "❌ Tests failed"
   exit 1
 }
