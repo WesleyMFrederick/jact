@@ -11,53 +11,64 @@ The **`MarkdownParser`** component acts as a specialized transformer. It accepts
 
 ## Structure
 
-The `MarkdownParser` is a class that depends on interfaces for the File System, Path Module, and the `FileCache`. It exposes a single public method, `parseFile()`, which returns the `ParserOutputContract`.
+The `MarkdownParser` is a TypeScript class that depends on `FileSystemInterface` for file I/O. It exposes a single public method, `parseFile()`, which returns the `ParserOutput` interface.
 
 ```mermaid
 classDiagram
     direction LR
 
-    class ParserOutputContract {
+    class ParserOutput {
         +filePath: string
         +content: string
-        +tokens: object[]
-        +links: Link[]
-        +anchors: Anchor[]
+        +tokens: Token[]
+        +links: LinkObject[]
+        +headings: HeadingObject[]
+        +anchors: AnchorObject[]
     }
 
-    class Link {
-      +linkType: string
-      +scope: string
-      +anchorType: string
-      +source: object
-      +target: object
-      +text: string
-      +fullMatch: string
-      +line: number
-      +column: number
+    class LinkObject {
+        +linkType: markdown | wiki
+        +scope: internal | cross-document
+        +anchorType: header | block | null
+        +source: SourcePath
+        +target: TargetPath
+        +text: string | null
+        +fullMatch: string
+        +line: number
+        +column: number
+        +extractionMarker: object | null
+        +validation?: ValidationMetadata
     }
-    
-    class Anchor {
-      +anchorType: string
-      +id: string
-      +rawText: string
-      +fullMatch: string
-      +line: number
-      +column: number
+
+    class AnchorObject {
+        +anchorType: header | block
+        +id: string
+        +urlEncodedId: string
+        +rawText: string | null
+        +fullMatch: string
+        +line: number
+        +column: number
+    }
+
+    class HeadingObject {
+        +level: number
+        +text: string
+        +raw: string
     }
 
     class MarkdownParser {
         -fs: FileSystemInterface
-        -path: PathModuleInterface
-        -fileCache: FileCacheInterface
-        +parseFile(filePath: string): ParserOutputContract
-        -extractLinks(content: string, sourcePath: string): Link[]
-        -extractAnchors(content: string): Anchor[]
+        -currentSourcePath: string | null
+        +parseFile(filePath): Promise~ParserOutput~
+        +extractLinks(content): LinkObject[]
+        +extractAnchors(content): AnchorObject[]
+        +extractHeadings(tokens): HeadingObject[]
     }
 
-    MarkdownParser ..> ParserOutputContract : returns
-    ParserOutputContract o-- Link
-    ParserOutputContract o-- Anchor
+    MarkdownParser ..> ParserOutput : returns
+    ParserOutput o-- LinkObject
+    ParserOutput o-- AnchorObject
+    ParserOutput o-- HeadingObject
 ```
 
 1. [ParserOutputContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
@@ -79,292 +90,251 @@ The component's contract requires the following inputs for operation:
 
 ## File Structure
 
-**Current Structure** (Monolithic Implementation):
+**Current Structure** (TypeScript Implementation):
 
 ```text
 tools/citation-manager/
 ├── src/
-│   └── MarkdownParser.js                              // 543-line monolithic file
-│       ├── constructor()                              // DI setup
-│       ├── parseFile()                                // Main orchestrator
-│       ├── extractLinks()                             // ~255 lines - link extraction
-│       ├── extractAnchors()                           // ~97 lines - anchor extraction
-│       ├── extractHeadings()                          // ~40 lines - heading extraction
-│       └── helpers/                                   // Inline helper methods
-│           ├── determineAnchorType()                  // Anchor type classification
-│           ├── resolvePath()                          // Path resolution
-│           ├── containsMarkdown()                     // Markdown detection
-│           └── toKebabCase()                          // String formatting
+│   ├── MarkdownParser.ts                              // TypeScript implementation (~640 lines)
+│   │   ├── FileSystemInterface                        // Dependency injection interface
+│   │   ├── parseFile()                                // Main orchestrator → ParserOutput
+│   │   ├── extractLinks()                             // Link extraction → LinkObject[]
+│   │   ├── extractAnchors()                           // Anchor extraction → AnchorObject[]
+│   │   ├── extractHeadings()                          // Heading extraction → HeadingObject[]
+│   │   └── helpers                                    // Inline helper methods
+│   │       ├── determineAnchorType()                  // Anchor type classification
+│   │       ├── resolvePath()                          // Path resolution
+│   │       ├── _detectExtractionMarker()              // Extraction marker detection
+│   │       └── toKebabCase()                          // String formatting
+│   │
+│   └── types/
+│       └── citationTypes.ts                           // Shared type definitions
+│           ├── ParserOutput                           // Parser output interface
+│           ├── LinkObject                             // Link data structure
+│           ├── AnchorObject                           // Anchor discriminated union
+│           └── HeadingObject                          // Heading data structure
 │
 ├── test/
-│   └── parser-output-contract.test.js                 // Contract validation (12 tests)
+│   └── parser-output-contract.test.js                 // Contract validation tests
 │
 └── factories/
-    └── componentFactory.js                            // Factory would instantiate MarkdownParser with DI
+    └── componentFactory.js                            // Factory instantiates MarkdownParser with DI
 ```
 
-**Technical Debt**: The current monolithic structure violates the project's [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>). See [Issue 5: Monolithic File Structure](#Issue%205%20Monolithic%20File%20Structure%20Violates%20File%20Naming%20Patterns) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Structure).
+**Technical Debt**: The current monolithic structure violates the project's action-based file naming patterns. See [Issue #18](https://github.com/WesleyMFrederick/cc-workflows/issues/18) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Organization).
 
-_Source_: [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>)
+## Component Workflow
 
-## Pseudocode
-This pseudocode follows the **MEDIUM-IMPLEMENTATION** abstraction level, showing the core logic and integration points required for implementation.
+### parseFile Sequence Diagram
 
-```tsx
-// The MarkdownParser class, responsible for transforming a markdown file into a structured data model.
-class MarkdownParser is
-  private field fileSystem
-  private field pathModule
-  private field fileCache
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Parser as MarkdownParser
+    participant FS as FileSystem
+    participant Marked as marked.js
 
-  // The constructor accepts all external dependencies, following the Dependency Abstraction principle.
-  constructor MarkdownParser(fs: FileSystemInterface, path: PathModuleInterface, cache: FileCacheInterface) is
-    // Integration: These dependencies are provided by the factory at runtime.
-    this.fileSystem = fs
-    this.pathModule = path
-    this.fileCache = cache
-    // ... initialization of regex patterns ...
+    Client->>+Parser: parseFile(filePath)
 
-  // The primary public method that executes the parsing workflow.
-  public async method parseFile(filePath: string): ParserOutputContract is
-    // Boundary: All file system reads are handled here.
-    field absoluteSourcePath = this.pathModule.resolve(filePath)
-    field content = this.fileSystem.readFileSync(absoluteSourcePath, "utf8")
+    note over Parser: Phase 1: Read file content
+    Parser->>+FS: readFileSync(filePath, "utf8")
+    FS-->>-Parser: content string
 
-    // Integration: Delegates low-level tokenization to the 'marked' library.
-    field tokens = marked.lexer(content)
+    note over Parser: Phase 2: Tokenize with marked.js
+    Parser->>+Marked: lexer(content)
+    Marked-->>-Parser: Token[] (markdown AST)
 
-    // Calls private methods to build the high-level data collections.
-    field links = this.extractLinks(content, absoluteSourcePath)
-    field anchors = this.extractAnchors(content)
-    
-    return {
-      filePath: absoluteSourcePath,
-      content: content,
-      tokens: tokens,
-      links: links,
-      anchors: anchors
-    }
+    note over Parser: Phase 3: Extract structured data
+    Parser->>Parser: extractLinks(content) → LinkObject[]
+    Parser->>Parser: extractHeadings(tokens) → HeadingObject[]
+    Parser->>Parser: extractAnchors(content) → AnchorObject[]
 
-  // Extracts all outgoing links from the document content.
-  private method extractLinks(content: string, sourcePath: string): array of Link is
-    field links = new array of Link
-    field lines = content.split("\n")
+    Parser-->>-Client: ParserOutput
 
-    foreach (line in lines with index) do
-      // Pattern: Apply regex for standard markdown links: [text](path#anchor)
-      // ... find all markdown link matches on the line ...
-      foreach (match in markdownMatches) do
-        // Decision: Resolve the path. Use FileCache for short filenames if available.
-        field rawPath = match.path
-        field resolvedPath = this.resolveTargetPath(rawPath, sourcePath)
-        
-        links.add(new Link({
-          linkType: "markdown",
-          scope: "cross-document", // or "internal"
-          anchorType: this.determineAnchorType(match.anchor), // "header" or "block"
-          source: { path: { absolute: sourcePath } },
-          target: {
-            path: {
-              raw: rawPath,
-              absolute: resolvedPath,
-              relative: this.pathModule.relative(this.pathModule.dirname(sourcePath), resolvedPath)
-            },
-            anchor: match.anchor
-          },
-          // ... populate text, fullMatch, line, column ...
-        }))
-
-      // Pattern: Apply regex for wiki-style links: [[path#anchor|text]]
-      // ... find all wiki link matches on the line ...
-      foreach (match in wikiMatches) do
-        // ... create and add wiki link objects to the links array ...
-    
-    return links
-    
-  // Extracts all potential link targets from the document content.
-  private method extractAnchors(content: string): array of Anchor is
-    field anchors = new array of Anchor
-    field lines = content.split("\n")
-
-    foreach (line in lines with index) do
-      // Pattern: Apply regex for header anchors: ## Header Text
-      if (line matches headerPattern) then
-        // US1.6: Create single anchor with both raw and URL-encoded IDs
-        field urlEncodedId = line.text.replace(/:/g, "").replace(/\s+/g, "%20")
-        anchors.add(new Anchor({
-          anchorType: "header",
-          id: line.text,              // Raw text: "Story 1.5: Implement Cache"
-          urlEncodedId: urlEncodedId, // Always populated: "Story%201.5%20Implement%20Cache"
-          rawText: line.text,
-          fullMatch: line.raw,
-          // ... populate line, column ...
-        }))
-        
-      // Pattern: Apply regex for block anchors: ^block-id
-      if (line contains blockPattern) then
-        anchors.add(new Anchor({
-          anchorType: "block",
-          id: match.id,
-          rawText: null,
-          fullMatch: match.raw,
-          // ... populate line, column ...
-        }))
-        
-    return anchors
+    note over Client: ParserOutput contains:<br/>filePath, content, tokens,<br/>links[], headings[], anchors[]
 ```
+
+### High-Level Flow
+
+```text
+parseFile(filePath) → ParserOutput
+├── READ: fs.readFileSync(filePath) → content
+├── TOKENIZE: marked.lexer(content) → tokens (standard markdown AST)
+├── EXTRACT LINKS: regex patterns on content lines → LinkObject[]
+│   ├── Pattern: [text](file.md#anchor) → markdown cross-document
+│   ├── Pattern: [[file#anchor|text]] → wiki cross-document
+│   ├── Pattern: [[#anchor|text]] → wiki internal
+│   └── Pattern: ^anchor-id → caret reference
+├── EXTRACT HEADINGS: walk tokens for type="heading" → HeadingObject[]
+└── EXTRACT ANCHORS: regex patterns on content lines → AnchorObject[]
+    ├── Pattern: ## Header Text → header anchor (with urlEncodedId)
+    └── Pattern: ^block-id → block anchor
+```
+
+**Key Integration Points**:
+
+- **marked.js**: Standard markdown tokenization (CommonMark spec)
+- **FileSystem**: Synchronous file read via dependency injection
+- **Path resolution**: Converts raw paths to absolute/relative using Node.js path module
 
 ## Data Contracts
 
-The component's output is strictly defined by the **`MarkdownParser.Output.DataContract`** JSON Schema. This is the definitive structure that all consuming components can rely on.
+TypeScript interfaces defining parser output structure. Source: `src/types/citationTypes.ts`
 
-> [!danger] Technical Lead Note:
-> - The `.headings[]` array is not used by any other source code. It is referenced in test code. It could be used to create an AST of the document.
+> [!danger] Technical Lead Note
+> The `.headings[]` array is not used by any other source code. It is referenced in test code. It could be used to create an AST of the document.
 
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cc-workflows.com/parser-output.schema.json",
-  "title": "MarkdownParser.Output.DataContract",
-  "description": "The complete output from the MarkdownParser's parseFile() method, containing all structural information about a markdown document.",
-  "type": "object",
-  "properties": {
-    "filePath": {
-      "description": "The absolute path of the file that was parsed.",
-      "type": "string"
-    },
-    "content": {
-      "description": "The full, raw string content of the parsed file.",
-      "type": "string"
-    },
-    "tokens": {
-      "description": "An array of raw token objects from the 'marked' library's lexer. The structure is defined by the external `marked` package.",
-      "type": "array",
-      "items": { "type": "object" }
-    },
-    "links": {
-      "description": "An array of all outgoing links found in the document.",
-      "type": "array",
-      "items": { "$ref": "#/$defs/linkObject" }
-    },
-    "headings": {
-      "description": "An array of all headings extracted from the document structure. Could later be used to generate an artifical AST.",
-      "type": "array",
-      "items": { "$ref": "#/$defs/headingObject" }
-    },
-    "anchors": {
-      "description": "An array of all available anchors (targets) defined in the document.",
-      "type": "array",
-      "items": { "$ref": "#/$defs/anchorObject" }
+### ParserOutput Interface
+
+```typescript
+export interface ParserOutput {
+  /** Absolute path of parsed file */
+  filePath: string;
+
+  /** Full raw content string */
+  content: string;
+
+  /** Tokenized markdown AST from marked.js */
+  tokens: Token[];  // from 'marked' library
+
+  /** All outgoing links found in document */
+  links: LinkObject[];
+
+  /** All headings extracted from document structure */
+  headings: HeadingObject[];
+
+  /** All anchors (potential link targets) in document */
+  anchors: AnchorObject[];
+}
+```
+
+### LinkObject Interface
+
+```typescript
+export interface LinkObject {
+  /** Link syntax type */
+  linkType: "markdown" | "wiki";
+
+  /** Link scope classification */
+  scope: "internal" | "cross-document";
+
+  /** Anchor type classification (null if no anchor) */
+  anchorType: "header" | "block" | null;
+
+  /** Source file information */
+  source: {
+    path: {
+      /** Absolute path of source file */
+      absolute: string | null;
+    };
+  };
+
+  /** Target resolution */
+  target: {
+    path: {
+      /** Raw path string from markdown (null for internal links) */
+      raw: string | null;
+      /** Absolute file system path (null if unresolved or internal) */
+      absolute: string | null;
+      /** Relative path from source file (null if unresolved or internal) */
+      relative: string | null;
+    };
+    /** Header/block anchor (null if no anchor) */
+    anchor: string | null;
+  };
+
+  /** Display text shown in markdown (null for caret references) */
+  text: string | null;
+
+  /** Complete matched markdown syntax */
+  fullMatch: string;
+
+  /** Source file line number (1-based) */
+  line: number;
+
+  /** Source file column number (0-based) */
+  column: number;
+
+  /** Extraction marker after link (null if none) */
+  extractionMarker: {
+    fullMatch: string;
+    innerText: string;
+  } | null;
+
+  /** Validation metadata (enriched post-parse by CitationValidator) */
+  validation?: ValidationMetadata;
+}
+```
+
+### AnchorObject Type (Discriminated Union)
+
+```typescript
+export type AnchorObject =
+  | {
+      /** Header anchor */
+      anchorType: "header";
+      /** Anchor identifier (raw heading text) */
+      id: string;
+      /** URL-encoded ID for Obsidian compatibility (always present for headers) */
+      urlEncodedId: string;
+      /** Original heading text */
+      rawText: string;
+      /** Full matched pattern from source */
+      fullMatch: string;
+      /** Source file line number (1-based) */
+      line: number;
+      /** Source file column number (1-based) */
+      column: number;
     }
-  },
-  "required": [ "filePath", "content", "tokens", "links", "headings", "anchors" ],
-  "$defs": {
-    "linkObject": {
-      "title": "Link Object",
-      "description": "Represents an outgoing link parsed from the document. The base properties are created by MarkdownParser. The optional 'validation' property is added post-parse by CitationValidator (US1.8 Validation Enrichment Pattern).",
-      "type": "object",
-      "properties": {
-        "linkType": { "type": "string", "enum": [ "markdown", "wiki" ], "description": "Parser-created: Link syntax type" },
-        "scope": { "type": "string", "enum": [ "internal", "cross-document" ], "description": "Parser-created: Link scope (same-document vs cross-document)" },
-        "anchorType": { "type": ["string", "null"], "enum": [ "header", "block", null ], "description": "Parser-created: Type of anchor target (null for full-file links)" },
-        "source": {
-     "title": "Source Link",
-     "description": "Parser-created: Source file information",
-     "type": "object",
-     "properties": {
-      "path": {
-       "type": "object",
-       "properties": {
-        "absolute": { "type": "string" }
-       },
-       "required": ["absolute"]
-      }
-     },
-     "required": ["path"]
-        },
-        "target": { 
-     "title": "Outgoing Target Link",
-     "description": "Parser-created: Target file path and anchor" },
-     "type": "object", 
-     "properties": { 
-      "path": { 
-       "type": "object", 
-       "properties": { 
-        "raw": { "type": ["string", "null"] }, 
-        "absolute": { "type": ["string", "null"] }, 
-        "relative": { "type": ["string", "null"] } 
-       }, 
-       "required": ["raw", "absolute", "relative"] }, 
-      "anchor": { "type": ["string", "null"] } 
-       }, 
-       "required": ["path", "anchor"], 
-    "text": { "type": ["string", "null"], "description": "Parser-created: Link display text" },
-    "fullMatch": { "type": "string", "description": "Parser-created: Full matched link text" },
-    "line": { "type": "integer", "minimum": 1, "description": "Parser-created: Line number in source file" },
-    "column": { "type": "integer", "minimum": 1, "description": "Parser-created: Column number in source file" },
-        "extractionMarker": {
-          "type": ["object", "null"],
-          "description": "Parser-created: Optional extraction control marker found after the link. Used by ContentExtractor to override default extraction eligibility. See Issue 5 for MVP technical debt.",
-          "properties": {
-            "fullMatch": { "type": "string", "description": "Complete marker text including delimiters (e.g., '%%force-extract%%')" },
-            "innerText": { "type": "string", "description": "Marker content without delimiters (e.g., 'force-extract')" }
-          },
-          "required": [ "fullMatch", "innerText" ]
-        },
-        "validation": {
-          "type": "object",
-          "description": "ADDED POST-PARSE by CitationValidator (US1.8): Validation metadata enrichment. This property does NOT exist when MarkdownParser returns the LinkObject. It is added after validation completes.",
-          "properties": {
-            "status": { "type": "string", "enum": [ "valid", "warning", "error" ], "description": "Validation result status" },
-            "error": { "type": "string", "description": "Error or warning message (only when status is 'error' or 'warning')" },
-            "suggestion": { "type": "string", "description": "Suggested fix (only when status is 'error' or 'warning')" },
-            "pathConversion": { "type": "object", "description": "Path conversion metadata (only when relevant)" }
-          },
-          "required": [ "status" ],
-          "allOf": [
-            {
-              "if": { "properties": { "status": { "enum": [ "error", "warning" ] } } },
-              "then": { "required": [ "error" ] }
-            }
-          ]
-        }
-      },
-      "required": [ "linkType", "scope", "anchorType", "source", "target", "text", "fullMatch", "line", "column" ]
-    },
-    "headingObject": {
-      "title": "Heading Object",
-      "description": "Represents a heading extracted from the document structure. Used by the CLI 'ast' command for document structure analysis and available for future content aggregation features.",
-      "type": "object",
-      "properties": {
-        "level": { "type": "integer", "minimum": 1, "maximum": 6, "description": "Heading depth (1-6)" },
-        "text": { "type": "string", "description": "Heading text content" },
-        "raw": { "type": "string", "description": "Raw markdown including # symbols" }
-      },
-      "required": [ "level", "text", "raw" ]
-    },
-    "anchorObject": {
-      "title": "Anchor Object",
-      "description": "Represents an anchor (link target) in the document. Header anchors include both raw and URL-encoded ID variants per US1.6. Block anchors omit urlEncodedId.",
-      "type": "object",
-      "properties": {
-        "anchorType": { "type": "string", "enum": [ "header", "block" ] },
-        "id": { "type": "string", "description": "Raw text format for headers (e.g., 'Story 1.5: Implement Cache'), or block ID for block anchors (e.g., 'FR1')" },
-        "urlEncodedId": { "type": "string", "description": "Obsidian-compatible URL-encoded format (e.g., 'Story%201.5%20Implement%20Cache'). Always populated for header anchors (even when identical to id), omitted for block anchors." },
-        "rawText": { "type": ["string", "null"], "description": "Original heading text for headers, null for block anchors" },
-        "fullMatch": { "type": "string" },
-        "line": { "type": "integer", "minimum": 1 },
-        "column": { "type": "integer", "minimum": 1 }
-      },
-      "required": [ "anchorType", "id", "rawText", "fullMatch", "line", "column" ],
-      "allOf": [
-        {
-          "if": { "properties": { "anchorType": { "const": "header" } } },
-          "then": { "required": [ "urlEncodedId" ] }
-        }
-      ]
-    }
-  }
+  | {
+      /** Block anchor */
+      anchorType: "block";
+      /** Anchor identifier (block ID like 'FR1' or '^my-anchor') */
+      id: string;
+      /** Always null for block anchors */
+      rawText: null;
+      /** Full matched pattern from source */
+      fullMatch: string;
+      /** Source file line number (1-based) */
+      line: number;
+      /** Source file column number (1-based) */
+      column: number;
+    };
+```
+
+### HeadingObject Interface
+
+```typescript
+export interface HeadingObject {
+  /** Heading depth (1-6) */
+  level: number;
+
+  /** Heading text content */
+  text: string;
+
+  /** Raw markdown including # symbols */
+  raw: string;
+}
+```
+
+### ValidationMetadata Interface
+
+```typescript
+export interface ValidationMetadata {
+  /** Validation outcome status */
+  status: "valid" | "warning" | "error";
+
+  /** Target file exists on disk */
+  fileExists: boolean;
+
+  /** Target anchor exists in file (null if no anchor specified) */
+  anchorExists: boolean | null;
+
+  /** Suggested corrections for errors (empty for valid) */
+  suggestions?: string[];
+
+  /** Path conversion info for cross-references */
+  pathConversion?: string;
 }
 ```
 
@@ -405,7 +375,8 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
       "text": "Component Details",
       "fullMatch": "[Component Details](test-target.md#auth-service)",
       "line": 5,
-      "column": 3
+      "column": 3,
+      "extractionMarker": null
     },
     {
       "linkType": "markdown",
@@ -427,7 +398,8 @@ The component's output is strictly defined by the **`MarkdownParser.Output.DataC
       "text": "Implementation Guide",
       "fullMatch": "[Implementation Guide](test-target.md)",
       "line": 11,
-      "column": 3
+      "column": 3,
+      "extractionMarker": null
     }
   ],
   "headings": [
@@ -493,12 +465,12 @@ The `extractionMarker` property captures optional control markers that appear af
 
 ## Testing Strategy
 
-**Philosophy**: Validate MarkdownParser's ability to correctly transform markdown into the `MarkdownParser.Output.DataContract` JSON Schema.
+**Philosophy**: Validate MarkdownParser's ability to correctly transform markdown into the `MarkdownParser.Output.DataContract` TypeScript interfaces.
 
 **Test Location**: `tools/citation-manager/test/parser-output-contract.test.js`
 
 1. **Schema Compliance Validation**
-   - All output objects match JSON Schema definitions (LinkObject, AnchorObject, HeadingObject)
+   - All output objects match TypeScript interface definitions (LinkObject, AnchorObject, HeadingObject)
    - Required fields present with correct types
    - Enum properties adhere to documented constraints
 
@@ -739,7 +711,7 @@ Example output saved at: `tools/citation-manager/design-docs/features/20251003-c
 
 ## Issue 1: Duplicate Parsing - Parse Twice, Use Once
 
-**Current Problem** (extractLinks() lines 104-357):
+**Current Problem** (extractLinks() lines 113-420 in MarkdownParser.ts):
 - `marked.lexer()` creates tokens with `type: "link"` objects containing `href`, `text`, `raw`
 - Code **ignores** these link tokens and re-parses entire content line-by-line with 6 different regex patterns
 - Result: Parse twice, O(n×patterns) complexity instead of O(n)
@@ -1154,7 +1126,7 @@ marked.walkTokens(tokens, (token) => {
 **Documentation Date**: 2025-10-09
 **Discovered During**: US1.6 Task 1.2 (CitationValidator Anchor Matching Integration Tests)
 **Related Files**:
-- `tools/citation-manager/src/MarkdownParser.js:88-299` (extractLinks method)
+- `tools/citation-manager/src/MarkdownParser.ts:113-420` (extractLinks method)
 - `tools/citation-manager/test/integration/citation-validator-anchor-matching.test.js` (uses cross-doc workaround)
 - `tools/citation-manager/design-docs/features/20251003-content-aggregation/user-stories/us1.6-refactor-anchor-schema/tasks/01-1-2-write-validator-anchor-matching-tests-us1.6.md` (specification that couldn't be followed)
 

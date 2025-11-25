@@ -114,8 +114,8 @@ _Commit:_ 1cb04b9
 - ParsedFileCache (~74 lines) - single-parse guarantee
 
 **Component/Module Guides**:
-- [ParsedDocument Implementation Guide](../../component-guides/ParsedDocument%20Implementation%20Guide.md)
-- [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md)
+- [ParsedDocument Implementation Guide](../../component-guides/ParsedDocument%20Implementation%20Guide.md) %% force-extract %%
+- [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md) %% force-extract %%
 
 **Deliverables**:
 - ✅ ParsedDocument.ts with facade methods typed
