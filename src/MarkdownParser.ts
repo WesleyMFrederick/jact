@@ -1,5 +1,6 @@
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { marked } from "marked";
+import type { readFileSync } from "node:fs";
 
 /**
  * Markdown parser with Obsidian-compatible link and anchor extraction
@@ -31,15 +32,27 @@ import { marked } from "marked";
  * const result = await parser.parseFile('/path/to/file.md');
  * // Returns { filePath, content, tokens, links, headings, anchors }
  */
+
+/**
+ * File system interface for dependency injection.
+ * Matches Node.js fs module subset used by MarkdownParser.
+ */
+interface FileSystemInterface {
+	readFileSync: typeof readFileSync;
+}
+
 export class MarkdownParser {
+	private fs: FileSystemInterface;
+	private currentSourcePath: string | null;
+
 	/**
 	 * Initialize parser with file system dependency
 	 *
-	 * @param {Object} fileSystem - Node.js fs module (or mock for testing)
+	 * @param fileSystem - Node.js fs module (or mock for testing)
 	 */
-	constructor(fileSystem) {
+	constructor(fileSystem: FileSystemInterface) {
 		this.fs = fileSystem;
-		this.currentSourcePath = null; // Store current file being parsed
+		this.currentSourcePath = null;
 	}
 
 	/**
