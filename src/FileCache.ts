@@ -23,6 +23,12 @@ interface ResolveResultFailure {
 
 type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
 
+interface FileEntry {
+	filename: string;
+	path: string;
+	isDuplicate: boolean;
+}
+
 /**
  * Filename-based cache for smart file resolution
  *
@@ -305,7 +311,7 @@ export class FileCache {
 	}
 
 	// Get all cached files with duplicate status
-	getAllFiles() {
+	getAllFiles(): FileEntry[] {
 		return Array.from(this.cache.entries()).map(([filename, path]) => ({
 			filename,
 			path,
