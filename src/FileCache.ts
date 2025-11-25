@@ -7,6 +7,22 @@ interface CacheStats {
 	realScopeFolder: string;
 }
 
+interface ResolveResultSuccess {
+	found: true;
+	path: string;
+	fuzzyMatch?: boolean;
+	correctedFilename?: string;
+	message?: string;
+}
+
+interface ResolveResultFailure {
+	found: false;
+	reason: 'duplicate' | 'not_found' | 'duplicate_fuzzy';
+	message: string;
+}
+
+type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
+
 /**
  * Filename-based cache for smart file resolution
  *
@@ -140,7 +156,7 @@ export class FileCache {
 	 * @param {string} filename - Filename to resolve (with or without .md extension)
 	 * @returns {Object} Result object with { found, path?, reason?, message?, fuzzyMatch?, correctedFilename? }
 	 */
-	resolveFile(filename: string) {
+	resolveFile(filename: string): ResolveResult {
 		// Check for exact filename match first
 		if (this.cache.has(filename)) {
 			if (this.duplicates.has(filename)) {
@@ -152,7 +168,7 @@ export class FileCache {
 			}
 			return {
 				found: true,
-				path: this.cache.get(filename),
+				path: this.cache.get(filename)!,
 			};
 		}
 
@@ -170,7 +186,7 @@ export class FileCache {
 			}
 			return {
 				found: true,
-				path: this.cache.get(withMdExt),
+				path: this.cache.get(withMdExt)!,
 			};
 		}
 
@@ -201,7 +217,7 @@ export class FileCache {
 	 * @param {string} filename - Original filename that failed exact match
 	 * @returns {Object|null} Fuzzy match result with { found, path, fuzzyMatch: true, correctedFilename, message } or null
 	 */
-	findFuzzyMatch(filename: string) {
+	findFuzzyMatch(filename: string): ResolveResult | null {
 		const allFiles = Array.from(this.cache.keys());
 
 		// Strategy 1: Fix double .md extension (e.g., "file.md.md" → "file.md")
@@ -217,7 +233,7 @@ export class FileCache {
 				}
 				return {
 					found: true,
-					path: this.cache.get(fixedFilename),
+					path: this.cache.get(fixedFilename)!,
 					fuzzyMatch: true,
 					correctedFilename: fixedFilename,
 					message: `Auto-corrected double extension: "${filename}" → "${fixedFilename}"`,
@@ -248,7 +264,7 @@ export class FileCache {
 					}
 					return {
 						found: true,
-						path: this.cache.get(correctedFilename),
+						path: this.cache.get(correctedFilename)!,
 						fuzzyMatch: true,
 						correctedFilename: correctedFilename,
 						message: `Auto-corrected typo: "${filename}" → "${correctedFilename}"`,
@@ -277,7 +293,7 @@ export class FileCache {
 			if (closeMatch) {
 				return {
 					found: true,
-					path: this.cache.get(closeMatch),
+					path: this.cache.get(closeMatch)!,
 					fuzzyMatch: true,
 					correctedFilename: closeMatch,
 					message: `Found similar architecture file: "${filename}" → "${closeMatch}"`,
