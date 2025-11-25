@@ -92,7 +92,7 @@ export class FileCache {
 	}
 
 	// Recursively scan directory for markdown files
-	scanDirectory(dirPath: string) {
+	private scanDirectory(dirPath: string): void {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
 
