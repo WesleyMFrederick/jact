@@ -64,7 +64,7 @@ export class MarkdownParser {
 	 * link resolution during extraction.
 	 *
 	 * @param {string} filePath - Absolute or relative path to markdown file
-	 * @returns {Promise<Object>} MarkdownParser.Output.DataContract with { filePath, content, tokens, links, headings, anchors }
+	 * @returns {Promise<ParserOutput>} Object containing parsed markdown metadata including filePath, content, tokens, links, headings, and anchors
 	 */
 	async parseFile(filePath: string): Promise<ParserOutput> {
 		this.currentSourcePath = filePath; // Store for use in extractLinks()
