@@ -118,7 +118,7 @@ export class FileCache {
 	}
 
 	// Add file to cache or mark as duplicate if filename already exists
-	addToCache(filename: string, fullPath: string) {
+	private addToCache(filename: string, fullPath: string): void {
 		if (this.cache.has(filename)) {
 			// Mark as duplicate
 			this.duplicates.add(filename);
