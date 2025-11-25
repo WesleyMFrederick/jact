@@ -1,6 +1,7 @@
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { marked } from "marked";
 import type { readFileSync } from "node:fs";
+import type { ParserOutput } from "./types/citationTypes.js";
 
 /**
  * Markdown parser with Obsidian-compatible link and anchor extraction
@@ -65,7 +66,7 @@ export class MarkdownParser {
 	 * @param {string} filePath - Absolute or relative path to markdown file
 	 * @returns {Promise<Object>} MarkdownParser.Output.DataContract with { filePath, content, tokens, links, headings, anchors }
 	 */
-	async parseFile(filePath) {
+	async parseFile(filePath: string): Promise<ParserOutput> {
 		this.currentSourcePath = filePath; // Store for use in extractLinks()
 		const content = this.fs.readFileSync(filePath, "utf8");
 		const tokens = marked.lexer(content);
