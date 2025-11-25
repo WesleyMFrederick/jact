@@ -1,3 +1,12 @@
+// Types defined inline: FileCache is leaf component with no consumers needing these types
+// If future components need these types, migrate to src/types/fileCacheTypes.ts
+interface CacheStats {
+	totalFiles: number;
+	duplicates: number;
+	scopeFolder: string;
+	realScopeFolder: string;
+}
+
 /**
  * Filename-based cache for smart file resolution
  *
@@ -49,7 +58,7 @@ export class FileCache {
 	 * @param {string} scopeFolder - Root folder to scan (can be symlink, will be resolved)
 	 * @returns {Object} Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
-	buildCache(scopeFolder: string) {
+	buildCache(scopeFolder: string): CacheStats {
 		this.cache.clear();
 		this.duplicates.clear();
 
