@@ -1,7 +1,7 @@
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { marked } from "marked";
 import type { readFileSync } from "node:fs";
-import type { ParserOutput } from "./types/citationTypes.js";
+import type { LinkObject, ParserOutput } from "./types/citationTypes.js";
 
 /**
  * Markdown parser with Obsidian-compatible link and anchor extraction
@@ -99,7 +99,7 @@ export class MarkdownParser {
 	 * @param {string} content - Full markdown file content
 	 * @returns {Array<Object>} Array of link objects with { linkType, scope, anchorType, source, target, text, fullMatch, line, column }
 	 */
-	extractLinks(content) {
+	extractLinks(content: string): LinkObject[] {
 		const links = [];
 		const lines = content.split("\n");
 		const sourceAbsolutePath = this.currentSourcePath;
