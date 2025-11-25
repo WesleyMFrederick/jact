@@ -426,9 +426,34 @@ export interface ParserOutput {
   headings: HeadingObject[];
   anchors: AnchorObject[];
 }
+
+// AnchorObject uses discriminated union for conditional properties
+export type AnchorObject =
+  | {
+      anchorType: 'header';
+      id: string;
+      urlEncodedId: string;  // REQUIRED for headers (Obsidian-compatible)
+      rawText: string;
+      fullMatch: string;
+      line: number;
+      column: number;
+    }
+  | {
+      anchorType: 'block';
+      id: string;
+      rawText: null;  // Always null for blocks
+      fullMatch: string;
+      line: number;
+      column: number;
+      // NO urlEncodedId property
+    };
 ```
 
 **Validation**: Extract contract via `citation-manager extract links component-guides/Markdown\ Parser\ Implementation\ Guide.md`
+
+**Critical**: AnchorObject must use discriminated union to match baseline JavaScript behavior:
+- Header anchors ALWAYS set `urlEncodedId` (verified in baseline commit 1c571e0, line 462-471)
+- Block anchors NEVER have `urlEncodedId` property (verified in baseline, lines 349, 371, 393)
 
 **Reference**: [Markdown Parser Data Contracts](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts)
 
@@ -791,10 +816,7 @@ npm run build               # Must generate .js + .d.ts
 
 ### Phase 2 Artifacts
 
-- **Phase 2 Whiteboard**: [phase2-design-whiteboard.md](phase2-design-whiteboard.md) - Research findings
-- **Gap Analysis**: [gap-analysis.md](gap-analysis.md) - Identified gaps
-- **Solutions Hypothesis**: [solutions-hypothesis.md](solutions-hypothesis.md) - Proposed solutions
-- **Research Documents**: [research/](research/) - 5 concurrent research outputs
+- **Research Documents**: [research/](research/) - Research outputs from design phase
 
 ### Component Contracts
 

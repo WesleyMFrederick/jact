@@ -86,7 +86,7 @@ _Commit:_ 78965246e4ae7acc5aeebea1b3ac138f83b6d089
 - MarkdownParser (~640 lines) - lexer + custom extraction
 
 **Component/Module Guides**:
-- [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md)
+- [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md) %% force-extract %%
 
 **Deliverables**:
 - ✅ MarkdownParser.ts with Token types from @types/marked
