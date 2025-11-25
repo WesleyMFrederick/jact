@@ -1,7 +1,13 @@
+import type { readFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { marked } from "marked";
-import type { readFileSync } from "node:fs";
-import type { AnchorObject, LinkObject, ParserOutput } from "./types/citationTypes.js";
+import type { Token } from "marked";
+import type {
+	AnchorObject,
+	HeadingObject,
+	LinkObject,
+	ParserOutput,
+} from "./types/citationTypes.js";
 
 /**
  * Markdown parser with Obsidian-compatible link and anchor extraction
@@ -489,7 +495,7 @@ export class MarkdownParser {
 	 * @param {Array} tokens - Token array from marked.lexer()
 	 * @returns {Array<Object>} Array of { level, text, raw } heading objects
 	 */
-	extractHeadings(tokens) {
+	extractHeadings(tokens: Token[]): HeadingObject[] {
 		const headings = [];
 
 		const extractFromTokens = (tokenList) => {
