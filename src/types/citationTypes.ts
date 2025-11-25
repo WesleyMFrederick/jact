@@ -1,5 +1,7 @@
 // src/types/citationTypes.ts
 
+import type { Token } from 'marked';
+
 /**
  * Link scope classification for citation validation.
  * Decision: Discriminated union prevents invalid scope values.
@@ -159,7 +161,7 @@ export interface ParserOutput {
 	content: string;
 
 	/** Tokenized markdown AST from marked.js */
-	tokens: unknown[]; // Will be typed as Token[] after importing from @types/marked
+	tokens: Token[];
 
 	/** All outgoing links found in document */
 	links: LinkObject[];
