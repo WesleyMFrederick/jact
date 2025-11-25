@@ -21,18 +21,18 @@
  * // Returns { found: true, path: '/project/docs/design/architecture.md' }
  */
 export class FileCache {
-	private fs: any;
-	private path: any;
+	private fs: typeof import('fs');
+	private path: typeof import('path');
 	private cache: Map<string, string>; // filename -> absolute path
 	private duplicates: Set<string>; // filenames that appear multiple times
 
 	/**
 	 * Initialize cache with file system and path dependencies
 	 *
-	 * @param {Object} fileSystem - Node.js fs module (or mock for testing)
-	 * @param {Object} pathModule - Node.js path module (or mock for testing)
+	 * @param fileSystem - Node.js fs module (or mock for testing)
+	 * @param pathModule - Node.js path module (or mock for testing)
 	 */
-	constructor(fileSystem: any, pathModule: any) {
+	constructor(fileSystem: typeof import('fs'), pathModule: typeof import('path')) {
 		this.fs = fileSystem;
 		this.path = pathModule;
 		this.cache = new Map<string, string>();
