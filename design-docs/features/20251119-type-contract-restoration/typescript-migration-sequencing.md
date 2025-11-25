@@ -49,6 +49,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 
 **Size**: Small (~50 lines total)
 
+_Status:_ ✅ Completed (2025-11-24)
+_Commit:_ ebefdb24a31206afa5bd407988b704e089cd0392
+
 ---
 
 ### Epic 2: Leaf Components
@@ -70,6 +73,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 
 **Size**: Small (single component, simple types)
 
+_Status:_ 🔲 Pending
+_Commit:_
+
 ---
 
 ### Epic 3: Parser Foundation
@@ -78,6 +84,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 
 **Components**:
 - MarkdownParser (~640 lines) - lexer + custom extraction
+
+**Component/Module Guides**:
+- [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md)
 
 **Deliverables**:
 - ✅ MarkdownParser.ts with Token types from @types/marked
@@ -91,6 +100,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 
 **Size**: Large (640 lines, complex regex patterns, external types)
 
+_Status:_ 🔲 Pending
+_Commit:_
+
 ---
 
 ### Epic 4: Parser Facade & Cache
@@ -100,6 +112,10 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 **Components**:
 - ParsedDocument (~321 lines) - query methods over parser output
 - ParsedFileCache (~74 lines) - single-parse guarantee
+
+**Component/Module Guides**:
+- [ParsedDocument Implementation Guide](../../component-guides/ParsedDocument%20Implementation%20Guide.md)
+- [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md)
 
 **Deliverables**:
 - ✅ ParsedDocument.ts with facade methods typed
@@ -113,6 +129,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 
 **Size**: Medium (395 lines, Promise generics)
 
+_Status:_ 🔲 Pending
+_Commit:_
+
 ---
 
 ### Epic 5: Validation Layer
@@ -121,6 +140,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 
 **Components**:
 - CitationValidator (~883 lines) - enriches links with validation metadata
+
+**Component/Module Guides**:
+- [CitationValidator Implementation Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md)
 
 **Deliverables**:
 - ✅ CitationValidator.ts with discriminated unions
@@ -138,6 +160,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 
 **Critical**: Epic 4.4 failure point - must preserve architecture, not refactor
 
+_Status:_ 🔲 Pending
+_Commit:_
+
 ---
 
 ### Epic 6: Extraction Layer
@@ -147,6 +172,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 **Components**:
 - ContentExtractor (~225 lines) - extracts content from enriched links
 - Strategy implementations (5 files) - eligibility evaluation chain
+
+**Component/Module Guides**:
+- [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
 
 **Deliverables**:
 - ✅ ContentExtractor.ts with strategy chain typed
@@ -161,6 +189,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 
 **Size**: Medium (225 lines + 5 strategy files, strategy pattern)
 
+_Status:_ 🔲 Pending
+_Commit:_
+
 ---
 
 ### Epic 7: CLI Integration
@@ -170,6 +201,10 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 **Components**:
 - CLI orchestrator - coordinates validator → extractor workflow
 - Integration validation
+
+**Component/Module Guides**:
+- [CLI Orchestrator Implementation Guide](../../component-guides/CLI%20Orchestrator%20Implementation%20Guide.md)
+- [CLI Architecture Overview](../../component-guides/CLI%20Architecture%20Overview.md)
 
 **Deliverables**:
 - ✅ CLI orchestrator typed
@@ -183,6 +218,9 @@ Converts 7 components (~2,436 lines) from JavaScript to TypeScript in dependency
 **Validation**: CLI commands work with TypeScript-compiled code
 
 **Size**: Medium (orchestration layer, integration testing)
+
+_Status:_ 🔲 Pending
+_Commit:_
 
 ---
 
