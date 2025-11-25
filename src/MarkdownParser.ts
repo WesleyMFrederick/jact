@@ -439,7 +439,7 @@ export class MarkdownParser {
 	 * @param {number} linkEndColumn - Column where link ends
 	 * @returns {Object|null} { fullMatch, innerText } or null if no marker
 	 */
-	_detectExtractionMarker(line, linkEndColumn) {
+	_detectExtractionMarker(line: string, linkEndColumn: number): { fullMatch: string; innerText: string } | null {
 		// Get text after link on same line
 		const remainingLine = line.substring(linkEndColumn);
 
@@ -458,7 +458,7 @@ export class MarkdownParser {
 	}
 
 	// Classify anchor as "block" (^prefix) or "header"
-	determineAnchorType(anchorString) {
+	determineAnchorType(anchorString: string): 'header' | 'block' | null {
 		if (!anchorString) return null;
 
 		// Block references start with ^ or match ^alphanumeric pattern
@@ -474,7 +474,7 @@ export class MarkdownParser {
 	}
 
 	// Resolve relative paths to absolute using source file's directory
-	resolvePath(rawPath, sourceAbsolutePath) {
+	resolvePath(rawPath: string, sourceAbsolutePath: string): string | null {
 		if (!rawPath || !sourceAbsolutePath) return null;
 
 		if (isAbsolute(rawPath)) {
@@ -635,7 +635,7 @@ export class MarkdownParser {
 	}
 
 	// Check if text contains markdown formatting (backticks, bold, italic, etc.)
-	containsMarkdown(text) {
+	containsMarkdown(text: string): boolean {
 		// Check for common markdown patterns that would affect anchor generation
 		const markdownPatterns = [
 			/`[^`]+`/, // Backticks (code spans)
@@ -649,7 +649,7 @@ export class MarkdownParser {
 	}
 
 	// Convert text to kebab-case (e.g., "Project Architecture" → "project-architecture")
-	toKebabCase(text) {
+	toKebabCase(text: string): string {
 		return text
 			.toLowerCase()
 			.replace(/[^a-z0-9\s-]/g, "") // Remove special chars except spaces and hyphens
