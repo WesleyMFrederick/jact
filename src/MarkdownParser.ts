@@ -106,7 +106,7 @@ export class MarkdownParser {
 	 * @returns {Array<Object>} Array of link objects with { linkType, scope, anchorType, source, target, text, fullMatch, line, column }
 	 */
 	extractLinks(content: string): LinkObject[] {
-		const links = [];
+		const links: LinkObject[] = [];
 		const lines = content.split("\n");
 		const sourceAbsolutePath = this.currentSourcePath;
 
@@ -123,8 +123,8 @@ export class MarkdownParser {
 				const scope = "cross-document";
 				const anchorType = anchor ? this.determineAnchorType(anchor) : null;
 
-				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath);
-				const relativePath = absolutePath
+				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
+				const relativePath = absolutePath && sourceAbsolutePath
 					? relative(dirname(sourceAbsolutePath), absolutePath)
 					: null;
 
@@ -169,8 +169,8 @@ export class MarkdownParser {
 				const scope = "cross-document";
 				const anchorType = null;
 
-				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath);
-				const relativePath = absolutePath
+				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
+				const relativePath = absolutePath && sourceAbsolutePath
 					? relative(dirname(sourceAbsolutePath), absolutePath)
 					: null;
 
@@ -222,8 +222,8 @@ export class MarkdownParser {
 					const scope = "cross-document";
 					const anchorType = anchor ? this.determineAnchorType(anchor) : null;
 
-					const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath);
-					const relativePath = absolutePath
+					const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
+					const relativePath = absolutePath && sourceAbsolutePath
 						? relative(dirname(sourceAbsolutePath), absolutePath)
 						: null;
 
@@ -270,8 +270,8 @@ export class MarkdownParser {
 				const scope = "cross-document";
 				const anchorType = anchor ? this.determineAnchorType(anchor) : null;
 
-				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath);
-				const relativePath = absolutePath
+				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
+				const relativePath = absolutePath && sourceAbsolutePath
 					? relative(dirname(sourceAbsolutePath), absolutePath)
 					: null;
 
@@ -322,7 +322,7 @@ export class MarkdownParser {
 					anchorType: anchorType,
 					source: {
 						path: {
-							absolute: sourceAbsolutePath,
+							absolute: sourceAbsolutePath ?? "",
 						},
 					},
 					target: {
@@ -363,7 +363,7 @@ export class MarkdownParser {
 					anchorType: anchorType,
 					source: {
 						path: {
-							absolute: sourceAbsolutePath,
+							absolute: sourceAbsolutePath ?? "",
 						},
 					},
 					target: {
@@ -403,7 +403,7 @@ export class MarkdownParser {
 					anchorType: anchorType,
 					source: {
 						path: {
-							absolute: sourceAbsolutePath,
+							absolute: sourceAbsolutePath ?? "",
 						},
 					},
 					target: {
@@ -496,9 +496,9 @@ export class MarkdownParser {
 	 * @returns {Array<Object>} Array of { level, text, raw } heading objects
 	 */
 	extractHeadings(tokens: Token[]): HeadingObject[] {
-		const headings = [];
+		const headings: HeadingObject[] = [];
 
-		const extractFromTokens = (tokenList) => {
+		const extractFromTokens = (tokenList: Token[]): void => {
 			for (const token of tokenList) {
 				if (token.type === "heading") {
 					headings.push({
@@ -538,7 +538,7 @@ export class MarkdownParser {
 	 * @returns {Array<Object>} Array of { anchorType, id, rawText, fullMatch, line, column } anchor objects
 	 */
 	extractAnchors(content: string): AnchorObject[] {
-		const anchors = [];
+		const anchors: AnchorObject[] = [];
 		const lines = content.split("\n");
 
 		lines.forEach((line, index) => {
