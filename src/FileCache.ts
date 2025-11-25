@@ -217,7 +217,7 @@ export class FileCache {
 	 * @param {string} filename - Original filename that failed exact match
 	 * @returns {Object|null} Fuzzy match result with { found, path, fuzzyMatch: true, correctedFilename, message } or null
 	 */
-	findFuzzyMatch(filename: string): ResolveResult | null {
+	private findFuzzyMatch(filename: string): ResolveResult | null {
 		const allFiles = Array.from(this.cache.keys());
 
 		// Strategy 1: Fix double .md extension (e.g., "file.md.md" → "file.md")
