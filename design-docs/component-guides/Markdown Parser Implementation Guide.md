@@ -720,10 +720,7 @@ direction: asc
 columns: [number, status, title, labels, created, updated]
 ```
 
-
-
 ---
-
 
 # Markdownlint Approach
 

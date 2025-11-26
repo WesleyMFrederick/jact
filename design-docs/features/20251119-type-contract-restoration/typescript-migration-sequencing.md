@@ -86,7 +86,7 @@ _Commit:_ 78965246e4ae7acc5aeebea1b3ac138f83b6d089
 - MarkdownParser (~640 lines) - lexer + custom extraction
 
 **Component/Module Guides**:
-- [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md) %% force-extract %%
+- [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md)
 
 **Deliverables**:
 - ✅ MarkdownParser.ts with Token types from @types/marked
@@ -114,8 +114,8 @@ _Commit:_ 1cb04b9
 - ParsedFileCache (~74 lines) - single-parse guarantee
 
 **Component/Module Guides**:
-- [ParsedDocument Implementation Guide](../../component-guides/ParsedDocument%20Implementation%20Guide.md) %% force-extract %%
-- [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md) %% force-extract %%
+- [ParsedDocument Implementation Guide](../../component-guides/ParsedDocument%20Implementation%20Guide.md)
+- [ParsedFileCache Implementation Guide](../../component-guides/ParsedFileCache%20Implementation%20Guide.md)
 
 **Deliverables**:
 - ✅ ParsedDocument.ts with facade methods typed
@@ -132,7 +132,7 @@ _Commit:_ 1cb04b9
 **Known Issue**: 50 CLI-dependent tests will fail after Epic 4 completion due to `componentFactory.js` remaining unconverted. These tests resolve automatically when componentFactory converts in Epic 7. Use 263 passing tests (84%) for validation during Epic 4-6. See [epic4-learnings.md](user-stories/epic4-parser-facade-cache/epic4-learnings.md#ComponentFactory%20Creates%20Test%20Blocker%20Until%20Epic%207) for details.
 
 _Status:_  ✅ Completed (2025-11-26)
-_Commit:_
+_Commit:_ 7667392d8d56a99c275505c433bbd0f6c1ab2fbe
 
 ---
 
@@ -144,7 +144,7 @@ _Commit:_
 - CitationValidator (~883 lines) - enriches links with validation metadata
 
 **Component/Module Guides**:
-- [CitationValidator Implementation Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md)
+- [CitationValidator Implementation Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md) %% force-extract %%
 
 **Deliverables**:
 - ✅ CitationValidator.ts with discriminated unions
