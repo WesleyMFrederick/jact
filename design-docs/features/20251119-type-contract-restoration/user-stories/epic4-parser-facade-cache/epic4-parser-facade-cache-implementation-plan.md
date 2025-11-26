@@ -8,6 +8,26 @@
 
 **Tech Stack:** TypeScript 5.3+, Map<K,V> for Promise caching, marked.js Token types
 
+## ⚠️ Import Extension Best Practice
+
+**CRITICAL:** This project uses `moduleResolution: NodeNext` for Node.js ESM.
+
+**Rule:** ALL imports MUST use `.js` extensions, even when importing from `.ts` files.
+
+```typescript
+// ✅ CORRECT
+import ParsedDocument from "./ParsedDocument.js";
+import type { ParserOutput } from "./types/citationTypes.js";
+
+// ❌ WRONG
+import ParsedDocument from "./ParsedDocument.ts";
+import ParsedDocument from "./ParsedDocument";
+```
+
+**Why:** Import paths reference compiled output files (`.js` in `dist/`), not source files (`.ts` in `src/`). Node.js ESM requires explicit extensions and TypeScript does not rewrite import paths.
+
+**See:** `epic4-learnings.md` for full explanation and references.
+
 ---
 
 ## Task 1 - Rename ParsedDocument.js to TypeScript

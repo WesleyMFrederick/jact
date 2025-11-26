@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
-import ParsedDocument from "../../src/ParsedDocument.js";
+import ParsedDocument from "../../dist/ParsedDocument.js";
 import { createCitationValidator } from "../../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);

@@ -1,5 +1,7 @@
 import { normalize, resolve } from "node:path";
 import ParsedDocument from "./ParsedDocument.js";
+import type { ParserOutput } from "./types/citationTypes.js";
+import type { MarkdownParser } from "./MarkdownParser.js";
 
 /**
  * Promise-based cache for parsed markdown files
@@ -21,14 +23,17 @@ import ParsedDocument from "./ParsedDocument.js";
  * const result2 = await cache.resolveParsedFile('/path/to/file.md'); // Uses cached Promise
  */
 export class ParsedFileCache {
+	private parser: MarkdownParser;
+	private cache: Map<string, Promise<ParsedDocument>>;
+
 	/**
 	 * Initialize cache with markdown parser
 	 *
-	 * @param {MarkdownParser} markdownParser - Parser instance for processing markdown files
+	 * @param markdownParser - Parser instance for processing markdown files
 	 */
-	constructor(markdownParser) {
+	constructor(markdownParser: MarkdownParser) {
 		this.parser = markdownParser;
-		this.cache = new Map();
+		this.cache = new Map<string, Promise<ParsedDocument>>();
 	}
 
 	/**
@@ -40,17 +45,17 @@ export class ParsedFileCache {
 	 *
 	 * Failed parse operations are automatically removed from cache to allow retry.
 	 *
-	 * @param {string} filePath - Path to markdown file (relative or absolute, will be normalized)
-	 * @returns {Promise<ParsedDocument>} ParsedDocument facade instance wrapping parser output
+	 * @param filePath - Path to markdown file (relative or absolute, will be normalized)
+	 * @returns ParsedDocument facade instance wrapping parser output
 	 */
-	async resolveParsedFile(filePath) {
+	async resolveParsedFile(filePath: string): Promise<ParsedDocument> {
 		// 1. Normalize path to absolute for consistent cache keys
 		const cacheKey = resolve(normalize(filePath));
 
 		// 2. Decision point: Check cache for existing Promise
 		if (this.cache.has(cacheKey)) {
 			// Cache hit: Return existing ParsedDocument Promise
-			return this.cache.get(cacheKey);
+			return this.cache.get(cacheKey)!;
 		}
 
 		// 3. Cache miss: Create parse operation
@@ -58,7 +63,7 @@ export class ParsedFileCache {
 
 		// 4. Wrap parser output in ParsedDocument facade before caching
 		const parsedDocPromise = parsePromise.then(
-			(contract) => new ParsedDocument(contract),
+			(contract: ParserOutput) => new ParsedDocument(contract),
 		);
 
 		// 5. Store ParsedDocument Promise IMMEDIATELY (prevents duplicate parses)
