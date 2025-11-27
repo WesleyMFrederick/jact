@@ -39,12 +39,7 @@ describe("CLI - extract header command", () => {
 		const targetFile = path.resolve(
 			__dirname,
 			"..",
-			"..",
-			"design-docs",
-			"features",
-			"20251003-content-aggregation",
-			"user-stories",
-			"us2.3-implement-extract-links-subcommand",
+			"fixtures",
 			"us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
 		const invalidHeader = "Nonexistent Header Name";
@@ -70,12 +65,7 @@ describe("CLI - extract header command", () => {
 		const targetFile = path.resolve(
 			__dirname,
 			"..",
-			"..",
-			"design-docs",
-			"features",
-			"20251003-content-aggregation",
-			"user-stories",
-			"us2.3-implement-extract-links-subcommand",
+			"fixtures",
 			"us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
 		const similarHeader = "Task 1: LinkObjectFactory"; // Partial match
