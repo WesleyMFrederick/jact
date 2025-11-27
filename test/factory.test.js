@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CitationValidator } from "../src/CitationValidator.js";
+import { CitationValidator } from "../dist/CitationValidator.js";
 import { MarkdownParser } from "../dist/MarkdownParser.js";
 import { ParsedFileCache } from "../dist/ParsedFileCache.js";
 import ParsedDocument from "../dist/ParsedDocument.js";

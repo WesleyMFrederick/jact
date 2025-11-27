@@ -85,10 +85,10 @@ describe("CitationManager - extractHeader()", () => {
 		// Fixture: Use US2.3 plan as realistic test document
 		const targetFile = join(
 			process.cwd(),
-			"tools/citation-manager/design-docs/features/20251003-content-aggregation/user-stories/us2.3-implement-extract-links-subcommand/us2.3-implement-extract-links-subcommand-implement-plan.md",
+			"tools/citation-manager/test/fixtures/us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
 		const headerName =
-			"Task 1 - LinkObjectFactory - createHeaderLink() Basic Structure";
+			"Task 10: CitationManager - extractLinks() Phase 1 Validation";
 
 		// Given: CitationManager with real components
 		const manager = new CitationManager();

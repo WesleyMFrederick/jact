@@ -8,16 +8,11 @@ const __dirname = path.dirname(__filename);
 
 describe("CLI - extract header command", () => {
 	it("should extract specified header from target file", async () => {
-		// Fixture: US2.3 implementation plan as realistic test document
+		// Fixture: US2.3 implementation plan from test fixtures
 		const targetFile = path.resolve(
 			__dirname,
 			"..",
-			"..",
-			"design-docs",
-			"features",
-			"20251003-content-aggregation",
-			"user-stories",
-			"us2.3-implement-extract-links-subcommand",
+			"fixtures",
 			"us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
 		const headerName =
@@ -26,7 +21,7 @@ describe("CLI - extract header command", () => {
 		// When: Run extract header command
 		const output = runCLI(
 			`node tools/citation-manager/src/citation-manager.js extract header "${targetFile}" "${headerName}"`,
-			{ captureStderr: false },
+			{ captureStderr: true },
 		);
 
 		// Then: Output contains OutgoingLinksExtractedContent JSON

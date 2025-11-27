@@ -2,9 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { CitationValidator } from "../../src/CitationValidator.js";
-import { MarkdownParser } from "../../src/MarkdownParser.ts";
-import { ParsedFileCache } from "../../src/ParsedFileCache.js";
+import { CitationValidator } from "../../dist/CitationValidator.js";
+import { MarkdownParser } from "../../dist/MarkdownParser.js";
+import { ParsedFileCache } from "../../dist/ParsedFileCache.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

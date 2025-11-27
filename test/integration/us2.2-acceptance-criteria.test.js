@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { createContentExtractor } from "../../src/factories/componentFactory.js";
 import { ContentExtractor } from "../../src/core/ContentExtractor/ContentExtractor.js";
 import { ParsedFileCache } from "../../dist/ParsedFileCache.js";
-import { CitationValidator } from "../../src/CitationValidator.js";
+import { CitationValidator } from "../../dist/CitationValidator.js";
 import { join } from "node:path";
 
 /**
