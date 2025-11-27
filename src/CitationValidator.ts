@@ -1,6 +1,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import type { LinkObject, ValidationResult, ValidationMetadata, PathConversion } from './types/validationTypes.js';
+import type { LinkObject } from './types/citationTypes.js';
+import type { ValidationResult, ValidationMetadata, ValidationSummary, PathConversion } from './types/validationTypes.js';
 import type { ParsedDocument } from './ParsedDocument.js';
 
 // Dependency Injection Interfaces (inline pattern per MarkdownParser.ts)
@@ -159,8 +160,8 @@ export class CitationValidator {
 		const links = sourceParsedDoc.getLinks();
 
 				// 3. Enrich each link with validation metadata (parallel execution)
-		await Promise.all<void>(
-			links.map(async (link): Promise<void> => {
+		await Promise.all(
+			links.map(async (link: LinkObject) => {
 				const result = await this.validateSingleCitation(link, filePath);
 
 				// Build discriminated union based on status
@@ -173,7 +174,7 @@ export class CitationValidator {
 					// Error/Warning variant: status + error + optional fields
 					validation = {
 						status: result.status as 'error' | 'warning',
-						error: result.error!,  // Non-null assertion safe (status !== 'valid')
+						error: result.error ?? "Unknown validation error",
 						...(result.suggestion && { suggestion: result.suggestion }),
 						...(result.pathConversion && { pathConversion: result.pathConversion }),
 					};
@@ -185,18 +186,19 @@ export class CitationValidator {
 		);
 
 		// 4. Generate summary from enriched links
+		const enrichedLinks = links as unknown as ValidationResult['links'];
 		const summary: ValidationSummary = {
-			total: links.length,
-			valid: links.filter((link) => (link as any).validation.status === "valid").length,
-			warnings: links.filter((link) => (link as any).validation.status === "warning")
+			total: enrichedLinks.length,
+			valid: enrichedLinks.filter((link) => link.validation.status === "valid").length,
+			warnings: enrichedLinks.filter((link) => link.validation.status === "warning")
 				.length,
-			errors: links.filter((link) => (link as any).validation.status === "error").length,
+			errors: enrichedLinks.filter((link) => link.validation.status === "error").length,
 		};
 
 		// 5. Return enriched links + summary (no separate results array)
 		return {
 			summary,
-			links: links as any,
+			links: enrichedLinks,
 		};
 	}
 
