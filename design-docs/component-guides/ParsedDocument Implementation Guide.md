@@ -58,7 +58,7 @@ classDiagram
 1. [MarkdownParser.Output.DataContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The raw data object being wrapped
 2. **ParsedDocument**: The facade providing query methods (this guide)
 3. [CitationValidator](CitationValidator%20Implementation%20Guide.md): Consumer using anchor/link query methods
-4. [Citation Manager.ContentExtractor](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ContentExtractor): Consumer using content extraction methods
+4. [Citation Manager.ContentExtractor](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.ContentExtractor>): Consumer using content extraction methods
 
 ## File Structure
 

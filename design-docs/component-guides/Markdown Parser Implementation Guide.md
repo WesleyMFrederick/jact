@@ -74,7 +74,7 @@ classDiagram
 1. [ParserOutputContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
 2. [Link Object](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing an outgoing link.
 3. [Anchor Object](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing a potential link target.
-4. [Markdown Parser](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Markdown%20Parser): The class that orchestrates the parsing process. The guide you are reading.
+4. [Markdown Parser](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.Markdown Parser>): The class that orchestrates the parsing process. The guide you are reading.
 
 ## Public Contracts
 
@@ -340,7 +340,7 @@ export interface ValidationMetadata {
 
 ### ParserOutputContract Example
 
-> **Note**: Links do NOT include `validation` property - added post-parse by CitationValidator ([Story 1.8 Acceptance Criteria](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%201.8%20Acceptance%20Criteria)).
+> **Note**: Links do NOT include `validation` property - added post-parse by CitationValidator ([Story 1.8 Acceptance Criteria](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 1.8 Acceptance Criteria>)).
 
 ```json
 {

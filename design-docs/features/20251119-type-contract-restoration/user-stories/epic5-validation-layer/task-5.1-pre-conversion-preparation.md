@@ -2,8 +2,7 @@
 
 **Task**: Pre-conversion preparation for CitationValidator TypeScript migration
 **Epic**: Epic 5 - Validation Layer
-**Date**: 2025-01-27
-**Model**: Claude 3.5 Sonnet
+**Model**: Claude 4.5 Sonnet
 
 ---
 
@@ -21,7 +20,7 @@ Gather context needed to write Epic 5 implementation plan:
 
 ### Contract: ValidationResult Output Structure
 
-**Source**: Component Guide - `CitationValidator.ValidationResult.Output.DataContract` JSON Schema
+**Source**: [CitationValidator Component Guide](../../../../component-guides/CitationValidator%20Implementation%20Guide.md#`CitationValidator.ValidationResult.Output.DataContract`%20JSON%20Schema) - ValidationResult Output Contract
 
 ```typescript
 interface ValidationResult {
@@ -54,7 +53,7 @@ interface EnrichedLinkObject extends LinkObject {
 
 ### Contract: Public Methods
 
-**From Component Guide pseudocode**:
+**Source**: [CitationValidator Component Guide](../../../../component-guides/CitationValidator%20Implementation%20Guide.md#Public%20Contracts) - Public method signatures
 
 1. **`validateFile(filePath: string): Promise<ValidationResult>`**
    - Returns `{ summary, links }` where links are enriched in-place
@@ -145,7 +144,7 @@ constructor(parsedFileCache, fileCache) {
 
 ### Primary Consumers (grep results)
 
-**1. citation-manager.js (CLI orchestrator)**
+#### 1. citation-manager.js (CLI orchestrator)
 
 ```javascript
 // Line 307
@@ -157,7 +156,7 @@ errors: filteredLinks.filter((link) => link.validation.status === "error").lengt
 warnings: filteredLinks.filter((link) => link.validation.status === "warning").length,
 ```
 
-**2. extractLinksContent.js (ContentExtractor)**
+#### 2. extractLinksContent.js (ContentExtractor)
 
 ```javascript
 // Line 25
@@ -169,7 +168,7 @@ if (link.validation.status === "error") {
 }
 ```
 
-**3. ContentExtractor.js**
+#### 3. ContentExtractor.js
 
 ```javascript
 // Line 97
@@ -190,40 +189,16 @@ if (link.validation.status === "error") {
 
 **Test Run Results** (2025-01-27):
 
+```text
+Test Files  63 passed (63)
+     Tests  313 passed (313)
 ```
-Test Files  4 failed | 48 passed (52)
-     Tests  18 failed | 261 passed (279)
-```
 
-### Failing Tests (18 CLI-dependent tests)
+**CRITICAL**: Must run `npm test` from **workspace root**, not citation-manager subdirectory.
 
-**All failures are CLI integration tests:**
+### All Tests Passing (313 tests across 63 test files)
 
-1. **extract-command.test.js**: 9 failures
-   - CLI command registration
-   - Full-files flag behavior
-   - Error reporting
-   - Help documentation
-
-2. **extract-header.test.js**: 4 failures
-   - Extract header command
-   - Validation error display
-   - Help documentation
-
-3. **extract-links-e2e.test.js**: 1 failure
-   - End-to-end extraction workflow
-
-4. **citation-manager.test.js**: 4 failures
-   - extractLinks orchestration phases
-   - extractHeader orchestration
-
-**Root Cause**: All failing tests depend on `componentFactory.js` (still JavaScript), which cannot import TypeScript modules (`ParsedFileCache.ts`, `ParsedDocument.ts`) due to Node.js ESM literal file extension requirements.
-
-**Expected Behavior**: This is documented in Epic 4 learnings - these 18 tests will remain failing until Epic 7 converts componentFactory to TypeScript.
-
-### Passing Tests (261 unit/integration tests)
-
-**CitationValidator-specific passing tests:**
+**CitationValidator-specific tests:**
 - `citation-validator.test.js` - Core validation logic
 - `citation-validator-enrichment.test.js` - Enrichment pattern validation
 - `citation-validator-anchor-matching.test.js` - Anchor validation
@@ -234,7 +209,8 @@ Test Files  4 failed | 48 passed (52)
 - ✅ Enrichment pattern extensively tested
 - ✅ ValidationResult structure validated
 - ✅ Discriminated union behavior verified
-- ✅ All non-CLI tests passing
+- ✅ All integration and unit tests passing
+- ✅ CLI orchestration tests passing
 
 ---
 
@@ -242,7 +218,7 @@ Test Files  4 failed | 48 passed (52)
 
 ### 1. Enrichment Pattern is Non-Negotiable
 - Line 196: `link.validation = validation` - in-place property addition
-- Epic 4.4 failure pattern: Created wrapper objects instead
+- Epic 4.4 failure pattern (see [lessons learned](../../0-elicit-sense-making-phase/lessons-learned.md)): Created wrapper objects instead
 - TypeScript conversion MUST preserve this exact pattern
 
 ### 2. Discriminated Union Already Defined
@@ -256,9 +232,9 @@ Test Files  4 failed | 48 passed (52)
 - Return types: `Promise<ValidationResult>`, `Promise<EnrichedLinkObject>`
 
 ### 4. Test Baseline Established
-- 261 passing tests = validation baseline
-- 18 failing CLI tests = expected until Epic 7
-- Success criteria: Maintain 261 passing tests after conversion
+- 313 passing tests = validation baseline
+- 0 failing tests = all tests passing
+- Success criteria: Maintain 313 passing tests after conversion
 
 ### 5. Downstream Contract Locked
 - citation-manager.js, ContentExtractor.js depend on:
@@ -288,8 +264,8 @@ Test Files  4 failed | 48 passed (52)
 
 4. **Validation Checkpoints**:
    - Run `./scripts/validate-typescript-migration.sh` (8 checkpoints)
-   - Verify 261 passing tests maintained
-   - Confirm 18 CLI tests still failing (no new failures)
+   - Verify 313 passing tests maintained (run from workspace root)
+   - Confirm 0 new test failures
    - Check no duplicate type definitions
 
 5. **Architecture Preservation**:
@@ -313,6 +289,12 @@ citation-manager extract header "tools/citation-manager/design-docs/features/202
 # Extract TypeScript design patterns
 citation-manager extract header "tools/citation-manager/design-docs/features/20251119-type-contract-restoration/typescript-migration-design.md" "TypeScript Conversion Patterns"
 ```
+
+**Referenced Documents**:
+- [CitationValidator Component Guide](../../../../component-guides/CitationValidator%20Implementation%20Guide.md) %% force-extract %%
+- [Epic 5 Sequencing](../../typescript-migration-sequencing.md#Epic%205%20Validation%20Layer)
+- [TypeScript Design Patterns](../../typescript-migration-design.md#TypeScript%20Conversion%20Patterns)
+- [TypeScript Migration PRD](../../typescript-migration-prd.md) %% force-extract %%
 
 ---
 

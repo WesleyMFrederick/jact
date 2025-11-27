@@ -71,10 +71,10 @@ classDiagram
     
 ```
 
-1. [Citation Manager.Citation Validator](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator): The class that orchestrates the validation process.
-2. [FileCache](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.File%20Cache): The dependency used for short filename lookups.
+1. [Citation Manager.Citation Validator](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.Citation Validator>): The class that orchestrates the validation process.
+2. [FileCache](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.File Cache>): The dependency used for short filename lookups.
 3. [ParsedFileCache](ParsedFileCache%20Implementation%20Guide.md): The dependency used to retrieve `ParsedDocument` instances efficiently.
-4. [ParsedDocument](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Parsed%20Document): The facade providing query methods over parser output (US1.7).
+4. [ParsedDocument](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.Parsed Document>): The facade providing query methods over parser output (US1.7).
 5. [ValidationResult](#`CitationValidator.ValidationResult.Output.DataContract`%20JSON%20Schema): The composite object returned by the validator.
 
 ---
@@ -125,7 +125,7 @@ _Source_: [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patter
 ### Input Contract
 The component's constructor accepts two dependencies:
 1. An implementation of a [`ParsedFileCache interface`](ParsedFileCache%20Implementation%20Guide.md#Public%20Contracts) that returns `ParsedDocument` facade instances
-2. An implementation of a [`FileCache interface`](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.File%20Cache)
+2. An implementation of a [`FileCache interface`](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.File Cache>)
 
 #### Public Method: `validateFile(filePath)`
 

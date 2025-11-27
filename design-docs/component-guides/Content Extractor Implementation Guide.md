@@ -2,7 +2,7 @@
 <!-- markdownlint-disable  -->
 # Content Extractor Implementation Guide
 
-This document expands on [ContentExtractor component definition](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ContentExtractor) from Level 3 architecture.
+This document expands on [ContentExtractor component definition](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.ContentExtractor>) from Level 3 architecture.
 
 ## Document Sequence
 Better Sequence:
@@ -44,11 +44,11 @@ The **`ContentExtractor`** component is responsible for:
 
 The component is **NOT** responsible for:
 
-- Link discovery or validation (expects pre-validated links from [**`CLI Orchestrator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.CLI%20Orchestrator))
-- Parsing markdown (delegated to [**`Markdown Parser`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Markdown%20Parser))
-- Navigating parser output structures (delegated to [**`ParsedDocument`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedDocument) facade)
-- Reading files from disk (delegated to [**`ParsedFileCache`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedFileCache))
-- Final output formatting or file writing (delegated to [**`CLI Orchestrator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.CLI%20Orchestrator))
+- Link discovery or validation (expects pre-validated links from [**`CLI Orchestrator`**](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.CLI Orchestrator>))
+- Parsing markdown (delegated to [**`Markdown Parser`**](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.Markdown Parser>))
+- Navigating parser output structures (delegated to [**`ParsedDocument`**](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.ParsedDocument>) facade)
+- Reading files from disk (delegated to [**`ParsedFileCache`**](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.ParsedFileCache>))
+- Final output formatting or file writing (delegated to [**`CLI Orchestrator`**](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.CLI Orchestrator>))
 
 This component operates as the extraction orchestration layer, sitting between the CLI and lower-level components (ParsedFileCache, ParsedDocument). It receives enriched LinkObjects from the CLI (after validation) and transforms them into a deduplicated `OutgoingLinksExtractedContent` object optimized for LLM consumption.
 
@@ -106,7 +106,7 @@ sequenceDiagram
 
 **Workflow Characteristics**:
 - CLI orchestrates validation before extraction (separation of concerns)
-- Validation Enrichment Pattern: [**`Citation Validator`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.Citation%20Validator) returns enriched links to CLI
+- Validation Enrichment Pattern: [**`Citation Validator`**](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.Citation Validator>) returns enriched links to CLI
 - ContentExtractor receives pre-validated links and focuses on extraction workflow
 - Performance: [**`ParsedFileCache`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedFileCache%20Implementation%20Guide.md#Output%20Contract) ensures each file parsed at most once
 - Source vs Target: **SOURCE** file contains citations (validated by CLI), **TARGET** files provide content (retrieved by Extractor)
@@ -131,7 +131,7 @@ class ContentExtractor {
 ```
 
 **Dependencies**:
-- [**`ParsedFileCache`**](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ParsedFileCache): Retrieves ParsedDocument instances for target files
+- [**`ParsedFileCache`**](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.ParsedFileCache>): Retrieves ParsedDocument instances for target files
 - `eligibilityStrategies`: Array of strategy objects in precedence order
 
 **Architecture Note**: ContentExtractor operates on pre-validated LinkObjects provided by the caller (typically CLI Orchestrator after validation step). Link discovery and validation are external concerns handled by the CLI before calling the extractor.
@@ -995,18 +995,18 @@ The ContentExtractor component follows the workspace testing principle of **"Rea
 
 **Status**: Documented for future Epic 2 iterations or separate enhancement epic
 **Deferral Date**: 2025-10-28 (US2.3 scope reduction)
-**Reference**: [Content Aggregation PRD line 416](../features/20251003-content-aggregation/content-aggregation-prd.md)
+**Reference**: [Content Aggregation PRD line 416](../.archive/features/20251003-content-aggregation/content-aggregation-prd.md)
 
 ---
 
 ## Related Documentation
 
-- [Content Aggregation PRD - US2.2a](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%202.2a%20Implement%20Content%20Deduplication%20for%20ExtractionResults)
-- [Content Aggregation Architecture - Level 3 Component](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ContentExtractor)
+- [Content Aggregation PRD - US2.2a](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 2.2a Implement Content Deduplication for ExtractionResults>)
+- [Content Aggregation Architecture - Level 3 Component](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.ContentExtractor>)
 - [ParsedDocument Implementation Guide](ParsedDocument%20Implementation%20Guide.md)
 - [ParsedFileCache Implementation Guide](ParsedFileCache%20Implementation%20Guide.md)
-- [US2.2: Content Retrieval](../features/20251003-content-aggregation/user-stories/us2.2-implement-content-retrieval/us2.2-implement-content-retrieval.md)
-- [US2.2a Design Plan](../features/20251003-content-aggregation/user-stories/us2.2a-implement-content-deduplication/us2.2a-implement-content-deduplication-design-plan.md)
+- [US2.2: Content Retrieval](../.archive/features/20251003-content-aggregation/user-stories/us2.2-implement-content-retrieval/us2.2-implement-content-retrieval.md)
+- [US2.2a Design Plan](../.archive/features/20251003-content-aggregation/user-stories/us2.2a-implement-content-deduplication/us2.2a-implement-content-deduplication-design-plan.md)
 
 ---
 

@@ -702,6 +702,8 @@ grep -r "link\.validation\.status" src/
 
 **Location**: `tools/citation-manager/src/types/`
 
+**Guide**: [type-patterns](research/type-patterns.md) %% force-extract %%
+
 **Organization**:
 - `citationTypes.ts` - LinkObject, ValidationMetadata, LinkScope, anchor types
 - `validationTypes.ts` - ValidationResult, Summary types
@@ -905,10 +907,3 @@ npm run build               # Must generate .js + .d.ts
 **Result**: 0 TypeScript errors, 313/313 tests passing
 
 ---
-
-## Next Steps
-
-1. **Design Validation**: Run `evaluate-against-architecture-principles` skill
-2. **Phase 3**: Sequencing - component order, decomposition strategy
-3. **Phase 4**: Implementation Plan - bite-sized tasks with exact code
-4. **Execution**: Subagent-driven development or parallel execution
