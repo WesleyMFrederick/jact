@@ -197,7 +197,9 @@ NFR1 verified: No breaking changes introduced.
 
 **Commit Details**:
 - Branch: typescript-refactor-epic5-validation-layer-worktree
+- Commit SHA: 5754f3e
 - Parent Commit: cac721d (test(epic5): verify 313/313 tests pass)
+- Message: docs(epic5): [Task 5.8] contract validation complete
 
 ---
 
