@@ -1,54 +1,43 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import type { LinkObject } from './types/citationTypes.js';
+import type { ValidationResult, ValidationMetadata, ValidationSummary, PathConversion } from './types/validationTypes.js';
+import type ParsedDocument from './ParsedDocument.js';
 
-/**
- * @typedef {Object} ValidValidation
- * @property {"valid"} status
- */
+// Dependency Injection Interfaces (inline pattern per MarkdownParser.ts)
+interface ParsedFileCacheInterface {
+	resolveParsedFile(filePath: string): Promise<ParsedDocument>;
+}
 
-/**
- * @typedef {Object} ErrorValidation
- * @property {"error"} status
- * @property {string} error - Error message describing the validation failure
- * @property {string} [suggestion] - Optional suggestion for fixing the error
- * @property {Object} [pathConversion] - Optional path conversion information
- */
+interface FileCacheInterface {
+	resolveFile(filename: string): { found: boolean; path: string | null; fuzzyMatch?: boolean; message?: string; reason?: string };
+}
 
-/**
- * @typedef {Object} WarningValidation
- * @property {"warning"} status
- * @property {string} error - Warning message
- * @property {string} [suggestion] - Optional suggestion for addressing the warning
- * @property {Object} [pathConversion] - Optional path conversion information
- */
-
-/**
- * @typedef {ValidValidation|ErrorValidation|WarningValidation} ValidationMetadata
- */
-
-/**
- * @typedef {Object} EnrichedLinkObject
- * @property {string} linkType - "markdown" or "wiki"
- * @property {string} scope - "cross-document" or "internal"
- * @property {Object} target - Link target with path and anchor
- * @property {number} line - Line number in source file
- * @property {number} column - Column number in source file
- * @property {string} fullMatch - Full matched link text
- * @property {ValidationMetadata} [validation] - Validation metadata (added after validation)
- */
-
-/**
- * @typedef {Object} ValidationResult
- * @property {Object} summary - Aggregate validation counts
- * @property {number} summary.total - Total number of links validated
- * @property {number} summary.valid - Number of valid links
- * @property {number} summary.warnings - Number of warnings
- * @property {number} summary.errors - Number of errors
- * @property {EnrichedLinkObject[]} links - Array of enriched LinkObjects
- */
+// SingleCitationValidationResult - what validateSingleCitation actually returns
+interface SingleCitationValidationResult {
+	line: number;
+	citation: string;
+	status: 'valid' | 'error' | 'warning';
+	linkType: string;
+	scope: string;
+	error?: string;
+	suggestion?: string;
+	pathConversion?: PathConversion;
+}
 
 export class CitationValidator {
-	constructor(parsedFileCache, fileCache) {
+	private parsedFileCache: ParsedFileCacheInterface;
+	private fileCache: FileCacheInterface;
+	private patterns: {
+		CARET_SYNTAX: { regex: RegExp; examples: string[]; description: string };
+		EMPHASIS_MARKED: { regex: RegExp; examples: string[]; description: string };
+		CROSS_DOCUMENT: { regex: RegExp; description: string };
+	};
+
+	constructor(
+		parsedFileCache: ParsedFileCacheInterface,
+		fileCache: FileCacheInterface,
+	) {
 		this.parsedFileCache = parsedFileCache;
 		this.fileCache = fileCache;
 
@@ -86,7 +75,7 @@ export class CitationValidator {
 	}
 
 	// Symlink resolution utilities
-	safeRealpathSync(path) {
+	private safeRealpathSync(path: string): string {
 		try {
 			return realpathSync(path);
 		} catch (_error) {
@@ -94,7 +83,7 @@ export class CitationValidator {
 		}
 	}
 
-	isFile(path) {
+	private isFile(path: string): boolean {
 		try {
 			return existsSync(path) && statSync(path).isFile();
 		} catch (_error) {
@@ -102,12 +91,12 @@ export class CitationValidator {
 		}
 	}
 
-	isObsidianAbsolutePath(path) {
+	private isObsidianAbsolutePath(path: string): boolean {
 		// Detect Obsidian absolute paths like "0_SoftwareDevelopment/..."
 		return /^[A-Za-z0-9_-]+\//.test(path) && !isAbsolute(path);
 	}
 
-	convertObsidianToFilesystemPath(obsidianPath, sourceFile) {
+	private convertObsidianToFilesystemPath(obsidianPath: string, sourceFile: string): string | null {
 		// Try to find the project root by walking up from source file
 		let currentDir = dirname(sourceFile);
 
@@ -123,12 +112,12 @@ export class CitationValidator {
 		return null;
 	}
 
-	generatePathResolutionDebugInfo(relativePath, sourceFile) {
+	private generatePathResolutionDebugInfo(relativePath: string, sourceFile: string): string {
 		const sourceDir = dirname(sourceFile);
 		const realSourceFile = this.safeRealpathSync(sourceFile);
 		const isSymlink = realSourceFile !== sourceFile;
 
-		const debugParts = [];
+		const debugParts: string[] = [];
 
 		// Show if source file is a symlink
 		if (isSymlink) {
@@ -159,7 +148,7 @@ export class CitationValidator {
 	 * @param {string} filePath - Absolute path to markdown file
 	 * @returns {Promise<ValidationResult>} Validation result with summary and enriched links
 	 */
-	async validateFile(filePath) {
+	async validateFile(filePath: string): Promise<ValidationResult> {
 		// 1. Validate file exists
 		if (!existsSync(filePath)) {
 			throw new Error(`File not found: ${filePath}`);
@@ -170,50 +159,53 @@ export class CitationValidator {
 			await this.parsedFileCache.resolveParsedFile(filePath);
 		const links = sourceParsedDoc.getLinks();
 
-		// 3. Enrich each link with validation metadata (parallel execution)
+				// 3. Enrich each link with validation metadata (parallel execution)
 		await Promise.all(
-			links.map(async (link) => {
+			links.map(async (link: LinkObject) => {
 				const result = await this.validateSingleCitation(link, filePath);
 
-				// Extract validation metadata from result
-				const validation = {
-					status: result.status,
-				};
+				// Build discriminated union based on status
+				let validation: ValidationMetadata;
 
-				if (result.error) {
-					validation.error = result.error;
+				if (result.status === 'valid') {
+					// Valid variant: only status field
+					validation = { status: 'valid' };
+				} else {
+					// Error/Warning variant: status + error + optional fields
+					validation = {
+						status: result.status as 'error' | 'warning',
+						error: result.error ?? "Unknown validation error",
+						...(result.suggestion && { suggestion: result.suggestion }),
+						...(result.pathConversion && { pathConversion: result.pathConversion }),
+					};
 				}
 
-				if (result.suggestion) {
-					validation.suggestion = result.suggestion;
-				}
-
-				if (result.pathConversion) {
-					validation.pathConversion = result.pathConversion;
-				}
-
-				// Add validation property to link object
-				link.validation = validation;
+				// ENRICHMENT: Add validation property in-place
+				(link as any).validation = validation;
 			}),
 		);
 
 		// 4. Generate summary from enriched links
-		const summary = {
-			total: links.length,
-			valid: links.filter((link) => link.validation.status === "valid").length,
-			warnings: links.filter((link) => link.validation.status === "warning")
+		const enrichedLinks = links as unknown as ValidationResult['links'];
+		const summary: ValidationSummary = {
+			total: enrichedLinks.length,
+			valid: enrichedLinks.filter((link) => link.validation.status === "valid").length,
+			warnings: enrichedLinks.filter((link) => link.validation.status === "warning")
 				.length,
-			errors: links.filter((link) => link.validation.status === "error").length,
+			errors: enrichedLinks.filter((link) => link.validation.status === "error").length,
 		};
 
 		// 5. Return enriched links + summary (no separate results array)
 		return {
 			summary,
-			links,
+			links: enrichedLinks,
 		};
 	}
 
-	async validateSingleCitation(citation, contextFile) {
+	async validateSingleCitation(
+		citation: LinkObject,
+		contextFile?: string,
+	): Promise<SingleCitationValidationResult> {
 		const patternType = this.classifyPattern(citation);
 
 		switch (patternType) {
@@ -235,7 +227,7 @@ export class CitationValidator {
 		}
 	}
 
-	classifyPattern(citation) {
+	private classifyPattern(citation: LinkObject): string {
 		// Pattern precedence: CARET > EMPHASIS > CROSS_DOCUMENT > WIKI_STYLE
 
 		// Caret references are now internal links with block anchorType
@@ -266,7 +258,7 @@ export class CitationValidator {
 		return "UNKNOWN_PATTERN";
 	}
 
-	validateCaretPattern(citation) {
+	private validateCaretPattern(citation: LinkObject): SingleCitationValidationResult {
 		const anchor = citation.target.anchor || citation.fullMatch.substring(1); // Remove ^ from fullMatch
 
 		// If anchor already starts with ^, don't add another one
@@ -283,8 +275,8 @@ export class CitationValidator {
 		);
 	}
 
-	validateEmphasisPattern(citation) {
-		const anchor = citation.target.anchor;
+	private validateEmphasisPattern(citation: LinkObject): SingleCitationValidationResult {
+		const anchor = citation.target.anchor ?? "";
 
 		if (this.patterns.EMPHASIS_MARKED.regex.test(anchor)) {
 			return this.createValidationResult(citation, "valid");
@@ -316,38 +308,41 @@ export class CitationValidator {
 		);
 	}
 
-	async validateCrossDocumentLink(citation, sourceFile) {
+	private async validateCrossDocumentLink(
+		citation: LinkObject,
+		sourceFile?: string,
+	): Promise<SingleCitationValidationResult> {
 		// Calculate what the standard path resolution would give us
-		const decodedRelativePath = decodeURIComponent(citation.target.path.raw);
-		const sourceDir = dirname(sourceFile);
+		const decodedRelativePath = decodeURIComponent(citation.target.path.raw ?? "");
+		const sourceDir = dirname(sourceFile ?? "");
 		const standardPath = resolve(sourceDir, decodedRelativePath);
 
 		const targetPath = this.resolveTargetPath(
-			citation.target.path.raw,
-			sourceFile,
+			citation.target.path.raw ?? "",
+			sourceFile ?? "",
 		);
 
 		// Check if target file exists
 		if (!existsSync(targetPath)) {
 			// Enhanced error message with path resolution debugging
 			const debugInfo = this.generatePathResolutionDebugInfo(
-				citation.target.path.raw,
-				sourceFile,
+				citation.target.path.raw ?? "",
+				sourceFile ?? "",
 			);
 
 			// Provide enhanced error message when using file cache
 			if (this.fileCache) {
-				const filename = citation.target.path.raw.split("/").pop();
+				const filename = (citation.target.path.raw ?? "").split("/").pop() ?? "";
 				const cacheResult = this.fileCache.resolveFile(filename);
 
 				if (cacheResult.found && cacheResult.fuzzyMatch) {
 					// Fuzzy match found - validate the corrected file exists and use it
-					if (existsSync(cacheResult.path)) {
+					if (cacheResult.path && existsSync(cacheResult.path)) {
 						// Continue with anchor validation using corrected file
 						if (citation.target.anchor) {
 							const anchorExists = await this.validateAnchorExists(
 								citation.target.anchor,
-								cacheResult.path,
+								cacheResult.path ?? "",
 							);
 							if (!anchorExists.valid) {
 								return this.createValidationResult(
@@ -363,16 +358,16 @@ export class CitationValidator {
 							citation,
 							"valid",
 							null,
-							cacheResult.message,
+							cacheResult.message ?? undefined,
 						);
 					}
 				} else if (cacheResult.found && !cacheResult.fuzzyMatch) {
 					// Exact match found in cache - validate the file and continue
-					if (existsSync(cacheResult.path)) {
+					if (cacheResult.path && existsSync(cacheResult.path)) {
 						// Check if resolution crosses directory boundaries FIRST
 						const isDirectoryMatch = this.isDirectoryMatch(
-							sourceFile,
-							cacheResult.path,
+							sourceFile ?? "",
+							cacheResult.path ?? "",
 						);
 						const baseStatus = isDirectoryMatch ? "valid" : "warning";
 						const crossDirMessage = isDirectoryMatch
@@ -383,7 +378,7 @@ export class CitationValidator {
 						if (citation.target.anchor) {
 							const anchorExists = await this.validateAnchorExists(
 								citation.target.anchor,
-								cacheResult.path,
+								cacheResult.path ?? "",
 							);
 							if (!anchorExists.valid) {
 								// Combine messages if cross-directory AND anchor issue
@@ -407,12 +402,12 @@ export class CitationValidator {
 						// Include path conversion suggestion for cross-directory warnings
 						if (!isDirectoryMatch) {
 							const originalCitation = citation.target.anchor
-								? `${citation.target.path.raw}#${citation.target.anchor}`
-								: citation.target.path.raw;
+								? `${citation.target.path.raw ?? ""}#${citation.target.anchor}`
+								: citation.target.path.raw ?? "";
 							const suggestion = this.generatePathConversionSuggestion(
 								originalCitation,
-								sourceFile,
-								cacheResult.path,
+								sourceFile ?? "",
+								cacheResult.path ?? "",
 							);
 							return this.createValidationResult(
 								citation,
@@ -441,7 +436,7 @@ export class CitationValidator {
 						citation,
 						"error",
 						`File not found: ${citation.target.path.raw}`,
-						`${cacheResult.message}. ${debugInfo}`,
+						`${cacheResult.message ?? ""}. ${debugInfo}`,
 					);
 				}
 				if (cacheResult.reason === "not_found") {
@@ -497,10 +492,10 @@ export class CitationValidator {
 		if (isCrossDirectory) {
 			const originalCitation = citation.target.anchor
 				? `${citation.target.path.raw}#${citation.target.anchor}`
-				: citation.target.path.raw;
+				: citation.target.path.raw ?? "";
 			const suggestion = this.generatePathConversionSuggestion(
 				originalCitation,
-				sourceFile,
+				sourceFile ?? "",
 				targetPath,
 			);
 			return this.createValidationResult(
@@ -515,13 +510,13 @@ export class CitationValidator {
 		return this.createValidationResult(citation, "valid");
 	}
 
-	validateWikiStyleLink(citation) {
+	private validateWikiStyleLink(citation: LinkObject): SingleCitationValidationResult {
 		// Wiki-style links are internal references, always valid for now
 		// Could add anchor existence checking in the future
 		return this.createValidationResult(citation, "valid");
 	}
 
-	resolveTargetPath(relativePath, sourceFile) {
+	private resolveTargetPath(relativePath: string, sourceFile: string): string {
 		// Decode URL encoding in paths (e.g., %20 becomes space)
 		const decodedRelativePath = decodeURIComponent(relativePath);
 
@@ -545,7 +540,7 @@ export class CitationValidator {
 		if (this.isObsidianAbsolutePath(decodedRelativePath)) {
 			const obsidianPath = this.convertObsidianToFilesystemPath(
 				decodedRelativePath,
-				sourceFile,
+				sourceFile ?? "",
 			);
 			if (obsidianPath && this.isFile(obsidianPath)) {
 				return obsidianPath;
@@ -578,10 +573,10 @@ export class CitationValidator {
 
 		// Strategy 4: File cache smart filename matching (existing logic)
 		if (this.fileCache) {
-			const filename = decodedRelativePath.split("/").pop();
+			const filename = decodedRelativePath.split("/").pop() ?? "";
 			const cacheResult = this.fileCache.resolveFile(filename);
 
-			if (cacheResult.found) {
+			if (cacheResult.found && cacheResult.path) {
 				return cacheResult.path;
 			}
 		}
@@ -590,7 +585,10 @@ export class CitationValidator {
 		return standardPath;
 	}
 
-	async validateAnchorExists(anchor, targetFile) {
+	private async validateAnchorExists(
+		anchor: string,
+		targetFile: string,
+	): Promise<{ valid: boolean; suggestion?: string; matchedAs?: string }> {
 		try {
 			const targetParsedDoc =
 				await this.parsedFileCache.resolveParsedFile(targetFile);
@@ -600,7 +598,7 @@ export class CitationValidator {
 				// Check if this is a kebab-case anchor that has a raw header equivalent
 				const obsidianBetterSuggestion = this.suggestObsidianBetterFormat(
 					anchor,
-					targetParsedDoc._data.anchors,
+					targetParsedDoc.data.anchors,
 				);
 				if (obsidianBetterSuggestion) {
 					return {
@@ -632,16 +630,16 @@ export class CitationValidator {
 			// Enhanced flexible matching for complex markdown in headers
 			const flexibleMatch = this.findFlexibleAnchorMatch(
 				anchor,
-				targetParsedDoc._data.anchors,
+				targetParsedDoc.data.anchors,
 			);
 			if (flexibleMatch.found) {
-				return { valid: true, matchedAs: flexibleMatch.matchType };
+				return { valid: true, ...(flexibleMatch.matchType && { matchedAs: flexibleMatch.matchType }) };
 			}
 
 			// Check if this is a kebab-case anchor that should use raw header format
 			const obsidianBetterSuggestion = this.suggestObsidianBetterFormat(
 				anchor,
-				targetParsedDoc._data.anchors,
+				targetParsedDoc.data.anchors,
 			);
 			if (obsidianBetterSuggestion) {
 				return {
@@ -654,17 +652,17 @@ export class CitationValidator {
 			const suggestions = targetParsedDoc.findSimilarAnchors(anchor);
 
 			// Include Obsidian block references in available anchors list
-			const availableHeaders = targetParsedDoc._data.anchors
+			const availableHeaders = targetParsedDoc.data.anchors
 				.filter((a) => a.anchorType === "header")
 				.map((a) => `"${a.rawText}" → #${a.id}`)
 				.slice(0, 5);
 
-			const availableBlockRefs = targetParsedDoc._data.anchors
+			const availableBlockRefs = targetParsedDoc.data.anchors
 				.filter((a) => a.anchorType === "block")
 				.map((a) => `^${a.id}`)
 				.slice(0, 5);
 
-			const allSuggestions = [];
+			const allSuggestions: string[] = [];
 			if (suggestions.length > 0) {
 				allSuggestions.push(
 					`Available anchors: ${suggestions.slice(0, 3).join(", ")}`,
@@ -689,14 +687,18 @@ export class CitationValidator {
 						: "No similar anchors found",
 			};
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			return {
 				valid: false,
-				suggestion: `Error reading target file: ${error.message}`,
+				suggestion: `Error reading target file: ${errorMessage}`,
 			};
 		}
 	}
 
-	findFlexibleAnchorMatch(searchAnchor, availableAnchors) {
+	private findFlexibleAnchorMatch(
+		searchAnchor: string,
+		availableAnchors: any[],
+	): { found: boolean; matchType?: string } {
 		// Remove URL encoding for comparison
 		const cleanSearchAnchor = decodeURIComponent(searchAnchor);
 
@@ -747,7 +749,7 @@ export class CitationValidator {
 		return { found: false };
 	}
 
-	cleanMarkdownForComparison(text) {
+	private cleanMarkdownForComparison(text: string): string {
 		if (!text) return "";
 		return text
 			.replace(/`/g, "") // Remove backticks
@@ -758,7 +760,7 @@ export class CitationValidator {
 			.trim();
 	}
 
-	suggestObsidianBetterFormat(usedAnchor, availableAnchors) {
+	private suggestObsidianBetterFormat(usedAnchor: string, availableAnchors: any[]): string | null {
 		// Check if the used anchor is kebab-case and a raw header equivalent exists
 		// Convert each header to kebab-case to check if it matches the used anchor
 		for (const anchorObj of availableAnchors) {
@@ -783,7 +785,7 @@ export class CitationValidator {
 		return null;
 	}
 
-	generateAnchorSuggestions(anchor, availableAnchors) {
+	private generateAnchorSuggestions(anchor: string, availableAnchors: string[]): string[] {
 		// Simple similarity matching - could be enhanced with fuzzy matching
 		const searchTerm = anchor.toLowerCase();
 		return availableAnchors
@@ -798,12 +800,8 @@ export class CitationValidator {
 	/**
 	 * Check if the source file and target file are in the same directory.
 	 * Used to detect cross-directory resolutions that should trigger warnings.
-	 * @param {string} sourceFile - The source file path
-	 * @param {string} targetFile - The target file path
-	 * @returns {boolean} True if files are in the same directory, false otherwise
 	 */
-	isDirectoryMatch(sourceFile, targetFile) {
-		const { dirname } = require("node:path");
+	private isDirectoryMatch(sourceFile: string, targetFile: string): boolean {
 		const sourceDir = dirname(sourceFile);
 		const targetDir = dirname(targetFile);
 		return sourceDir === targetDir;
@@ -811,11 +809,8 @@ export class CitationValidator {
 
 	/**
 	 * Calculate relative path from source file to target file
-	 * @param {string} sourceFile - Path to the source file
-	 * @param {string} targetFile - Path to the target file
-	 * @returns {string} Relative path with normalized forward slashes
 	 */
-	calculateRelativePath(sourceFile, targetFile) {
+	private calculateRelativePath(sourceFile: string, targetFile: string): string {
 		const sourceDir = dirname(sourceFile);
 		const relativePath = relative(sourceDir, targetFile);
 		return relativePath.replace(/\\/g, "/"); // Normalize path separators for cross-platform compatibility
@@ -823,17 +818,17 @@ export class CitationValidator {
 
 	/**
 	 * Generate structured conversion suggestion for path corrections
-	 * @param {string} originalCitation - Original citation path
-	 * @param {string} sourceFile - Path to the source file
-	 * @param {string} targetFile - Path to the target file
-	 * @returns {object} Structured suggestion with type, original, and recommended paths
 	 */
-	generatePathConversionSuggestion(originalCitation, sourceFile, targetFile) {
+	private generatePathConversionSuggestion(
+		originalCitation: string,
+		sourceFile: string,
+		targetFile: string,
+	): PathConversion {
 		const relativePath = this.calculateRelativePath(sourceFile, targetFile);
 
 		// Preserve anchor fragments from original citation
 		const anchorMatch = originalCitation.match(/#(.*)$/);
-		const anchor = anchorMatch ? `#${anchorMatch[1]}` : "";
+		const anchor = (anchorMatch && anchorMatch[1]) ? `#${anchorMatch[1]}` : "";
 
 		return {
 			type: "path-conversion",
@@ -844,21 +839,15 @@ export class CitationValidator {
 
 	/**
 	 * Create a validation result object
-	 * @param {Object} citation - Citation object from parser
-	 * @param {string} status - Validation status: "valid", "warning", or "error"
-	 * @param {string|null} [error=null] - Error message if any
-	 * @param {string|null} [message=null] - Additional message if any
-	 * @param {Object|null} [suggestion=null] - Suggestion object if any
-	 * @returns {Object} Validation result object
 	 */
-	createValidationResult(
-		citation,
-		status,
-		error = null,
-		message = null,
-		suggestion = null,
-	) {
-		const result = {
+	private createValidationResult(
+		citation: LinkObject,
+		status: 'valid' | 'error' | 'warning',
+		error: string | null = null,
+		message: string | null = null,
+		suggestion: PathConversion | null = null,
+	): SingleCitationValidationResult {
+		const result: SingleCitationValidationResult = {
 			line: citation.line,
 			citation: citation.fullMatch,
 			status,
