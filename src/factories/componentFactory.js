@@ -16,7 +16,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { CitationValidator } from "../CitationValidator.ts";
+import { CitationValidator } from "../../dist/CitationValidator.js";
 import { FileCache } from "../../dist/FileCache.js";
 import { MarkdownParser } from "../../dist/MarkdownParser.js";
 import { ParsedFileCache } from "../../dist/ParsedFileCache.js";
