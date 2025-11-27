@@ -1,63 +1,72 @@
-// src/types/validationTypes.ts
-import type { LinkObject, ValidationStatus } from "./citationTypes.js";
-
 /**
- * Validation result for single citation.
- * Integration: Returned by CitationValidator for each link.
- */
-export interface CitationValidationResult {
-	/** Link object with validation enrichment */
-	link: LinkObject;
-
-	/** Validation outcome */
-	status: ValidationStatus;
-
-	/** Human-readable message */
-	message: string;
-
-	/** Suggested corrections */
-	suggestions: string[];
-}
-
-/**
- * File validation summary.
- * Integration: Top-level result from validateFile.
- */
-export interface FileValidationSummary {
-	/** Source file path */
-	filePath: string;
-
-	/** Total citation count */
-	totalCitations: number;
-
-	/** Valid citation count */
-	validCount: number;
-
-	/** Warning citation count */
-	warningCount: number;
-
-	/** Error citation count */
-	errorCount: number;
-
-	/** Individual validation results */
-	results: CitationValidationResult[];
-}
-
-/**
- * File cache resolution result.
- * Pattern: Discriminated union with found/notFound states.
+ * ValidationTypes - CitationValidator output contracts
  *
- * Decision: Separate states prevent null path access errors.
+ * CRITICAL: These types match the enrichment pattern where LinkObjects
+ * get a `validation` property added in-place. DO NOT create wrapper objects.
+ *
+ * Reference: CitationValidator Component Guide - Output Contract
  */
-export type ResolutionResult =
-	| {
-			found: true;
-			path: string;
-			reason: "direct" | "cache";
-	  }
-	| {
-			found: false;
-			path: null;
-			reason: "not_found" | "duplicate";
-			candidates?: string[];
-	  };
+
+import type { LinkObject } from './citationTypes.js';
+
+/**
+ * PathConversion metadata for path auto-fix suggestions
+ * Used when validator detects path resolution issues
+ */
+export interface PathConversion {
+  type: "path-conversion";
+  original: string;
+  recommended: string;
+}
+
+/**
+ * ValidationMetadata - Discriminated union based on status
+ *
+ * Valid state: No additional fields
+ * Error/Warning states: Include error message, optional suggestion, optional path conversion
+ */
+export type ValidationMetadata =
+  | { status: "valid" }
+  | {
+      status: "error";
+      error: string;
+      suggestion?: string;
+      pathConversion?: PathConversion;
+    }
+  | {
+      status: "warning";
+      error: string;
+      suggestion?: string;
+      pathConversion?: PathConversion;
+    };
+
+/**
+ * EnrichedLinkObject - LinkObject with validation property added in-place
+ *
+ * ENRICHMENT PATTERN: CitationValidator adds `validation` property to
+ * existing LinkObjects from parser. No wrapper objects created.
+ */
+export interface EnrichedLinkObject extends LinkObject {
+  validation: ValidationMetadata;
+}
+
+/**
+ * ValidationSummary - Aggregate counts derived from enriched links
+ */
+export interface ValidationSummary {
+  total: number;
+  valid: number;
+  warnings: number;
+  errors: number;
+}
+
+/**
+ * ValidationResult - CitationValidator.validateFile() return structure
+ *
+ * CRITICAL: Property names are `summary` and `links` (NOT `results`)
+ * This matches the enrichment pattern where links are enriched in-place.
+ */
+export interface ValidationResult {
+  summary: ValidationSummary;
+  links: EnrichedLinkObject[];
+}

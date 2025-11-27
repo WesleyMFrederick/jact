@@ -1,6 +1,7 @@
 // src/types/citationTypes.ts
 
 import type { Token } from 'marked';
+import type { ValidationMetadata } from './validationTypes.js';
 
 /**
  * Link scope classification for citation validation.
@@ -77,28 +78,6 @@ export interface LinkObject {
 	validation?: ValidationMetadata;
 }
 
-/**
- * Validation metadata enriched during validation.
- * Integration: Added by CitationValidator during validateFile.
- *
- * Pattern: Optional enrichment prevents coupling parser to validator.
- */
-export interface ValidationMetadata {
-	/** Validation outcome status */
-	status: ValidationStatus;
-
-	/** Target file exists on disk */
-	fileExists: boolean;
-
-	/** Target anchor exists in file (null if no anchor specified) */
-	anchorExists: boolean | null;
-
-	/** Suggested corrections for errors (empty for valid) */
-	suggestions?: string[];
-
-	/** Path conversion info for cross-references */
-	pathConversion?: string;
-}
 
 /**
  * Anchor object representing a potential link target in a markdown document.
