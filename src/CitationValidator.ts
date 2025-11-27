@@ -158,46 +158,45 @@ export class CitationValidator {
 			await this.parsedFileCache.resolveParsedFile(filePath);
 		const links = sourceParsedDoc.getLinks();
 
-		// 3. Enrich each link with validation metadata (parallel execution)
-		await Promise.all(
-			links.map(async (link) => {
+				// 3. Enrich each link with validation metadata (parallel execution)
+		await Promise.all<void>(
+			links.map(async (link): Promise<void> => {
 				const result = await this.validateSingleCitation(link, filePath);
 
-				// Extract validation metadata from result
-				const validation = {
-					status: result.status,
-				};
+				// Build discriminated union based on status
+				let validation: ValidationMetadata;
 
-				if (result.error) {
-					validation.error = result.error;
+				if (result.status === 'valid') {
+					// Valid variant: only status field
+					validation = { status: 'valid' };
+				} else {
+					// Error/Warning variant: status + error + optional fields
+					validation = {
+						status: result.status as 'error' | 'warning',
+						error: result.error!,  // Non-null assertion safe (status !== 'valid')
+						...(result.suggestion && { suggestion: result.suggestion }),
+						...(result.pathConversion && { pathConversion: result.pathConversion }),
+					};
 				}
 
-				if (result.suggestion) {
-					validation.suggestion = result.suggestion;
-				}
-
-				if (result.pathConversion) {
-					validation.pathConversion = result.pathConversion;
-				}
-
-				// Add validation property to link object
-				link.validation = validation;
+				// ENRICHMENT: Add validation property in-place
+				(link as any).validation = validation;
 			}),
 		);
 
 		// 4. Generate summary from enriched links
-		const summary = {
+		const summary: ValidationSummary = {
 			total: links.length,
-			valid: links.filter((link) => link.validation.status === "valid").length,
-			warnings: links.filter((link) => link.validation.status === "warning")
+			valid: links.filter((link) => (link as any).validation.status === "valid").length,
+			warnings: links.filter((link) => (link as any).validation.status === "warning")
 				.length,
-			errors: links.filter((link) => link.validation.status === "error").length,
+			errors: links.filter((link) => (link as any).validation.status === "error").length,
 		};
 
 		// 5. Return enriched links + summary (no separate results array)
 		return {
 			summary,
-			links,
+			links: links as any,
 		};
 	}
 
@@ -826,7 +825,7 @@ export class CitationValidator {
 
 		// Preserve anchor fragments from original citation
 		const anchorMatch = originalCitation.match(/#(.*)$/);
-		const anchor = anchorMatch ? `#${anchorMatch[1]}` : "";
+		const anchor = (anchorMatch && anchorMatch[1]) ? `#${anchorMatch[1]}` : "";
 
 		return {
 			type: "path-conversion",
