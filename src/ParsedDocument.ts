@@ -30,6 +30,14 @@ class ParsedDocument {
 		this._cachedAnchorIds = null;
 	}
 
+	/**
+	 * Get internal parser output data
+	 * Used by CitationValidator for direct data access
+	 */
+	get data(): ParserOutput {
+		return this._data;
+	}
+
 	// === PUBLIC QUERY METHODS ===
 
 	/**
@@ -274,7 +282,7 @@ class ParsedDocument {
 	 */
 	private _fuzzyMatch(target: string, candidates: string[]): string[] {
 		// Calculate similarity scores for all candidates
-		const matches = [];
+		const matches: Array<{ candidate: string; score: number }> = [];
 		for (const candidate of candidates) {
 			const similarity = this._calculateSimilarity(target, candidate);
 
