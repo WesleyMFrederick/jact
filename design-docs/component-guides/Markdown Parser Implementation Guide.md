@@ -1,17 +1,37 @@
 <!-- markdownlint-disable MD025 -->
 # Markdown Parser Implementation Guide
 
-## Problem
+## Overview
+Parses markdown files into structured ParserOutput objects containing links, anchors, and headings for consumption by CitationValidator and ContentExtractor.
 
-Downstream components like the `CitationValidator` and `ContentExtractor` need a structured, queryable representation of a markdown document's links and anchors. Parsing raw markdown text with regular expressions in each component would be repetitive, brittle, and inefficient. The system needs a single, reliable component to transform a raw markdown file into a consistent and explicit data model.
+### Problem
+- Downstream components like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) and [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) need a structured, queryable representation of a markdown document's links and anchors.
+- Parsing raw markdown text with regular expressions in each component would be repetitive, brittle, and inefficient.
+- The system needs a single, reliable component to transform a raw markdown file into a consistent and explicit data model.
 
-## Solution
+### Solution
+- The [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) component acts as a specialized transformer. It:
+  - accepts a file path,
+  - reads the document, and
+  - applies a series of parsing strategies to produce a single, comprehensive [**`MarkdownParser.ParserOutput`**](#Data%20Contracts) object.
+- The [**`MarkdownParser.ParserOutput`**](#Data%20Contracts) object:
+  - is wrapped by the [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade before being consumed by other components, providing a stable interface that decouples them from the parser's internal data structure.
+  - contains two primary collections: a list of all outgoing [**`MarkdownParser.Link Objects`**](#LinkObject%20Interface) and a list of all available [**`MarkdownParser.Anchor Objects`**](#AnchorObject%20Type%20(Discriminated%20Union)). By centralizing this parsing logic, the[**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
 
-The **`MarkdownParser`** component acts as a specialized transformer. It accepts a file path, reads the document, and applies a series of parsing strategies to produce a single, comprehensive **`MarkdownParser.Output.DataContract`** object. This object is wrapped by the `ParsedDocument` facade before being consumed by other components, providing a stable interface that decouples them from the parser's internal data structure. This object contains two primary collections: a list of all outgoing **`Link Objects`** and a list of all available **`Anchor Objects`**. By centralizing this parsing logic, the `MarkdownParser` provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
+### Impact
+
+| Solution                                       | Impact                                                                                                                              | Principles                                                                                                                                 |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Well defined interfaces and data shapes        | Less errors when navigating and consuming data                                                                                      | [Data-First Design Principles](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#Data-First%20Design%20Principles) |
+| Well defined input/output contracts            | Quicker design and implementation of code changes                                                                                   | [Modular Design Principles](../../../../../resume-coach/design-docs/Architecture%20Principles.md#Modular%20Design%20Principles)            |
+| Dependency Injection                           | - Flexible testing<br>  - can use real components for e2e and integration<br> - can use mock components to unit test business logic | [Modular Design Principles](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#Modular%20Design%20Principles)       |
+| TypeScript discriminated unions (AnchorObject) | Impossible to represent invalid  states                                                                                             | [Data-First Design Principles](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#Data-First%20Design%20Principles) |
+
+---
 
 ## Structure
 
-The `MarkdownParser` is a TypeScript class that depends on `FileSystemInterface` for file I/O. It exposes a single public method, `parseFile()`, which returns the `ParserOutput` interface.
+The[**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) is a TypeScript class that depends on `FileSystemInterface` for file I/O. It exposes a single public method, `parseFile()`, which returns the [**`ParserOutput`**](#ParserOutput%20Interface)interface.
 
 ```mermaid
 classDiagram
@@ -71,23 +91,12 @@ classDiagram
     ParserOutput o-- HeadingObject
 ```
 
-1. [ParserOutputContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
-2. [Link Object](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing an outgoing link.
-3. [Anchor Object](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object representing a potential link target.
-4. [Markdown Parser](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.Markdown Parser>): The class that orchestrates the parsing process. The guide you are reading.
+1. [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
+2. [**``LinkObject``**](#LinkObject%20Interface): The data object representing an outgoing link.
+3. [**`AnchorObject`**](#AnchorObject%20Type%20(Discriminated%20Union)): The data object representing a potential link target.
+4. [**`CitationManager.MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser): The class that orchestrates the parsing process. The guide you are reading.
 
-## Public Contracts
-
-### Input Contract
-
-The component's contract requires the following inputs for operation:
-1. Interfaces for the **`FileSystem`** and **`Path Module`**, provided at instantiation.
-2. An optional **`FileCache` interface**, provided at instantiation, to be used for short filename resolution.
-3. A **`filePath`** (string), provided to the public `parseFile()` method.
-
-### Output Contract
-1. The `parseFile()` method returns a `Promise` that resolves with the **`MarkdownParser.Output.DataContract`**. This object represents the full structural composition of the document and is the component's sole output. Its detailed schema is defined in the [`Data Contracts`](#Data%20Contracts) section below.
-
+---
 ## File Structure
 
 **Current Structure** (TypeScript Implementation):
@@ -123,6 +132,7 @@ tools/citation-manager/
 
 **Technical Debt**: The current monolithic structure violates the project's action-based file naming patterns. See [Issue #18](https://github.com/WesleyMFrederick/cc-workflows/issues/18) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Organization).
 
+---
 ## Component Workflow
 
 ### parseFile Sequence Diagram
@@ -177,6 +187,38 @@ parseFile(filePath) → ParserOutput
 - **FileSystem**: Synchronous file read via dependency injection
 - **Path resolution**: Converts raw paths to absolute/relative using Node.js path module
 
+---
+## Public Contracts
+
+### Input Contract
+
+```typescript
+// Input 1 & 2: Constructor dependencies (at instantiation)
+new MarkdownParser(
+  fileSystem: FileSystemInterface,     // Required: Read file operations
+  fileCache?: FileCacheInterface       // Optional: Short filename resolution
+)
+
+// Input 3: Runtime parameter (when calling parseFile)
+MarkdownParser.parseFile(
+  filePath: string                      // Required: Absolute path to markdown file
+) → Promise<ParserOutput>
+```
+
+### Output Contract
+
+```typescript
+Promise<ParserOutput>
+```
+
+**Returns:** Complete structured representation of markdown document including:
+- File metadata (path, content, tokens)
+- All outgoing links with resolution metadata
+- All available anchors (headers and blocks)
+- Document headings with hierarchy
+
+**See:** [ParserOutput Interface](#ParserOutput%20Interface)
+
 ## Data Contracts
 
 TypeScript interfaces defining parser output structure. Source: `src/types/citationTypes.ts`
@@ -208,6 +250,9 @@ export interface ParserOutput {
 }
 ```
 
+- [**``LinkObject``**](#LinkObject%20Interface)
+- [**`HeadingObject`**](#HeadingObject%20Interface)
+- [**`AnchorObject`**](#AnchorObject%20Type%20(Discriminated%20Union))
 ### LinkObject Interface
 
 ```typescript
@@ -452,7 +497,7 @@ export interface ValidationMetadata {
 
 ### Extraction Marker Examples
 
-The `extractionMarker` property captures optional control markers that appear after links, used by ContentExtractor to override default extraction eligibility:
+The `extractionMarker` property captures optional control markers that appear after links, used by `ContentExtractor` to override default extraction eligibility:
 
 | Markdown | extractionMarker Value |
 |----------|----------------------|
@@ -465,7 +510,7 @@ The `extractionMarker` property captures optional control markers that appear af
 
 ## Testing Strategy
 
-**Philosophy**: Validate MarkdownParser's ability to correctly transform markdown into the `MarkdownParser.Output.DataContract` TypeScript interfaces.
+**Philosophy**: Validate MarkdownParser's ability to correctly transform markdown into the `MarkdownParser.ParserOutput` TypeScript interfaces.
 
 **Test Location**: `tools/citation-manager/test/parser-output-contract.test.js`
 
@@ -491,9 +536,9 @@ The `extractionMarker` property captures optional control markers that appear af
 
 # Whiteboard
 
-## MarkdownParser.Output.DataContract: How Tokens, Links, and Anchors Are Populated
+## MarkdownParser.ParserOutput: How Tokens, Links, and Anchors Are Populated
 
-**Key Question**: How does the MarkdownParser.Output.DataContract get its data? Which code is responsible for each array?
+**Key Question**: How does the MarkdownParser.ParserOutput get its data? Which code is responsible for each array?
 
 **Answer**: MarkdownParser uses a **two-layer parsing approach** - standard markdown parsing via marked.js, plus custom regex extraction for Obsidian-specific syntax.
 
@@ -636,7 +681,7 @@ async parseFile(filePath) {
 - Uses **both layers** (content string + metadata from tokens/anchors)
 - Algorithm: Return entire `content` field with metadata from parser output
 
-### Viewing MarkdownParser.Output.DataContract
+### Viewing MarkdownParser.ParserOutput
 
 To see the complete JSON structure for any file:
 

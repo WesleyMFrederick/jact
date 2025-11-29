@@ -6,7 +6,10 @@ This guide provides the Level 4 (Code) details for implementing the **`ParsedFil
 Components like the `CitationValidator` and the upcoming `ContentExtractor` need access to the parsed structure of multiple files during a single operation. Without a caching mechanism, the same file could be read from disk and parsed by the `MarkdownParser` repeatedly, leading to significant and unnecessary I/O and CPU overhead, creating a severe performance bottleneck.
 
 ## Solution
-The **`ParsedFileCache`** component acts as an in-memory, per-run singleton that serves as a broker for parsed file data. This component implements the **Read-Through Cache** pattern. It intercepts all requests for a [**`MarkdownParser.Output.DataContract`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts), calling the `MarkdownParser` only on the first request for a given file and wrapping the result in a `ParsedDocument` facade before storing and returning it. Subsequent requests for the same file are served directly from the cache, ensuring that each file is parsed at most once per command execution. This drastically improves performance and reduces redundant work.
+The **`ParsedFileCache`** component acts as an in-memory, per-run singleton that serves as a broker for parsed file data. This component implements the **Read-Through Cache** pattern. It intercepts all requests for a [**`MarkdownParser.Output.DataContract`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts), calling the `MarkdownParser` only on the first request for a given file and wrapping the result in a `ParsedDocument` facade before storing and returning it. Subsequent requests for the same file are served directly from the cache, ensuring that each file is parsed at most once per command execution.
+
+## Outcome/Impact
+- Improves performance and reduces redundant work.
 
 ### Caching Technology
 We'll use the native JavaScript **`Map`** object. A `Map` is a simple, high-performance, in-memory key-value store that's built into Node.js. It's perfectly suited for our needs and requires no external dependencies, which aligns with our [Simplicity First](../../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) principle.
