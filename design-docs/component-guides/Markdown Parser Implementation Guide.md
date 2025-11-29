@@ -2,7 +2,7 @@
 # Markdown Parser Implementation Guide
 
 ## Overview
-Parses markdown files into structured ParserOutput objects containing links, anchors, and headings for consumption by CitationValidator and ContentExtractor.
+Parses markdown files into structured objects containing outgoing links and header/anchors for consumption by downstream components.
 
 ### Problem
 - Downstream components like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) and [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) need a structured, queryable representation of a markdown document's links and anchors.
@@ -31,13 +31,16 @@ Parses markdown files into structured ParserOutput objects containing links, anc
 
 ## Structure
 
-The[**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) is a TypeScript class that depends on `FileSystemInterface` for file I/O. It exposes a single public method, `parseFile()`, which returns the [**`ParserOutput`**](#ParserOutput%20Interface)interface.
+### Class Diagram
+
+[**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) depends on `FileSystemInterface` for file I/O. It exposes a single public method, `parseFile()`, which returns the [**`ParserOutput`**](#ParserOutput%20Interface)interface.
 
 ```mermaid
 classDiagram
     direction LR
 
     class ParserOutput {
+		    <<interface>>
         +filePath: string
         +content: string
         +tokens: Token[]
@@ -47,6 +50,7 @@ classDiagram
     }
 
     class LinkObject {
+        <<interface>>
         +linkType: markdown | wiki
         +scope: internal | cross-document
         +anchorType: header | block | null
@@ -61,6 +65,7 @@ classDiagram
     }
 
     class AnchorObject {
+        <<interface>>
         +anchorType: header | block
         +id: string
         +urlEncodedId: string
@@ -71,24 +76,22 @@ classDiagram
     }
 
     class HeadingObject {
+        <<interface>>
         +level: number
         +text: string
         +raw: string
     }
 
     class MarkdownParser {
+		    <<class>>
         -fs: FileSystemInterface
-        -currentSourcePath: string | null
         +parseFile(filePath): Promise~ParserOutput~
-        +extractLinks(content): LinkObject[]
-        +extractAnchors(content): AnchorObject[]
-        +extractHeadings(tokens): HeadingObject[]
     }
 
-    MarkdownParser ..> ParserOutput : returns
-    ParserOutput o-- LinkObject
-    ParserOutput o-- AnchorObject
-    ParserOutput o-- HeadingObject
+    MarkdownParser ..> ParserOutput : «creates»
+    ParserOutput "1" *-- "0..*" LinkObject
+    ParserOutput "1" *-- "0..*" AnchorObject
+    ParserOutput "1" *-- "0..*" HeadingObject
 ```
 
 1. [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
@@ -97,7 +100,7 @@ classDiagram
 4. [**`CitationManager.MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser): The class that orchestrates the parsing process. The guide you are reading.
 
 ---
-## File Structure
+### File Structure
 
 **Current Structure** (TypeScript Implementation):
 
@@ -193,13 +196,13 @@ parseFile(filePath) → ParserOutput
 ### Input Contract
 
 ```typescript
-// Input 1 & 2: Constructor dependencies (at instantiation)
+// Input 1: Constructor dependencies (at instantiation)
 new MarkdownParser(
   fileSystem: FileSystemInterface,     // Required: Read file operations
-  fileCache?: FileCacheInterface       // Optional: Short filename resolution
+	currentSourcePath: string | null     // Required: File path of the source file being parsed
 )
 
-// Input 3: Runtime parameter (when calling parseFile)
+// Input 2: Runtime parameter (when calling parseFile)
 MarkdownParser.parseFile(
   filePath: string                      // Required: Absolute path to markdown file
 ) → Promise<ParserOutput>
@@ -208,7 +211,9 @@ MarkdownParser.parseFile(
 ### Output Contract
 
 ```typescript
-Promise<ParserOutput>
+MarkdownParser.parseFile(
+  filePath: string                      // Required: Absolute path to markdown file
+) → Promise<ParserOutput>
 ```
 
 **Returns:** Complete structured representation of markdown document including:

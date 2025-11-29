@@ -1,16 +1,32 @@
 # CitationValidator Implementation Guide
 
-This guide provides the Level 4 (Code) details for refactoring the **`CitationValidator`** component as part of user story `us1.5`. It includes the component's updated structure, pseudocode for its refactored logic, its formal data contracts, and a strategy for testing.
+## Overview
+Validates [**`MarkdownParser.LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) by enriching them with semantic validation metadata, checking file existence and anchor presence using [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade for consumption by [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor).
 
-## Problem
+### Problem
+- Links and anchors identified by the [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) are purely syntactic constructs with no guarantee that paths point to existing files or anchors correspond to real headers/blocks.
+- Creating separate validation result objects duplicates 80% of link metadata (source paths, target paths, line numbers).
+- The system requires semantic validation that maintains a single data flow through the pipeline: parse → validate → filter → extract.
 
-Links and anchors identified by the `MarkdownParser` are purely syntactic constructs. There's no guarantee that a link's path points to an existing file or that its anchor corresponds to a real header or block in the target document. The system requires a dedicated component to perform this semantic validation and report the status of each link.
+### Solution
+- The [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) component acts as a semantic validator and enricher. It:
+  - consumes [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade instances from the [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache)
+  - verifies target file existence and anchor presence using facade query methods
+  - enriches LinkObjects directly by adding a [**`CitationValidator.ValidationMetadata`**](#ValidationMetadata%20Type%20(Discriminated%20Union)) property
+- The [**`CitationValidator.ValidationResult`**](#ValidationResult%20Interface) output:
+  - is consumed by the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) for extraction eligibility analysis
+  - contains enriched LinkObjects with validation metadata plus aggregate summary statistics
+  - eliminates data duplication (80% reduction) by adding validation property instead of creating separate result objects
 
-## Solution
+### Impact
 
-The **`CitationValidator`** component is responsible for the semantic validation of links. It consumes `ParsedDocument` facade instances from the `ParsedFileCache`. For each link, it verifies that the target file exists and, if an anchor is specified, uses the `ParsedDocument` query methods to check if the anchor is present.
+| Solution | Impact | Principles |
+|----------|--------|------------|
+| Enrichment pattern (add validation to LinkObject) | 80% reduction in data duplication | [One Source of Truth](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^one-source-of-truth), [Data-First Design](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#Data-First%20Design%20Principles) |
+| Discriminated union ValidationMetadata | Illegal states unrepresentable (no valid+error state) | [Illegal States Unrepresentable](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable) |
+| ParsedDocument facade integration | Zero direct data structure access from validator | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) |
 
-**Enrichment Pattern**: Instead of creating separate validation result objects, the validator **enriches** the LinkObjects directly by adding a `validation` property containing status, error messages, and suggestions. This progressive enhancement pattern eliminates data duplication (80% reduction) and enables a single data flow through the pipeline: parse → validate (enrich) → filter → extract. The validator returns `{ summary, links }` where `summary` provides aggregate counts and `links` is the array of enriched LinkObjects.
+---
 
 ## Structure
 

@@ -1,14 +1,33 @@
 # ParsedDocument Implementation Guide
 
-This guide provides the Level 4 (Code) details for the **`ParsedDocument`** facade, which is the facade wrapper implemented in User Story 1.7.
+## Overview
+Wraps [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) in a facade providing stable query methods for anchor validation, link retrieval, and content extraction for consumption by [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) and [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor).
 
-## Problem
+### Problem
+- Consumers like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) are tightly coupled to the internal structure of [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface), making them complex and forcing them to contain data-querying logic.
+- Any change to the parser's output structure becomes a breaking change for all consumers.
+- Direct data structure access violates encapsulation and makes the system brittle to refactoring.
 
-Consumers like the `CitationValidator` are tightly coupled to the internal structure of the [**`MarkdownParser.Output.DataContract`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts). This makes the `CitationValidator` complex, forces it to contain data-querying logic, and makes any future change to the parser's output a breaking change for all consumers.
+### Solution
+- The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade acts as a stable interface wrapper. It:
+  - encapsulates the raw [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) object,
+  - provides method-based query APIs for anchors, links, and content, and
+  - hides complex internal data structures from all consumers.
+- The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) query methods:
+  - are consumed by the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) for validation workflows and the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) for content extraction,
+  - provide a stable API that decouples consumers from parser internals, and
+  - enable parser refactoring without breaking consumer code.
 
-## Solution
+### Impact
 
-The **`ParsedDocument`** facade is a wrapper class that encapsulates the raw [**`MarkdownParser.Output.DataContract`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts). It provides a stable, method-based API for querying links, anchors, and content, hiding the complex internal data structures from all consumers. This simplifies consumer logic and isolates the system from future changes to the underlying parser.
+| Solution | Impact | Principles |
+|----------|--------|------------|
+| Facade pattern with query methods | Zero direct data structure access from consumers | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces), [Modular Design](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^modular-design-principles-definition) |
+| Lazy-loaded anchor cache | Reduced memory overhead and improved query performance | [Access-Pattern Fit](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^access-pattern-fit) |
+| Dual-key anchor matching (id + urlEncodedId) | Handles Obsidian encoding variations transparently | [Simplicity First](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^simplicity-first) |
+| Token-walking extraction algorithms | Content reconstruction preserves original markdown formatting | [Data-First Design](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^data-first-principles-definition) |
+
+---
 
 ## Structure
 
@@ -58,7 +77,7 @@ classDiagram
 1. [MarkdownParser.Output.DataContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The raw data object being wrapped
 2. **ParsedDocument**: The facade providing query methods (this guide)
 3. [CitationValidator](CitationValidator%20Implementation%20Guide.md): Consumer using anchor/link query methods
-4. [Citation Manager.ContentExtractor](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.ContentExtractor>): Consumer using content extraction methods
+4. [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor): Consumer using content extraction methods
 
 ## File Structure
 
