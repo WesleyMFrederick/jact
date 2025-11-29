@@ -60,7 +60,7 @@ classDiagram
         +extract(link)
     }
 
-    class MarkdownParserOutputDataContract {
+    class MarkdownParser.ParserOutput {
         +filePath: string
         +content: string
         +links: Link[]
@@ -68,10 +68,10 @@ classDiagram
         +tokens: object[]
     }
 
-    ParsedFileCache --> ParsedDocument : creates and returns
+    ParsedFileCache ..> ParsedDocument : «creates»
     CitationValidator --> ParsedDocument : uses
     ContentExtractor --> ParsedDocument : uses
-    ParsedDocument o-- MarkdownParserOutputDataContract : wraps
+    ParsedDocument o-- MarkdownParser.ParserOutput : wraps
 ```
 
 1. [MarkdownParser.Output.DataContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The raw data object being wrapped
