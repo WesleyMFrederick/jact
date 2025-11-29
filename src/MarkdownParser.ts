@@ -55,7 +55,6 @@ interface FileSystemInterface {
 
 export class MarkdownParser {
 	private fs: FileSystemInterface;
-	private currentSourcePath: string | null;
 
 	/**
 	 * Initialize parser with file system dependency
@@ -64,21 +63,19 @@ export class MarkdownParser {
 	 */
 	constructor(fileSystem: FileSystemInterface) {
 		this.fs = fileSystem;
-		this.currentSourcePath = null;
 	}
 
 	/**
 	 * Parse markdown file and extract all metadata
 	 *
 	 * Main entry point for file parsing. Reads file, tokenizes with marked.lexer(),
-	 * and extracts links, headings, and anchors. Stores source path for relative
-	 * link resolution during extraction.
+	 * and extracts links, headings, and anchors. Passes source path to link
+	 * extraction for relative path resolution.
 	 *
 	 * @param {string} filePath - Absolute or relative path to markdown file
 	 * @returns {Promise<ParserOutput>} Object containing parsed markdown metadata including filePath, content, tokens, links, headings, and anchors
 	 */
 	async parseFile(filePath: string): Promise<ParserOutput> {
-		this.currentSourcePath = filePath; // Store for use in extractLinks()
 		const content = this.fs.readFileSync(filePath, "utf8");
 		const tokens = marked.lexer(content);
 
@@ -86,7 +83,7 @@ export class MarkdownParser {
 			filePath,
 			content,
 			tokens,
-			links: this.extractLinks(content),
+			links: this.extractLinks(content, filePath),
 			headings: this.extractHeadings(tokens),
 			anchors: this.extractAnchors(content),
 		};
@@ -104,16 +101,17 @@ export class MarkdownParser {
 	 * - Caret references: ^anchor-id
 	 *
 	 * For each link, resolves paths to absolute and relative forms using the
-	 * current source file as reference. Determines anchor type (header vs block)
+	 * source file path as reference. Determines anchor type (header vs block)
 	 * and link scope (internal vs cross-document).
 	 *
 	 * @param {string} content - Full markdown file content
+	 * @param {string} sourcePath - Absolute path to the source file being parsed
 	 * @returns {Array<Object>} Array of link objects with { linkType, scope, anchorType, source, target, text, fullMatch, line, column }
 	 */
-	extractLinks(content: string): LinkObject[] {
+	extractLinks(content: string, sourcePath: string): LinkObject[] {
 		const links: LinkObject[] = [];
 		const lines = content.split("\n");
-		const sourceAbsolutePath = this.currentSourcePath;
+		const sourceAbsolutePath = sourcePath;
 
 		lines.forEach((line, index) => {
 			// Cross-document markdown links with .md extension (with optional anchors)

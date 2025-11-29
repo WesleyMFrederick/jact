@@ -40,7 +40,7 @@ classDiagram
     direction LR
 
     class ParserOutput {
-		    <<interface>>
+      <<interface>>
         +filePath: string
         +content: string
         +tokens: Token[]
@@ -50,48 +50,27 @@ classDiagram
     }
 
     class LinkObject {
-        <<interface>>
-        +linkType: markdown | wiki
-        +scope: internal | cross-document
-        +anchorType: header | block | null
-        +source: SourcePath
-        +target: TargetPath
-        +text: string | null
-        +fullMatch: string
-        +line: number
-        +column: number
-        +extractionMarker: object | null
-        +validation?: ValidationMetadata
+        <<data>>
     }
 
     class AnchorObject {
-        <<interface>>
-        +anchorType: header | block
-        +id: string
-        +urlEncodedId: string
-        +rawText: string | null
-        +fullMatch: string
-        +line: number
-        +column: number
+        <<data>>
     }
 
     class HeadingObject {
-        <<interface>>
-        +level: number
-        +text: string
-        +raw: string
+        <<data>>
     }
 
     class MarkdownParser {
-		    <<class>>
+      <<class>>
         -fs: FileSystemInterface
         +parseFile(filePath): Promise~ParserOutput~
     }
 
     MarkdownParser ..> ParserOutput : «creates»
     ParserOutput "1" *-- "0..*" LinkObject
-    ParserOutput "1" *-- "0..*" AnchorObject
     ParserOutput "1" *-- "0..*" HeadingObject
+    ParserOutput "1" *-- "0..*" AnchorObject
 ```
 
 1. [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
@@ -199,31 +178,26 @@ parseFile(filePath) → ParserOutput
 // Input 1: Constructor dependencies (at instantiation)
 new MarkdownParser(
   fileSystem: FileSystemInterface,     // Required: Read file operations
-	currentSourcePath: string | null     // Required: File path of the source file being parsed
 )
 
 // Input 2: Runtime parameter (when calling parseFile)
-MarkdownParser.parseFile(
-  filePath: string                      // Required: Absolute path to markdown file
-) → Promise<ParserOutput>
+MarkdownParser.parseFile(filePath: string)  // Required: Absolute path to markdown file
 ```
 
 ### Output Contract
 
 ```typescript
-MarkdownParser.parseFile(
-  filePath: string                      // Required: Absolute path to markdown file
-) → Promise<ParserOutput>
+MarkdownParser.parseFile(filePath) → Promise<ParserOutput>.   // <ParserOutput> defines the data shape
 ```
 
-**Returns:** Complete structured representation of markdown document including:
-- File metadata (path, content, tokens)
-- All outgoing links with resolution metadata
-- All available anchors (headers and blocks)
-- Document headings with hierarchy
+**Returns:** [**`ParserOutput`**](#ParserOutput%20Interface)
+- Complete structured representation of markdown document including:
+  - File metadata (path, content, tokens)
+  - All outgoing links with resolution metadata
+  - All available anchors (headers and blocks)
+  - Document headings with hierarchy
 
-**See:** [ParserOutput Interface](#ParserOutput%20Interface)
-
+---
 ## Data Contracts
 
 TypeScript interfaces defining parser output structure. Source: `src/types/citationTypes.ts`
@@ -258,6 +232,8 @@ export interface ParserOutput {
 - [**``LinkObject``**](#LinkObject%20Interface)
 - [**`HeadingObject`**](#HeadingObject%20Interface)
 - [**`AnchorObject`**](#AnchorObject%20Type%20(Discriminated%20Union))
+
+---
 ### LinkObject Interface
 
 ```typescript
@@ -316,6 +292,41 @@ export interface LinkObject {
 }
 ```
 
+#### Extraction Marker Examples
+
+The `extractionMarker` property captures optional control markers that appear after links, used by `ContentExtractor` to override default extraction eligibility:
+
+| Markdown | extractionMarker Value |
+|----------|----------------------|
+| `[link](file.md)%%force-extract%%` | `{ fullMatch: '%%force-extract%%', innerText: 'force-extract' }` |
+| `[link](file.md) %%stop-extract-link%%` | `{ fullMatch: '%%stop-extract-link%%', innerText: 'stop-extract-link' }` |
+| `[link](file.md)<!-- force-extract -->` | `{ fullMatch: '<!-- force-extract -->', innerText: 'force-extract' }` |
+| `[link](file.md)` | `null` |
+
+**Note**: See [Issue 5: Hardcoded Extraction Marker Detection](#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20MVP%20Tech%20Debt) for MVP technical debt discussion.
+
+#### ValidationMetadata Interface
+
+```typescript
+export interface ValidationMetadata {
+  /** Validation outcome status */
+  status: "valid" | "warning" | "error";
+
+  /** Target file exists on disk */
+  fileExists: boolean;
+
+  /** Target anchor exists in file (null if no anchor specified) */
+  anchorExists: boolean | null;
+
+  /** Suggested corrections for errors (empty for valid) */
+  suggestions?: string[];
+
+  /** Path conversion info for cross-references */
+  pathConversion?: string;
+}
+```
+
+---
 ### AnchorObject Type (Discriminated Union)
 
 ```typescript
@@ -352,6 +363,7 @@ export type AnchorObject =
     };
 ```
 
+---
 ### HeadingObject Interface
 
 ```typescript
@@ -367,27 +379,7 @@ export interface HeadingObject {
 }
 ```
 
-### ValidationMetadata Interface
-
-```typescript
-export interface ValidationMetadata {
-  /** Validation outcome status */
-  status: "valid" | "warning" | "error";
-
-  /** Target file exists on disk */
-  fileExists: boolean;
-
-  /** Target anchor exists in file (null if no anchor specified) */
-  anchorExists: boolean | null;
-
-  /** Suggested corrections for errors (empty for valid) */
-  suggestions?: string[];
-
-  /** Path conversion info for cross-references */
-  pathConversion?: string;
-}
-```
-
+---
 ### ParserOutputContract Example
 
 > **Note**: Links do NOT include `validation` property - added post-parse by CitationValidator ([Story 1.8 Acceptance Criteria](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 1.8 Acceptance Criteria>)).
@@ -500,19 +492,7 @@ export interface ValidationMetadata {
 }
 ```
 
-### Extraction Marker Examples
-
-The `extractionMarker` property captures optional control markers that appear after links, used by `ContentExtractor` to override default extraction eligibility:
-
-| Markdown | extractionMarker Value |
-|----------|----------------------|
-| `[link](file.md)%%force-extract%%` | `{ fullMatch: '%%force-extract%%', innerText: 'force-extract' }` |
-| `[link](file.md) %%stop-extract-link%%` | `{ fullMatch: '%%stop-extract-link%%', innerText: 'stop-extract-link' }` |
-| `[link](file.md)<!-- force-extract -->` | `{ fullMatch: '<!-- force-extract -->', innerText: 'force-extract' }` |
-| `[link](file.md)` | `null` |
-
-**Note**: See [Issue 5: Hardcoded Extraction Marker Detection](#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20MVP%20Tech%20Debt) for MVP technical debt discussion.
-
+---
 ## Testing Strategy
 
 **Philosophy**: Validate MarkdownParser's ability to correctly transform markdown into the `MarkdownParser.ParserOutput` TypeScript interfaces.
@@ -538,7 +518,6 @@ The `extractionMarker` property captures optional control markers that appear af
 **Contract Validation Pattern**: Tests validate against the JSON Schema documented in the [Data Contracts](#Data%20Contracts) section, ensuring parser output matches the published API contract.
 
 ---
-
 # Whiteboard
 
 ## MarkdownParser.ParserOutput: How Tokens, Links, and Anchors Are Populated
