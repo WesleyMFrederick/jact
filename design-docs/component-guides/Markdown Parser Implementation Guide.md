@@ -137,7 +137,7 @@ sequenceDiagram
     Marked-->>-Parser: Token[] (markdown AST)
 
     note over Parser: Phase 3: Extract structured data
-    Parser->>Parser: extractLinks(content) → LinkObject[]
+    Parser->>Parser: extractLinks(content, filePath) → LinkObject[]
     Parser->>Parser: extractHeadings(tokens) → HeadingObject[]
     Parser->>Parser: extractAnchors(content) → AnchorObject[]
 
