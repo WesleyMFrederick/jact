@@ -90,7 +90,7 @@ classDiagram
 1. [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator): The module that orchestrates the validation process.
 2. [**`FileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.File%20Cache): The dependency used for short filename lookups.
 3. [**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md): The dependency used to retrieve [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) instances efficiently.
-4. [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument): The facade providing **query** methods over parser output (US1.7).
+4. [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument): The facade providing **query** methods over parser output.
 5. [**`ValidationResult`**](#Data%20Contracts): The composite object returned by the validator.
 
 ---
