@@ -166,11 +166,11 @@ MarkdownParser.parseFile(filePath) → Promise<ParserOutput>.   // <ParserOutput
 
 **Returns:**
 - [**`ParserOutput`**](#ParserOutput%20Interface)
-	- Complete structured representation of markdown document including:
-		- File metadata (path, content, tokens)
-		- All outgoing links with resolution metadata
-		- All available anchors (headers and blocks)
-		- Document headings with hierarchy
+ 	- Complete structured representation of markdown document including:
+  		- File metadata (path, content, tokens)
+  		- All outgoing links with resolution metadata
+  		- All available anchors (headers and blocks)
+  		- Document headings with hierarchy
 
 ---
 ## Component Workflow
@@ -201,31 +201,7 @@ sequenceDiagram
 
     Parser-->>-Client: ParserOutput
 
-    note over Client: ParserOutput contains:<br/>filePath, content, tokens,<br/>links[], headings[], anchors[]
 ```
-
-### High-Level Flow
-
-```text
-parseFile(filePath) → ParserOutput
-├── READ: fs.readFileSync(filePath) → content
-├── TOKENIZE: marked.lexer(content) → tokens (standard markdown AST)
-├── EXTRACT LINKS: regex patterns on content lines → LinkObject[]
-│   ├── Pattern: [text](file.md#anchor) → markdown cross-document
-│   ├── Pattern: [[file#anchor|text]] → wiki cross-document
-│   ├── Pattern: [[#anchor|text]] → wiki internal
-│   └── Pattern: ^anchor-id → caret reference
-├── EXTRACT HEADINGS: walk tokens for type="heading" → HeadingObject[]
-└── EXTRACT ANCHORS: regex patterns on content lines → AnchorObject[]
-    ├── Pattern: ## Header Text → header anchor (with urlEncodedId)
-    └── Pattern: ^block-id → block anchor
-```
-
-**Key Integration Points**:
-
-- **marked.js**: Standard markdown tokenization (CommonMark spec)
-- **FileSystem**: Synchronous file read via dependency injection
-- **Path resolution**: Converts raw paths to absolute/relative using Node.js path module
 
 ---
 ## Data Contracts
@@ -547,6 +523,22 @@ export interface HeadingObject {
 
 **Contract Validation Pattern**: Tests validate against the JSON Schema documented in the [Data Contracts](#Data%20Contracts) section, ensuring parser output matches the published API contract.
 
+
+---
+## Technical Debt
+
+```github-query
+outputType: table
+queryType: issue
+org: WesleyMFrederick
+repo: cc-workflows
+query: "is:issue  label:component:MarkdownParser"
+sort: number
+direction: asc
+columns: [number, status, title, labels, created, updated]
+```
+
+
 ---
 <!-- markdownlint-disable -->
 # Whiteboard
@@ -765,20 +757,6 @@ Example output saved at: `tools/citation-manager/design-docs/features/20251003-c
 **Research Date**: 2025-10-07
 **POC Validation**: Section extraction (7/7 tests) + Block extraction (9/9 tests) = 100% success rate
 **Epic 2 Readiness**: ContentExtractor implementation can proceed with validated data contracts
-
----
-# Technical Debt
-
-```github-query
-outputType: table
-queryType: issue
-org: WesleyMFrederick
-repo: cc-workflows
-query: "is:issue  label:component:MarkdownParser"
-sort: number
-direction: asc
-columns: [number, status, title, labels, created, updated]
-```
 
 ---
 
