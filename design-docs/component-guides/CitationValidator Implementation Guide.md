@@ -195,8 +195,6 @@ interface ParsedFileCacheInterface {
  /**
  * Parses the given markdown file (from cache if available) and
  * returns a parsed document with extracted citation links.
- *
- * Implementations should handle reading, parsing, and caching.
  */
   resolveParsedFile(filePath: string): Promise<ParsedDocument>;
 }
@@ -213,6 +211,9 @@ interface ParsedFileCacheInterface {
 
 ```typescript
 interface FileCacheInterface {
+  /**
+	* Resolve a short filename to its absolute path.
+	*/
   resolveFile(filename: string): {
     found: boolean;
     path: string | null;
@@ -225,7 +226,7 @@ interface FileCacheInterface {
 
 | Type       | Value                                             | Comment                              |
 | :--------- | :------------------------------------------------ | :----------------------------------- |
-| `@param`   | `filename: string`                                | Short filename to resolve            |
+| `@param`   | `filename: string`                                | Short filename to resolve (e.g., "file.md")            |
 | `@returns` | `{ found, path, fuzzyMatch?, message?, reason? }` | Resolution result with path or error |
 
 ---
@@ -233,6 +234,10 @@ interface FileCacheInterface {
 ### validateFile(filePath)
 
 ```typescript
+/**
+* Validate all citations in a markdown file.
+* Enriches each LinkObject with ValidationMetadata in-place.
+*/
 CitationValidator.validateFile(filePath: string) → Promise<ValidationResult>
 ```
 
@@ -244,8 +249,14 @@ CitationValidator.validateFile(filePath: string) → Promise<ValidationResult>
 ---
 
 ### validateSingleCitation(link, contextFile?)
+- Called by CLI Orchestrator for synthetic link validation
+- Supports `extract header/file` commands
 
 ```typescript
+/**
+* Validate a single citation link.
+* Classifies pattern type and delegates to appropriate validator.
+*/
 CitationValidator.validateSingleCitation(link: LinkObject, contextFile?: string) → Promise<EnrichedLinkObject>
 ```
 
@@ -255,9 +266,6 @@ CitationValidator.validateSingleCitation(link: LinkObject, contextFile?: string)
 | `@param`   | `contextFile?: string`                                       | Optional source context for path resolution             |
 | `@returns` | [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface)  | Input LinkObject with added `validation` property       |
 
-**Usage Notes:**
-- Called by CLI Orchestrator for synthetic link validation
-- Supports `extract header/file` commands
 
 ---
 

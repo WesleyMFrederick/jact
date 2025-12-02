@@ -137,40 +137,46 @@ tools/citation-manager/
 
 ```typescript
 new MarkdownParser(
-  fileSystem: FileSystemInterface,     // Required: Read file operations
+  fileSystem: FileSystemInterface,  // Required: File system operations
 )
 ```
 
-- [**`FileSystemInterface`**](#FileSystemInterface): File system abstraction for reading files
+| Type     | Value                                                | Comment                                   |
+| :------- | :--------------------------------------------------- | :---------------------------------------- |
+| `@param` | [**`FileSystemInterface`**](#FileSystemInterface)    | File system abstraction for reading files |
 
 #### FileSystemInterface
+- **Tight coupling**: Interface signature is `typeof readFileSync` from `node:fs`. Enables test mocking but not true abstraction—any replacement must match Node's exact method signature.
 
 ```typescript
+/**
+ * File system interface for dependency injection.
+ * Matches Node.js fs module subset used by MarkdownParser.
+ */
 interface FileSystemInterface {
   readFileSync: typeof readFileSync;  // from "node:fs"
 }
 ```
 
-- **Tight coupling**: Interface signature is `typeof readFileSync` from `node:fs`. Enables test mocking but not true abstraction—any replacement must match Node's exact method signature.
-
 ---
 
 ### parseFile(filePath)
-
+- [**`MarkdownParser.parseFile()`**](#`MarkdownParser.parseFile()`%20Sequence%20Diagram): Workflow sequence diagram
+  
 ```typescript
+/**
+ * Parse markdown file and extract all metadata.
+ *
+ * Main entry point for file parsing. Reads file, tokenizes with marked.lexer(),
+ * and extracts links, headings, and anchors.
+ */
 MarkdownParser.parseFile(filePath: string) → Promise<ParserOutput>
 ```
 
-**Inputs**:
-- `filePath: string` - Absolute path to markdown file
-
-**Returns:**
-- [**`ParserOutput`**](#ParserOutput%20Interface)
-  - Complete structured representation of markdown document including:
-    - File metadata (path, content, tokens)
-    - All outgoing links with resolution metadata
-    - All available anchors (headers and blocks)
-    - Document headings with hierarchy
+| Type       | Value                                           | Comment                                                                                                                             |
+| :--------- | :---------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
+| `@param`   | `filePath: string`                              | Absolute path to markdown file                                                                                                      |
+| `@returns` | [**`ParserOutput`**](#ParserOutput%20Interface) | Complete structured representation with file metadata (path, content, tokens), outgoing links, available anchors, and document headings |
 
 ---
 ## Component Workflow

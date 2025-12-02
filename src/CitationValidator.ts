@@ -1,20 +1,26 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import type { LinkObject } from './types/citationTypes.js';
-import type { ValidationResult, ValidationMetadata, ValidationSummary, PathConversion } from './types/validationTypes.js';
-import type ParsedDocument from './ParsedDocument.js';
+import type ParsedDocument from "./ParsedDocument.js";
+import type { AnchorObject, LinkObject } from "./types/citationTypes.js";
+import type {
+	EnrichedLinkObject,
+	PathConversion,
+	ValidationMetadata,
+	ValidationResult,
+	ValidationSummary,
+} from "./types/validationTypes.js";
 
 // Dependency Injection Interfaces (inline pattern per MarkdownParser.ts)
 interface ParsedFileCacheInterface {
 	/**
-   * Parses the given markdown file (from cache if available) and
-   * returns a parsed document with extracted citation links.
-   *
-   * Implementations should handle reading, parsing, and caching.
-   *
-   * @param filePath Absolute path to the markdown file to parse.
-   * @returns Parsed representation with link metadata.
-   */
+	 * Parses the given markdown file (from cache if available) and
+	 * returns a parsed document with extracted citation links.
+	 *
+	 * Implementations should handle reading, parsing, and caching.
+	 *
+	 * @param filePath Absolute path to the markdown file to parse.
+	 * @returns Parsed representation with link metadata.
+	 */
 	resolveParsedFile(filePath: string): Promise<ParsedDocument>;
 }
 
@@ -31,7 +37,9 @@ interface FileCacheInterface {
 	resolveFile(filename: string): {
 		found: boolean;
 		path: string | null;
-		fuzzyMatch?: boolean; message?: string; reason?: string
+		fuzzyMatch?: boolean;
+		message?: string;
+		reason?: string;
 	};
 }
 
@@ -39,7 +47,7 @@ interface FileCacheInterface {
 interface SingleCitationValidationResult {
 	line: number;
 	citation: string;
-	status: 'valid' | 'error' | 'warning';
+	status: "valid" | "error" | "warning";
 	linkType: string;
 	scope: string;
 	error?: string;
@@ -118,7 +126,10 @@ export class CitationValidator {
 		return /^[A-Za-z0-9_-]+\//.test(path) && !isAbsolute(path);
 	}
 
-	private convertObsidianToFilesystemPath(obsidianPath: string, sourceFile: string): string | null {
+	private convertObsidianToFilesystemPath(
+		obsidianPath: string,
+		sourceFile: string,
+	): string | null {
 		// Try to find the project root by walking up from source file
 		let currentDir = dirname(sourceFile);
 
@@ -134,7 +145,10 @@ export class CitationValidator {
 		return null;
 	}
 
-	private generatePathResolutionDebugInfo(relativePath: string, sourceFile: string): string {
+	private generatePathResolutionDebugInfo(
+		relativePath: string,
+		sourceFile: string,
+	): string {
 		const sourceDir = dirname(sourceFile);
 		const realSourceFile = this.safeRealpathSync(sourceFile);
 		const isSymlink = realSourceFile !== sourceFile;
@@ -182,7 +196,7 @@ export class CitationValidator {
 			await this.parsedFileCache.resolveParsedFile(filePath);
 		const links = sourceParsedDoc.getLinks();
 
-				// 3. Enrich each link with validation metadata (parallel execution)
+		// 3. Enrich each link with validation metadata (parallel execution)
 		await Promise.all(
 			links.map(async (link: LinkObject) => {
 				const result = await this.validateSingleCitation(link, filePath);
@@ -190,32 +204,37 @@ export class CitationValidator {
 				// Build discriminated union based on status
 				let validation: ValidationMetadata;
 
-				if (result.status === 'valid') {
+				if (result.status === "valid") {
 					// Valid variant: only status field
-					validation = { status: 'valid' };
+					validation = { status: "valid" };
 				} else {
 					// Error/Warning variant: status + error + optional fields
 					validation = {
-						status: result.status as 'error' | 'warning',
+						status: result.status as "error" | "warning",
 						error: result.error ?? "Unknown validation error",
 						...(result.suggestion && { suggestion: result.suggestion }),
-						...(result.pathConversion && { pathConversion: result.pathConversion }),
+						...(result.pathConversion && {
+							pathConversion: result.pathConversion,
+						}),
 					};
 				}
 
 				// ENRICHMENT: Add validation property in-place
-				(link as any).validation = validation;
+				(link as EnrichedLinkObject).validation = validation;
 			}),
 		);
 
 		// 4. Generate summary from enriched links
-		const enrichedLinks = links as unknown as ValidationResult['links'];
+		const enrichedLinks = links as unknown as ValidationResult["links"];
 		const summary: ValidationSummary = {
 			total: enrichedLinks.length,
-			valid: enrichedLinks.filter((link) => link.validation.status === "valid").length,
-			warnings: enrichedLinks.filter((link) => link.validation.status === "warning")
+			valid: enrichedLinks.filter((link) => link.validation.status === "valid")
 				.length,
-			errors: enrichedLinks.filter((link) => link.validation.status === "error").length,
+			warnings: enrichedLinks.filter(
+				(link) => link.validation.status === "warning",
+			).length,
+			errors: enrichedLinks.filter((link) => link.validation.status === "error")
+				.length,
 		};
 
 		// 5. Return enriched links + summary (no separate results array)
@@ -288,7 +307,9 @@ export class CitationValidator {
 		return "UNKNOWN_PATTERN";
 	}
 
-	private validateCaretPattern(citation: LinkObject): SingleCitationValidationResult {
+	private validateCaretPattern(
+		citation: LinkObject,
+	): SingleCitationValidationResult {
 		const anchor = citation.target.anchor || citation.fullMatch.substring(1); // Remove ^ from fullMatch
 
 		// If anchor already starts with ^, don't add another one
@@ -305,7 +326,9 @@ export class CitationValidator {
 		);
 	}
 
-	private validateEmphasisPattern(citation: LinkObject): SingleCitationValidationResult {
+	private validateEmphasisPattern(
+		citation: LinkObject,
+	): SingleCitationValidationResult {
 		const anchor = citation.target.anchor ?? "";
 
 		if (this.patterns.EMPHASIS_MARKED.regex.test(anchor)) {
@@ -343,7 +366,9 @@ export class CitationValidator {
 		sourceFile?: string,
 	): Promise<SingleCitationValidationResult> {
 		// Calculate what the standard path resolution would give us
-		const decodedRelativePath = decodeURIComponent(citation.target.path.raw ?? "");
+		const decodedRelativePath = decodeURIComponent(
+			citation.target.path.raw ?? "",
+		);
 		const sourceDir = dirname(sourceFile ?? "");
 		const standardPath = resolve(sourceDir, decodedRelativePath);
 
@@ -362,7 +387,8 @@ export class CitationValidator {
 
 			// Provide enhanced error message when using file cache
 			if (this.fileCache) {
-				const filename = (citation.target.path.raw ?? "").split("/").pop() ?? "";
+				const filename =
+					(citation.target.path.raw ?? "").split("/").pop() ?? "";
 				const cacheResult = this.fileCache.resolveFile(filename);
 
 				if (cacheResult.found && cacheResult.fuzzyMatch) {
@@ -433,7 +459,7 @@ export class CitationValidator {
 						if (!isDirectoryMatch) {
 							const originalCitation = citation.target.anchor
 								? `${citation.target.path.raw ?? ""}#${citation.target.anchor}`
-								: citation.target.path.raw ?? "";
+								: (citation.target.path.raw ?? "");
 							const suggestion = this.generatePathConversionSuggestion(
 								originalCitation,
 								sourceFile ?? "",
@@ -522,7 +548,7 @@ export class CitationValidator {
 		if (isCrossDirectory) {
 			const originalCitation = citation.target.anchor
 				? `${citation.target.path.raw}#${citation.target.anchor}`
-				: citation.target.path.raw ?? "";
+				: (citation.target.path.raw ?? "");
 			const suggestion = this.generatePathConversionSuggestion(
 				originalCitation,
 				sourceFile ?? "",
@@ -540,7 +566,9 @@ export class CitationValidator {
 		return this.createValidationResult(citation, "valid");
 	}
 
-	private validateWikiStyleLink(citation: LinkObject): SingleCitationValidationResult {
+	private validateWikiStyleLink(
+		citation: LinkObject,
+	): SingleCitationValidationResult {
 		// Wiki-style links are internal references, always valid for now
 		// Could add anchor existence checking in the future
 		return this.createValidationResult(citation, "valid");
@@ -663,7 +691,12 @@ export class CitationValidator {
 				targetParsedDoc.data.anchors,
 			);
 			if (flexibleMatch.found) {
-				return { valid: true, ...(flexibleMatch.matchType && { matchedAs: flexibleMatch.matchType }) };
+				return {
+					valid: true,
+					...(flexibleMatch.matchType && {
+						matchedAs: flexibleMatch.matchType,
+					}),
+				};
 			}
 
 			// Check if this is a kebab-case anchor that should use raw header format
@@ -717,7 +750,8 @@ export class CitationValidator {
 						: "No similar anchors found",
 			};
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 			return {
 				valid: false,
 				suggestion: `Error reading target file: ${errorMessage}`,
@@ -727,7 +761,7 @@ export class CitationValidator {
 
 	private findFlexibleAnchorMatch(
 		searchAnchor: string,
-		availableAnchors: any[],
+		availableAnchors: AnchorObject[],
 	): { found: boolean; matchType?: string } {
 		// Remove URL encoding for comparison
 		const cleanSearchAnchor = decodeURIComponent(searchAnchor);
@@ -790,7 +824,10 @@ export class CitationValidator {
 			.trim();
 	}
 
-	private suggestObsidianBetterFormat(usedAnchor: string, availableAnchors: any[]): string | null {
+	private suggestObsidianBetterFormat(
+		usedAnchor: string,
+		availableAnchors: AnchorObject[],
+	): string | null {
 		// Check if the used anchor is kebab-case and a raw header equivalent exists
 		// Convert each header to kebab-case to check if it matches the used anchor
 		for (const anchorObj of availableAnchors) {
@@ -815,7 +852,10 @@ export class CitationValidator {
 		return null;
 	}
 
-	private generateAnchorSuggestions(anchor: string, availableAnchors: string[]): string[] {
+	private generateAnchorSuggestions(
+		anchor: string,
+		availableAnchors: string[],
+	): string[] {
 		// Simple similarity matching - could be enhanced with fuzzy matching
 		const searchTerm = anchor.toLowerCase();
 		return availableAnchors
@@ -840,7 +880,10 @@ export class CitationValidator {
 	/**
 	 * Calculate relative path from source file to target file
 	 */
-	private calculateRelativePath(sourceFile: string, targetFile: string): string {
+	private calculateRelativePath(
+		sourceFile: string,
+		targetFile: string,
+	): string {
 		const sourceDir = dirname(sourceFile);
 		const relativePath = relative(sourceDir, targetFile);
 		return relativePath.replace(/\\/g, "/"); // Normalize path separators for cross-platform compatibility
@@ -858,7 +901,7 @@ export class CitationValidator {
 
 		// Preserve anchor fragments from original citation
 		const anchorMatch = originalCitation.match(/#(.*)$/);
-		const anchor = (anchorMatch && anchorMatch[1]) ? `#${anchorMatch[1]}` : "";
+		const anchor = anchorMatch?.[1] ? `#${anchorMatch[1]}` : "";
 
 		return {
 			type: "path-conversion",
@@ -872,7 +915,7 @@ export class CitationValidator {
 	 */
 	private createValidationResult(
 		citation: LinkObject,
-		status: 'valid' | 'error' | 'warning',
+		status: "valid" | "error" | "warning",
 		error: string | null = null,
 		message: string | null = null,
 		suggestion: PathConversion | null = null,
