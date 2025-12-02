@@ -133,24 +133,17 @@ tools/citation-manager/
 ---
 ## Public Contracts
 
-### Input Contract
+### Constructor
 
 ```typescript
-// Input 1: Constructor dependencies (at instantiation)
 new MarkdownParser(
   fileSystem: FileSystemInterface,     // Required: Read file operations
 )
-
-// Input 2: Runtime parameter (when calling parseFile)
-MarkdownParser.parseFile(filePath: string)  // Required: Absolute path to markdown file
 ```
 
-- [**`FileSystemInterface`**](#FileSystemInterface):
-- [**`MarkdownParser.parseFile()`**](#`MarkdownParser.parseFile()`%20Sequence%20Diagram):
+- [**`FileSystemInterface`**](#FileSystemInterface): File system abstraction for reading files
 
 #### FileSystemInterface
-
-- **Tight coupling**: Interface signature is `typeof readFileSync` from `node:fs`. Enables test mocking but not true abstraction—any replacement must match Node's exact method signature.
 
 ```typescript
 interface FileSystemInterface {
@@ -158,19 +151,26 @@ interface FileSystemInterface {
 }
 ```
 
-### Output Contract
+- **Tight coupling**: Interface signature is `typeof readFileSync` from `node:fs`. Enables test mocking but not true abstraction—any replacement must match Node's exact method signature.
+
+---
+
+### parseFile(filePath)
 
 ```typescript
-MarkdownParser.parseFile(filePath) → Promise<ParserOutput>.   // <ParserOutput> defines the data shape
+MarkdownParser.parseFile(filePath: string) → Promise<ParserOutput>
 ```
+
+**Inputs**:
+- `filePath: string` - Absolute path to markdown file
 
 **Returns:**
 - [**`ParserOutput`**](#ParserOutput%20Interface)
- 	- Complete structured representation of markdown document including:
-  		- File metadata (path, content, tokens)
-  		- All outgoing links with resolution metadata
-  		- All available anchors (headers and blocks)
-  		- Document headings with hierarchy
+  - Complete structured representation of markdown document including:
+    - File metadata (path, content, tokens)
+    - All outgoing links with resolution metadata
+    - All available anchors (headers and blocks)
+    - Document headings with hierarchy
 
 ---
 ## Component Workflow
@@ -523,7 +523,6 @@ export interface HeadingObject {
 
 **Contract Validation Pattern**: Tests validate against the JSON Schema documented in the [Data Contracts](#Data%20Contracts) section, ensuring parser output matches the published API contract.
 
-
 ---
 ## Technical Debt
 
@@ -537,7 +536,6 @@ sort: number
 direction: asc
 columns: [number, status, title, labels, created, updated]
 ```
-
 
 ---
 <!-- markdownlint-disable -->

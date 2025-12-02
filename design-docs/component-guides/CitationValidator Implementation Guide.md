@@ -171,71 +171,93 @@ tools/citation-manager/
 ---
 ## Public Contracts
 
-### Input Contract
+### Constructor
 
 ```typescript
-// Input 1: Constructor dependencies (at instantiation)
 new CitationValidator(
   parsedFileCache: ParsedFileCacheInterface,  // Required: Returns ParsedDocument instances
   fileCache: FileCacheInterface,              // Required: Legacy path resolution
 )
-
-// Input 2: Runtime parameters (when calling public methods)
-CitationValidator.validateFile(filePath: string)  // Required: Absolute path to source file
-CitationValidator.validateSingleCitation(link: LinkObject, contextFile?: string)  // Required: Link to validate
 ```
 
-- [**`ParsedFileCacheInterface`**](ParsedFileCache%20Implementation%20Guide.md#Public%20Contracts): Returns [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) instances
-- **`FileCacheInterface`**: Legacy path resolution
+| Type     | Value                                                         | Comment                                                                                                                          |
+| :------- | :------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------- |
+| `@param` | [**`ParsedFileCacheInterface`**](#ParsedFileCacheInterface)   | Abstraction of [**`CitationManager.ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache)   |
+| `@param` | [**`FileCacheInterface`**](#FileCacheInterface)               | Abstraction of [**`CitationManager.FileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.File%20Cache)            |
 
-#### Public Method: `validateFile(filePath)`
-
-The primary public method for validating all citations in a source document.
-
-**Input:**
-- **`filePath`** (string): The absolute path to the source markdown file to validate
-
-**Output:**
-- **ValidationResult** (`{ summary, links }`): Enriched links with aggregate summary statistics
-
-#### Public Method: `validateSingleCitation(link, contextFile?)`
-
-Public method for validating a single LinkObject. Added to support CLI Orchestrator's synthetic link validation workflow in Epic 2 (extract header/file commands).
-
-**Input:**
-- **`link`** (LinkObject): Unvalidated LinkObject (synthetic or discovered by parser)
-  - Can be created by LinkObjectFactory for `extract header/file` commands
-  - Can be from parser output for normal validation workflows
-- **`contextFile`** (string, optional): Source file context for path resolution
-
-**Output:**
-- **EnrichedLinkObject**: The input LinkObject with added `validation` property containing:
-  - `status`: "valid" | "warning" | "error"
-  - `error?`: Error message (when status is error/warning)
-  - `suggestion?`: Suggested fix (when available)
-  - `pathConversion?`: Path conversion metadata (when applicable)
-
-**Usage:**
-- Called by CLI Orchestrator to validate synthetic links created by LinkObjectFactory
-- Enables `extract header <target-file> "<header>"` command to validate header existence before extraction
-- Enables `extract file <target-file>` command to validate file existence before extraction
-- Enriches link in place using same validation logic as `validateFile()`
-
-### Output Contract
+#### ParsedFileCacheInterface
+- **Consumer-defined**: Inline interface in `CitationValidator.ts`
+- [**`CitationManager.ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) provides the concrete implementation
 
 ```typescript
-CitationValidator.validateFile(filePath) → Promise<ValidationResult>
-CitationValidator.validateSingleCitation(link, contextFile?) → Promise<EnrichedLinkObject>
+
+interface ParsedFileCacheInterface {
+ /**
+ * Parses the given markdown file (from cache if available) and
+ * returns a parsed document with extracted citation links.
+ *
+ * Implementations should handle reading, parsing, and caching.
+ */
+  resolveParsedFile(filePath: string): Promise<ParsedDocument>;
+}
 ```
 
-**Returns:**
+| Type       | Value                     | Comment                                                                                                                       |
+| :--------- | :------------------------ | :---------------------------------------------------------------------------------------------------------------------------- |
+| `@param`   | `filePath: string`        | Absolute path to markdown file                                                                                                |
+| `@returns` | `Promise<ParsedDocument>` | [**`CitationManager.ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade instance |
 
-- [**`ValidationResult`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator)
-  - `summary`: Aggregate counts (`total`, `valid`, `warning`, `error`)
-  - `links`: EnrichedLinkObject[] with added `validation` property
+#### FileCacheInterface
+- **Consumer-defined**: Inline interface in `CitationValidator.ts`
+- **Implementation**: [**`CitationManager.FileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.File%20Cache)  provides the concrete implementation
 
-- **EnrichedLinkObject**
-  - Original LinkObject extended with ValidationMetadata
+```typescript
+interface FileCacheInterface {
+  resolveFile(filename: string): {
+    found: boolean;
+    path: string | null;
+    fuzzyMatch?: boolean;
+    message?: string;
+    reason?: string
+  };
+}
+```
+
+| Type       | Value                                             | Comment                              |
+| :--------- | :------------------------------------------------ | :----------------------------------- |
+| `@param`   | `filename: string`                                | Short filename to resolve            |
+| `@returns` | `{ found, path, fuzzyMatch?, message?, reason? }` | Resolution result with path or error |
+
+---
+
+### validateFile(filePath)
+
+```typescript
+CitationValidator.validateFile(filePath: string) → Promise<ValidationResult>
+```
+
+| Type       | Value                                                        | Comment                                                            |
+| :--------- | :----------------------------------------------------------- | :----------------------------------------------------------------- |
+| `@param`   | `filePath: string`                                           | Absolute path to source markdown file                              |
+| `@returns` | [**`ValidationResult`**](#ValidationResult%20Interface)      | `{ summary, links }` with aggregate counts and enriched LinkObjects |
+
+---
+
+### validateSingleCitation(link, contextFile?)
+
+```typescript
+CitationValidator.validateSingleCitation(link: LinkObject, contextFile?: string) → Promise<EnrichedLinkObject>
+```
+
+| Type       | Value                                                        | Comment                                                 |
+| :--------- | :----------------------------------------------------------- | :------------------------------------------------------ |
+| `@param`   | `link: LinkObject`                                           | Link to validate (synthetic or from parser)             |
+| `@param`   | `contextFile?: string`                                       | Optional source context for path resolution             |
+| `@returns` | [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface)  | Input LinkObject with added `validation` property       |
+
+**Usage Notes:**
+- Called by CLI Orchestrator for synthetic link validation
+- Supports `extract header/file` commands
 
 ---
 

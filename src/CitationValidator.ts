@@ -18,11 +18,20 @@ interface ParsedFileCacheInterface {
 	resolveParsedFile(filePath: string): Promise<ParsedDocument>;
 }
 
+/**
+ * Interface for file cache dependency injection.
+ * Provides short filename to absolute path resolution.
+ */
 interface FileCacheInterface {
-	resolveFile(filename: string): { 
-		found: boolean; 
-		path: string | null; 
-		fuzzyMatch?: boolean; message?: string; reason?: string 
+	/**
+	 * Resolve a short filename to its absolute path.
+	 * @param filename - Short filename to resolve (e.g., "file.md")
+	 * @returns Resolution result with path or error information
+	 */
+	resolveFile(filename: string): {
+		found: boolean;
+		path: string | null;
+		fuzzyMatch?: boolean; message?: string; reason?: string
 	};
 }
 
@@ -157,9 +166,10 @@ export class CitationValidator {
 	}
 
 	/**
-	 * Validate all citations in a markdown file
-	 * @param {string} filePath - Absolute path to markdown file
-	 * @returns {Promise<ValidationResult>} Validation result with summary and enriched links
+	 * Validate all citations in a markdown file.
+	 * Enriches each LinkObject with ValidationMetadata in-place.
+	 * @param filePath - Absolute path to markdown file
+	 * @returns Validation result with summary and enriched links
 	 */
 	async validateFile(filePath: string): Promise<ValidationResult> {
 		// 1. Validate file exists
@@ -215,6 +225,13 @@ export class CitationValidator {
 		};
 	}
 
+	/**
+	 * Validate a single citation link.
+	 * Classifies pattern type and delegates to appropriate validator.
+	 * @param citation - LinkObject to validate
+	 * @param contextFile - Source file path for relative path resolution
+	 * @returns Validation result with status and suggestions
+	 */
 	async validateSingleCitation(
 		citation: LinkObject,
 		contextFile?: string,
