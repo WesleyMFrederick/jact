@@ -112,24 +112,136 @@ tools/citation-manager/
 ---
 ## Public Contracts
 
-### Input Contract
-1. **`parserOutput`** (object): A complete `MarkdownParser.Output.DataContract` object produced by the `MarkdownParser`.
+### Constructor
 
-### Output Contract (Public Methods)
-The facade exposes a set of query methods for consumers.
+```typescript
+new ParsedDocument(
+  parserOutput: ParserOutput  // Complete MarkdownParser.Output.DataContract
+)
+```
 
-#### Anchor Queries
-- **`hasAnchor(anchorId: string): boolean`**: Returns `true` or `false` if an anchor ID exists in the document. This method encapsulates all complex matching logic, including direct, URL-decoded, and flexible markdown matching.
-- **`findSimilarAnchors(anchorId: string): string[]`**: Returns an array of similar anchor IDs for generating suggestions when an anchor is not found, encapsulating fuzzy matching logic.
-- **`getAnchorIds(): string[]`**: Returns all available anchor IDs in the document (includes both `id` and `urlEncodedId` variants).
+| Type     | Value           | Comment                      |
+| :------- | :-------------- | :--------------------------- |
+| `@param` | `ParserOutput`  | [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) produced by MarkdownParser |
 
-#### Link Queries
-- **`getLinks(): LinkObject[]`**: Returns the full array of `LinkObject`s from the document for consumers that need to iterate over all links.
+---
 
-#### Content Extraction
-- **`extractSection(headingText: string, headingLevel: number): string | null`**: Returns the string content for a specific section by encapsulating the complex token-walking logic.
-- **`extractBlock(anchorId: string): string | null`**: Returns the string content for a specific block reference (e.g., `^my-block-id`).
-- **`extractFullContent(): string`**: A simple getter that returns the entire raw content of the document as a string.
+### hasAnchor(anchorId)
+
+```typescript
+/**
+ * Check if specific anchor exists in document.
+ * Encapsulates all complex matching logic including direct, URL-decoded, and flexible markdown matching.
+ */
+ParsedDocument.hasAnchor(anchorId: string) → boolean
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@param`   | `anchorId: string` | Anchor ID to check (raw or URL-encoded format) |
+| `@returns` | `boolean`       | True if anchor found, false otherwise |
+
+---
+
+### findSimilarAnchors(anchorId)
+
+```typescript
+/**
+ * Find anchors similar to given anchor ID using fuzzy matching.
+ * Returns suggestions for use when anchor is not found.
+ */
+ParsedDocument.findSimilarAnchors(anchorId: string) → string[]
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@param`   | `anchorId: string` | Target anchor ID to find matches for |
+| `@returns` | `string[]`      | Array of similar anchor IDs sorted by similarity (max 5 results) |
+
+---
+
+### getAnchorIds()
+
+```typescript
+/**
+ * Get all available anchor IDs in the document.
+ * Result cached after first call for performance.
+ */
+ParsedDocument.getAnchorIds() → string[]
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@returns` | `string[]`      | Array containing both `id` and `urlEncodedId` variants for all anchors |
+
+---
+
+### getLinks()
+
+```typescript
+/**
+ * Get all links in the document.
+ * Returns direct reference to internal array for performance.
+ */
+ParsedDocument.getLinks() → LinkObject[]
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@returns` | `LinkObject[]`  | Array of all [**`LinkObject`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface)s from document |
+
+---
+
+### extractSection(headingText, headingLevel)
+
+```typescript
+/**
+ * Extract content under specific heading until next same-or-higher level heading.
+ * Encapsulates complex token-walking logic for section boundary detection.
+ */
+ParsedDocument.extractSection(headingText: string, headingLevel: number) → string | null
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@param`   | `headingText: string` | Exact text of heading to extract (case-sensitive) |
+| `@param`   | `headingLevel: number` | Heading level (1-6, where 1 is `#`, 2 is `##`, etc.) |
+| `@returns` | `string \| null` | Section content including heading and nested content, or null if not found |
+
+---
+
+### extractBlock(anchorId)
+
+```typescript
+/**
+ * Extract single line containing specific block anchor.
+ * Filters by anchorType="block" for type safety.
+ */
+ParsedDocument.extractBlock(anchorId: string) → string | null
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@param`   | `anchorId: string` | Block anchor ID without `^` prefix (e.g., "FR1" for `^FR1`) |
+| `@returns` | `string \| null` | Single line content containing block anchor, or null if not found |
+
+---
+
+### extractFullContent()
+
+```typescript
+/**
+ * Get complete file content.
+ * Simple accessor for raw content string.
+ */
+ParsedDocument.extractFullContent() → string
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@returns` | `string`        | Full content string from document |
+
+---
 
 ## Pseudocode
 
