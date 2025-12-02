@@ -1,95 +1,110 @@
 # ParsedFileCache Implementation Guide
 
-This guide provides the Level 4 (Code) details for implementing the **`ParsedFileCache`** component, as defined in user story `us1.5`. It includes the component's structure, pseudocode for its core logic, formal data contracts, and a testing strategy.
+## Overview
 
-## Problem
-Components like the `CitationValidator` and the upcoming `ContentExtractor` need access to the parsed structure of multiple files during a single operation. Without a caching mechanism, the same file could be read from disk and parsed by the `MarkdownParser` repeatedly, leading to significant and unnecessary I/O and CPU overhead, creating a severe performance bottleneck.
+Caches parsed markdown files as ParsedDocument facades, ensuring each file is parsed at most once per command execution.
 
-## Solution
-The **`ParsedFileCache`** component acts as an in-memory, per-run singleton that serves as a broker for parsed file data. This component implements the **Read-Through Cache** pattern. It intercepts all requests for a [**`MarkdownParser.Output.DataContract`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts), calling the `MarkdownParser` only on the first request for a given file and wrapping the result in a `ParsedDocument` facade before storing and returning it. Subsequent requests for the same file are served directly from the cache, ensuring that each file is parsed at most once per command execution.
+### Problem
 
-## Outcome/Impact
-- Improves performance and reduces redundant work.
+1. Components like [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md) and [**`ContentExtractor`**](Content%20Extractor%20Implementation%20Guide.md) need access to parsed file data during validation runs. ^P1
+2. Without caching, the same file could be parsed repeatedly, causing significant I/O and CPU overhead. ^P2
+3. The system needs a single broker to manage parsed file access with concurrent request deduplication. ^P3
 
-### Caching Technology
-We'll use the native JavaScript **`Map`** object. A `Map` is a simple, high-performance, in-memory key-value store that's built into Node.js. It's perfectly suited for our needs and requires no external dependencies, which aligns with our [Simplicity First](../../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) principle.
+### Solution
 
-### Key-Value Structure
-The key-value structure for the cache will be:
-- **Key**: The **absolute, normalized file path** (string) of the document. This ensures that different relative paths pointing to the same file are treated as a single cache entry.
-- **Value**: The **`ParsedDocument` facade instance** that wraps the `MarkdownParser.Output.DataContract` for that file. We store the facade instance to ensure consumers receive a stable query interface and are decoupled from parser internals.
+The [**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md) provides centralized parsed file access by:
+1. implementing the [[#Read-Through Cache with Promise Deduplication Pattern|Read-Through Cache pattern]] with Promise-based deduplication (addresses [P2](#^P2), [P3](#^P3)) ^S1
+2. wrapping [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts) in [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) facade before caching (addresses [P1](#^P1)) ^S2
+3. using normalized absolute paths as cache keys to prevent duplicate entries for same file (addresses [P2](#^P2)) ^S3
 
-## Memory Management
-No, we do not need to worry about manual memory cleanup. Because the cache is **ephemeral** (living only for the duration of a single command run), all memory it uses is part of the Node.js process. When the command finishes and the process exits, the operating system will automatically reclaim all of its memory. There's no risk of memory leaks between command executions.
+### Impact
+
+| Problem ID | Problem | Solution ID | Solution | Impact | Principles | How Principle Applies |
+| :--------: | ------- | :---------: | -------- | ------ | ---------- | --------------------- |
+| [P1](#^P1) | Consumers need parsed file data | [S2](#^S2) | ParsedDocument facade | Stable query interface | [Black Box Interfaces](../../../../ARCHITECTURE-PRINCIPLES.md#^black-box-interfaces) | Expose clean API; hide parser internals |
+| [P2](#^P2) | Repeated parsing wastes resources | [S1](#^S1), [S3](#^S3) | Promise cache + path normalization | Each file parsed once per run | [Simplicity First](../../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) | Native Map, no external deps |
+| [P3](#^P3) | Concurrent requests cause duplicate work | [S1](#^S1) | Promise deduplication | Concurrent callers share single parse | [One Source of Truth](../../../../ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth) | Single Promise per file |
+
+---
 
 ## Structure
 
-The `ParsedFileCache` is a class that holds an in-memory map and has a dependency on the `MarkdownParser` interface. It exposes a single public method, `resolveParsedFile()`, which asynchronously returns a `ParsedDocument` facade instance. It is consumed by any component that needs parsed file data.
+### Class Diagram
+
+[**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) depends on [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) for file parsing. It exposes a single public method, [[#Read-Through Cache with Promise Deduplication Pattern|`resolveParsedFile()`]], which returns a [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) facade instance. It is consumed by any component that needs parsed file data.
 
 ```mermaid
 classDiagram
     direction LR
 
-    class ParserOutputContract {
+    class ParserOutput {
+        <<data>>
         +filePath: string
         +content: string
-        +tokens: object[]
-        +links: Link[]
-        +anchors: Anchor[]
+        +tokens: Token[]
+        +links: LinkObject[]
+        +headings: HeadingObject[]
+        +anchors: AnchorObject[]
     }
 
     class ParsedDocument {
-        -_data: ParserOutputContract
-        +getAnchorIds(): string[]
+        <<facade>>
+        +data: ParserOutput
         +hasAnchor(anchorId): boolean
-        +getBlockAnchors(): Anchor[]
-        +getHeaderAnchors(): Anchor[]
         +findSimilarAnchors(anchorId): string[]
-        +getLinks(): Link[]
-        +getCrossDocumentLinks(): Link[]
-        +extractSection(headingText): string
-        +extractBlock(anchorId): string
+        +getLinks(): LinkObject[]
+        +getAnchorIds(): string[]
         +extractFullContent(): string
+        +extractSection(headingText, level): string
+        +extractBlock(anchorId): string
     }
 
     class MarkdownParser {
-        <<interface>>
-        +parseFile(filePath: string): Promise~ParserOutputContract~
+        <<class>>
+        +parseFile(filePath): Promise~ParserOutput~
     }
 
     class CitationValidator {
-        +validateFile(filePath: string): Promise~ValidationResult~
+        <<class>>
+        +validateFile(filePath): Promise~ValidationResult~
     }
 
     class ParsedFileCache {
-        -cache: Map:string, ParsedDocument
-        -markdownParser: MarkdownParserInterface
-        +resolveParsedFile(filePath: string): Promise~ParsedDocument~
+        <<class>>
+        -cache: Map«string, Promise~ParsedDocument~»
+        -parser: MarkdownParser
+        +resolveParsedFile(filePath): Promise~ParsedDocument~
     }
 
-    CitationValidator --> ParsedFileCache : uses
-    ParsedFileCache --> MarkdownParser : uses
-    ParsedFileCache --> ParsedDocument : creates and returns
-    ParsedDocument --> ParserOutputContract : wraps
-    MarkdownParser ..> ParserOutputContract : returns
+    CitationValidator --> ParsedFileCache : «uses»
+    ParsedFileCache --> MarkdownParser : «uses»
+    ParsedFileCache ..> ParsedDocument : «creates»
+    ParsedDocument --> ParserOutput : «wraps»
+    MarkdownParser ..> ParserOutput : «returns»
 ```
 
-1. [**ParserOutputContract**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data object wrapped by ParsedDocument.
-2. **ParsedDocument**: The facade providing query methods over parser output (US1.7).
-3. [**MarkdownParser**](Markdown%20Parser%20Implementation%20Guide.md): The dependency that produces the `ParserOutputContract` on a cache miss.
-4. [**CitationValidator**](CitationValidator%20Implementation%20Guide.md): An example of a consumer of the cache.
-5. [**ParsedFileCache**](ParsedFileCache%20Implementation%20Guide.md): The class that orchestrates the caching logic.
+1. [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data contract returned by parser.
+2. [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md): Facade providing query methods over parser output.
+3. [**`MarkdownParser`**](Markdown%20Parser%20Implementation%20Guide.md): Parser class that produces `ParserOutput` on cache miss.
+4. [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md): Example consumer of the cache.
+5. [**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md): Cache orchestrator with Promise deduplication.
 
-## File Structure
+---
+### File Structure
 
 ```text
 tools/citation-manager/
-└── src/
-    ├── ParsedFileCache.ts     # Promise-based cache for parsed markdown files
-    ├── ParsedDocument.ts      # Facade class wrapping parser output
-    ├── MarkdownParser.ts      # Parser dependency
-    └── types/
-        └── citationTypes.ts   # TypeScript type definitions
+├── src/
+│   └── ParsedFileCache.ts                     // Promise-based cache (~79 lines)
+│       ├── constructor()                      // Initialize with parser dependency
+│       └── resolveParsedFile()                // Main entry point with deduplication
+│
+└── test/
+    ├── parsed-file-cache.test.js              // Unit tests for cache behavior
+    └── integration/
+        ├── parsed-file-cache-facade.test.js   // Integration: cache + ParsedDocument
+        ├── citation-validator-cache.test.js   // Integration: cache + validator
+        └── end-to-end-cache.test.js           // E2E: full cache workflow
 ```
 
 **Architecture Notes:**
@@ -99,6 +114,7 @@ tools/citation-manager/
 - Ephemeral cache cleared on process exit
 - Current structure prioritizes simplicity and performance
 
+---
 ## Public Contracts
 
 ### Input Contract
@@ -112,7 +128,7 @@ The `resolveParsedFile()` method returns a `Promise` that resolves with a **`Par
 - **Facade Wrapping**: The cache wraps `MarkdownParser.Output.DataContract` in `ParsedDocument` facade before caching and returning.
 - **Cache Lifecycle**: The cache is ephemeral and persists only for the duration of a single command execution. It is cleared when the process exits.
 
-## Pseudocode
+## Read-Through Cache with Promise Deduplication Pattern
 
 High-level architectural patterns showing Read-Through Cache with Promise deduplication.
 
@@ -175,12 +191,11 @@ class ParsedFileCache {
 
 Tests for the `ParsedFileCache` must validate its core caching logic and its correct interaction with its dependencies.
 
-**TypeScript Testing Notes:**
-- Test files use `.test.ts` extension with Vitest
-- Imports must reference compiled output: `import { ParsedFileCache } from "../../dist/ParsedFileCache.js"`
+**Testing Notes:**
+- Test files use `.test.js` extension with Vitest
+- Imports reference compiled output: `import { ParsedFileCache } from "../src/ParsedFileCache.js"`
 - Mock MarkdownParser using Vitest's `vi.fn()` for dependency injection
-- All test files follow Epic 3 TypeScript conversion standards (see `scripts/validate-typescript-conversion.js`)
-- Type safety validated at compile time and runtime
+- Uses real parser via `createMarkdownParser()` factory for integration tests
 
 ### Test Coverage Patterns
 
@@ -207,8 +222,11 @@ Tests for the `ParsedFileCache` must validate its core caching logic and its cor
 ### Test File Locations
 
 **Source of Truth**: Actual test implementations in:
-- Unit tests: `test/unit/ParsedFileCache.test.ts`
-- Integration tests: `test/integration/ParsedFileCache-integration.test.ts`
+- Unit tests: `test/parsed-file-cache.test.js`
+- Integration tests:
+  - `test/integration/parsed-file-cache-facade.test.js` (cache + ParsedDocument)
+  - `test/integration/citation-validator-cache.test.js` (cache + validator)
+  - `test/integration/end-to-end-cache.test.js` (full cache workflow)
 
 **See actual tests for implementation details** - this guide documents WHAT to test and WHY, test files show HOW.
 
@@ -228,3 +246,22 @@ columns: [number, status, title, labels, created, updated]
 ```
 
 ---
+
+## Whiteboard
+
+Design decisions and implementation details captured during development.
+
+### Caching Technology
+
+We use the native JavaScript **`Map`** object. A `Map` is a simple, high-performance, in-memory key-value store built into Node.js. It's perfectly suited for our needs and requires no external dependencies, which aligns with our [Simplicity First](../../../../ARCHITECTURE-PRINCIPLES.md#^simplicity-first) principle.
+
+### Key-Value Structure
+
+The key-value structure for the cache:
+
+- **Key**: The **absolute, normalized file path** (string) of the document. This ensures that different relative paths pointing to the same file are treated as a single cache entry.
+- **Value**: The **`ParsedDocument` facade instance** that wraps the `MarkdownParser.Output.DataContract` for that file. We store the facade instance to ensure consumers receive a stable query interface and are decoupled from parser internals.
+
+### Memory Management
+
+No manual memory cleanup required. Because the cache is **ephemeral** (living only for the duration of a single command run), all memory it uses is part of the Node.js process. When the command finishes and the process exits, the operating system automatically reclaims all memory. There's no risk of memory leaks between command executions.

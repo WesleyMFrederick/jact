@@ -1,100 +1,115 @@
 # ParsedDocument Implementation Guide
 
 ## Overview
-Wraps [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) in a facade providing stable query methods for anchor validation, link retrieval, and content extraction for consumption by [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) and [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor).
+
+Wraps parser output in a facade providing stable query methods for anchor validation, link retrieval, and content extraction for consumption by downstream components.
 
 ### Problem
-- Consumers like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) are tightly coupled to the internal structure of [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface), making them complex and forcing them to contain data-querying logic.
-- Any change to the parser's output structure becomes a breaking change for all consumers.
-- Direct data structure access violates encapsulation and makes the system brittle to refactoring.
+1. Consumers like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) are tightly coupled to the internal structure of [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface), making them complex and forcing them to contain data-querying logic. ^P1
+2. Any change to the parser's output structure becomes a breaking change for all consumers. ^P2
+3. Direct data structure access violates encapsulation and makes the system brittle to refactoring. ^P3
 
 ### Solution
-- The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade acts as a stable interface wrapper. It:
-  - encapsulates the raw [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) object,
-  - provides method-based query APIs for anchors, links, and content, and
-  - hides complex internal data structures from all consumers.
-- The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) query methods:
-  - are consumed by the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) for validation workflows and the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) for content extraction,
-  - provide a stable API that decouples consumers from parser internals, and
-  - enable parser refactoring without breaking consumer code.
+The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade provides a stable query interface by:
+1. encapsulating the raw [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) and hiding internal data structures from all consumers (addresses [P1](#^P1)) ^S1
+2. providing method-based query APIs for anchors, links, and content that decouple consumers from parser internals (addresses [P1](#^P1), [P2](#^P2)) ^S2
+3. enabling parser refactoring without breaking consumer code (addresses [P2](#^P2), [P3](#^P3)) ^S3
 
 ### Impact
 
-| Solution | Impact | Principles |
-|----------|--------|------------|
-| Facade pattern with query methods | Zero direct data structure access from consumers | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces), [Modular Design](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^modular-design-principles-definition) |
-| Lazy-loaded anchor cache | Reduced memory overhead and improved query performance | [Access-Pattern Fit](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^access-pattern-fit) |
-| Dual-key anchor matching (id + urlEncodedId) | Handles Obsidian encoding variations transparently | [Simplicity First](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^simplicity-first) |
-| Token-walking extraction algorithms | Content reconstruction preserves original markdown formatting | [Data-First Design](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^data-first-principles-definition) |
+| Problem ID | Problem | Solution ID | Solution | Impact | Principles | How Principle Applies |
+| :--------: | ------- | :---------: | -------- | ------ | ---------- | --------------------- |
+| [P1](#^P1) | Tight coupling to parser internals | [S1](#^S1), [S2](#^S2) | Facade with query methods | Zero direct data structure access | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Expose clean API; hide implementation |
+| [P2](#^P2) | Breaking changes propagate | [S2](#^S2), [S3](#^S3) | Stable method-based API | Parser refactoring doesn't break consumers | [Modular Design](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^modular-design-principles-definition) | Replaceable parts via interfaces |
+| [P3](#^P3) | Brittle to refactoring | [S1](#^S1), [S3](#^S3) | Encapsulated data access | System resilient to internal changes | [Access-Pattern Fit](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^access-pattern-fit) | Data structures aligned with query patterns |
 
 ---
 
 ## Structure
 
-The [**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md#Output%20Contract)  is responsible for creating `ParsedDocument` instances. Consumers like `CitationValidator` and `ContentExtractor` depend on the `ParsedDocument` interface for all data access.
+### Class Diagram
+
+[**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md#Output%20Contract) creates `ParsedDocument` instances. Consumers like [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md) and [**`ContentExtractor`**](Content%20Extractor%20Implementation%20Guide.md) depend on the `ParsedDocument` facade for all data access.
 
 ```mermaid
 classDiagram
     direction LR
 
     class ParsedFileCache {
+        <<service>>
         +resolveParsedFile(filePath): Promise~ParsedDocument~
     }
 
     class ParsedDocument {
-        <<Facade>>
-        -data: MarkdownParserOutputDataContract
+        <<facade>>
         +hasAnchor(anchorId): boolean
-        +findSimilarAnchors(anchorId): string
-        +getLinks(): Link[]
-        +extractSection(headingText): string
-        +extractBlock(anchorId): string
+        +findSimilarAnchors(anchorId): string[]
+        +getAnchorIds(): string[]
+        +getLinks(): LinkObject[]
+        +extractSection(headingText, level): string | null
+        +extractBlock(anchorId): string | null
         +extractFullContent(): string
     }
 
     class CitationValidator {
-        +validateFile(filePath)
+        <<class>>
+        +validateFile(filePath): ValidationResult
     }
 
     class ContentExtractor {
-        +extract(link)
+        <<class>>
+        +extractContent(links): ExtractedContent
     }
 
-    class MarkdownParser.ParserOutput {
+    class ParserOutput {
+        <<data>>
         +filePath: string
         +content: string
-        +links: Link[]
-        +anchors: Anchor[]
-        +tokens: object[]
+        +tokens: Token[]
+        +links: LinkObject[]
+        +anchors: AnchorObject[]
     }
 
     ParsedFileCache ..> ParsedDocument : «creates»
-    CitationValidator --> ParsedDocument : uses
-    ContentExtractor --> ParsedDocument : uses
-    ParsedDocument o-- MarkdownParser.ParserOutput : wraps
+    CitationValidator --> ParsedDocument : «uses»
+    ContentExtractor --> ParsedDocument : «uses»
+    ParsedDocument o-- ParserOutput : «wraps»
 ```
 
-1. [MarkdownParser.Output.DataContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The raw data object being wrapped
-2. **ParsedDocument**: The facade providing query methods (this guide)
-3. [CitationValidator](CitationValidator%20Implementation%20Guide.md): Consumer using anchor/link query methods
+1. [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache): Service that creates `ParsedDocument` instances
+2. [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument): Facade providing query methods (this guide)
+3. [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator): Consumer using anchor/link query methods
 4. [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor): Consumer using content extraction methods
+5. [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface): Data contract being wrapped
 
-## File Structure
+---
+### File Structure
 
 ```text
 tools/citation-manager/
-└── src/
-    ├── ParsedDocument.ts           # Facade class with query and extraction methods
-    └── types/
-        └── citationTypes.ts        # TypeScript type definitions for data contracts
+├── src/
+│   ├── ParsedDocument.ts                      // Facade implementation (~355 lines)
+│   │   ├── hasAnchor()                        // Anchor existence check
+│   │   ├── findSimilarAnchors()               // Fuzzy matching for suggestions
+│   │   ├── getAnchorIds()                     // Lazy-loaded anchor cache
+│   │   ├── getLinks()                         // Link array passthrough
+│   │   ├── extractFullContent()               // Raw content accessor
+│   │   ├── extractSection()                   // Token-walking section extraction
+│   │   └── extractBlock()                     // Line-based block extraction
+│   │
+│   └── types/
+│       └── citationTypes.ts                   // TypeScript type definitions
+│
+└── test/
+    ├── parsed-document.test.js                // Unit tests for facade methods
+    ├── parsed-document-extraction.test.js     // Section/block extraction tests
+    ├── poc-block-extraction.test.js           // POC validation for block extraction
+    │
+    └── integration/
+        └── citation-validator-parsed-document.test.js  // Integration with CitationValidator
 ```
 
-**Architecture Notes:**
-- Implemented in TypeScript with strict type safety
-- Maintained as single facade class per Facade Pattern
-- Future refactoring may extract operations following Action-Based Organization if complexity warrants
-- Current structure prioritizes encapsulation and interface stability
-
+---
 ## Public Contracts
 
 ### Input Contract
@@ -283,7 +298,7 @@ public method extractFullContent(): string is
   - Includes all nested lower-level headings (e.g., H3/H4 within H2 section)
   - Last section includes all remaining content to end of file
 - **Example**: `extractSection("Overview", 2)` → `"## Overview\n\nContent here...\n### Subsection\n..."`
-- **Proof Of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-section-extraction.test.js`
+- **Tests**: `test/parsed-document-extraction.test.js` validates section extraction behavior
 
 **Pattern Overview:**
 
@@ -378,9 +393,9 @@ public method extractFullContent(): string is
 ### Test File Locations
 
 **Source of Truth**: Actual test implementations in:
-- Unit tests: `test/unit/ParsedDocument.test.ts`
-- Integration tests: `test/integration/ParsedDocument-integration.test.ts`
-- POC validation: `test/poc-section-extraction.test.js`, `test/poc-block-extraction.test.js`
+- Unit tests: `test/parsed-document.test.js`, `test/parsed-document-extraction.test.js`
+- Integration tests: `test/integration/citation-validator-parsed-document.test.js`
+- POC validation: `test/poc-block-extraction.test.js`
 
 **See actual tests for implementation details** - this guide documents WHAT to test and WHY, test files show HOW.
 
@@ -402,7 +417,7 @@ The `extractSection()` and `extractBlock()` methods are fully implemented with a
 - Last section automatically includes all remaining content to end of file
 - Returns `null` when heading not found
 
-**Proof of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-section-extraction.test.js`
+**Tests**: `test/parsed-document-extraction.test.js` validates section extraction behavior
 
 ### Block Extraction Algorithm (Implemented)
 

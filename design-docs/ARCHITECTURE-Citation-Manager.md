@@ -140,6 +140,8 @@ The component's primary responsibility is to orchestrate workflow coordination b
 - _provides_ structured AST data to `CLI Orchestrator` and `Citation Validator` (synchronous)
 
 ##### Boundaries
+![Boundaries](component-guides/Markdown%20Parser%20Implementation%20Guide.md#Boundaries)
+
 The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** aware of the `ParsedDocument` facade that wraps its output. The component is **not** responsible for:
 - Validating the existence or accessibility of file paths.
 - Verifying the semantic correctness of links or anchors.

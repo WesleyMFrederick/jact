@@ -1,31 +1,34 @@
-<!-- markdownlint-disable MD025 -->
 # Markdown Parser Implementation Guide
 
 ## Overview
 Parses markdown files into structured objects containing outgoing links and header/anchors for consumption by downstream components.
 
 ### Problem
-- Downstream components like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) and [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) need a structured, queryable representation of a markdown document's links and anchors.
-- Parsing raw markdown text with regular expressions in each component would be repetitive, brittle, and inefficient.
-- The system needs a single, reliable component to transform a raw markdown file into a consistent and explicit data model.
+1. Downstream components like [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) and [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) need a structured, queryable representation of a markdown document's links and anchors. ^P1
+2. Parsing raw markdown text with regular expressions in each component would be repetitive, brittle, and inefficient. ^P2
+3. The system needs a single, reliable component to transform a raw markdown file into a consistent and explicit data model. ^P3
 
 ### Solution
-- The [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) component acts as a specialized transformer. It:
-  - accepts a file path,
-  - reads the document, and
-  - applies a series of parsing strategies to produce a single, comprehensive [**`MarkdownParser.ParserOutput`**](#Data%20Contracts) object.
-- The [**`MarkdownParser.ParserOutput`**](#Data%20Contracts) object:
-  - is wrapped by the [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade before being consumed by other components, providing a stable interface that decouples them from the parser's internal data structure.
-  - contains two primary collections: a list of all outgoing [**`MarkdownParser.Link Objects`**](#LinkObject%20Interface) and a list of all available [**`MarkdownParser.Anchor Objects`**](#AnchorObject%20Type%20(Discriminated%20Union)). By centralizing this parsing logic, the[**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) provides a clean, reusable service that decouples all other components from the complexities of markdown syntax.
+The [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) component provides centralized markdown parsing by:
+1. accepting a file path, reading the document, and applying parsing strategies to produce a comprehensive [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) object ^S1
+2. wrapping output in the [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade before consumption, decoupling consumers from parser internals ([P1](#^P1)) ^S2
+3. producing two primary collections: [**`LinkObject[]`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) and [**`AnchorObject[]`**](Markdown%20Parser%20Implementation%20Guide.md#AnchorObject%20Type%20(Discriminated%20Union)), centralizing parsing logic and eliminating regex duplication ([P2](#^P2), [P3](#^P3)) ^S3
 
 ### Impact
 
-| Solution                                       | Impact                                                                                                                              | Principles                                                                                                                                 |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Well defined interfaces and data shapes        | Less errors when navigating and consuming data                                                                                      | [Data-First Design Principles](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#Data-First%20Design%20Principles) |
-| Well defined input/output contracts            | Quicker design and implementation of code changes                                                                                   | [Modular Design Principles](../../../../../resume-coach/design-docs/Architecture%20Principles.md#Modular%20Design%20Principles)            |
-| Dependency Injection                           | - Flexible testing<br>  - can use real components for e2e and integration<br> - can use mock components to unit test business logic | [Modular Design Principles](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#Modular%20Design%20Principles)       |
-| TypeScript discriminated unions (AnchorObject) | Impossible to represent invalid  states                                                                                             | [Data-First Design Principles](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#Data-First%20Design%20Principles) |
+| Problem ID | Problem | Solution ID | Solution | Impact | Principles | How Principle Applies |
+| :--------: | ------- | :---------: | -------- | ------ | ---------- | --------------------- |
+| [P1](#^P1) | Components need structured representation | [S1](#^S1), [S2](#^S2) | Single parse with comprehensive [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) + facade wrapping | Fewer errors navigating data; stable consumer interface | [Data Model First](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^data-model-first) | Clean data structures lead to clean code; structured output prevents navigation errors |
+| [P2](#^P2) | Regex duplication across components | [S3](#^S3) | Centralized link/anchor extraction | 100% reduction in duplicated parsing logic (0 regex per consumer vs N) | [Single Responsibility](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^single-responsibility) | Parser parses; consumers consume - each component has one clear concern |
+| [P3](#^P3) | No reliable transformer | [S1](#^S1) | DI-enabled [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) class | Flexible testing (mock fs for unit, real fs for integration) | [Dependency Abstraction](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^dependency-abstraction) | Depend on FileSystemInterface abstraction, not concrete node:fs |
+| [P1](#^P1) | Type safety for anchors | [S3](#^S3) | TypeScript discriminated unions ([**`AnchorObject`**](Markdown%20Parser%20Implementation%20Guide.md#AnchorObject%20Type%20(Discriminated%20Union))) | Impossible to represent invalid anchor states | [Illegal States Unrepresentable](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable) | Header vs block enforced at type level; invalid combinations cannot compile |
+
+### Boundaries
+
+The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** aware of the `ParsedDocument` facade that wraps its output. The component is **not** responsible for:
+- Validating the existence or accessibility of file paths.
+- Verifying the semantic correctness of links or anchors.
+- Interpreting or executing any code within the document.
 
 ---
 
@@ -33,11 +36,16 @@ Parses markdown files into structured objects containing outgoing links and head
 
 ### Class Diagram
 
-[**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) depends on `FileSystemInterface` for file I/O. It exposes a single public method, `parseFile()`, which returns the [**`ParserOutput`**](#ParserOutput%20Interface)interface.
+[**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) depends on [**`FileSystemInterface`**](#FileSystemInterface) for file I/O. It exposes a single public method, [`parseFile()`](#`MarkdownParser.parseFile()`%20Sequence%20Diagram) , which returns the [**`ParserOutput`**](#ParserOutput%20Interface)interface.
 
 ```mermaid
 classDiagram
     direction LR
+
+    class FileSystemInterface {
+      <<interface>>
+        +readFileSync(path, encoding): string
+    }
 
     class ParserOutput {
       <<interface>>
@@ -67,10 +75,11 @@ classDiagram
         +parseFile(filePath): Promise~ParserOutput~
     }
 
+    MarkdownParser --> FileSystemInterface : «depends on»
     MarkdownParser ..> ParserOutput : «creates»
-    ParserOutput "1" *-- "0..*" LinkObject
-    ParserOutput "1" *-- "0..*" HeadingObject
-    ParserOutput "1" *-- "0..*" AnchorObject
+    ParserOutput *-- LinkObject
+    ParserOutput *-- HeadingObject
+    ParserOutput *-- AnchorObject
 ```
 
 1. [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
@@ -81,12 +90,10 @@ classDiagram
 ---
 ### File Structure
 
-**Current Structure** (TypeScript Implementation):
-
 ```text
 tools/citation-manager/
 ├── src/
-│   ├── MarkdownParser.ts                              // TypeScript implementation (~640 lines)
+│   ├── MarkdownParser.ts                              // TypeScript implementation (~670 lines)
 │   │   ├── FileSystemInterface                        // Dependency injection interface
 │   │   ├── parseFile()                                // Main orchestrator → ParserOutput
 │   │   ├── extractLinks()                             // Link extraction → LinkObject[]
@@ -96,28 +103,79 @@ tools/citation-manager/
 │   │       ├── determineAnchorType()                  // Anchor type classification
 │   │       ├── resolvePath()                          // Path resolution
 │   │       ├── _detectExtractionMarker()              // Extraction marker detection
+│   │       ├── containsMarkdown()                     // Markdown pattern detection
 │   │       └── toKebabCase()                          // String formatting
 │   │
-│   └── types/
-│       └── citationTypes.ts                           // Shared type definitions
-│           ├── ParserOutput                           // Parser output interface
-│           ├── LinkObject                             // Link data structure
-│           ├── AnchorObject                           // Anchor discriminated union
-│           └── HeadingObject                          // Heading data structure
+│   ├── types/
+│   │   ├── citationTypes.ts                           // Parser output type definitions
+│   │   │   ├── ParserOutput                           // Parser output interface
+│   │   │   ├── LinkObject                             // Link data structure
+│   │   │   ├── AnchorObject                           // Anchor discriminated union
+│   │   │   └── HeadingObject                          // Heading data structure
+│   │   │
+│   │   └── validationTypes.ts                         // Validation type definitions
+│   │       └── ValidationMetadata                     // Added to LinkObject post-parse
+│   │
+│   └── factories/
+│       └── componentFactory.js                        // Factory instantiates MarkdownParser with DI
 │
-├── test/
-│   └── parser-output-contract.test.js                 // Contract validation tests
-│
-└── factories/
-    └── componentFactory.js                            // Factory instantiates MarkdownParser with DI
+└── test/
+    ├── parser-output-contract.test.js                 // Contract validation tests
+    ├── integration/
+    │   └── e2e-parser-to-extractor.test.js            // E2E: parser → extractor workflow
+    └── fixtures/
+        ├── enhanced-citations.md                      // Link pattern test data
+        └── complex-headers.md                         // Anchor extraction test data
 ```
 
 **Technical Debt**: The current monolithic structure violates the project's action-based file naming patterns. See [Issue #18](https://github.com/WesleyMFrederick/cc-workflows/issues/18) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Organization).
 
 ---
+## Public Contracts
+
+### Input Contract
+
+```typescript
+// Input 1: Constructor dependencies (at instantiation)
+new MarkdownParser(
+  fileSystem: FileSystemInterface,     // Required: Read file operations
+)
+
+// Input 2: Runtime parameter (when calling parseFile)
+MarkdownParser.parseFile(filePath: string)  // Required: Absolute path to markdown file
+```
+
+- [**`FileSystemInterface`**](#FileSystemInterface):
+- [**`MarkdownParser.parseFile()`**](#`MarkdownParser.parseFile()`%20Sequence%20Diagram):
+
+#### FileSystemInterface
+
+- **Tight coupling**: Interface signature is `typeof readFileSync` from `node:fs`. Enables test mocking but not true abstraction—any replacement must match Node's exact method signature.
+
+```typescript
+interface FileSystemInterface {
+  readFileSync: typeof readFileSync;  // from "node:fs"
+}
+```
+
+### Output Contract
+
+```typescript
+MarkdownParser.parseFile(filePath) → Promise<ParserOutput>.   // <ParserOutput> defines the data shape
+```
+
+**Returns:**
+- [**`ParserOutput`**](#ParserOutput%20Interface)
+	- Complete structured representation of markdown document including:
+		- File metadata (path, content, tokens)
+		- All outgoing links with resolution metadata
+		- All available anchors (headers and blocks)
+		- Document headings with hierarchy
+
+---
 ## Component Workflow
 
-### parseFile Sequence Diagram
+### `MarkdownParser.parseFile()` Sequence Diagram
 
 ```mermaid
 sequenceDiagram
@@ -168,34 +226,6 @@ parseFile(filePath) → ParserOutput
 - **marked.js**: Standard markdown tokenization (CommonMark spec)
 - **FileSystem**: Synchronous file read via dependency injection
 - **Path resolution**: Converts raw paths to absolute/relative using Node.js path module
-
----
-## Public Contracts
-
-### Input Contract
-
-```typescript
-// Input 1: Constructor dependencies (at instantiation)
-new MarkdownParser(
-  fileSystem: FileSystemInterface,     // Required: Read file operations
-)
-
-// Input 2: Runtime parameter (when calling parseFile)
-MarkdownParser.parseFile(filePath: string)  // Required: Absolute path to markdown file
-```
-
-### Output Contract
-
-```typescript
-MarkdownParser.parseFile(filePath) → Promise<ParserOutput>.   // <ParserOutput> defines the data shape
-```
-
-**Returns:** [**`ParserOutput`**](#ParserOutput%20Interface)
-- Complete structured representation of markdown document including:
-  - File metadata (path, content, tokens)
-  - All outgoing links with resolution metadata
-  - All available anchors (headers and blocks)
-  - Document headings with hierarchy
 
 ---
 ## Data Contracts
@@ -518,6 +548,7 @@ export interface HeadingObject {
 **Contract Validation Pattern**: Tests validate against the JSON Schema documented in the [Data Contracts](#Data%20Contracts) section, ensuring parser output matches the published API contract.
 
 ---
+<!-- markdownlint-disable -->
 # Whiteboard
 
 ## MarkdownParser.ParserOutput: How Tokens, Links, and Anchors Are Populated

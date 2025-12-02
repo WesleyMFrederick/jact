@@ -6,11 +6,24 @@ import type ParsedDocument from './ParsedDocument.js';
 
 // Dependency Injection Interfaces (inline pattern per MarkdownParser.ts)
 interface ParsedFileCacheInterface {
+	/**
+   * Parses the given markdown file (from cache if available) and
+   * returns a parsed document with extracted citation links.
+   *
+   * Implementations should handle reading, parsing, and caching.
+   *
+   * @param filePath Absolute path to the markdown file to parse.
+   * @returns Parsed representation with link metadata.
+   */
 	resolveParsedFile(filePath: string): Promise<ParsedDocument>;
 }
 
 interface FileCacheInterface {
-	resolveFile(filename: string): { found: boolean; path: string | null; fuzzyMatch?: boolean; message?: string; reason?: string };
+	resolveFile(filename: string): { 
+		found: boolean; 
+		path: string | null; 
+		fuzzyMatch?: boolean; message?: string; reason?: string 
+	};
 }
 
 // SingleCitationValidationResult - what validateSingleCitation actually returns

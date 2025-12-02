@@ -1,147 +1,172 @@
 # CitationValidator Implementation Guide
 
 ## Overview
-Validates [**`MarkdownParser.LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) by enriching them with semantic validation metadata, checking file existence and anchor presence using [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade for consumption by [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor).
+Confirms a link is valid by checking if the file exists (path + file name) and if the anchor is valid (header, block anchors).
 
 ### Problem
-- Links and anchors identified by the [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) are purely syntactic constructs with no guarantee that paths point to existing files or anchors correspond to real headers/blocks.
-- Creating separate validation result objects duplicates 80% of link metadata (source paths, target paths, line numbers).
-- The system requires semantic validation that maintains a single data flow through the pipeline: parse → validate → filter → extract.
+1. Links and anchors identified by the [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) have no guarantee that paths point to existing files or anchors correspond to real headers/blocks. ^P1
+2. [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) contains link information about the source and target document we do not want to re-build or repeat in other consumers ([One Source Of Truth](../../../../../resume-coach/design-docs/Architecture%20Principles.md#^one-source-of-truth)) ^P2
+1. Creating a separate validation result object duplicates 80% of link metadata (source paths, target paths, line numbers). ^P2-1
+3. If errors occur in the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor), it is challenging to determine if the errors are due to invalid link or invalid content (missing, malformed, etc) ^P3
 
 ### Solution
-- The [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) component acts as a semantic validator and enricher. It:
-  - consumes [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade instances from the [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache)
-  - verifies target file existence and anchor presence using facade query methods
-  - enriches LinkObjects directly by adding a [**`CitationValidator.ValidationMetadata`**](#ValidationMetadata%20Type%20(Discriminated%20Union)) property
-- The [**`CitationValidator.ValidationResult`**](#ValidationResult%20Interface) output:
-  - is consumed by the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) for extraction eligibility analysis
-  - contains enriched LinkObjects with validation metadata plus aggregate summary statistics
-  - eliminates data duplication (80% reduction) by adding validation property instead of creating separate result objects
+The [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) component validates link paths and anchors are valid by:
+1. consuming [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade instances from the [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) ^S1
+1. verifying target file and anchor exist using [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade query methods ^S1-1
+2. enriching/extending [**`LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) directly by adding a [**`CitationValidator.ValidationMetadata`**](#ValidationMetadata%20Type%20(Discriminated%20Union)) property ^S2
+3. The [**`CitationValidator.ValidationResult`**](#ValidationResult%20Interface) output:
+1. is consumed by the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) for extraction eligibility analysis ^S3
+2. extends [**`LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) via the [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface) interface, and contains [**`ValidationMetadata`**)](#ValidationMetadata%20Type%20(Discriminated%20Union)) statuses, errors, and fix suggestions
+3. eliminates data duplication (80% reduction) by adding validation property instead of creating separate result objects
 
 ### Impact
 
-| Solution | Impact | Principles |
-|----------|--------|------------|
-| Enrichment pattern (add validation to LinkObject) | 80% reduction in data duplication | [One Source of Truth](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^one-source-of-truth), [Data-First Design](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#Data-First%20Design%20Principles) |
-| Discriminated union ValidationMetadata | Illegal states unrepresentable (no valid+error state) | [Illegal States Unrepresentable](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable) |
-| ParsedDocument facade integration | Zero direct data structure access from validator | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) |
+| Problem ID | Problem                                     |  Solution ID   | Solution                                                                                                                                                                         | Impact                                                                 | Principles                                                                                                              | How Principle Applies                                                                                                                |
+| :--------: | ------------------------------------------- | :------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| [P1](#^P1) | Validate target paths                       |   [S1](#^S1)   | [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) as existence check                                                               | 66% reduction in filesystem calls (1 vs 3)                             | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Use [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) API, not raw `node:fs` calls     |
+| [P1](#^P1) | Validate target anchors                     | [S1.1](#^S1-1) | [**`ParsedDocument.hasAnchor()`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md#Anchor%20Queries) on fetched doc | 100% reduction in direct data access (0 vs 4)                          | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Use[**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) API, not raw `_data.anchors` access |
+| [P2](#^P2) | Avoid link metadata duplication             |   [S2](#^S2)   | Enrichment pattern (add validation to [**`LinkObject`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface))                                                  | 80% reduction in data duplication (1 property vs 8 fields              | [One Source of Truth](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^one-source-of-truth)   | Mutate original, not copy-then-extend                                                                                                |
+| [P3](#^P3) | Distinguish link errors from content errors |   [S3](#^S3)   | Pre-validation before extraction                                                                                                                                                 | 100% link errors caught before ContentExtractor (0 ambiguous failures) | [Single Responsibility](../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility)                                  | Validator validates links;<br>Extractor extracts content;                                                                            |
 
 ---
 
 ## Structure
 
-The `CitationValidator` is a class that depends on the `ParsedFileCache` (for retrieving parsed documents) and the `FileCache` (for legacy path resolution). It exposes a primary public method, `validateFile()`, which orchestrates the validation process.
+### Class Diagram
+
+[**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) depends on [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) for parsed document retrieval and [**`FileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.File%20Cache) for legacy path resolution. It exposes public methods [`validateFile()`](#Public%20Method%20validateFile%20filePath) and [`validateSingleCitation()`](#Public%20Method%20validateSingleCitation%20link%20contextFile), which return [**`ValidationResult`**](#ValidationResult%20Interface).
 
 ```mermaid
 classDiagram
     direction LR
 
     class CitationValidator {
+        <<class>>
         -parsedFileCache: ParsedFileCacheInterface
         -fileCache: FileCacheInterface
         +validateFile(filePath: string): Promise~ValidationResult~
         +validateSingleCitation(link: LinkObject): Promise~EnrichedLinkObject~
-        -validateAnchorExists(link: Link): Promise~object~
     }
 
-    
-    
     class FileCache {
         <<interface>>
         +resolveFile(filename: string): ResolutionResult
     }
-    
-  class ResolutionResult {
-      +found: boolean
-      +path: string
-    }    
-    
-  class ParsedFileCache {
+
+    class ResolutionResult {
+        <<anonymous>>
+        +found: boolean
+        +path: string | null
+        +fuzzyMatch?: boolean
+        +message?: string
+        +reason?: string
+    }
+
+    class ParsedFileCache {
         <<interface>>
         +resolveParsedFile(filePath: string): Promise~ParsedDocument~
     }
-      
-  class ParsedDocument {
+
+    class ParsedDocument {
         <<facade>>
         +hasAnchor(anchorId): boolean
-        +getAnchorIds(): string[]
         +findSimilarAnchors(anchorId): string[]
-        +getLinks(): Link[]
+        +getLinks(): LinkObject[]
     }
-    
+
+    class LinkObject {
+        <<data>>
+        +linkType: string
+        +scope: string
+        +anchorType: string
+        +target: TargetInfo
+        +line: number
+    }
+
+    class EnrichedLinkObject {
+        <<data>>
+        +validation: ValidationMetadata
+    }
+
+    class ValidationMetadata {
+        <<data>>
+        +status: valid | error | warning
+        +error?: string
+        +suggestion?: string
+    }
+
     class ValidationResult {
-        +summary: object
+        <<data>>
+        +summary: ValidationSummary
         +links: EnrichedLinkObject[]
     }
-  
-  CitationValidator ..> FileCache : depends on
-  FileCache --> ResolutionResult : returns
-  
-    CitationValidator ..> ParsedFileCache : depends on
-    ParsedFileCache --> ParsedDocument : returns
-    
-    CitationValidator ..> ParsedDocument : calls methods on
-    
-    CitationValidator --> ValidationResult : returns
-    
-    
+
+    CitationValidator --> FileCache : «depends on»
+    FileCache ..> ResolutionResult : «returns»
+    CitationValidator --> ParsedFileCache : «depends on»
+    ParsedFileCache ..> ParsedDocument : «returns»
+    CitationValidator --> ParsedDocument : «uses»
+    ParsedDocument ..> LinkObject : «returns»
+    EnrichedLinkObject --|> LinkObject : «extends»
+    EnrichedLinkObject *-- ValidationMetadata : «has»
+    ValidationResult *-- EnrichedLinkObject : «contains»
+    CitationValidator ..> ValidationResult : «creates»
 ```
 
-1. [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator): The module that orchestrates the validation process.
-2. [**`FileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.File%20Cache): The dependency used for short filename lookups.
-3. [**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md): The dependency used to retrieve [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) instances efficiently.
-4. [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument): The facade providing **query** methods over parser output.
-5. [**`ValidationResult`**](#Data%20Contracts): The composite object returned by the validator.
+1. [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator): The orchestrator class that validates links.
+2. [**`FileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.File%20Cache): Dependency for short filename lookups.
+3. [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache): Dependency that returns [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) instances.
+4. [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument): Facade providing query methods over parser output.
+5. [**`LinkObject`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface): Input data from parser (link metadata).
+6. [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface): LinkObject extended with validation property.
+7. [**`ValidationMetadata`**](#ValidationMetadata%20Type%20(Discriminated%20Union)): Discriminated union (valid | error | warning).
+8. [**`ValidationResult`**](#ValidationResult%20Interface): Output containing summary + enriched links.
+9. **`ResolutionResult`**: FileCache return type (currently inline anonymous object in `CitationValidator.ts`). See [Issue #40](https://github.com/WesleyMFrederick/cc-workflows/issues/40) for planned TypeScript refactor.
 
 ---
-## File Structure
-
-### Current Implementation (TypeScript)
+### File Structure
 
 ```text
 tools/citation-manager/
 ├── src/
 │   ├── CitationValidator.ts                       // TypeScript implementation (~883 lines)
-│   │   ├── ParsedFileCacheInterface              // DI interface
-│   │   ├── FileCacheInterface                    // DI interface
+│   │   ├── ParsedFileCacheInterface              // Dependency injection interface
+│   │   ├── FileCacheInterface                    // Dependency injection interface
 │   │   ├── validateFile()                        // Main orchestrator → ValidationResult
 │   │   ├── validateSingleCitation()              // Single link validation → EnrichedLinkObject
-│   │   ├── enrichLinkWithValidation()            // Enrichment with discriminated union
+│   │   ├── enrichLinkWithValidation()            // Link enrichment → void (mutates link)
 │   │   └── helpers                               // Inline helper methods
+│   │       ├── resolveTargetPath()               // Path resolution strategies
+│   │       ├── validateAnchorExists()            // Anchor existence check
+│   │       ├── generateSuggestion()              // Fuzzy match suggestions
+│   │       └── classifyLinkPattern()             // Link pattern classification
 │   │
-│   └── types/
-│       └── validationTypes.ts                    // Validation type definitions
-│           ├── ValidationMetadata                // Discriminated union (status-based)
-│           ├── EnrichedLinkObject                // LinkObject + validation property
-│           └── ValidationResult                  // { summary, links } output
-│
-├── test/
-│   ├── integration/
-│   │   ├── citation-validator.test.js             // Core validation tests
-│   │   ├── citation-validator-enrichment.test.js  // US1.8 enrichment pattern tests
-│   │   ├── citation-validator-anchor-matching.test.js // Anchor validation tests
-│   │   ├── citation-validator-cache.test.js       // ParsedFileCache integration tests
-│   │   └── citation-validator-parsed-document.test.js // ParsedDocument facade tests
+│   ├── types/
+│   │   └── validationTypes.ts                    // Validation type definitions
+│   │       ├── ValidationMetadata                // Discriminated union (status-based)
+│   │       ├── EnrichedLinkObject                // LinkObject + validation property
+│   │       └── ValidationResult                  // { summary, links } output
 │   │
-│   └── fixtures/
-│       ├── enrichment/                            // US1.8 enrichment pattern fixtures (7 files)
-│       │
-│       ├── section-extraction/                    // Content extraction fixtures (2 files)
-│       │   └── ...
-│       │
-│       ├── subdir/                                // Path resolution fixtures (1 file)
-│       │   └── ...
-│       │
-│       ├── anchor-matching.md                     // Anchor validation scenarios
-│       ├── anchor-matching-source.md              // Cross-document anchor tests
-│       └── ... (32 fixtures total)
+│   └── factories/
+│       └── componentFactory.js                   // Factory instantiates CitationValidator with DI
 │
-└── design-docs/
-    └── component-guides/
-        └── CitationValidator Implementation Guide.md // This document
+└── test/
+    ├── integration/
+    │   ├── citation-validator.test.js            // Core validation tests
+    │   ├── citation-validator-enrichment.test.js // Enrichment pattern tests
+    │   ├── citation-validator-anchor-matching.test.js // Anchor validation tests
+    │   ├── citation-validator-cache.test.js      // ParsedFileCache integration tests
+    │   └── citation-validator-parsed-document.test.js // ParsedDocument facade tests
+    │
+    └── fixtures/
+        ├── enrichment/                           // Enrichment pattern fixtures
+        ├── section-extraction/                   // Content extraction fixtures
+        ├── subdir/                               // Path resolution fixtures
+        ├── anchor-matching.md                    // Anchor validation scenarios
+        └── anchor-matching-source.md             // Cross-document anchor tests
 ```
 
-**Current State**: The CitationValidator exists as a single monolithic file containing all validation logic (745+ lines). See Technical Debt Issue 2 for proposed component folder refactoring.
+**Technical Debt**: The current monolithic structure violates the project's action-based file naming patterns. See [Issue #41](https://github.com/WesleyMFrederick/cc-workflows/issues/41) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Organization).
 
 ---
 ## Public Contracts
@@ -308,7 +333,39 @@ class CitationValidator is
 
 TypeScript interfaces defining validator output structure. Source: `src/types/validationTypes.ts`
 
-### ValidationMetadata Type (Discriminated Union)
+### ValidationResult Interface
+
+```typescript
+export interface ValidationResult {
+  summary: ValidationSummary;
+  links: EnrichedLinkObject[];
+}
+```
+
+- [**`ValidationSummary`**](#ValidationSummary%20Interface)
+- [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface)
+
+#### ValidationSummary Interface
+
+```typescript
+export interface ValidationSummary {
+  total: number;
+  valid: number;
+  warnings: number;
+  errors: number;
+}
+```
+
+#### EnrichedLinkObject Interface
+
+```typescript
+export interface EnrichedLinkObject extends LinkObject {
+  /** Validation metadata (added post-parse by enrichment pattern) */
+  validation: ValidationMetadata;
+}
+```
+
+##### ValidationMetadata Type (Discriminated Union)
 
 ```typescript
 export type ValidationMetadata =
@@ -328,35 +385,6 @@ export type ValidationMetadata =
 ```
 
 > **Note**: TypeScript narrows `ValidationMetadata` based on `status` checks. When `status === "error"`, TypeScript makes `error` property available without additional type guards.
-
-### EnrichedLinkObject Interface
-
-```typescript
-export interface EnrichedLinkObject extends LinkObject {
-  /** Validation metadata (added post-parse by enrichment pattern) */
-  validation: ValidationMetadata;
-}
-```
-
-### ValidationResult Interface
-
-```typescript
-export interface ValidationResult {
-  summary: ValidationSummary;
-  links: EnrichedLinkObject[];
-}
-```
-
-### ValidationSummary Interface
-
-```typescript
-export interface ValidationSummary {
-  total: number;
-  valid: number;
-  warnings: number;
-  errors: number;
-}
-```
 
 ## Testing Strategy
 

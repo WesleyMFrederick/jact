@@ -317,7 +317,7 @@ Dependencies provided via constructor parameters for testability and loose coupl
 
 ## File Organization
 
-**Component Files** (Action-Based Organization):
+**Component Files**:
 
 ```text
 tools/citation-manager/src/core/ContentExtractor/
