@@ -172,9 +172,21 @@ tools/citation-manager/
 ## Public Contracts
 
 ### Input Contract
-The component's constructor accepts two dependencies:
-1. An implementation of [**`ParsedFileCacheInterface`**](ParsedFileCache%20Implementation%20Guide.md#Public%20Contracts) that returns [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) instances
-2. An implementation of **`FileCacheInterface`** for legacy path resolution
+
+```typescript
+// Input 1: Constructor dependencies (at instantiation)
+new CitationValidator(
+  parsedFileCache: ParsedFileCacheInterface,  // Required: Returns ParsedDocument instances
+  fileCache: FileCacheInterface,              // Required: Legacy path resolution
+)
+
+// Input 2: Runtime parameters (when calling public methods)
+CitationValidator.validateFile(filePath: string)  // Required: Absolute path to source file
+CitationValidator.validateSingleCitation(link: LinkObject, contextFile?: string)  // Required: Link to validate
+```
+
+- [**`ParsedFileCacheInterface`**](ParsedFileCache%20Implementation%20Guide.md#Public%20Contracts): Returns [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) instances
+- **`FileCacheInterface`**: Legacy path resolution
 
 #### Public Method: `validateFile(filePath)`
 
@@ -211,9 +223,21 @@ Public method for validating a single LinkObject. Added to support CLI Orchestra
 
 ### Output Contract
 
-**Enrichment Pattern**: The `validateFile()` method returns `{ summary, links }` where:
-- **`summary`** (object): Aggregate counts of `total`, `valid`, `warning`, and `error` links
-- **`links`** (EnrichedLinkObject[]): Original LinkObjects from parser with added `validation` property
+```typescript
+CitationValidator.validateFile(filePath) → Promise<ValidationResult>
+CitationValidator.validateSingleCitation(link, contextFile?) → Promise<EnrichedLinkObject>
+```
+
+**Returns:**
+
+- [**`ValidationResult`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator)
+  - `summary`: Aggregate counts (`total`, `valid`, `warning`, `error`)
+  - `links`: EnrichedLinkObject[] with added `validation` property
+
+- **EnrichedLinkObject**
+  - Original LinkObject extended with ValidationMetadata
+
+---
 
 ## Pseudocode
 
