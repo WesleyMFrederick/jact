@@ -96,12 +96,12 @@ The CLI includes a `semanticSuggestionMap` constant that maps common user mistak
 
 ```javascript
 const semanticSuggestionMap = {
-	// Command synonyms
-	check: ['validate'],
-	verify: ['validate'],
-	lint: ['validate'],
-	parse: ['ast'],
-	// ... etc
+ // Command synonyms
+ check: ['validate'],
+ verify: ['validate'],
+ lint: ['validate'],
+ parse: ['ast'],
+ // ... etc
 };
 ```
 
@@ -132,7 +132,7 @@ tools/citation-manager/
 
 ### Ideal Structure (Future Refactoring)
 
-Following the Component Folder pattern from [File Naming Patterns](../../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns):
+Following the Component Folder pattern from [File Naming Patterns](../../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%)
 
 ```text
 tools/citation-manager/
