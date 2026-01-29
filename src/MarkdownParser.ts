@@ -92,13 +92,10 @@ export class MarkdownParser {
 	/**
 	 * Extract all link references from markdown content
 	 *
-	 * Detects and structures multiple link formats:
-	 * - Cross-document markdown: [text](file.md#anchor)
-	 * - Citation format: [cite: path]
-	 * - Relative paths without extension: [text](path/to/file)
-	 * - Wiki-style cross-document: [[file.md#anchor|text]]
-	 * - Wiki-style internal: [[#anchor|text]]
-	 * - Caret references: ^anchor-id
+	 * Uses token-first extraction for standard markdown links (via marked.lexer tokens),
+	 * retaining regex ONLY for Obsidian-specific syntax not in CommonMark:
+	 * - Token extraction: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
+	 * - Regex extraction: citation format, wiki-links, caret syntax
 	 *
 	 * For each link, resolves paths to absolute and relative forms using the
 	 * source file path as reference. Determines anchor type (header vs block)
@@ -113,332 +110,465 @@ export class MarkdownParser {
 		const lines = content.split("\n");
 		const sourceAbsolutePath = sourcePath;
 
+		// Phase 1: Token-based extraction for standard markdown links
+		const tokens = marked.lexer(content);
+		this._extractLinksFromTokens(tokens, lines, sourceAbsolutePath, links);
+
+		// Phase 2: Regex extraction for patterns not in CommonMark or not caught by token parser
 		lines.forEach((line, index) => {
-			// Cross-document markdown links with .md extension (with optional anchors)
-			const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(?:#((?:[^()]|\([^)]*\))+))?\)/g;
-			let match = linkPattern.exec(line);
-			while (match !== null) {
-				const text = match[1] ?? "";
-				const rawPath = match[2] ?? "";
-				const anchor = match[3] ?? null;
+			// Regex fallback for markdown links with non-URL-encoded anchors
+			// (CommonMark only recognizes URL-encoded anchors, but Obsidian allows raw spaces/colons)
+			this._extractMarkdownLinksRegex(line, index, sourceAbsolutePath, links);
 
-				const linkType = "markdown" as const;
-				const scope = "cross-document" as const;
-				const anchorType = anchor ? this.determineAnchorType(anchor) : null;
+			// Citation format: [cite: path] — NOT in CommonMark
+			this._extractCiteLinks(line, index, sourceAbsolutePath, links);
 
-				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
-				const relativePath = absolutePath && sourceAbsolutePath
-					? relative(dirname(sourceAbsolutePath), absolutePath)
-					: null;
+			// Wiki-style cross-document links: [[file.md#anchor|text]] — NOT in CommonMark
+			this._extractWikiCrossDocLinks(line, index, sourceAbsolutePath, links);
 
-				const linkObject = {
-					linkType: linkType,
-					scope: scope,
-					anchorType: anchorType,
-					source: {
-						path: {
-							absolute: sourceAbsolutePath,
-						},
-					},
-					target: {
-						path: {
-							raw: rawPath,
-							absolute: absolutePath,
-							relative: relativePath,
-						},
-						anchor: anchor,
-					},
-					text: text,
-					fullMatch: match[0],
-					line: index + 1,
-					column: match.index,
-					extractionMarker: this._detectExtractionMarker(
-						line,
-						match.index + match[0].length,
-					),
-				};
-				links.push(linkObject);
-				match = linkPattern.exec(line);
-			}
+			// Wiki-style internal links: [[#anchor|text]] — NOT in CommonMark
+			this._extractWikiInternalLinks(line, index, sourceAbsolutePath, links);
 
-			// Citation format: [cite: path]
-			const citePattern = /\[cite:\s*([^\]]+)\]/g;
-			match = citePattern.exec(line);
-			while (match !== null) {
-				const rawPath = (match[1] ?? "").trim();
-				const text = `cite: ${rawPath}`;
+			// Caret syntax references: ^anchor-id — NOT in CommonMark
+			this._extractCaretLinks(line, index, sourceAbsolutePath, links);
+		});
 
-				const linkType = "markdown" as const;
-				const scope = "cross-document" as const;
-				const anchorType = null;
+		return links;
+	}
 
-				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
-				const relativePath = absolutePath && sourceAbsolutePath
-					? relative(dirname(sourceAbsolutePath), absolutePath)
-					: null;
+	/**
+	 * Walk marked.js tokens recursively to extract standard markdown links.
+	 * Handles: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
+	 */
+	private _extractLinksFromTokens(
+		tokens: Token[],
+		lines: string[],
+		sourceAbsolutePath: string,
+		links: LinkObject[]
+	): void {
+		const walkTokens = (tokenList: Token[]): void => {
+			for (const token of tokenList) {
+				if (token.type === "link") {
+					const href = (token as any).href || "";
+					const text = (token as any).text || "";
+					const raw = (token as any).raw || "";
 
-				const citeLinkObject = {
-					linkType: linkType,
-					scope: scope,
-					anchorType: anchorType,
-					source: {
-						path: {
-							absolute: sourceAbsolutePath,
-						},
-					},
-					target: {
-						path: {
-							raw: rawPath,
-							absolute: absolutePath,
-							relative: relativePath,
-						},
-						anchor: null,
-					},
-					text: text,
-					fullMatch: match[0],
-					line: index + 1,
-					column: match.index,
-					extractionMarker: this._detectExtractionMarker(
-						line,
-						match.index + match[0].length,
-					),
-				};
-				links.push(citeLinkObject);
-				match = citePattern.exec(line);
-			}
+					// Skip external links (http/https)
+					if (href.startsWith("http://") || href.startsWith("https://")) {
+						// Recurse into children regardless
+						if (hasNestedTokens(token)) {
+							walkTokens(token.tokens);
+						}
+						continue;
+					}
 
-			// Cross-document links without .md extension (relative paths)
-			const relativeDocRegex = /\[([^\]]+)\]\(([^)]*\/[^)#]+)(?:#((?:[^()]|\([^)]*\))+))?\)/g;
-			match = relativeDocRegex.exec(line);
-			while (match !== null) {
-				const filepath = match[2] ?? "";
-				if (
-					filepath &&
-					!filepath.endsWith(".md") &&
-					!filepath.startsWith("http") &&
-					filepath.includes("/")
-				) {
-					const text = match[1] ?? "";
-					const rawPath = match[2] ?? "";
-					const anchor = match[3] ?? null;
+					// Determine scope and parse anchor
+					const isInternal = href.startsWith("#");
+					const scope = isInternal ? ("internal" as const) : ("cross-document" as const);
 
-					const linkType = "markdown" as const;
-					const scope = "cross-document" as const;
-					const anchorType = anchor ? this.determineAnchorType(anchor) : null;
+					let rawPath: string | null = null;
+					let anchor: string | null = null;
 
-					const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
+					if (isInternal) {
+						anchor = href.substring(1); // Remove leading #
+					} else {
+						const hashIndex = href.indexOf("#");
+						if (hashIndex !== -1) {
+							rawPath = href.substring(0, hashIndex);
+							anchor = href.substring(hashIndex + 1);
+						} else {
+							rawPath = href;
+						}
+					}
+
+					// Resolve paths for cross-document links
+					const absolutePath = rawPath
+						? this.resolvePath(rawPath, sourceAbsolutePath)
+						: null;
 					const relativePath = absolutePath && sourceAbsolutePath
 						? relative(dirname(sourceAbsolutePath), absolutePath)
 						: null;
 
-					const relativeDocLinkObject = {
-						linkType: linkType,
-						scope: scope,
-						anchorType: anchorType,
-						source: {
-							path: {
-								absolute: sourceAbsolutePath,
-							},
-						},
+					const anchorType = anchor ? this.determineAnchorType(anchor) : null;
+
+					// Find line/column from raw match in content
+					const { line: lineNum, column } = this._findPosition(raw, lines);
+
+					const linkObject: LinkObject = {
+						linkType: "markdown" as const,
+						scope,
+						anchorType,
+						source: { path: { absolute: sourceAbsolutePath } },
 						target: {
 							path: {
 								raw: rawPath,
 								absolute: absolutePath,
 								relative: relativePath,
 							},
-							anchor: anchor,
+							anchor,
 						},
-						text: text,
-						fullMatch: match[0],
-						line: index + 1,
-						column: match.index,
-						extractionMarker: this._detectExtractionMarker(
-							line,
-							match.index + match[0].length,
-						),
+						text,
+						fullMatch: raw,
+						line: lineNum,
+						column,
+						extractionMarker:
+							lineNum > 0
+								? this._detectExtractionMarker(
+										lines[lineNum - 1] || "",
+										column + raw.length
+									)
+								: null,
 					};
-					links.push(relativeDocLinkObject);
+					links.push(linkObject);
 				}
-				match = relativeDocRegex.exec(line);
+
+				// Recurse into nested tokens
+				if (hasNestedTokens(token)) {
+					walkTokens(token.tokens);
+				}
+				// Also check items (list items have items property)
+				if ("items" in token && Array.isArray((token as any).items)) {
+					for (const item of (token as any).items) {
+						if (hasNestedTokens(item)) {
+							walkTokens(item.tokens);
+						}
+					}
+				}
 			}
+		};
+		walkTokens(tokens);
+	}
 
-			// Wiki-style cross-document links: [[file.md#anchor|text]]
-			const wikiCrossDocRegex = /\[\[([^#\]]+\.md)(#([^|]+?))?\|([^\]]+)\]\]/g;
-			match = wikiCrossDocRegex.exec(line);
-			while (match !== null) {
-				const rawPath = match[1] ?? "";
-				const anchor = match[3] ?? null;
-				const text = match[4] ?? "";
+	/**
+	 * Find line number and column for a raw match string in content lines.
+	 * Returns 1-based line, 0-based column.
+	 */
+	private _findPosition(raw: string, lines: string[]): { line: number; column: number } {
+		for (let i = 0; i < lines.length; i++) {
+			const col = lines[i].indexOf(raw);
+			if (col !== -1) {
+				return { line: i + 1, column: col };
+			}
+		}
+		return { line: 0, column: 0 };
+	}
 
-				const linkType = "wiki" as const;
-				const scope = "cross-document" as const;
-				const anchorType = anchor ? this.determineAnchorType(anchor) : null;
+	/**
+	 * Regex fallback for markdown links with non-URL-encoded anchors.
+	 * CommonMark (marked.js) only recognizes URL-encoded anchors in links,
+	 * but Obsidian allows raw spaces/colons. This catches those edge cases.
+	 * Only extracts links NOT already extracted by token parser.
+	 */
+	private _extractMarkdownLinksRegex(
+		line: string,
+		index: number,
+		sourceAbsolutePath: string,
+		links: LinkObject[]
+	): void {
+		// Pattern for markdown links: [text](path#anchor)
+		// Permissive anchor pattern allows spaces, colons, parens
+		const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(?:#((?:[^()]|\([^)]*\))+))?\)/g;
+		let match = linkPattern.exec(line);
+		while (match !== null) {
+			const text = match[1] ?? "";
+			const rawPath = match[2] ?? "";
+			const anchor = match[3] ?? null;
+			const fullMatch = match[0];
 
+			// Skip if already extracted by token parser
+			// Token parser creates entries with exact fullMatch, so check if this exists
+			const alreadyExtracted = links.some(l => l.fullMatch === fullMatch);
+			if (!alreadyExtracted) {
 				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
-				const relativePath = absolutePath && sourceAbsolutePath
-					? relative(dirname(sourceAbsolutePath), absolutePath)
-					: null;
+				const relativePath =
+					absolutePath && sourceAbsolutePath
+						? relative(dirname(sourceAbsolutePath), absolutePath)
+						: null;
 
-				const wikiCrossDocLinkObject = {
-					linkType: linkType,
-					scope: scope,
-					anchorType: anchorType,
-					source: {
-						path: {
-							absolute: sourceAbsolutePath,
-						},
-					},
+				links.push({
+					linkType: "markdown" as const,
+					scope: "cross-document" as const,
+					anchorType: anchor ? this.determineAnchorType(anchor) : null,
+					source: { path: { absolute: sourceAbsolutePath } },
 					target: {
 						path: {
 							raw: rawPath,
 							absolute: absolutePath,
 							relative: relativePath,
 						},
-						anchor: anchor,
+						anchor,
 					},
-					text: text,
-					fullMatch: match[0],
+					text,
+					fullMatch: fullMatch,
 					line: index + 1,
 					column: match.index,
 					extractionMarker: this._detectExtractionMarker(
 						line,
-						match.index + match[0].length,
+						match.index + fullMatch.length
 					),
-				};
-				links.push(wikiCrossDocLinkObject);
-				match = wikiCrossDocRegex.exec(line);
+				});
 			}
+			match = linkPattern.exec(line);
+		}
 
-			// Wiki-style links (internal anchors only)
-			const wikiRegex = /\[\[#([^|]+)\|([^\]]+)\]\]/g;
-			match = wikiRegex.exec(line);
-			while (match !== null) {
-				const anchor = match[1] ?? "";
-				const text = match[2] ?? "";
+		// Internal anchor links: [text](#anchor) with permissive anchor
+		const internalAnchorRegex = /\[([^\]]+)\]\(#((?:[^()]|\([^)]*\))+)\)/g;
+		match = internalAnchorRegex.exec(line);
+		while (match !== null) {
+			const text = match[1] ?? "";
+			const anchor = match[2] ?? "";
+			const fullMatch = match[0];
 
-				const linkType = "wiki" as const;
-				const scope = "internal" as const;
-				const anchorType = this.determineAnchorType(anchor);
-
-				const wikiLinkObject = {
-					linkType: linkType,
-					scope: scope,
-					anchorType: anchorType,
-					source: {
-						path: {
-							absolute: sourceAbsolutePath ?? "",
-						},
-					},
+			// Skip if already extracted
+			const alreadyExtracted = links.some(l => l.fullMatch === fullMatch);
+			if (!alreadyExtracted) {
+				links.push({
+					linkType: "markdown" as const,
+					scope: "internal" as const,
+					anchorType: this.determineAnchorType(anchor),
+					source: { path: { absolute: sourceAbsolutePath ?? "" } },
 					target: {
-						path: {
-							raw: null,
-							absolute: null,
-							relative: null,
-						},
-						anchor: anchor,
+						path: { raw: null, absolute: null, relative: null },
+						anchor,
 					},
-					text: text,
-					fullMatch: match[0],
+					text,
+					fullMatch: fullMatch,
 					line: index + 1,
 					column: match.index,
 					extractionMarker: this._detectExtractionMarker(
 						line,
-						match.index + match[0].length,
+						match.index + fullMatch.length
 					),
-				};
-				links.push(wikiLinkObject);
-				match = wikiRegex.exec(line);
+				});
 			}
-
-			// Internal markdown anchor links: [text](#anchor)
-			const internalAnchorRegex = /\[([^\]]+)\]\(#((?:[^()]|\([^)]*\))+)\)/g;
 			match = internalAnchorRegex.exec(line);
-			while (match !== null) {
+		}
+
+		// Relative doc links without .md extension: [text](path/to/file#anchor)
+		const relativeDocRegex = /\[([^\]]+)\]\(([^)]*\/[^)#]+)(?:#((?:[^()]|\([^)]*\))+))?\)/g;
+		match = relativeDocRegex.exec(line);
+		while (match !== null) {
+			const filepath = match[2] ?? "";
+			if (
+				filepath &&
+				!filepath.endsWith(".md") &&
+				!filepath.startsWith("http") &&
+				filepath.includes("/")
+			) {
 				const text = match[1] ?? "";
-				const anchor = match[2] ?? "";
+				const rawPath = match[2] ?? "";
+				const anchor = match[3] ?? null;
+				const fullMatch = match[0];
 
-				const linkType = "markdown" as const;
-				const scope = "internal" as const;
-				const anchorType = this.determineAnchorType(anchor);
+				// Skip if already extracted
+				const alreadyExtracted = links.some(l => l.fullMatch === fullMatch);
+				if (!alreadyExtracted) {
+					const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
+					const relativePath =
+						absolutePath && sourceAbsolutePath
+							? relative(dirname(sourceAbsolutePath), absolutePath)
+							: null;
 
-				const internalAnchorLinkObject = {
-					linkType: linkType,
-					scope: scope,
-					anchorType: anchorType,
-					source: {
-						path: {
-							absolute: sourceAbsolutePath ?? "",
-						},
-					},
-					target: {
-						path: {
-							raw: null,
-							absolute: null,
-							relative: null,
-						},
-						anchor: anchor,
-					},
-					text: text,
-					fullMatch: match[0],
-					line: index + 1,
-					column: match.index,
-					extractionMarker: this._detectExtractionMarker(
-						line,
-						match.index + match[0].length,
-					),
-				};
-				links.push(internalAnchorLinkObject);
-				match = internalAnchorRegex.exec(line);
-			}
-
-			// Caret syntax references (internal references)
-			const caretRegex = /\^([A-Za-z0-9-]+)/g;
-			match = caretRegex.exec(line);
-			while (match !== null) {
-				const anchor = match[1] ?? "";
-
-				// Skip semantic version patterns (^14.0.1, ^v1.2.3, etc)
-				const afterMatch = line.substring(match.index + match[0].length);
-				const isSemanticVersion = /^\.\d/.test(afterMatch);
-
-				if (!isSemanticVersion) {
-					const linkType = "markdown" as const;
-					const scope = "internal" as const;
-					const anchorType = "block" as const;
-
-					const caretLinkObject = {
-						linkType: linkType,
-						scope: scope,
-						anchorType: anchorType,
-						source: {
-							path: {
-								absolute: sourceAbsolutePath ?? "",
-							},
-						},
+					links.push({
+						linkType: "markdown" as const,
+						scope: "cross-document" as const,
+						anchorType: anchor ? this.determineAnchorType(anchor) : null,
+						source: { path: { absolute: sourceAbsolutePath } },
 						target: {
 							path: {
-								raw: null,
-								absolute: null,
-								relative: null,
+								raw: rawPath,
+								absolute: absolutePath,
+								relative: relativePath,
 							},
-							anchor: anchor,
+							anchor,
 						},
-						text: null,
-						fullMatch: match[0],
+						text,
+						fullMatch: fullMatch,
 						line: index + 1,
 						column: match.index,
 						extractionMarker: this._detectExtractionMarker(
 							line,
-							match.index + match[0].length,
+							match.index + fullMatch.length
 						),
-					};
-					links.push(caretLinkObject);
+					});
 				}
-				match = caretRegex.exec(line);
 			}
-		});
+			match = relativeDocRegex.exec(line);
+		}
+	}
 
-		return links;
+	/**
+	 * Extract citation format links: [cite: path]
+	 * NOT in CommonMark — Obsidian specific
+	 */
+	private _extractCiteLinks(
+		line: string,
+		index: number,
+		sourceAbsolutePath: string,
+		links: LinkObject[]
+	): void {
+		const citePattern = /\[cite:\s*([^\]]+)\]/g;
+		let match = citePattern.exec(line);
+		while (match !== null) {
+			const rawPath = (match[1] ?? "").trim();
+			const text = `cite: ${rawPath}`;
+
+			const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
+			const relativePath =
+				absolutePath && sourceAbsolutePath
+					? relative(dirname(sourceAbsolutePath), absolutePath)
+					: null;
+
+			links.push({
+				linkType: "markdown" as const,
+				scope: "cross-document" as const,
+				anchorType: null,
+				source: { path: { absolute: sourceAbsolutePath } },
+				target: {
+					path: { raw: rawPath, absolute: absolutePath, relative: relativePath },
+					anchor: null,
+				},
+				text: text,
+				fullMatch: match[0],
+				line: index + 1,
+				column: match.index,
+				extractionMarker: this._detectExtractionMarker(
+					line,
+					match.index + match[0].length
+				),
+			});
+			match = citePattern.exec(line);
+		}
+	}
+
+	/**
+	 * Extract wiki-style cross-document links: [[file.md#anchor|text]]
+	 * NOT in CommonMark — Obsidian specific
+	 */
+	private _extractWikiCrossDocLinks(
+		line: string,
+		index: number,
+		sourceAbsolutePath: string,
+		links: LinkObject[]
+	): void {
+		const wikiCrossDocRegex = /\[\[([^#\]]+\.md)(#([^|]+?))?\|([^\]]+)\]\]/g;
+		let match = wikiCrossDocRegex.exec(line);
+		while (match !== null) {
+			const rawPath = match[1] ?? "";
+			const anchor = match[3] ?? null;
+			const text = match[4] ?? "";
+
+			const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
+			const relativePath =
+				absolutePath && sourceAbsolutePath
+					? relative(dirname(sourceAbsolutePath), absolutePath)
+					: null;
+
+			links.push({
+				linkType: "wiki" as const,
+				scope: "cross-document" as const,
+				anchorType: anchor ? this.determineAnchorType(anchor) : null,
+				source: { path: { absolute: sourceAbsolutePath } },
+				target: {
+					path: {
+						raw: rawPath,
+						absolute: absolutePath,
+						relative: relativePath,
+					},
+					anchor,
+				},
+				text,
+				fullMatch: match[0],
+				line: index + 1,
+				column: match.index,
+				extractionMarker: this._detectExtractionMarker(
+					line,
+					match.index + match[0].length
+				),
+			});
+			match = wikiCrossDocRegex.exec(line);
+		}
+	}
+
+	/**
+	 * Extract wiki-style internal links: [[#anchor|text]]
+	 * NOT in CommonMark — Obsidian specific
+	 */
+	private _extractWikiInternalLinks(
+		line: string,
+		index: number,
+		sourceAbsolutePath: string,
+		links: LinkObject[]
+	): void {
+		const wikiRegex = /\[\[#([^|]+)\|([^\]]+)\]\]/g;
+		let match = wikiRegex.exec(line);
+		while (match !== null) {
+			const anchor = match[1] ?? "";
+			const text = match[2] ?? "";
+
+			links.push({
+				linkType: "wiki" as const,
+				scope: "internal" as const,
+				anchorType: this.determineAnchorType(anchor),
+				source: { path: { absolute: sourceAbsolutePath ?? "" } },
+				target: {
+					path: { raw: null, absolute: null, relative: null },
+					anchor,
+				},
+				text,
+				fullMatch: match[0],
+				line: index + 1,
+				column: match.index,
+				extractionMarker: this._detectExtractionMarker(
+					line,
+					match.index + match[0].length
+				),
+			});
+			match = wikiRegex.exec(line);
+		}
+	}
+
+	/**
+	 * Extract caret syntax references: ^anchor-id
+	 * NOT in CommonMark — Obsidian specific
+	 */
+	private _extractCaretLinks(
+		line: string,
+		index: number,
+		sourceAbsolutePath: string,
+		links: LinkObject[]
+	): void {
+		const caretRegex = /\^([A-Za-z0-9-]+)/g;
+		let match = caretRegex.exec(line);
+		while (match !== null) {
+			const anchor = match[1] ?? "";
+
+			// Skip semantic version patterns (^14.0.1, ^v1.2.3, etc)
+			const afterMatch = line.substring(match.index + match[0].length);
+			const isSemanticVersion = /^\.\d/.test(afterMatch);
+
+			if (!isSemanticVersion) {
+				links.push({
+					linkType: "markdown" as const,
+					scope: "internal" as const,
+					anchorType: "block" as const,
+					source: { path: { absolute: sourceAbsolutePath ?? "" } },
+					target: {
+						path: { raw: null, absolute: null, relative: null },
+						anchor,
+					},
+					text: null,
+					fullMatch: match[0],
+					line: index + 1,
+					column: match.index,
+					extractionMarker: this._detectExtractionMarker(
+						line,
+						match.index + match[0].length
+					),
+				});
+			}
+			match = caretRegex.exec(line);
+		}
 	}
 
 	/**

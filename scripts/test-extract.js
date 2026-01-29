@@ -10,7 +10,7 @@
  *   node scripts/test-extract.js path/to/file.md --full-files
  */
 
-import { createContentExtractor } from "../src/factories/componentFactory.js";
+import { createContentExtractor } from "../dist/factories/componentFactory.js";
 import { resolve } from "node:path";
 
 async function testExtract(sourceFilePath, cliFlags = {}) {
