@@ -137,6 +137,18 @@ export class MarkdownParser {
 	}
 
 	/**
+	 * Type guard for link tokens from marked.js
+	 */
+	private _isLinkToken(token: Token): token is Token & { href: string; text: string; raw: string } {
+		return (
+			token.type === "link" &&
+			typeof (token as any).href === "string" &&
+			typeof (token as any).text === "string" &&
+			typeof (token as any).raw === "string"
+		);
+	}
+
+	/**
 	 * Walk marked.js tokens recursively to extract standard markdown links.
 	 * Handles: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
 	 */
@@ -148,10 +160,10 @@ export class MarkdownParser {
 	): void {
 		const walkTokens = (tokenList: Token[]): void => {
 			for (const token of tokenList) {
-				if (token.type === "link") {
-					const href = (token as any).href || "";
-					const text = (token as any).text || "";
-					const raw = (token as any).raw || "";
+				if (this._isLinkToken(token)) {
+					const href = token.href;
+					const text = token.text;
+					const raw = token.raw;
 
 					// Skip external links (http/https)
 					if (href.startsWith("http://") || href.startsWith("https://")) {
@@ -245,12 +257,32 @@ export class MarkdownParser {
 	 */
 	private _findPosition(raw: string, lines: string[]): { line: number; column: number } {
 		for (let i = 0; i < lines.length; i++) {
-			const col = lines[i].indexOf(raw);
+			const line = lines[i];
+			if (line === undefined) continue;
+			const col = line.indexOf(raw);
 			if (col !== -1) {
 				return { line: i + 1, column: col };
 			}
 		}
 		return { line: 0, column: 0 };
+	}
+
+	/**
+	 * Deduplication helper: check if a link was already extracted.
+	 * Uses multi-property matching to handle variations in encoding/whitespace.
+	 * Compares: rawPath, anchor, line, column (stricter than fullMatch alone)
+	 */
+	private _isDuplicateLink(
+		candidate: { rawPath: string | null; anchor: string | null; line: number; column: number },
+		existingLinks: LinkObject[]
+	): boolean {
+		return existingLinks.some(
+			l =>
+				l.target.path.raw === candidate.rawPath &&
+				l.target.anchor === candidate.anchor &&
+				l.line === candidate.line &&
+				l.column === candidate.column
+		);
 	}
 
 	/**
@@ -275,9 +307,11 @@ export class MarkdownParser {
 			const anchor = match[3] ?? null;
 			const fullMatch = match[0];
 
-			// Skip if already extracted by token parser
-			// Token parser creates entries with exact fullMatch, so check if this exists
-			const alreadyExtracted = links.some(l => l.fullMatch === fullMatch);
+			// Skip if already extracted by token parser using robust deduplication
+			const alreadyExtracted = this._isDuplicateLink(
+				{ rawPath, anchor, line: index + 1, column: match.index },
+				links
+			);
 			if (!alreadyExtracted) {
 				const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
 				const relativePath =
@@ -319,8 +353,11 @@ export class MarkdownParser {
 			const anchor = match[2] ?? "";
 			const fullMatch = match[0];
 
-			// Skip if already extracted
-			const alreadyExtracted = links.some(l => l.fullMatch === fullMatch);
+			// Skip if already extracted using robust deduplication
+			const alreadyExtracted = this._isDuplicateLink(
+				{ rawPath: null, anchor, line: index + 1, column: match.index },
+				links
+			);
 			if (!alreadyExtracted) {
 				links.push({
 					linkType: "markdown" as const,
@@ -360,8 +397,11 @@ export class MarkdownParser {
 				const anchor = match[3] ?? null;
 				const fullMatch = match[0];
 
-				// Skip if already extracted
-				const alreadyExtracted = links.some(l => l.fullMatch === fullMatch);
+				// Skip if already extracted using robust deduplication
+				const alreadyExtracted = this._isDuplicateLink(
+					{ rawPath, anchor, line: index + 1, column: match.index },
+					links
+				);
 				if (!alreadyExtracted) {
 					const absolutePath = this.resolvePath(rawPath, sourceAbsolutePath ?? "");
 					const relativePath =
