@@ -44,7 +44,7 @@ export interface SourceLinkEntry {
 export interface ExtractedContentBlock {
 	content: string;
 	contentLength: number;
-	sourceLinks: SourceLinkEntry[];
+	sourceLinks?: SourceLinkEntry[];
 }
 
 /**
@@ -54,6 +54,11 @@ export interface ExtractedContentBlock {
 export interface ProcessedLinkEntry {
 	sourceLink: EnrichedLinkObject;
 	contentId: string | null;
+	/**
+	 * Processing outcome status.
+	 * - extractLinksContent path: "skipped" | "success" | "error"
+	 * - ContentExtractor.extractContent path: "skipped" | "extracted" | "failed"
+	 */
 	status: "extracted" | "skipped" | "success" | "error" | "failed";
 	eligibilityReason?: string;
 	failureDetails?: {
