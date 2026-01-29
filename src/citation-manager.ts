@@ -897,7 +897,7 @@ const semanticSuggestionMap: Record<string, string[]> = {
 	dir: ["--scope"],
 };
 
-const program = new Command();
+const program: Command = new Command();
 
 program
 	.name("citation-manager")
@@ -906,7 +906,7 @@ program
 
 // Configure custom error output with semantic suggestions
 program.configureOutput({
-	outputError: (str, write) => {
+	outputError: (str: string, write: (str: string) => void) => {
 		const match = str.match(/unknown (?:command|option) '([^']+)'/);
 		if (match && match[1]) {
 			const input = match[1].replace(/^--?/, "");
@@ -958,7 +958,7 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (file: string, options: any) => {
+	.action(async (file: string, options: CliValidateOptions) => {
 		const manager = new CitationManager();
 		let result;
 
@@ -1014,6 +1014,7 @@ Output includes:
 		console.log(JSON.stringify(ast, null, 2));
 	});
 
+
 // Pattern: Extract command with links subcommand
 const extractCmd = program
 	.command("extract")
@@ -1045,7 +1046,7 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (sourceFile: string, options: any) => {
+	.action(async (sourceFile: string, options: CliExtractOptions) => {
 		// Pattern: Delegate to CitationManager orchestrator
 		const manager = new CitationManager();
 
@@ -1079,7 +1080,7 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (targetFile: string, headerName: string, options: any) => {
+	.action(async (targetFile: string, headerName: string, options: CliExtractOptions) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
 
@@ -1127,7 +1128,7 @@ Exit Codes:
   2  System error (permission denied, parse error)
 `,
 	)
-	.action(async (targetFile: string, options: any) => {
+	.action(async (targetFile: string, options: CliExtractOptions) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
 
