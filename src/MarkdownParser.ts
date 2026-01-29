@@ -201,24 +201,16 @@ export class MarkdownParser {
 						? relative(dirname(sourceAbsolutePath), absolutePath)
 						: null;
 
-					const anchorType = anchor ? this.determineAnchorType(anchor) : null;
-
 					// Find line/column from raw match in content
 					const { line: lineNum, column } = this._findPosition(raw, lines);
 
-					const linkObject: LinkObject = {
-						linkType: "markdown" as const,
+					// Use factory function to create link object
+					const linkObject = this._createLinkObject({
+						linkType: "markdown",
 						scope,
-						anchorType,
-						source: { path: { absolute: sourceAbsolutePath } },
-						target: {
-							path: {
-								raw: rawPath,
-								absolute: absolutePath,
-								relative: relativePath,
-							},
-							anchor,
-						},
+						anchor,
+						rawPath,
+						sourceAbsolutePath,
 						text,
 						fullMatch: raw,
 						line: lineNum,
@@ -230,7 +222,7 @@ export class MarkdownParser {
 										column + raw.length
 									)
 								: null,
-					};
+					});
 					links.push(linkObject);
 				}
 
@@ -844,5 +836,52 @@ export class MarkdownParser {
 			.replace(/\s+/g, "-") // Replace spaces with hyphens
 			.replace(/-+/g, "-") // Replace multiple hyphens with single
 			.replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
+	}
+
+	/**
+	 * Factory function for creating LinkObject instances.
+	 * Single source of truth for link object construction.
+	 * Handles path resolution, anchor type classification, and structure.
+	 */
+	_createLinkObject(params: {
+		linkType: "markdown" | "wiki";
+		scope: "internal" | "cross-document";
+		anchor: string | null;
+		rawPath: string | null;
+		sourceAbsolutePath: string;
+		text: string | null;
+		fullMatch: string;
+		line: number;
+		column: number;
+		extractionMarker: { fullMatch: string; innerText: string } | null;
+	}): LinkObject {
+		const anchorType = params.anchor ? this.determineAnchorType(params.anchor) : null;
+
+		const absolutePath = params.rawPath
+			? this.resolvePath(params.rawPath, params.sourceAbsolutePath)
+			: null;
+		const relativePath = absolutePath && params.sourceAbsolutePath
+			? relative(dirname(params.sourceAbsolutePath), absolutePath)
+			: null;
+
+		return {
+			linkType: params.linkType,
+			scope: params.scope,
+			anchorType,
+			source: { path: { absolute: params.sourceAbsolutePath } },
+			target: {
+				path: {
+					raw: params.rawPath,
+					absolute: absolutePath,
+					relative: relativePath,
+				},
+				anchor: params.anchor,
+			},
+			text: params.text,
+			fullMatch: params.fullMatch,
+			line: params.line,
+			column: params.column,
+			extractionMarker: params.extractionMarker,
+		};
 	}
 }
