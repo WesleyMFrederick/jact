@@ -4,13 +4,12 @@ import type {
 	ExtractionEligibilityStrategy,
 	ExtractionStats,
 	OutgoingLinksExtractedContent,
-	OutgoingLinksReport,
 	ProcessedLinkEntry,
 	ExtractedContentBlock,
 } from '../../types/contentExtractorTypes.js';
-import { analyzeEligibility } from './analyzeEligibility.js';
-import { generateContentId } from './generateContentId.js';
-import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.js';
+import { analyzeEligibility } from './analyzeEligibility.ts';
+import { generateContentId } from './generateContentId.ts';
+import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.ts';
 
 /**
  * Consumer-defined interface for ParsedFileCache dependency.
