@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateContentId } from "../src/core/ContentExtractor/generateContentId.js";
+import { generateContentId } from "../src/core/ContentExtractor/generateContentId.ts";
 
 describe("Content ID Generation - Determinism", () => {
 	it("should generate identical hashes for identical content", () => {
