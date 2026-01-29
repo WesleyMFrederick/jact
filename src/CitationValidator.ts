@@ -199,28 +199,8 @@ export class CitationValidator {
 		// 3. Enrich each link with validation metadata (parallel execution)
 		await Promise.all(
 			links.map(async (link: LinkObject) => {
-				const result = await this.validateSingleCitation(link, filePath);
-
-				// Build discriminated union based on status
-				let validation: ValidationMetadata;
-
-				if (result.status === "valid") {
-					// Valid variant: only status field
-					validation = { status: "valid" };
-				} else {
-					// Error/Warning variant: status + error + optional fields
-					validation = {
-						status: result.status as "error" | "warning",
-						error: result.error ?? "Unknown validation error",
-						...(result.suggestion && { suggestion: result.suggestion }),
-						...(result.pathConversion && {
-							pathConversion: result.pathConversion,
-						}),
-					};
-				}
-
-				// ENRICHMENT: Add validation property in-place
-				(link as EnrichedLinkObject).validation = validation;
+				// validateSingleCitation enriches link in-place and returns it
+				await this.validateSingleCitation(link, filePath);
 			}),
 		);
 
@@ -247,11 +227,40 @@ export class CitationValidator {
 	/**
 	 * Validate a single citation link.
 	 * Classifies pattern type and delegates to appropriate validator.
-	 * @param citation - LinkObject to validate
+	 * Enriches the input LinkObject in-place with validation metadata.
+	 * @param citation - LinkObject to validate (enriched in-place)
 	 * @param contextFile - Source file path for relative path resolution
-	 * @returns Validation result with status and suggestions
+	 * @returns The same LinkObject enriched with validation property
 	 */
 	async validateSingleCitation(
+		citation: LinkObject,
+		contextFile?: string,
+	): Promise<EnrichedLinkObject> {
+		const result = await this._validateSingleCitationInternal(citation, contextFile);
+
+		// Transform internal result → ValidationMetadata (enrichment pattern)
+		let validation: ValidationMetadata;
+		if (result.status === "valid") {
+			validation = { status: "valid" };
+		} else {
+			validation = {
+				status: result.status as "error" | "warning",
+				error: result.error ?? "Unknown validation error",
+				...(result.suggestion && { suggestion: result.suggestion }),
+				...(result.pathConversion && { pathConversion: result.pathConversion }),
+			};
+		}
+
+		// ENRICHMENT: Add validation property in-place
+		(citation as EnrichedLinkObject).validation = validation;
+		return citation as EnrichedLinkObject;
+	}
+
+	/**
+	 * Internal validation logic - returns flat result for internal use.
+	 * @internal
+	 */
+	private async _validateSingleCitationInternal(
 		citation: LinkObject,
 		contextFile?: string,
 	): Promise<SingleCitationValidationResult> {

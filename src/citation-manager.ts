@@ -23,7 +23,7 @@
  */
 
 import { Command } from "commander";
-import type { ValidationResult, EnrichedLinkObject, ValidationMetadata } from "./types/validationTypes.js";
+import type { EnrichedLinkObject } from "./types/validationTypes.js";
 import type { OutgoingLinksExtractedContent } from "./types/contentExtractorTypes.js";
 import {
 	createCitationValidator,
@@ -507,45 +507,20 @@ export class CitationManager {
 
 			// --- Phase 2: Validation ---
 			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
-			// Integration: CitationValidator returns validation result
-			const validationResult = await this.validator.validateSingleCitation(
+			// Integration: CitationValidator enriches link in-place with validation metadata
+			const enrichedLink = await this.validator.validateSingleCitation(
 				syntheticLink,
 				targetFile,
 			);
 
-			// Extract validation metadata from result - build proper union type
-			let validation: ValidationMetadata;
-			if (validationResult.status === "error") {
-				validation = {
-					status: "error",
-					error: validationResult.error || "",
-					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
-					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
-				};
-			} else if (validationResult.status === "warning") {
-				validation = {
-					status: "warning",
-					error: validationResult.error || "",
-					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
-					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
-				};
-			} else {
-				validation = {
-					status: "valid",
-				};
-			}
-
-			// Add validation property to link object
-			syntheticLink.validation = validation;
-
 			// Decision: Check validation status before extraction (error handling)
-			if (syntheticLink.validation.status === "error") {
+			if (enrichedLink.validation.status === "error") {
 				// Boundary: Error output to stderr
 				// Type narrowing allows accessing error property
-				const errorMsg = syntheticLink.validation.error;
+				const errorMsg = enrichedLink.validation.error;
 				console.error("Validation failed:", errorMsg);
-				if (syntheticLink.validation.suggestion) {
-					console.error("Suggestion:", syntheticLink.validation.suggestion);
+				if (enrichedLink.validation.suggestion) {
+					console.error("Suggestion:", enrichedLink.validation.suggestion);
 				}
 				process.exitCode = 1;
 				return;
@@ -554,7 +529,6 @@ export class CitationManager {
 			// --- Phase 3: Extraction ---
 			// Pattern: Extract content from validated link
 			// Integration: ContentExtractor processes single-link array
-			const enrichedLink = syntheticLink as EnrichedLinkObject;
 			const result = await this.contentExtractor.extractContent(
 				[enrichedLink],
 				options,
@@ -621,58 +595,35 @@ export class CitationManager {
 
 			// --- Phase 2: Validation ---
 			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
-			const validationResult = await this.validator.validateSingleCitation(
+			// Integration: CitationValidator enriches link in-place with validation metadata
+			const enrichedLink = await this.validator.validateSingleCitation(
 				syntheticLink,
 				targetFile,
 			);
 
-			// Extract validation metadata from result - build proper union type
-			let validation: ValidationMetadata;
-			if (validationResult.status === "error") {
-				validation = {
-					status: "error",
-					error: validationResult.error || "",
-					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
-					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
-				};
-			} else if (validationResult.status === "warning") {
-				validation = {
-					status: "warning",
-					error: validationResult.error || "",
-					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
-					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
-				};
-			} else {
-				validation = {
-					status: "valid",
-				};
-			}
-
-			// Add validation property to link object
-			syntheticLink.validation = validation;
-
 			// Decision: Apply path conversion if validator found file via cache
 			// Pattern: Validator suggests recommended path when file found in different location
 			if (
-				validationResult.pathConversion &&
-				validationResult.pathConversion.recommended
+				enrichedLink.validation.status !== "valid" &&
+				"pathConversion" in enrichedLink.validation &&
+				enrichedLink.validation.pathConversion?.recommended
 			) {
 				// Update target path to use cache-resolved absolute path
 				const { resolve } = await import("node:path");
 				const absolutePath = resolve(
-					validationResult.pathConversion.recommended,
+					enrichedLink.validation.pathConversion.recommended,
 				);
 				syntheticLink.target.path.absolute = absolutePath;
 			}
 
 			// Decision: Check validation status before extraction (error handling)
-			if (syntheticLink.validation.status === "error") {
+			if (enrichedLink.validation.status === "error") {
 				// Boundary: Error output to stderr
 				// Type narrowing allows accessing error property
-				const errorMsg = syntheticLink.validation.error;
+				const errorMsg = enrichedLink.validation.error;
 				console.error("Validation failed:", errorMsg);
-				if (syntheticLink.validation.suggestion) {
-					console.error("Suggestion:", syntheticLink.validation.suggestion);
+				if (enrichedLink.validation.suggestion) {
+					console.error("Suggestion:", enrichedLink.validation.suggestion);
 				}
 				process.exitCode = 1;
 				return;
@@ -681,7 +632,6 @@ export class CitationManager {
 			// --- Phase 3: Extraction ---
 			// Decision: Force fullFiles flag for full-file extraction
 			// Pattern: ContentExtractor uses CliFlagStrategy to make link eligible
-			const enrichedLink = syntheticLink as EnrichedLinkObject;
 			const result = await this.contentExtractor.extractContent(
 				[enrichedLink],
 				{ ...options, fullFiles: true },
