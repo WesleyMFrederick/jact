@@ -397,37 +397,43 @@ export class MarkdownParser {
 			while (match !== null) {
 				const anchor = match[1] ?? "";
 
-				const linkType = "markdown" as const;
-				const scope = "internal" as const;
-				const anchorType = "block" as const;
+				// Skip semantic version patterns (^14.0.1, ^v1.2.3, etc)
+				const afterMatch = line.substring(match.index + match[0].length);
+				const isSemanticVersion = /^\.\d/.test(afterMatch);
 
-				const caretLinkObject = {
-					linkType: linkType,
-					scope: scope,
-					anchorType: anchorType,
-					source: {
-						path: {
-							absolute: sourceAbsolutePath ?? "",
+				if (!isSemanticVersion) {
+					const linkType = "markdown" as const;
+					const scope = "internal" as const;
+					const anchorType = "block" as const;
+
+					const caretLinkObject = {
+						linkType: linkType,
+						scope: scope,
+						anchorType: anchorType,
+						source: {
+							path: {
+								absolute: sourceAbsolutePath ?? "",
+							},
 						},
-					},
-					target: {
-						path: {
-							raw: null,
-							absolute: null,
-							relative: null,
+						target: {
+							path: {
+								raw: null,
+								absolute: null,
+								relative: null,
+							},
+							anchor: anchor,
 						},
-						anchor: anchor,
-					},
-					text: null,
-					fullMatch: match[0],
-					line: index + 1,
-					column: match.index,
-					extractionMarker: this._detectExtractionMarker(
-						line,
-						match.index + match[0].length,
-					),
-				};
-				links.push(caretLinkObject);
+						text: null,
+						fullMatch: match[0],
+						line: index + 1,
+						column: match.index,
+						extractionMarker: this._detectExtractionMarker(
+							line,
+							match.index + match[0].length,
+						),
+					};
+					links.push(caretLinkObject);
+				}
 				match = caretRegex.exec(line);
 			}
 		});
@@ -567,7 +573,12 @@ export class MarkdownParser {
 			while (match !== null) {
 				// Skip if this is already captured as an Obsidian block reference
 				const isObsidianBlock = line.endsWith(match[0]);
-				if (!isObsidianBlock) {
+
+				// Skip semantic version patterns (^14.0.1, ^v1.2.3, etc)
+				const afterMatch = line.substring(match.index + match[0].length);
+				const isSemanticVersion = /^\.\d/.test(afterMatch);
+
+				if (!isObsidianBlock && !isSemanticVersion) {
 					anchors.push({
 						anchorType: "block",
 						id: match[1] ?? "",
