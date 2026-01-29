@@ -1,7 +1,7 @@
 // tools/citation-manager/test/integration/us2.2-acceptance-criteria.test.js
 import { describe, it, expect } from "vitest";
 import { createContentExtractor } from "../../src/factories/componentFactory.js";
-import { ContentExtractor } from "../../src/core/ContentExtractor/ContentExtractor.js";
+import { ContentExtractor } from "../../dist/core/ContentExtractor/ContentExtractor.js";
 import { ParsedFileCache } from "../../dist/ParsedFileCache.js";
 import { CitationValidator } from "../../dist/CitationValidator.js";
 import { join } from "node:path";

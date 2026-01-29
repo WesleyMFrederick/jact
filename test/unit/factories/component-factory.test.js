@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { createContentExtractor } from "../../../src/factories/componentFactory.js";
-import { ContentExtractor } from "../../../src/core/ContentExtractor/ContentExtractor.js";
+import { ContentExtractor } from "../../../dist/core/ContentExtractor/ContentExtractor.js";
 import { StopMarkerStrategy } from "../../../dist/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
 import { ForceMarkerStrategy } from "../../../dist/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
 import { SectionLinkStrategy } from "../../../dist/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
