@@ -1,5 +1,5 @@
 // tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js
-import { analyzeEligibility } from "./analyzeEligibility.js";
+import { analyzeEligibility } from "./analyzeEligibility.ts";
 import { extractLinksContent as extractLinksContentOp } from "./extractLinksContent.js";
 
 /**
@@ -63,7 +63,7 @@ export class ContentExtractor {
 	async extractContent(enrichedLinks, cliFlags) {
 		// Import the extraction logic from extractLinksContent
 		// We'll need to refactor to reuse the extraction logic without validation
-		const { analyzeEligibility } = await import("./analyzeEligibility.js");
+		const { analyzeEligibility } = await import("./analyzeEligibility.ts");
 		const { generateContentId } = await import("./generateContentId.js");
 		const { decodeUrlAnchor, normalizeBlockId } = await import(
 			"./normalizeAnchor.ts"

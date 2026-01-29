@@ -1,4 +1,4 @@
-import { analyzeEligibility } from "./analyzeEligibility.js";
+import { analyzeEligibility } from "./analyzeEligibility.ts";
 import { generateContentId } from "./generateContentId.js";
 import { decodeUrlAnchor, normalizeBlockId } from "./normalizeAnchor.ts";
 
