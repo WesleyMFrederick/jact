@@ -424,7 +424,7 @@ export class CitationManager {
 	 * @param {Object} options - CLI options (scope)
 	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
 	 */
-	async extractHeader(targetFile: string, headerName: string, options: ExtractOptions): Promise<any> {
+	async extractHeader(targetFile: string, headerName: string, options: ExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -498,6 +498,7 @@ export class CitationManager {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
+			return undefined;
 		}
 	}
 
@@ -515,7 +516,7 @@ export class CitationManager {
 	 * @param {Object} options - CLI options (scope, format)
 	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
 	 */
-	async extractFile(targetFile: string, options: ExtractOptions): Promise<any> {
+	async extractFile(targetFile: string, options: ExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -602,6 +603,7 @@ export class CitationManager {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
+			return undefined;
 		}
 	}
 
