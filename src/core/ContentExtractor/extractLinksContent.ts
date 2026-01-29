@@ -7,9 +7,9 @@ import type {
 	ProcessedLinkEntry,
 	ExtractedContentBlock,
 } from '../../types/contentExtractorTypes.js';
-import { analyzeEligibility } from './analyzeEligibility.ts';
-import { generateContentId } from './generateContentId.ts';
-import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.ts';
+import { analyzeEligibility } from './analyzeEligibility.js';
+import { generateContentId } from './generateContentId.js';
+import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.js';
 
 /**
  * Consumer-defined interface for ParsedFileCache dependency.

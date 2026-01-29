@@ -20,7 +20,7 @@ import { CitationValidator } from "../../dist/CitationValidator.js";
 import { FileCache } from "../../dist/FileCache.js";
 import { MarkdownParser } from "../../dist/MarkdownParser.js";
 import { ParsedFileCache } from "../../dist/ParsedFileCache.js";
-import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.js";
+import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.ts";
 import { StopMarkerStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
 import { ForceMarkerStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
 import { SectionLinkStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
