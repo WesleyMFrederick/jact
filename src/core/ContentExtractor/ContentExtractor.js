@@ -1,6 +1,6 @@
 // tools/citation-manager/src/core/ContentExtractor/ContentExtractor.js
 import { analyzeEligibility } from "./analyzeEligibility.ts";
-import { extractLinksContent as extractLinksContentOp } from "./extractLinksContent.js";
+import { extractLinksContent as extractLinksContentOp } from "./extractLinksContent.ts";
 
 /**
  * Content Extractor component orchestrating extraction eligibility analysis.
