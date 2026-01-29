@@ -16,22 +16,23 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { CitationValidator } from "../../dist/CitationValidator.js";
-import { FileCache } from "../../dist/FileCache.js";
-import { MarkdownParser } from "../../dist/MarkdownParser.js";
-import { ParsedFileCache } from "../../dist/ParsedFileCache.js";
-import { ContentExtractor } from "../../dist/core/ContentExtractor/ContentExtractor.js";
-import { StopMarkerStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
-import { ForceMarkerStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
-import { SectionLinkStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
-import { CliFlagStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
+import { CitationValidator } from "../CitationValidator.js";
+import { FileCache } from "../FileCache.js";
+import { MarkdownParser } from "../MarkdownParser.js";
+import { ParsedFileCache } from "../ParsedFileCache.js";
+import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.js";
+import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { ForceMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
+import { SectionLinkStrategy } from "../core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
+import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
+import type { ExtractionEligibilityStrategy } from "../types/contentExtractorTypes.js";
 
 /**
  * Create markdown parser with file system dependency
  *
  * @returns {MarkdownParser} Parser instance configured with Node.js fs module
  */
-export function createMarkdownParser() {
+export function createMarkdownParser(): MarkdownParser {
 	return new MarkdownParser(fs);
 }
 
@@ -40,7 +41,7 @@ export function createMarkdownParser() {
  *
  * @returns {FileCache} Cache instance configured with Node.js fs and path modules
  */
-export function createFileCache() {
+export function createFileCache(): FileCache {
 	return new FileCache(fs, path);
 }
 
@@ -53,7 +54,9 @@ export function createFileCache() {
  * @param {MarkdownParser|null} [parser=null] - Optional parser instance for testing
  * @returns {ParsedFileCache} Cache instance configured with parser
  */
-export function createParsedFileCache(parser = null) {
+export function createParsedFileCache(
+	parser: MarkdownParser | null = null,
+): ParsedFileCache {
 	const _parser = parser || createMarkdownParser();
 	return new ParsedFileCache(_parser);
 }
@@ -70,9 +73,9 @@ export function createParsedFileCache(parser = null) {
  * @returns {CitationValidator} Validator instance with all dependencies wired
  */
 export function createCitationValidator(
-	parsedFileCache = null,
-	fileCache = null,
-) {
+	parsedFileCache: ParsedFileCache | null = null,
+	fileCache: FileCache | null = null,
+): CitationValidator {
 	const _parsedFileCache = parsedFileCache || createParsedFileCache();
 	const _fileCache = fileCache || createFileCache();
 	return new CitationValidator(_parsedFileCache, _fileCache);
@@ -94,10 +97,10 @@ export function createCitationValidator(
  * @returns {ContentExtractor} Configured ContentExtractor instance
  */
 export function createContentExtractor(
-	parsedFileCache = null,
-	citationValidator = null,
-	strategies = null,
-) {
+	parsedFileCache: ParsedFileCache | null = null,
+	citationValidator: CitationValidator | null = null,
+	strategies: ExtractionEligibilityStrategy[] | null = null,
+): ContentExtractor {
 	// Create or use provided dependencies
 	const _parsedFileCache = parsedFileCache || createParsedFileCache();
 	const _citationValidator = citationValidator || createCitationValidator();
