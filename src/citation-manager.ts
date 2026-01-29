@@ -33,6 +33,11 @@ import {
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
+import type { MarkdownParser } from "./MarkdownParser.js";
+import type { ParsedFileCache } from "./ParsedFileCache.js";
+import type { FileCache } from "./FileCache.js";
+import type { CitationValidator } from "./CitationValidator.js";
+import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
 
 /**
  * Options for validation operations.
@@ -96,11 +101,11 @@ interface PathConversion {
  * error reporting.
  */
 export class CitationManager {
-	private parser: any;
-	private parsedFileCache: any;
-	private fileCache: any;
-	private validator: any;
-	private contentExtractor: any;
+	private parser: MarkdownParser;
+	private parsedFileCache: ParsedFileCache;
+	private fileCache: FileCache;
+	private validator: CitationValidator;
+	private contentExtractor: ContentExtractor;
 
 	/**
 	 * Initialize citation manager with all required components
@@ -378,10 +383,12 @@ export class CitationManager {
 			if (validationResult.summary.errors > 0) {
 				console.error("Validation errors found:");
 				const errors = enrichedLinks.filter(
-					(l: any) => l.validation.status === "error",
+					(l: EnrichedLinkObject) => l.validation.status === "error",
 				);
 				for (const link of errors) {
-					console.error(`  Line ${link.line}: ${link.validation.error}`);
+					if (link.validation.status === "error") {
+						console.error(`  Line ${link.line}: ${link.validation.error}`);
+					}
 				}
 			}
 
@@ -389,7 +396,7 @@ export class CitationManager {
 			// Pattern: Pass pre-validated enriched links to extractor
 			const extractionResult = await this.contentExtractor.extractContent(
 				enrichedLinks,
-				{ fullFiles: options.fullFiles }, // Pass CLI flags to strategies
+				{ fullFiles: options.fullFiles ?? false }, // Pass CLI flags to strategies
 			);
 
 			// Phase 3: Output
@@ -450,15 +457,15 @@ export class CitationManager {
 				validation = {
 					status: "error",
 					error: validationResult.error || "",
-					suggestion: validationResult.suggestion,
-					pathConversion: validationResult.pathConversion,
+					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
+					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
 				};
 			} else if (validationResult.status === "warning") {
 				validation = {
 					status: "warning",
 					error: validationResult.error || "",
-					suggestion: validationResult.suggestion,
-					pathConversion: validationResult.pathConversion,
+					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
+					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
 				};
 			} else {
 				validation = {
@@ -485,8 +492,9 @@ export class CitationManager {
 			// --- Phase 3: Extraction ---
 			// Pattern: Extract content from validated link
 			// Integration: ContentExtractor processes single-link array
+			const enrichedLink = syntheticLink as EnrichedLinkObject;
 			const result = await this.contentExtractor.extractContent(
-				[syntheticLink],
+				[enrichedLink],
 				options,
 			);
 
@@ -541,15 +549,15 @@ export class CitationManager {
 				validation = {
 					status: "error",
 					error: validationResult.error || "",
-					suggestion: validationResult.suggestion,
-					pathConversion: validationResult.pathConversion,
+					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
+					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
 				};
 			} else if (validationResult.status === "warning") {
 				validation = {
 					status: "warning",
 					error: validationResult.error || "",
-					suggestion: validationResult.suggestion,
-					pathConversion: validationResult.pathConversion,
+					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
+					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
 				};
 			} else {
 				validation = {
@@ -590,8 +598,9 @@ export class CitationManager {
 			// --- Phase 3: Extraction ---
 			// Decision: Force fullFiles flag for full-file extraction
 			// Pattern: ContentExtractor uses CliFlagStrategy to make link eligible
+			const enrichedLink = syntheticLink as EnrichedLinkObject;
 			const result = await this.contentExtractor.extractContent(
-				[syntheticLink],
+				[enrichedLink],
 				{ ...options, fullFiles: true },
 			);
 
@@ -674,7 +683,7 @@ export class CitationManager {
 				let fixType = "";
 
 				// Apply path conversion if available
-				if (link.validation.pathConversion) {
+				if (link.validation.status !== "valid" && link.validation.pathConversion) {
 					newCitation = this.applyPathConversion(
 						newCitation,
 						link.validation.pathConversion,
