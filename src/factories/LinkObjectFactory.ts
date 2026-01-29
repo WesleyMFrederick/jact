@@ -14,11 +14,20 @@ export class LinkObjectFactory {
 	 * Integration: Produces LinkObject matching MarkdownParser output contract
 	 * Pattern: CLI calls this before validator.validateSingleCitation()
 	 *
-	 * @param targetPath - Absolute or relative path to target file
-	 * @param headerName - Exact header text to extract
+	 * @param targetPath - Absolute or relative path to target file (must be non-empty)
+	 * @param headerName - Exact header text to extract (must be non-empty)
 	 * @returns Unvalidated LinkObject with anchorType: "header"
+	 * @throws {Error} If targetPath or headerName is empty
 	 */
 	createHeaderLink(targetPath: string, headerName: string): LinkObject {
+		// Defensive validation: reject empty inputs at CLI boundary
+		if (!targetPath?.trim()) {
+			throw new Error("targetPath cannot be empty");
+		}
+		if (!headerName?.trim()) {
+			throw new Error("headerName cannot be empty");
+		}
+
 		// Boundary: Normalize path to absolute
 		const absolutePath = resolve(targetPath);
 
@@ -55,10 +64,16 @@ export class LinkObjectFactory {
 	 * Pattern: CLI calls this before validator.validateSingleCitation()
 	 * Decision: anchorType: null signals full-file link
 	 *
-	 * @param targetPath - Absolute or relative path to target file
+	 * @param targetPath - Absolute or relative path to target file (must be non-empty)
 	 * @returns Unvalidated LinkObject with anchorType: null
+	 * @throws {Error} If targetPath is empty
 	 */
 	createFileLink(targetPath: string): LinkObject {
+		// Defensive validation: reject empty inputs at CLI boundary
+		if (!targetPath?.trim()) {
+			throw new Error("targetPath cannot be empty");
+		}
+
 		const absolutePath = resolve(targetPath);
 		const fileName = basename(targetPath);
 

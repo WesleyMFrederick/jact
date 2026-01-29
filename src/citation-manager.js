@@ -29,8 +29,8 @@ import {
 	createFileCache,
 	createMarkdownParser,
 	createParsedFileCache,
-} from "../dist/factories/componentFactory.js";
-import { LinkObjectFactory } from "../dist/factories/LinkObjectFactory.js";
+} from "./factories/componentFactory.js";
+import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 
 /**
  * Main application class for citation management operations

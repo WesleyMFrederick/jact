@@ -24,8 +24,8 @@ interface ParsedFileCacheDep {
  * Only declares the methods this operation calls.
  */
 interface ParsedDocumentDep {
-	extractSection(headingText: string): string | null;
-	extractBlock(blockId: string | null): string;
+	extractSection(headingText: string, headingLevel?: number): string | null;
+	extractBlock(blockId: string | null): string | null;
 	extractFullContent(): string;
 }
 
@@ -136,7 +136,11 @@ export async function extractLinksContent(
 			} else if (link.anchorType === 'block') {
 				// AC6: Block
 				const normalizedAnchor = normalizeBlockId(link.target.anchor);
-				extractedContent = targetDoc.extractBlock(normalizedAnchor);
+				const blockResult = targetDoc.extractBlock(normalizedAnchor);
+				if (!blockResult) {
+					throw new Error(`Block not found: ${normalizedAnchor}`);
+				}
+				extractedContent = blockResult;
 			} else {
 				// AC7: Full file
 				extractedContent = targetDoc.extractFullContent();
