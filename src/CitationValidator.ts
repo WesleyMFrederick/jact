@@ -275,6 +275,8 @@ export class CitationValidator {
 				return await this.validateCrossDocumentLink(citation, contextFile);
 			case "WIKI_STYLE":
 				return this.validateWikiStyleLink(citation);
+			case "INTERNAL_ANCHOR":
+				return await this.validateInternalAnchorLink(citation, contextFile);
 			default:
 				return this.createValidationResult(
 					citation,
@@ -286,7 +288,7 @@ export class CitationValidator {
 	}
 
 	private classifyPattern(citation: LinkObject): string {
-		// Pattern precedence: CARET > EMPHASIS > CROSS_DOCUMENT > WIKI_STYLE
+		// Pattern precedence: CARET > EMPHASIS > CROSS_DOCUMENT > WIKI_STYLE > INTERNAL_ANCHOR
 
 		// Caret references are now internal links with block anchorType
 		if (citation.scope === "internal" && citation.anchorType === "block") {
@@ -311,6 +313,15 @@ export class CitationValidator {
 				return "EMPHASIS_MARKED";
 			}
 			return "CROSS_DOCUMENT";
+		}
+
+		// Markdown internal header anchors: [text](#Heading)
+		if (
+			citation.linkType === "markdown" &&
+			citation.scope === "internal" &&
+			citation.anchorType === "header"
+		) {
+			return "INTERNAL_ANCHOR";
 		}
 
 		return "UNKNOWN_PATTERN";
@@ -580,6 +591,42 @@ export class CitationValidator {
 	): SingleCitationValidationResult {
 		// Wiki-style links are internal references, always valid for now
 		// Could add anchor existence checking in the future
+		return this.createValidationResult(citation, "valid");
+	}
+
+	private async validateInternalAnchorLink(
+		citation: LinkObject,
+		sourceFile?: string,
+	): Promise<SingleCitationValidationResult> {
+		// Validate markdown internal anchor: [text](#Heading)
+		if (!sourceFile) {
+			return this.createValidationResult(
+				citation,
+				"error",
+				"Cannot validate internal anchor without source file context",
+			);
+		}
+
+		const anchor = citation.target.anchor;
+		if (!anchor) {
+			return this.createValidationResult(
+				citation,
+				"error",
+				"Internal anchor link missing anchor fragment",
+			);
+		}
+
+		// Validate anchor exists in source file
+		const anchorExists = await this.validateAnchorExists(anchor, sourceFile);
+		if (!anchorExists.valid) {
+			return this.createValidationResult(
+				citation,
+				"error",
+				`Anchor not found: #${anchor}`,
+				anchorExists.suggestion,
+			);
+		}
+
 		return this.createValidationResult(citation, "valid");
 	}
 

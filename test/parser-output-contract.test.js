@@ -331,4 +331,75 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 			"Story%201.5%20Implement%20Cache",
 		);
 	});
+
+	it("should parse cross-document links with parentheses in anchor fragments", async () => {
+		// Given: Parser and test file with parens in anchor
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, "fixtures", "parens-in-anchors.md");
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: Full anchor with parentheses captured
+		const link = result.links.find(
+			(l) => l.target.anchor === "ValidationMetadata%20Type%20(Discriminated%20Union)",
+		);
+		expect(link).toBeDefined();
+		expect(link.fullMatch).toBe(
+			"[validation metadata type discriminated union](CitationValidator%20Implementation%20Guide.md#ValidationMetadata%20Type%20(Discriminated%20Union))",
+		);
+	});
+
+	it("should parse internal anchor links with parentheses correctly", async () => {
+		// Given: Parser and test file with internal anchor containing parens
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, "fixtures", "parens-in-anchors.md");
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: Full anchor with parentheses captured
+		const link = result.links.find(
+			(l) => l.scope === "internal" && l.target.anchor === "Heading%20(With%20Parens)",
+		);
+		expect(link).toBeDefined();
+		expect(link.fullMatch).toBe("[heading with parens](#Heading%20(With%20Parens))");
+	});
+
+	it("should not regress on standard links without parentheses in anchors", async () => {
+		// Given: Parser and existing test file
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: All existing links still parse correctly
+		expect(result.links.length).toBeGreaterThan(0);
+		const standardLink = result.links.find(
+			(l) => l.target.anchor === "auth-service",
+		);
+		expect(standardLink).toBeDefined();
+	});
+
+	it("should parse multiple links on same line with mixed parens/no-parens correctly", async () => {
+		// Given: Parser and test file with multiple links on one line
+		const parser = createMarkdownParser();
+		const testFile = join(__dirname, "fixtures", "parens-in-anchors.md");
+
+		// When: Parse file
+		const result = await parser.parseFile(testFile);
+
+		// Then: Both links captured with full anchors
+		const line4Links = result.links.filter((l) => l.line === 4);
+		expect(line4Links.length).toBe(2);
+
+		const withParens = line4Links.find((l) => l.target.anchor?.includes("("));
+		const withoutParens = line4Links.find((l) => l.target.anchor === "Normal%20Anchor");
+
+		expect(withParens).toBeDefined();
+		expect(withParens.target.anchor).toBe("Section%20(Notes)");
+		expect(withoutParens).toBeDefined();
+		expect(withoutParens.target.anchor).toBe("Normal%20Anchor");
+	});
 });

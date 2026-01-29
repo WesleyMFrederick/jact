@@ -5,7 +5,7 @@ Confirms a link is valid by checking if the file exists (path + file name) and i
 
 ### Problem
 1. Links and anchors identified by the [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) have no guarantee that paths point to existing files or anchors correspond to real headers/blocks. ^P1
-2. [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) contains link information about the source and target document we do not want to re-build or repeat in other consumers ([One Source Of Truth](../../../../../resume-coach/design-docs/Architecture%20Principles.md#^one-source-of-truth)) ^P2
+2. [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) contains link information about the source and target document we do not want to re-build or repeat in other consumers ([One Source Of Truth](../../../../ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth)) ^P2
    1. Creating a separate validation result object duplicates 80% of link metadata (source paths, target paths, line numbers). ^P2-1
 3. If errors occur in the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor), it is challenging to determine if the errors are due to invalid link or invalid content (missing, malformed, etc) ^P3
 
@@ -24,7 +24,7 @@ The [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Man
 | Problem ID | Problem                                     |  Solution ID   | Solution                                                                                                                                                                         | Impact                                                                 | Principles                                                                                                              | How Principle Applies                                                                                                                |
 | :--------: | ------------------------------------------- | :------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | [P1](#^P1) | Validate target paths                       |   [S1](#^S1)   | [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) as existence check                                                               | 66% reduction in filesystem calls (1 vs 3)                             | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Use [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) API, not raw `node:fs` calls     |
-| [P1](#^P1) | Validate target anchors                     | [S1.1](#^S1-1) | [**`ParsedDocument.hasAnchor()`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md#Anchor%20Queries) on fetched doc | 100% reduction in direct data access (0 vs 4)                          | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Use[**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) API, not raw `_data.anchors` access |
+| [P1](#^P1) | Validate target anchors                     | [S1.1](#^S1-1) | [**`ParsedDocument.hasAnchor()`**](ParsedDocument%20Implementation%20Guide.md#Anchor%20Query%20Methods) on fetched doc | 100% reduction in direct data access (0 vs 4)                          | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Use[**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) API, not raw `_data.anchors` access |
 | [P2](#^P2) | Avoid link metadata duplication             |   [S2](#^S2)   | Enrichment pattern (add validation to [**`LinkObject`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface))                                                  | 80% reduction in data duplication (1 property vs 8 fields              | [One Source of Truth](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^one-source-of-truth)   | Mutate original, not copy-then-extend                                                                                                |
 | [P3](#^P3) | Distinguish link errors from content errors |   [S3](#^S3)   | Pre-validation before extraction                                                                                                                                                 | 100% link errors caught before ContentExtractor (0 ambiguous failures) | [Single Responsibility](../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility)                                  | Validator validates links;<br>Extractor extracts content;                                                                            |
 
@@ -268,120 +268,6 @@ CitationValidator.validateSingleCitation(link: LinkObject, contextFile?: string)
 
 ---
 
-## Pseudocode
-
-### Current Implementation
-
-This pseudocode shows the **validation enrichment pattern** where LinkObjects are enriched with validation metadata instead of creating separate result objects.
-
-```tsx
-// The CitationValidator class with US1.8 Enrichment Pattern
-class CitationValidator is
-  private field parsedFileCache: ParsedFileCacheInterface
-  private field fileCache: FileCacheInterface
-
-  constructor CitationValidator(pCache: ParsedFileCacheInterface, fCache: FileCacheInterface) is
-    this.parsedFileCache = pCache
-    this.fileCache = fCache
-
-  // Returns { summary, links } with enriched LinkObjects
-  public async method validateFile(filePath: string): { summary: object, links: EnrichedLinkObject[] } is
-    // Boundary: Get the ParsedDocument facade instance from the cache.
-    field sourceParsedDoc = await this.parsedFileCache.resolveParsedFile(filePath)
-
-    // Get links array - these will be enriched in place
-    field links = sourceParsedDoc.getLinks()
-
-    // Pattern: Enrich each link with validation metadata
-    field validationPromises = new array of Promise
-    foreach (link in links) do
-      validationPromises.add(this.enrichLinkWithValidation(link))
-
-    await Promise.all(validationPromises)
-
-    // Generate summary from enriched links, return both
-    return {
-      summary: this.generateSummaryFromEnrichedLinks(links),
-      links: links  // Return enriched links (no duplication!)
-    }
-
-  // Enriches a LinkObject with validation metadata (instead of returning separate result)
-  private async method enrichLinkWithValidation(link: EnrichedLinkObject): void is
-    // TypeScript Implementation Note (CitationValidator.ts line 184):
-    // Cast to 'any' to add validation property (LinkObject doesn't include it yet)
-    // Then rely on return type to enforce EnrichedLinkObject contract
-    // (link as any).validation = validation;
-
-    // Decision: Check if the target file path was successfully resolved by the parser.
-    if (link.target.path.absolute == null) then
-      // Enrichment: Add validation property directly to link
-      link.validation = {
-        status: "error",
-        error: "File not found: " + link.target.path.raw
-      }
-      return
-
-    // Decision: Does the link have an anchor that needs validation?
-    if (link.anchorType == "header" || link.anchorType == "block") then
-      await this.enrichWithAnchorValidation(link)
-    else
-      // This is a full-file link; path existence is sufficient.
-      // Enrichment: Add validation property with valid status
-      link.validation = { status: "valid" }
-
-  // Enriches link with anchor validation metadata
-  private async method enrichWithAnchorValidation(link: EnrichedLinkObject): void is
-    try
-      // Boundary: Retrieve the ParsedDocument facade for the target file
-      field targetParsedDoc = await this.parsedFileCache.resolveParsedFile(link.target.path.absolute)
-
-      // Use facade method to check anchor existence
-      if (targetParsedDoc.hasAnchor(link.target.anchor)) then
-        // Enrichment: Valid anchor found
-        link.validation = { status: "valid" }
-      else
-        // Pattern: Delegate suggestion generation to facade
-        field suggestions = targetParsedDoc.findSimilarAnchors(link.target.anchor)
-        // Enrichment: Add error with suggestion
-        link.validation = {
-          status: "error",
-          error: "Anchor not found",
-          suggestion: suggestions[0]
-        }
-
-    catch (error) is
-      // Error Handling: If the target file can't be parsed (e.g., doesn't exist)
-      // Enrichment: Add error metadata
-      link.validation = {
-        status: "error",
-        error: error.message
-      }
-
-  // Generate summary by counting validation statuses from enriched links
-  private method generateSummaryFromEnrichedLinks(links: EnrichedLinkObject[]): object is
-    field summary = { total: links.length, valid: 0, warnings: 0, errors: 0 }
-
-    foreach (link in links) do
-      // All links have validation property after enrichment
-      if (link.validation.status == "valid") then
-        summary.valid++
-      else if (link.validation.status == "warning") then
-        summary.warnings++
-      else if (link.validation.status == "error") then
-        summary.errors++
-
-    return summary
-
-  // Public method for validating a single LinkObject (Epic 2)
-  // Used by CLI Orchestrator for synthetic link validation in extract header/file commands
-  public async method validateSingleCitation(link: LinkObject, contextFile?: string): Promise<EnrichedLinkObject> is
-    // Pattern: Reuse enrichment logic from validateFile workflow
-    await this.enrichLinkWithValidation(link)
-
-    // Enrichment: Link now has validation property added in place
-    return link  // Return enriched LinkObject
-```
-
 ## Data Contracts
 
 TypeScript interfaces defining validator output structure. Source: `src/types/validationTypes.ts`
@@ -461,6 +347,28 @@ The validator assigns one of three statuses to each link: `valid`, `warning`, or
 - File found but anchor does not exist (regardless of how the file was resolved)
 - Pattern syntax is invalid (caret, emphasis, wiki-style)
 - **Key rule**: A broken anchor is always an error, even if the file was resolved via cross-directory cache lookup
+
+### Path Resolution Strategies
+
+The validator attempts these strategies in order when resolving a link's target file:
+
+1. **Standard relative path** — resolve from the source file's directory (URL-decodes `%20` and other encoded characters first)
+2. **Obsidian absolute path** — detects vault-relative paths like `0_SoftwareDevelopment/...` and converts to filesystem paths
+3. **Symlink resolution** — follows symlinks to locate the real file on disk
+4. **File cache lookup** — falls back to `FileCacheInterface.resolveFile()` for cross-directory matches
+
+If none succeed → `error`. If only strategy 4 succeeds → `warning` with `pathConversion` suggestion.
+
+### Anchor Matching Strategies
+
+When an anchor is present, the validator attempts these matching strategies in order:
+
+1. **Direct match** — exact anchor ID lookup via `ParsedDocument.hasAnchor()`
+2. **URL-decoded match** — decodes `%20` and other encoded characters, then retries
+3. **Block reference match** — strips leading `^` and matches against block-type anchors
+4. **Flexible markdown match** — strips backticks, bold, italic, and highlights from headers before comparing
+
+If a direct match succeeds but a raw header format exists, the validator returns an **error** with a suggestion to use the raw header format for better Obsidian compatibility (e.g., `#My Header` instead of `#my-header`).
 
 ### Status Decision Matrix
 
@@ -619,7 +527,7 @@ tools/citation-manager/src/
 - Use Strategy Pattern for validator chain (similar to US2.1 extraction eligibility)
 - Implement during Epic 2 or as standalone refactoring story
 
-_Source_: [File Naming Patterns](<../../../../ARCHITECTURE.md#File Naming Patterns>)
+_Source_: [File Naming Patterns](../../../../ARCHITECTURE.md#File%20Naming%20Patterns)
 
 ---
 

@@ -115,12 +115,12 @@ export class MarkdownParser {
 
 		lines.forEach((line, index) => {
 			// Cross-document markdown links with .md extension (with optional anchors)
-			const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(#([^)]+))?\)/g;
+			const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(?:#((?:[^()]|\([^)]*\))+))?\)/g;
 			let match = linkPattern.exec(line);
 			while (match !== null) {
 				const text = match[1] ?? "";
 				const rawPath = match[2] ?? "";
-				const anchor = match[4] ?? null;
+				const anchor = match[3] ?? null;
 
 				const linkType = "markdown" as const;
 				const scope = "cross-document" as const;
@@ -208,7 +208,7 @@ export class MarkdownParser {
 			}
 
 			// Cross-document links without .md extension (relative paths)
-			const relativeDocRegex = /\[([^\]]+)\]\(([^)]*\/[^)#]+)(#[^)]+)?\)/g;
+			const relativeDocRegex = /\[([^\]]+)\]\(([^)]*\/[^)#]+)(?:#((?:[^()]|\([^)]*\))+))?\)/g;
 			match = relativeDocRegex.exec(line);
 			while (match !== null) {
 				const filepath = match[2] ?? "";
@@ -220,7 +220,7 @@ export class MarkdownParser {
 				) {
 					const text = match[1] ?? "";
 					const rawPath = match[2] ?? "";
-					const anchor = match[3] ? match[3].substring(1) : null;
+					const anchor = match[3] ?? null;
 
 					const linkType = "markdown" as const;
 					const scope = "cross-document" as const;
@@ -263,7 +263,7 @@ export class MarkdownParser {
 			}
 
 			// Wiki-style cross-document links: [[file.md#anchor|text]]
-			const wikiCrossDocRegex = /\[\[([^#\]]+\.md)(#([^\]|]+))?\|([^\]]+)\]\]/g;
+			const wikiCrossDocRegex = /\[\[([^#\]]+\.md)(#([^|]+?))?\|([^\]]+)\]\]/g;
 			match = wikiCrossDocRegex.exec(line);
 			while (match !== null) {
 				const rawPath = match[1] ?? "";
@@ -351,7 +351,7 @@ export class MarkdownParser {
 			}
 
 			// Internal markdown anchor links: [text](#anchor)
-			const internalAnchorRegex = /\[([^\]]+)\]\(#([^)]+)\)/g;
+			const internalAnchorRegex = /\[([^\]]+)\]\(#((?:[^()]|\([^)]*\))+)\)/g;
 			match = internalAnchorRegex.exec(line);
 			while (match !== null) {
 				const text = match[1] ?? "";

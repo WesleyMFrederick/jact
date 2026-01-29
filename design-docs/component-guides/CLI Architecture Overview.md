@@ -17,6 +17,26 @@ The CLI maintains strict separation between **command orchestration** (CLI's res
 
 ---
 
+## Build Pipeline
+
+Source is TypeScript (`src/*.ts`), compiled to JavaScript (`dist/*.js`) via `tsc`. The global `citation-manager` CLI binary points to `dist/citation-manager.js`.
+
+```bash
+# Build and re-link after TS changes
+npm run build -w tools/citation-manager
+npm link -w tools/citation-manager
+```
+
+| Artifact | Path | Purpose |
+|----------|------|---------|
+| Source | `src/citation-manager.ts` | TypeScript entry point with shebang |
+| Compiled | `dist/citation-manager.js` | Built JS, referenced by `package.json` `bin` |
+| Global CLI | `/opt/homebrew/bin/citation-manager` | Symlink via `npm link` |
+
+> **Hook dependency**: The `citation-validator.sh` PostToolUse hook calls the global `citation-manager` binary. If the CLI is stale (not rebuilt after TS changes), the hook silently fails.
+
+---
+
 ## Command Registry
 
 The CLI exposes five commands, each accessible via `npm run citation:<command>`:

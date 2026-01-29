@@ -7,7 +7,16 @@ A citation validation and management tool for markdown files that enforces Obsid
 ```bash
 # Install dependencies
 npm install
+
+# Build TypeScript and link CLI globally
+npm run build -w tools/citation-manager
+npm link -w tools/citation-manager
+
+# Verify CLI is available
+citation-manager --help
 ```
+
+> **Note:** Source is TypeScript (`src/*.ts`), compiled to `dist/*.js`. After any TS changes, re-run `npm run build -w tools/citation-manager` to update the CLI. The `citation-validator.sh` hook depends on the global `citation-manager` binary being current.
 
 ## Features
 

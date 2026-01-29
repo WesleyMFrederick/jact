@@ -9,7 +9,7 @@ describe("E2E: MarkdownParser → ContentExtractor", () => {
 	let extractor;
 
 	beforeEach(() => {
-		parser = new MarkdownParser(fs, path);
+		parser = new MarkdownParser(fs);
 		extractor = createContentExtractor();
 	});
 
