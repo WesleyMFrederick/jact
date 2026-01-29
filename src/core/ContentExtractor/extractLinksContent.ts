@@ -1,4 +1,4 @@
-import type { EnrichedLinkObject, ValidationResult } from '../../types/validationTypes.js';
+import type { EnrichedLinkObject, ValidationResult } from '../../types/validationTypes.ts';
 import type {
 	CliFlags,
 	ExtractionEligibilityStrategy,
@@ -6,10 +6,10 @@ import type {
 	OutgoingLinksExtractedContent,
 	ProcessedLinkEntry,
 	ExtractedContentBlock,
-} from '../../types/contentExtractorTypes.js';
-import { analyzeEligibility } from './analyzeEligibility.js';
-import { generateContentId } from './generateContentId.js';
-import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.js';
+} from '../../types/contentExtractorTypes.ts';
+import { analyzeEligibility } from './analyzeEligibility.ts';
+import { generateContentId } from './generateContentId.ts';
+import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.ts';
 
 /**
  * Consumer-defined interface for ParsedFileCache dependency.

@@ -1,5 +1,5 @@
-import type { LinkObject } from '../../types/citationTypes.js';
-import type { EnrichedLinkObject, ValidationResult } from '../../types/validationTypes.js';
+import type { LinkObject } from '../../types/citationTypes.ts';
+import type { EnrichedLinkObject, ValidationResult } from '../../types/validationTypes.ts';
 import type {
 	CliFlags,
 	EligibilityDecision,
@@ -8,11 +8,11 @@ import type {
 	ExtractionStats,
 	OutgoingLinksExtractedContent,
 	ProcessedLinkEntry,
-} from '../../types/contentExtractorTypes.js';
-import { analyzeEligibility } from './analyzeEligibility.js';
-import { extractLinksContent as extractLinksContentOp } from './extractLinksContent.js';
-import { generateContentId } from './generateContentId.js';
-import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.js';
+} from '../../types/contentExtractorTypes.ts';
+import { analyzeEligibility } from './analyzeEligibility.ts';
+import { extractLinksContent as extractLinksContentOp } from './extractLinksContent.ts';
+import { generateContentId } from './generateContentId.ts';
+import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.ts';
 
 /**
  * Consumer-defined interface for ParsedFileCache dependency.
@@ -176,14 +176,13 @@ export class ContentExtractor {
 					stats.tokensSaved += contentLength;
 				}
 
-				// Add source link traceability
-				const block = extractedContentBlocks[contentId];
-				if (block && typeof block === 'object' && 'sourceLinks' in block) {
-					block.sourceLinks.push({
-						rawSourceLink: link.fullMatch,
-						sourceLine: link.line,
-					});
-				}
+				// Add source link traceability (type system guarantees sourceLinks exists)
+				const block = extractedContentBlocks[contentId] as ExtractedContentBlock;
+				block.sourceLinks = block.sourceLinks || [];
+				block.sourceLinks.push({
+					rawSourceLink: link.fullMatch,
+					sourceLine: link.line,
+				});
 
 				processedLinks.push({
 					sourceLink: link,
