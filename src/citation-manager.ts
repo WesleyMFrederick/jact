@@ -37,7 +37,7 @@ import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 /**
  * Options for validation operations.
  */
-interface ValidateOptions {
+interface CliValidateOptions {
 	scope?: string;
 	lines?: string;
 	format?: string;
@@ -47,7 +47,7 @@ interface ValidateOptions {
 /**
  * Options for extraction and file operations.
  */
-interface ExtractOptions {
+interface CliExtractOptions {
 	scope?: string;
 	format?: string;
 	fullFiles?: boolean;
@@ -132,7 +132,7 @@ export class CitationManager {
 	 * @param options - Validation options
 	 * @returns Formatted validation report
 	 */
-	async validate(filePath: string, options: ValidateOptions = {}): Promise<string> {
+	async validate(filePath: string, options: CliValidateOptions = {}): Promise<string> {
 		try {
 			const startTime = Date.now();
 
@@ -362,7 +362,7 @@ export class CitationManager {
 	 * @param {Object} options - CLI options (scope, fullFiles)
 	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
 	 */
-	async extractLinks(sourceFile: string, options: ExtractOptions): Promise<void> {
+	async extractLinks(sourceFile: string, options: CliExtractOptions): Promise<void> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -424,7 +424,7 @@ export class CitationManager {
 	 * @param {Object} options - CLI options (scope)
 	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
 	 */
-	async extractHeader(targetFile: string, headerName: string, options: ExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
+	async extractHeader(targetFile: string, headerName: string, options: CliExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -516,7 +516,7 @@ export class CitationManager {
 	 * @param {Object} options - CLI options (scope, format)
 	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
 	 */
-	async extractFile(targetFile: string, options: ExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
+	async extractFile(targetFile: string, options: CliExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -621,7 +621,7 @@ export class CitationManager {
 	 * @param {string} [options.scope] - Scope folder for file cache
 	 * @returns {Promise<string>} Fix report with changes made
 	 */
-	async fix(filePath: string, options: ValidateOptions = {}): Promise<string> {
+	async fix(filePath: string, options: CliValidateOptions = {}): Promise<string> {
 		try {
 			// Import fs for file operations
 			const { readFileSync, writeFileSync } = await import("node:fs");
