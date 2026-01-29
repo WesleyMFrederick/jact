@@ -21,10 +21,10 @@ import { FileCache } from "../../dist/FileCache.js";
 import { MarkdownParser } from "../../dist/MarkdownParser.js";
 import { ParsedFileCache } from "../../dist/ParsedFileCache.js";
 import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.js";
-import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
-import { ForceMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
-import { SectionLinkStrategy } from "../core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
-import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
+import { StopMarkerStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { ForceMarkerStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
+import { SectionLinkStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
+import { CliFlagStrategy } from "../../dist/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
 
 /**
  * Create markdown parser with file system dependency
