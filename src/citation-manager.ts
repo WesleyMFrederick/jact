@@ -23,6 +23,8 @@
  */
 
 import { Command } from "commander";
+import type { ValidationResult, EnrichedLinkObject } from "./types/validationTypes.js";
+import type { OutgoingLinksExtractedContent } from "./types/contentExtractorTypes.js";
 import {
 	createCitationValidator,
 	createContentExtractor,
@@ -33,6 +35,59 @@ import {
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 
 /**
+ * Options for validation operations.
+ */
+interface ValidateOptions {
+	scope?: string;
+	lines?: string;
+	format?: string;
+	fix?: boolean;
+}
+
+/**
+ * Options for extraction and file operations.
+ */
+interface ExtractOptions {
+	scope?: string;
+	format?: string;
+	fullFiles?: boolean;
+}
+
+/**
+ * Line range parsed from input string.
+ */
+interface LineRange {
+	startLine: number;
+	endLine: number;
+}
+
+/**
+ * Header object with text and anchor.
+ */
+interface HeaderObject {
+	text: string;
+	anchor: string;
+}
+
+/**
+ * Fix record tracking applied fixes.
+ */
+interface FixRecord {
+	line: number;
+	old: string;
+	new: string;
+	type: string;
+}
+
+/**
+ * Path conversion object from validator.
+ */
+interface PathConversion {
+	original: string;
+	recommended: string;
+}
+
+/**
  * Main application class for citation management operations
  *
  * Wires together all components and provides high-level operations for validation,
@@ -40,6 +95,12 @@ import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
  * error reporting.
  */
 export class CitationManager {
+	private parser: any;
+	private parsedFileCache: any;
+	private fileCache: any;
+	private validator: any;
+	private contentExtractor: any;
+
 	/**
 	 * Initialize citation manager with all required components
 	 *
@@ -66,14 +127,11 @@ export class CitationManager {
 	 * Main validation entry point. Optionally builds file cache if scope provided.
 	 * Supports line range filtering and multiple output formats (CLI or JSON).
 	 *
-	 * @param {string} filePath - Path to markdown file to validate
-	 * @param {Object} [options={}] - Validation options
-	 * @param {string} [options.scope] - Scope folder for file cache
-	 * @param {string} [options.lines] - Line range to validate (e.g., "150-160" or "157")
-	 * @param {string} [options.format='cli'] - Output format ('cli' or 'json')
-	 * @returns {Promise<string>} Formatted validation report
+	 * @param filePath - Path to markdown file to validate
+	 * @param options - Validation options
+	 * @returns Formatted validation report
 	 */
-	async validate(filePath, options = {}) {
+	async validate(filePath: string, options: ValidateOptions = {}): Promise<string> {
 		try {
 			const startTime = Date.now();
 
@@ -136,11 +194,11 @@ export class CitationManager {
 	 * Filters citation results to only include those within specified line range.
 	 * Recalculates summary statistics for filtered results.
 	 *
-	 * @param {Object} result - Full validation result object
-	 * @param {string} lineRange - Line range string (e.g., "150-160" or "157")
-	 * @returns {Object} Filtered result with updated summary and lineRange property
+	 * @param result - Full validation result object
+	 * @param lineRange - Line range string
+	 * @returns Filtered result with updated summary and lineRange property
 	 */
-	filterResultsByLineRange(result, lineRange) {
+	private filterResultsByLineRange(result: any, lineRange: string): any {
 		const { startLine, endLine } = this.parseLineRange(lineRange);
 
 		const filteredLinks = result.links.filter((link) => {
@@ -166,13 +224,17 @@ export class CitationManager {
 		};
 	}
 
-	// Parse line range string (e.g., "150-160" or "157")
-	parseLineRange(lineRange) {
+	/**
+	 * Parse line range string
+	 * @param lineRange - Line range string to parse
+	 * @returns Parsed line range
+	 */
+	private parseLineRange(lineRange: string): LineRange {
 		if (lineRange.includes("-")) {
 			const [start, end] = lineRange
 				.split("-")
 				.map((n) => Number.parseInt(n.trim(), 10));
-			return { startLine: start, endLine: end };
+			return { startLine: start || 0, endLine: end || 0 };
 		}
 		const line = Number.parseInt(lineRange.trim(), 10);
 		return { startLine: line, endLine: line };
@@ -184,10 +246,10 @@ export class CitationManager {
 	 * Generates human-readable tree-style output with sections for errors,
 	 * warnings, and valid citations. Includes summary statistics and validation time.
 	 *
-	 * @param {Object} result - Validation result object
-	 * @returns {string} Formatted CLI output
+	 * @param result - Validation result object
+	 * @returns Formatted CLI output
 	 */
-	formatForCLI(result) {
+	private formatForCLI(result: any): string {
 		const lines = [];
 		lines.push("Citation Validation Report");
 		lines.push("==========================");
@@ -279,8 +341,12 @@ export class CitationManager {
 		return lines.join("\n");
 	}
 
-	// Format validation results as JSON
-	formatAsJSON(result) {
+	/**
+	 * Format validation results as JSON
+	 * @param result - Result object to format
+	 * @returns JSON string representation
+	 */
+	private formatAsJSON(result: any): string {
 		return JSON.stringify(result, null, 2);
 	}
 
@@ -660,8 +726,13 @@ export class CitationManager {
 		}
 	}
 
-	// Apply path conversion to citation
-	applyPathConversion(citation, pathConversion) {
+	/**
+	 * Apply path conversion to citation
+	 * @param citation - Citation text to modify
+	 * @param pathConversion - Path conversion object
+	 * @returns Citation with converted path
+	 */
+	private applyPathConversion(citation: string, pathConversion: PathConversion): string {
 		return citation.replace(
 			pathConversion.original,
 			pathConversion.recommended,
@@ -674,10 +745,10 @@ export class CitationManager {
 	 * Extracts header mappings from validator suggestion string.
 	 * Format: "Available headers: \"Vision Statement\" → #Vision Statement, ..."
 	 *
-	 * @param {string} suggestion - Suggestion message from validator
-	 * @returns {Array<Object>} Array of { text, anchor } header objects
+	 * @param suggestion - Suggestion message from validator
+	 * @returns Array of header objects with text and anchor
 	 */
-	parseAvailableHeaders(suggestion) {
+	private parseAvailableHeaders(suggestion: string): HeaderObject[] {
 		const headerRegex = /"([^"]+)"\s*→\s*#([^,]+)/g;
 		return [...suggestion.matchAll(headerRegex)].map((match) => ({
 			text: match[1].trim(),
@@ -685,8 +756,12 @@ export class CitationManager {
 		}));
 	}
 
-	// Normalize anchor for fuzzy matching (removes # and hyphens)
-	normalizeAnchorForMatching(anchor) {
+	/**
+	 * Normalize anchor for fuzzy matching (removes # and hyphens)
+	 * @param anchor - Anchor text to normalize
+	 * @returns Normalized anchor
+	 */
+	private normalizeAnchorForMatching(anchor: string): string {
 		return anchor.replace("#", "").replace(/-/g, " ").toLowerCase();
 	}
 
@@ -696,11 +771,11 @@ export class CitationManager {
 	 * Matches normalized broken anchor against available headers using exact
 	 * or punctuation-stripped comparison.
 	 *
-	 * @param {string} brokenAnchor - Anchor that wasn't found
-	 * @param {Array<Object>} availableHeaders - Available headers with { text, anchor }
-	 * @returns {Object|undefined} Best matching header or undefined
+	 * @param brokenAnchor - Anchor that wasn't found
+	 * @param availableHeaders - Available headers
+	 * @returns Best matching header or undefined
 	 */
-	findBestHeaderMatch(brokenAnchor, availableHeaders) {
+	private findBestHeaderMatch(brokenAnchor: string, availableHeaders: HeaderObject[]): HeaderObject | undefined {
 		const searchText = this.normalizeAnchorForMatching(brokenAnchor);
 		return availableHeaders.find(
 			(header) =>
@@ -710,8 +785,12 @@ export class CitationManager {
 		);
 	}
 
-	// URL-encode anchor text (spaces to %20, periods to %2E)
-	urlEncodeAnchor(headerText) {
+	/**
+	 * URL-encode anchor text (spaces to %20, periods to %2E)
+	 * @param headerText - Header text to encode
+	 * @returns URL-encoded anchor
+	 */
+	private urlEncodeAnchor(headerText: string): string {
 		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
 	}
 
@@ -722,11 +801,11 @@ export class CitationManager {
 	 * - Obsidian compatibility: kebab-case to raw header format
 	 * - Missing anchors: fuzzy match to available headers
 	 *
-	 * @param {string} citation - Original citation text
-	 * @param {Object} link - Enriched link object with validation metadata
-	 * @returns {string} Citation with corrected anchor or original if no fix found
+	 * @param citation - Original citation text
+	 * @param link - Link object with validation metadata
+	 * @returns Citation with corrected anchor or original
 	 */
-	applyAnchorFix(citation, link) {
+	private applyAnchorFix(citation: string, link: any): string {
 		const suggestionMatch = link.validation.suggestion.match(
 			/Use raw header format for better Obsidian compatibility: #(.+)$/,
 		);
