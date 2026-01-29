@@ -1,5 +1,5 @@
 import { analyzeEligibility } from "./analyzeEligibility.ts";
-import { generateContentId } from "./generateContentId.js";
+import { generateContentId } from "./generateContentId.ts";
 import { decodeUrlAnchor, normalizeBlockId } from "./normalizeAnchor.ts";
 
 /**

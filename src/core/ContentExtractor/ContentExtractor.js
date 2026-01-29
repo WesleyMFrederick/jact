@@ -64,7 +64,7 @@ export class ContentExtractor {
 		// Import the extraction logic from extractLinksContent
 		// We'll need to refactor to reuse the extraction logic without validation
 		const { analyzeEligibility } = await import("./analyzeEligibility.ts");
-		const { generateContentId } = await import("./generateContentId.js");
+		const { generateContentId } = await import("./generateContentId.ts");
 		const { decodeUrlAnchor, normalizeBlockId } = await import(
 			"./normalizeAnchor.ts"
 		);
