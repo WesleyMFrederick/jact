@@ -30,7 +30,7 @@ import type { ExtractionEligibilityStrategy } from "../types/contentExtractorTyp
 /**
  * Create markdown parser with file system dependency
  *
- * @returns {MarkdownParser} Parser instance configured with Node.js fs module
+ * @returns Parser instance configured with Node.js fs module
  */
 export function createMarkdownParser(): MarkdownParser {
 	return new MarkdownParser(fs);
@@ -39,7 +39,7 @@ export function createMarkdownParser(): MarkdownParser {
 /**
  * Create file cache with file system and path dependencies
  *
- * @returns {FileCache} Cache instance configured with Node.js fs and path modules
+ * @returns Cache instance configured with Node.js fs and path modules
  */
 export function createFileCache(): FileCache {
 	return new FileCache(fs, path);
@@ -51,8 +51,8 @@ export function createFileCache(): FileCache {
  * If no parser provided, creates default MarkdownParser. This enables test
  * scenarios to inject mock parsers while production code uses defaults.
  *
- * @param {MarkdownParser|null} [parser=null] - Optional parser instance for testing
- * @returns {ParsedFileCache} Cache instance configured with parser
+ * @param parser - Optional parser instance for testing
+ * @returns Cache instance configured with parser
  */
 export function createParsedFileCache(
 	parser: MarkdownParser | null = null,
@@ -68,9 +68,9 @@ export function createParsedFileCache(
  * creates default instances. This is the main entry point for production code
  * while supporting full dependency injection for testing.
  *
- * @param {ParsedFileCache|null} [parsedFileCache=null] - Optional cache for testing
- * @param {FileCache|null} [fileCache=null] - Optional file cache for testing
- * @returns {CitationValidator} Validator instance with all dependencies wired
+ * @param parsedFileCache - Optional cache for testing
+ * @param fileCache - Optional file cache for testing
+ * @returns Validator instance with all dependencies wired
  */
 export function createCitationValidator(
 	parsedFileCache: ParsedFileCache | null = null,
@@ -91,17 +91,17 @@ export function createCitationValidator(
  * 3. SectionLinkStrategy - Anchors eligible by default
  * 4. CliFlagStrategy - --full-files flag (terminal)
  *
- * @param {ParsedFileCache|null} [parsedFileCache=null] - Optional cache for testing
- * @param {CitationValidator|null} [citationValidator=null] - Optional validator for testing
- * @param {ExtractionStrategy[]|null} [strategies=null] - Optional strategy override
- * @returns {ContentExtractor} Configured ContentExtractor instance
+ * @param parsedFileCache - Optional cache for testing
+ * @param citationValidator - Optional validator for testing
+ * @param strategies - Optional strategy override
+ * @returns Configured ContentExtractor instance
  */
 export function createContentExtractor(
 	parsedFileCache: ParsedFileCache | null = null,
 	citationValidator: CitationValidator | null = null,
 	strategies: ExtractionEligibilityStrategy[] | null = null,
 ): ContentExtractor {
-	// Create or use provided dependencies
+	// Use provided dependencies or create defaults
 	const _parsedFileCache = parsedFileCache || createParsedFileCache();
 	const _citationValidator = citationValidator || createCitationValidator();
 	const _strategies = strategies || [
