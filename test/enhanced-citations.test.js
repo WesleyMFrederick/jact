@@ -5,7 +5,7 @@ import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "src", "citation-manager.js");
+const citationManagerPath = join(__dirname, "..", "dist", "citation-manager.js");
 
 describe("Enhanced Citation Pattern Tests", () => {
 	it("should detect all citation patterns including cite format and links without anchors", async () => {

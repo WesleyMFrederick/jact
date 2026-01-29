@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CitationManager } from "../../src/citation-manager.js";
+import { CitationManager } from "../../dist/citation-manager.js";
 
 describe("CitationManager public methods TypeScript", () => {
   it("validate returns string", async () => {
