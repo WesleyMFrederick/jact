@@ -18,7 +18,7 @@ describe("LinkObjectFactory - Header Link Creation", () => {
 		expect(link.scope).toBe("cross-document");
 		expect(link.anchorType).toBe("header");
 		expect(link.target.anchor).toBe(headerName);
-		expect(link.validation).toBeNull(); // Pre-validation state
+		expect(link).not.toHaveProperty("validation"); // Omitted by factory
 	});
 });
 
@@ -55,7 +55,7 @@ describe("LinkObjectFactory - File Link Creation", () => {
 		expect(link.scope).toBe("cross-document");
 		expect(link.anchorType).toBeNull(); // Full-file indicator
 		expect(link.target.anchor).toBeNull();
-		expect(link.validation).toBeNull();
+		expect(link).not.toHaveProperty("validation"); // Omitted by factory
 	});
 });
 

@@ -1,4 +1,5 @@
 import { resolve, relative, basename } from "node:path";
+import type { LinkObject } from "../types/citationTypes.js";
 
 /**
  * LinkObjectFactory - Level 4 helper for CLI Orchestrator
@@ -17,7 +18,7 @@ export class LinkObjectFactory {
 	 * @param headerName - Exact header text to extract
 	 * @returns Unvalidated LinkObject with anchorType: "header"
 	 */
-	createHeaderLink(targetPath, headerName) {
+	createHeaderLink(targetPath: string, headerName: string): LinkObject {
 		// Boundary: Normalize path to absolute
 		const absolutePath = resolve(targetPath);
 
@@ -44,7 +45,6 @@ export class LinkObjectFactory {
 			line: 0, // Synthetic links have no source line
 			column: 0,
 			extractionMarker: null,
-			validation: null, // Will be enriched by validator
 		};
 	}
 
@@ -58,7 +58,7 @@ export class LinkObjectFactory {
 	 * @param targetPath - Absolute or relative path to target file
 	 * @returns Unvalidated LinkObject with anchorType: null
 	 */
-	createFileLink(targetPath) {
+	createFileLink(targetPath: string): LinkObject {
 		const absolutePath = resolve(targetPath);
 		const fileName = basename(targetPath);
 
@@ -84,7 +84,6 @@ export class LinkObjectFactory {
 			line: 0,
 			column: 0,
 			extractionMarker: null,
-			validation: null,
 		};
 	}
 }
