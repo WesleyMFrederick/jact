@@ -128,14 +128,35 @@ export class CitationManager {
 	}
 
 	/**
-	 * Validate citations in markdown file
+	 * Validate citations in markdown file and generate a formatted report
 	 *
-	 * Main validation entry point. Optionally builds file cache if scope provided.
+	 * Validates all wiki-style citations in the specified markdown file, checking for
+	 * broken links, missing files, invalid anchors, and path conversion opportunities.
+	 * Optionally builds a file cache when scope is provided for more accurate validation.
 	 * Supports line range filtering and multiple output formats (CLI or JSON).
 	 *
-	 * @param filePath - Path to markdown file to validate
-	 * @param options - Validation options
-	 * @returns Formatted validation report
+	 * @param filePath - Path to markdown file (absolute or relative to current directory)
+	 * @param options - Validation configuration options
+	 * @param options.format - Output format: "cli" (default) for human-readable or "json" for structured data
+	 * @param options.lines - Line range filter in format "start-end" (e.g., "10-50") to validate specific sections
+	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
+	 * @param options.fix - Not used by validate (reserved for fix command)
+	 * @returns Formatted validation report - CLI format with colors/symbols or JSON with structured data
+	 *
+	 * @example
+	 * ```typescript
+	 * // Basic validation with CLI output
+	 * const report = await manager.validate("docs/readme.md");
+	 *
+	 * // JSON output for programmatic use
+	 * const jsonReport = await manager.validate("docs/readme.md", { format: "json" });
+	 *
+	 * // Validate specific line range with file cache
+	 * const filtered = await manager.validate("docs/readme.md", {
+	 *   lines: "50-100",
+	 *   scope: "/path/to/docs"
+	 * });
+	 * ```
 	 */
 	async validate(filePath: string, options: CliValidateOptions = {}): Promise<string> {
 		try {
@@ -358,14 +379,33 @@ export class CitationManager {
 	}
 
 	/**
-	 * Extract content from links in source document
+	 * Extract content from all citations found in a markdown file
+	 *
+	 * Discovers all wiki-style citations in the source file, validates each link,
+	 * and extracts the referenced content. Outputs a structured JSON result to stdout
+	 * containing the extracted content with metadata. Reports validation errors to stderr.
 	 *
 	 * Pattern: Three-phase orchestration workflow
 	 * Integration: Coordinates validator → extractor → output
 	 *
-	 * @param {string} sourceFile - Path to markdown file containing citations
-	 * @param {Object} options - CLI options (scope, fullFiles)
-	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 * @param sourceFile - Path to markdown file containing wiki-style citations (e.g., [[file#header]])
+	 * @param options - Extraction configuration options
+	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
+	 * @param options.format - Output format (currently only "json" is supported)
+	 * @param options.fullFiles - If true, extract entire file content instead of just header sections
+	 * @returns Promise that resolves when extraction completes (outputs to stdout, sets process.exitCode)
+	 *
+	 * @example
+	 * ```typescript
+	 * // Extract header sections from all citations
+	 * await manager.extractLinks("source.md", { scope: "/docs" });
+	 *
+	 * // Extract full file content for each citation
+	 * await manager.extractLinks("source.md", {
+	 *   scope: "/docs",
+	 *   fullFiles: true
+	 * });
+	 * ```
 	 */
 	async extractLinks(sourceFile: string, options: CliExtractOptions): Promise<void> {
 		try {
@@ -417,8 +457,12 @@ export class CitationManager {
 	}
 
 	/**
-	 * Extract specific header content from target file using synthetic link pattern.
-	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 * Extract a specific header section from a markdown file
+	 *
+	 * Creates a synthetic citation targeting the specified header, validates it exists,
+	 * and extracts the header section content including any nested citations. Returns
+	 * structured JSON output to stdout. Useful for extracting specific sections on-demand
+	 * without needing to add citations to a source file.
 	 *
 	 * Pattern: Four-phase orchestration workflow
 	 * 1. Create synthetic LinkObject via factory
@@ -426,10 +470,28 @@ export class CitationManager {
 	 * 3. Extract content via extractor (if valid)
 	 * 4. Return OutgoingLinksExtractedContent structure
 	 *
-	 * @param {string} targetFile - Path to markdown file containing header
-	 * @param {string} headerName - Exact header text to extract
-	 * @param {Object} options - CLI options (scope)
-	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 *
+	 * @param targetFile - Path to markdown file containing the header to extract
+	 * @param headerName - Exact header text to extract (e.g., "Installation" for ## Installation)
+	 * @param options - Extraction configuration options
+	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
+	 * @param options.format - Output format (currently only "json" is supported)
+	 * @param options.fullFiles - Not used by extractHeader (applies to nested citations only)
+	 * @returns Promise resolving to OutgoingLinksExtractedContent structure, or undefined on error
+	 *
+	 * @example
+	 * ```typescript
+	 * // Extract specific section
+	 * const content = await manager.extractHeader(
+	 *   "docs/api.md",
+	 *   "Authentication",
+	 *   { scope: "/docs" }
+	 * );
+	 *
+	 * // Output contains extracted header content with metadata
+	 * console.log(JSON.stringify(content, null, 2));
+	 * ```
 	 */
 	async extractHeader(targetFile: string, headerName: string, options: CliExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
@@ -511,8 +573,12 @@ export class CitationManager {
 	}
 
 	/**
-	 * Extract entire file content using synthetic link pattern.
-	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 * Extract entire content from a markdown file
+	 *
+	 * Creates a synthetic citation targeting the entire file, validates the file exists,
+	 * and extracts all content including any nested citations. Returns structured JSON
+	 * output to stdout. Useful for programmatically retrieving complete file content
+	 * with citation metadata without manual file operations.
 	 *
 	 * Pattern: Four-phase orchestration workflow
 	 * 1. Create synthetic LinkObject via factory (anchorType: null)
@@ -520,9 +586,26 @@ export class CitationManager {
 	 * 3. Extract content via extractor with fullFiles flag
 	 * 4. Return OutgoingLinksExtractedContent structure
 	 *
-	 * @param {string} targetFile - Path to markdown file to extract
-	 * @param {Object} options - CLI options (scope, format)
-	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 *
+	 * @param targetFile - Path to markdown file to extract in full
+	 * @param options - Extraction configuration options
+	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
+	 * @param options.format - Output format (currently only "json" is supported)
+	 * @param options.fullFiles - Not used by extractFile (entire file is always extracted)
+	 * @returns Promise resolving to OutgoingLinksExtractedContent structure, or undefined on error
+	 *
+	 * @example
+	 * ```typescript
+	 * // Extract complete file content
+	 * const content = await manager.extractFile(
+	 *   "docs/guide.md",
+	 *   { scope: "/docs" }
+	 * );
+	 *
+	 * // Output contains full file content with all nested citations
+	 * console.log(JSON.stringify(content, null, 2));
+	 * ```
 	 */
 	async extractFile(targetFile: string, options: CliExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
@@ -617,7 +700,12 @@ export class CitationManager {
 	}
 
 	/**
-	 * Automatically fix citations in markdown file
+	 * Auto-fix fixable citation issues in a markdown file
+	 *
+	 * Validates citations and automatically applies fixes for correctable issues including
+	 * path conversions (relative to absolute paths) and anchor format corrections (GitHub
+	 * to Obsidian format). Modifies the file in-place and returns a detailed report of
+	 * changes made. Only fixes issues where automated correction is safe and unambiguous.
 	 *
 	 * Applies automatic fixes for:
 	 * - Path corrections (cross-directory warnings with pathConversion suggestions)
@@ -625,10 +713,25 @@ export class CitationManager {
 	 *
 	 * Modifies file in-place. Builds file cache if scope provided.
 	 *
-	 * @param {string} filePath - Path to markdown file to fix
-	 * @param {Object} [options={}] - Fix options
-	 * @param {string} [options.scope] - Scope folder for file cache
-	 * @returns {Promise<string>} Fix report with changes made
+	 * @param filePath - Path to markdown file to fix (will be modified in-place)
+	 * @param options - Fix configuration options
+	 * @param options.scope - Base directory to scan for building file cache (enables path conversion fixes)
+	 * @param options.format - Not used by fix (always returns CLI format)
+	 * @param options.lines - Not used by fix (always processes entire file)
+	 * @param options.fix - Not used by fix (reserved for future fix modes)
+	 * @returns Promise resolving to fix report describing changes made and statistics
+	 *
+	 * @example
+	 * ```typescript
+	 * // Auto-fix with file cache for path conversions
+	 * const report = await manager.fix("docs/readme.md", {
+	 *   scope: "/path/to/docs"
+	 * });
+	 * console.log(report); // "Applied 3 fixes to docs/readme.md..."
+	 *
+	 * // Fix without cache (only anchor format fixes)
+	 * const report = await manager.fix("docs/readme.md");
+	 * ```
 	 */
 	async fix(filePath: string, options: CliValidateOptions = {}): Promise<string> {
 		try {
