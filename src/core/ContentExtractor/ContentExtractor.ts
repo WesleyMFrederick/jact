@@ -25,8 +25,8 @@ interface ParsedFileCacheInterface {
  * Consumer-defined interface for ParsedDocument facade.
  */
 interface ParsedDocumentInterface {
-	extractSection(headingText: string): string | null;
-	extractBlock(blockId: string | null): string;
+	extractSection(headingText: string, headingLevel?: number): string | null;
+	extractBlock(blockId: string | null): string | null;
 	extractFullContent(): string;
 }
 
@@ -155,7 +155,11 @@ export class ContentExtractor {
 					extractedContent = result;
 				} else if (link.anchorType === 'block') {
 					const blockId = normalizeBlockId(link.target.anchor);
-					extractedContent = targetDoc.extractBlock(blockId);
+					const blockResult = targetDoc.extractBlock(blockId);
+					if (!blockResult) {
+						throw new Error(`Block not found: ${blockId}`);
+					}
+					extractedContent = blockResult;
 				} else {
 					extractedContent = targetDoc.extractFullContent();
 				}

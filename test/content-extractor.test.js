@@ -2,9 +2,9 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { ContentExtractor } from "../dist/core/ContentExtractor/ContentExtractor.js";
-import { SectionLinkStrategy } from "../dist/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
-import { StopMarkerStrategy } from "../dist/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { ContentExtractor } from "../src/core/ContentExtractor/ContentExtractor.js";
+import { SectionLinkStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
+import { StopMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
 import { createContentExtractor } from "../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);

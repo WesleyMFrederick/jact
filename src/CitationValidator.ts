@@ -36,7 +36,7 @@ interface FileCacheInterface {
 	 */
 	resolveFile(filename: string): {
 		found: boolean;
-		path: string | null;
+		path?: string | null;
 		fuzzyMatch?: boolean;
 		message?: string;
 		reason?: string;

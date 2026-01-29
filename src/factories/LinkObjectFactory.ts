@@ -1,4 +1,5 @@
 import { resolve, relative, basename } from "node:path";
+import type { LinkObject } from "../types/citationTypes.js";
 
 /**
  * LinkObjectFactory - Level 4 helper for CLI Orchestrator
@@ -13,11 +14,20 @@ export class LinkObjectFactory {
 	 * Integration: Produces LinkObject matching MarkdownParser output contract
 	 * Pattern: CLI calls this before validator.validateSingleCitation()
 	 *
-	 * @param targetPath - Absolute or relative path to target file
-	 * @param headerName - Exact header text to extract
+	 * @param targetPath - Absolute or relative path to target file (must be non-empty)
+	 * @param headerName - Exact header text to extract (must be non-empty)
 	 * @returns Unvalidated LinkObject with anchorType: "header"
+	 * @throws {Error} If targetPath or headerName is empty
 	 */
-	createHeaderLink(targetPath, headerName) {
+	createHeaderLink(targetPath: string, headerName: string): LinkObject {
+		// Defensive validation: reject empty inputs at CLI boundary
+		if (!targetPath?.trim()) {
+			throw new Error("targetPath cannot be empty");
+		}
+		if (!headerName?.trim()) {
+			throw new Error("headerName cannot be empty");
+		}
+
 		// Boundary: Normalize path to absolute
 		const absolutePath = resolve(targetPath);
 
@@ -44,7 +54,6 @@ export class LinkObjectFactory {
 			line: 0, // Synthetic links have no source line
 			column: 0,
 			extractionMarker: null,
-			validation: null, // Will be enriched by validator
 		};
 	}
 
@@ -55,10 +64,16 @@ export class LinkObjectFactory {
 	 * Pattern: CLI calls this before validator.validateSingleCitation()
 	 * Decision: anchorType: null signals full-file link
 	 *
-	 * @param targetPath - Absolute or relative path to target file
+	 * @param targetPath - Absolute or relative path to target file (must be non-empty)
 	 * @returns Unvalidated LinkObject with anchorType: null
+	 * @throws {Error} If targetPath is empty
 	 */
-	createFileLink(targetPath) {
+	createFileLink(targetPath: string): LinkObject {
+		// Defensive validation: reject empty inputs at CLI boundary
+		if (!targetPath?.trim()) {
+			throw new Error("targetPath cannot be empty");
+		}
+
 		const absolutePath = resolve(targetPath);
 		const fileName = basename(targetPath);
 
@@ -84,7 +99,6 @@ export class LinkObjectFactory {
 			line: 0,
 			column: 0,
 			extractionMarker: null,
-			validation: null,
 		};
 	}
 }

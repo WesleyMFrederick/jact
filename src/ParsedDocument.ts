@@ -117,7 +117,7 @@ class ParsedDocument {
 	 * @param {number} [headingLevel] - Optional heading level (1-6). If not provided, looked up from headings array
 	 * @returns {string|null} Section content string or null if not found
 	 */
-	extractSection(headingText: string, headingLevel: number): string | null {
+	extractSection(headingText: string, headingLevel?: number): string | null {
 		// Phase 0: Look up heading level if not provided
 		let targetLevel = headingLevel;
 		if (targetLevel === undefined) {

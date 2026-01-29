@@ -23,6 +23,8 @@
  */
 
 import { Command } from "commander";
+import type { ValidationResult, EnrichedLinkObject, ValidationMetadata } from "./types/validationTypes.js";
+import type { OutgoingLinksExtractedContent } from "./types/contentExtractorTypes.js";
 import {
 	createCitationValidator,
 	createContentExtractor,
@@ -31,6 +33,65 @@ import {
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
+import type { MarkdownParser } from "./MarkdownParser.js";
+import type { ParsedFileCache } from "./ParsedFileCache.js";
+import type { FileCache } from "./FileCache.js";
+import type { CitationValidator } from "./CitationValidator.js";
+import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
+
+/**
+ * Options for validation operations.
+ */
+interface CliValidateOptions {
+	scope?: string;
+	lines?: string;
+	format?: string;
+	fix?: boolean;
+}
+
+/**
+ * Options for extraction and file operations.
+ */
+interface CliExtractOptions {
+	scope?: string;
+	format?: string;
+	fullFiles?: boolean;
+}
+
+/**
+ * Line range parsed from input string.
+ */
+interface LineRange {
+	startLine: number;
+	endLine: number;
+}
+
+/**
+ * Header object with text and anchor.
+ */
+interface HeaderObject {
+	text: string;
+	anchor: string;
+}
+
+/**
+ * Fix record tracking applied fixes.
+ */
+interface FixRecord {
+	line: number;
+	old: string;
+	new: string;
+	type: string;
+}
+
+/**
+ * Path conversion object from validator.
+ */
+interface PathConversion {
+	original: string;
+	recommended: string;
+}
+
 
 /**
  * Main application class for citation management operations
@@ -40,6 +101,12 @@ import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
  * error reporting.
  */
 export class CitationManager {
+	private parser: MarkdownParser;
+	private parsedFileCache: ParsedFileCache;
+	private fileCache: FileCache;
+	private validator: CitationValidator;
+	private contentExtractor: ContentExtractor;
+
 	/**
 	 * Initialize citation manager with all required components
 	 *
@@ -61,19 +128,37 @@ export class CitationManager {
 	}
 
 	/**
-	 * Validate citations in markdown file
+	 * Validate citations in markdown file and generate a formatted report
 	 *
-	 * Main validation entry point. Optionally builds file cache if scope provided.
+	 * Validates all wiki-style citations in the specified markdown file, checking for
+	 * broken links, missing files, invalid anchors, and path conversion opportunities.
+	 * Optionally builds a file cache when scope is provided for more accurate validation.
 	 * Supports line range filtering and multiple output formats (CLI or JSON).
 	 *
-	 * @param {string} filePath - Path to markdown file to validate
-	 * @param {Object} [options={}] - Validation options
-	 * @param {string} [options.scope] - Scope folder for file cache
-	 * @param {string} [options.lines] - Line range to validate (e.g., "150-160" or "157")
-	 * @param {string} [options.format='cli'] - Output format ('cli' or 'json')
-	 * @returns {Promise<string>} Formatted validation report
+	 * @param filePath - Path to markdown file (absolute or relative to current directory)
+	 * @param options - Validation configuration options
+	 * @param options.format - Output format: "cli" (default) for human-readable or "json" for structured data
+	 * @param options.lines - Line range filter in format "start-end" (e.g., "10-50") to validate specific sections
+	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
+	 * @param options.fix - Not used by validate (reserved for fix command)
+	 * @returns Formatted validation report - CLI format with colors/symbols or JSON with structured data
+	 *
+	 * @example
+	 * ```typescript
+	 * // Basic validation with CLI output
+	 * const report = await manager.validate("docs/readme.md");
+	 *
+	 * // JSON output for programmatic use
+	 * const jsonReport = await manager.validate("docs/readme.md", { format: "json" });
+	 *
+	 * // Validate specific line range with file cache
+	 * const filtered = await manager.validate("docs/readme.md", {
+	 *   lines: "50-100",
+	 *   scope: "/path/to/docs"
+	 * });
+	 * ```
 	 */
-	async validate(filePath, options = {}) {
+	async validate(filePath: string, options: CliValidateOptions = {}): Promise<string> {
 		try {
 			const startTime = Date.now();
 
@@ -115,10 +200,11 @@ export class CitationManager {
 			}
 			return this.formatForCLI(result);
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			if (options.format === "json") {
 				return JSON.stringify(
 					{
-						error: error.message,
+						error: errorMessage,
 						file: filePath,
 						success: false,
 					},
@@ -126,7 +212,7 @@ export class CitationManager {
 					2,
 				);
 			}
-			return `ERROR: ${error.message}`;
+			return `ERROR: ${errorMessage}`;
 		}
 	}
 
@@ -136,25 +222,25 @@ export class CitationManager {
 	 * Filters citation results to only include those within specified line range.
 	 * Recalculates summary statistics for filtered results.
 	 *
-	 * @param {Object} result - Full validation result object
-	 * @param {string} lineRange - Line range string (e.g., "150-160" or "157")
-	 * @returns {Object} Filtered result with updated summary and lineRange property
+	 * @param result - Full validation result object
+	 * @param lineRange - Line range string
+	 * @returns Filtered result with updated summary and lineRange property
 	 */
-	filterResultsByLineRange(result, lineRange) {
+	private filterResultsByLineRange(result: any, lineRange: string): any {
 		const { startLine, endLine } = this.parseLineRange(lineRange);
 
-		const filteredLinks = result.links.filter((link) => {
+		const filteredLinks = result.links.filter((link: any) => {
 			return link.line >= startLine && link.line <= endLine;
 		});
 
 		const filteredSummary = {
 			total: filteredLinks.length,
-			valid: filteredLinks.filter((link) => link.validation.status === "valid")
+			valid: filteredLinks.filter((link: any) => link.validation.status === "valid")
 				.length,
-			errors: filteredLinks.filter((link) => link.validation.status === "error")
+			errors: filteredLinks.filter((link: any) => link.validation.status === "error")
 				.length,
 			warnings: filteredLinks.filter(
-				(link) => link.validation.status === "warning",
+				(link: any) => link.validation.status === "warning",
 			).length,
 		};
 
@@ -166,13 +252,17 @@ export class CitationManager {
 		};
 	}
 
-	// Parse line range string (e.g., "150-160" or "157")
-	parseLineRange(lineRange) {
+	/**
+	 * Parse line range string
+	 * @param lineRange - Line range string to parse
+	 * @returns Parsed line range
+	 */
+	private parseLineRange(lineRange: string): LineRange {
 		if (lineRange.includes("-")) {
 			const [start, end] = lineRange
 				.split("-")
 				.map((n) => Number.parseInt(n.trim(), 10));
-			return { startLine: start, endLine: end };
+			return { startLine: start || 0, endLine: end || 0 };
 		}
 		const line = Number.parseInt(lineRange.trim(), 10);
 		return { startLine: line, endLine: line };
@@ -184,10 +274,10 @@ export class CitationManager {
 	 * Generates human-readable tree-style output with sections for errors,
 	 * warnings, and valid citations. Includes summary statistics and validation time.
 	 *
-	 * @param {Object} result - Validation result object
-	 * @returns {string} Formatted CLI output
+	 * @param result - Validation result object
+	 * @returns Formatted CLI output
 	 */
-	formatForCLI(result) {
+	private formatForCLI(result: any): string {
 		const lines = [];
 		lines.push("Citation Validation Report");
 		lines.push("==========================");
@@ -202,11 +292,11 @@ export class CitationManager {
 		if (result.summary.errors > 0) {
 			lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
 			result.links
-				.filter((link) => link.validation.status === "error")
-				.forEach((link, index) => {
+				.filter((link: any) => link.validation.status === "error")
+				.forEach((link: any, index: number) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "error")
+						result.links.filter((link: any) => link.validation.status === "error")
 							.length -
 							1;
 					const prefix = isLast ? "└─" : "├─";
@@ -223,11 +313,11 @@ export class CitationManager {
 		if (result.summary.warnings > 0) {
 			lines.push(`WARNINGS (${result.summary.warnings})`);
 			result.links
-				.filter((link) => link.validation.status === "warning")
-				.forEach((link, index) => {
+				.filter((link: any) => link.validation.status === "warning")
+				.forEach((link: any, index: number) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "warning")
+						result.links.filter((link: any) => link.validation.status === "warning")
 							.length -
 							1;
 					const prefix = isLast ? "└─" : "├─";
@@ -243,11 +333,11 @@ export class CitationManager {
 		if (result.summary.valid > 0) {
 			lines.push(`VALID CITATIONS (${result.summary.valid})`);
 			result.links
-				.filter((link) => link.validation.status === "valid")
-				.forEach((link, index) => {
+				.filter((link: any) => link.validation.status === "valid")
+				.forEach((link: any, index: number) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "valid")
+						result.links.filter((link: any) => link.validation.status === "valid")
 							.length -
 							1;
 					const prefix = isLast ? "└─" : "├─";
@@ -279,22 +369,45 @@ export class CitationManager {
 		return lines.join("\n");
 	}
 
-	// Format validation results as JSON
-	formatAsJSON(result) {
+	/**
+	 * Format validation results as JSON
+	 * @param result - Result object to format
+	 * @returns JSON string representation
+	 */
+	private formatAsJSON(result: any): string {
 		return JSON.stringify(result, null, 2);
 	}
 
 	/**
-	 * Extract content from links in source document
+	 * Extract content from all citations found in a markdown file
+	 *
+	 * Discovers all wiki-style citations in the source file, validates each link,
+	 * and extracts the referenced content. Outputs a structured JSON result to stdout
+	 * containing the extracted content with metadata. Reports validation errors to stderr.
 	 *
 	 * Pattern: Three-phase orchestration workflow
 	 * Integration: Coordinates validator → extractor → output
 	 *
-	 * @param {string} sourceFile - Path to markdown file containing citations
-	 * @param {Object} options - CLI options (scope, fullFiles)
-	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 * @param sourceFile - Path to markdown file containing wiki-style citations (e.g., [[file#header]])
+	 * @param options - Extraction configuration options
+	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
+	 * @param options.format - Output format (currently only "json" is supported)
+	 * @param options.fullFiles - If true, extract entire file content instead of just header sections
+	 * @returns Promise that resolves when extraction completes (outputs to stdout, sets process.exitCode)
+	 *
+	 * @example
+	 * ```typescript
+	 * // Extract header sections from all citations
+	 * await manager.extractLinks("source.md", { scope: "/docs" });
+	 *
+	 * // Extract full file content for each citation
+	 * await manager.extractLinks("source.md", {
+	 *   scope: "/docs",
+	 *   fullFiles: true
+	 * });
+	 * ```
 	 */
-	async extractLinks(sourceFile, options) {
+	async extractLinks(sourceFile: string, options: CliExtractOptions): Promise<void> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -310,10 +423,12 @@ export class CitationManager {
 			if (validationResult.summary.errors > 0) {
 				console.error("Validation errors found:");
 				const errors = enrichedLinks.filter(
-					(l) => l.validation.status === "error",
+					(l: EnrichedLinkObject) => l.validation.status === "error",
 				);
 				for (const link of errors) {
-					console.error(`  Line ${link.line}: ${link.validation.error}`);
+					if (link.validation.status === "error") {
+						console.error(`  Line ${link.line}: ${link.validation.error}`);
+					}
 				}
 			}
 
@@ -321,7 +436,7 @@ export class CitationManager {
 			// Pattern: Pass pre-validated enriched links to extractor
 			const extractionResult = await this.contentExtractor.extractContent(
 				enrichedLinks,
-				{ fullFiles: options.fullFiles }, // Pass CLI flags to strategies
+				{ fullFiles: options.fullFiles ?? false }, // Pass CLI flags to strategies
 			);
 
 			// Phase 3: Output
@@ -335,14 +450,19 @@ export class CitationManager {
 				process.exitCode = 1;
 			}
 		} catch (error) {
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	}
 
 	/**
-	 * Extract specific header content from target file using synthetic link pattern.
-	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 * Extract a specific header section from a markdown file
+	 *
+	 * Creates a synthetic citation targeting the specified header, validates it exists,
+	 * and extracts the header section content including any nested citations. Returns
+	 * structured JSON output to stdout. Useful for extracting specific sections on-demand
+	 * without needing to add citations to a source file.
 	 *
 	 * Pattern: Four-phase orchestration workflow
 	 * 1. Create synthetic LinkObject via factory
@@ -350,12 +470,30 @@ export class CitationManager {
 	 * 3. Extract content via extractor (if valid)
 	 * 4. Return OutgoingLinksExtractedContent structure
 	 *
-	 * @param {string} targetFile - Path to markdown file containing header
-	 * @param {string} headerName - Exact header text to extract
-	 * @param {Object} options - CLI options (scope)
-	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 *
+	 * @param targetFile - Path to markdown file containing the header to extract
+	 * @param headerName - Exact header text to extract (e.g., "Installation" for ## Installation)
+	 * @param options - Extraction configuration options
+	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
+	 * @param options.format - Output format (currently only "json" is supported)
+	 * @param options.fullFiles - Not used by extractHeader (applies to nested citations only)
+	 * @returns Promise resolving to OutgoingLinksExtractedContent structure, or undefined on error
+	 *
+	 * @example
+	 * ```typescript
+	 * // Extract specific section
+	 * const content = await manager.extractHeader(
+	 *   "docs/api.md",
+	 *   "Authentication",
+	 *   { scope: "/docs" }
+	 * );
+	 *
+	 * // Output contains extracted header content with metadata
+	 * console.log(JSON.stringify(content, null, 2));
+	 * ```
 	 */
-	async extractHeader(targetFile, headerName, options) {
+	async extractHeader(targetFile: string, headerName: string, options: CliExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -375,21 +513,26 @@ export class CitationManager {
 				targetFile,
 			);
 
-			// Extract validation metadata from result
-			const validation = {
-				status: validationResult.status,
-			};
-
-			if (validationResult.error) {
-				validation.error = validationResult.error;
-			}
-
-			if (validationResult.suggestion) {
-				validation.suggestion = validationResult.suggestion;
-			}
-
-			if (validationResult.pathConversion) {
-				validation.pathConversion = validationResult.pathConversion;
+			// Extract validation metadata from result - build proper union type
+			let validation: ValidationMetadata;
+			if (validationResult.status === "error") {
+				validation = {
+					status: "error",
+					error: validationResult.error || "",
+					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
+					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
+				};
+			} else if (validationResult.status === "warning") {
+				validation = {
+					status: "warning",
+					error: validationResult.error || "",
+					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
+					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
+				};
+			} else {
+				validation = {
+					status: "valid",
+				};
 			}
 
 			// Add validation property to link object
@@ -398,7 +541,9 @@ export class CitationManager {
 			// Decision: Check validation status before extraction (error handling)
 			if (syntheticLink.validation.status === "error") {
 				// Boundary: Error output to stderr
-				console.error("Validation failed:", syntheticLink.validation.error);
+				// Type narrowing allows accessing error property
+				const errorMsg = syntheticLink.validation.error;
+				console.error("Validation failed:", errorMsg);
 				if (syntheticLink.validation.suggestion) {
 					console.error("Suggestion:", syntheticLink.validation.suggestion);
 				}
@@ -409,8 +554,9 @@ export class CitationManager {
 			// --- Phase 3: Extraction ---
 			// Pattern: Extract content from validated link
 			// Integration: ContentExtractor processes single-link array
+			const enrichedLink = syntheticLink as EnrichedLinkObject;
 			const result = await this.contentExtractor.extractContent(
-				[syntheticLink],
+				[enrichedLink],
 				options,
 			);
 
@@ -419,14 +565,20 @@ export class CitationManager {
 			return result;
 		} catch (error) {
 			// Decision: System errors use exit code 2
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
+			return undefined;
 		}
 	}
 
 	/**
-	 * Extract entire file content using synthetic link pattern.
-	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 * Extract entire content from a markdown file
+	 *
+	 * Creates a synthetic citation targeting the entire file, validates the file exists,
+	 * and extracts all content including any nested citations. Returns structured JSON
+	 * output to stdout. Useful for programmatically retrieving complete file content
+	 * with citation metadata without manual file operations.
 	 *
 	 * Pattern: Four-phase orchestration workflow
 	 * 1. Create synthetic LinkObject via factory (anchorType: null)
@@ -434,11 +586,28 @@ export class CitationManager {
 	 * 3. Extract content via extractor with fullFiles flag
 	 * 4. Return OutgoingLinksExtractedContent structure
 	 *
-	 * @param {string} targetFile - Path to markdown file to extract
-	 * @param {Object} options - CLI options (scope, format)
-	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
+	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
+	 *
+	 * @param targetFile - Path to markdown file to extract in full
+	 * @param options - Extraction configuration options
+	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
+	 * @param options.format - Output format (currently only "json" is supported)
+	 * @param options.fullFiles - Not used by extractFile (entire file is always extracted)
+	 * @returns Promise resolving to OutgoingLinksExtractedContent structure, or undefined on error
+	 *
+	 * @example
+	 * ```typescript
+	 * // Extract complete file content
+	 * const content = await manager.extractFile(
+	 *   "docs/guide.md",
+	 *   { scope: "/docs" }
+	 * );
+	 *
+	 * // Output contains full file content with all nested citations
+	 * console.log(JSON.stringify(content, null, 2));
+	 * ```
 	 */
-	async extractFile(targetFile, options) {
+	async extractFile(targetFile: string, options: CliExtractOptions): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -457,21 +626,26 @@ export class CitationManager {
 				targetFile,
 			);
 
-			// Extract validation metadata from result
-			const validation = {
-				status: validationResult.status,
-			};
-
-			if (validationResult.error) {
-				validation.error = validationResult.error;
-			}
-
-			if (validationResult.suggestion) {
-				validation.suggestion = validationResult.suggestion;
-			}
-
-			if (validationResult.pathConversion) {
-				validation.pathConversion = validationResult.pathConversion;
+			// Extract validation metadata from result - build proper union type
+			let validation: ValidationMetadata;
+			if (validationResult.status === "error") {
+				validation = {
+					status: "error",
+					error: validationResult.error || "",
+					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
+					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
+				};
+			} else if (validationResult.status === "warning") {
+				validation = {
+					status: "warning",
+					error: validationResult.error || "",
+					...(validationResult.suggestion !== undefined && { suggestion: validationResult.suggestion }),
+					...(validationResult.pathConversion !== undefined && { pathConversion: validationResult.pathConversion }),
+				};
+			} else {
+				validation = {
+					status: "valid",
+				};
 			}
 
 			// Add validation property to link object
@@ -494,7 +668,9 @@ export class CitationManager {
 			// Decision: Check validation status before extraction (error handling)
 			if (syntheticLink.validation.status === "error") {
 				// Boundary: Error output to stderr
-				console.error("Validation failed:", syntheticLink.validation.error);
+				// Type narrowing allows accessing error property
+				const errorMsg = syntheticLink.validation.error;
+				console.error("Validation failed:", errorMsg);
 				if (syntheticLink.validation.suggestion) {
 					console.error("Suggestion:", syntheticLink.validation.suggestion);
 				}
@@ -505,8 +681,9 @@ export class CitationManager {
 			// --- Phase 3: Extraction ---
 			// Decision: Force fullFiles flag for full-file extraction
 			// Pattern: ContentExtractor uses CliFlagStrategy to make link eligible
+			const enrichedLink = syntheticLink as EnrichedLinkObject;
 			const result = await this.contentExtractor.extractContent(
-				[syntheticLink],
+				[enrichedLink],
 				{ ...options, fullFiles: true },
 			);
 
@@ -515,13 +692,20 @@ export class CitationManager {
 			return result;
 		} catch (error) {
 			// Decision: System errors use exit code 2
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
+			return undefined;
 		}
 	}
 
 	/**
-	 * Automatically fix citations in markdown file
+	 * Auto-fix fixable citation issues in a markdown file
+	 *
+	 * Validates citations and automatically applies fixes for correctable issues including
+	 * path conversions (relative to absolute paths) and anchor format corrections (GitHub
+	 * to Obsidian format). Modifies the file in-place and returns a detailed report of
+	 * changes made. Only fixes issues where automated correction is safe and unambiguous.
 	 *
 	 * Applies automatic fixes for:
 	 * - Path corrections (cross-directory warnings with pathConversion suggestions)
@@ -529,12 +713,27 @@ export class CitationManager {
 	 *
 	 * Modifies file in-place. Builds file cache if scope provided.
 	 *
-	 * @param {string} filePath - Path to markdown file to fix
-	 * @param {Object} [options={}] - Fix options
-	 * @param {string} [options.scope] - Scope folder for file cache
-	 * @returns {Promise<string>} Fix report with changes made
+	 * @param filePath - Path to markdown file to fix (will be modified in-place)
+	 * @param options - Fix configuration options
+	 * @param options.scope - Base directory to scan for building file cache (enables path conversion fixes)
+	 * @param options.format - Not used by fix (always returns CLI format)
+	 * @param options.lines - Not used by fix (always processes entire file)
+	 * @param options.fix - Not used by fix (reserved for future fix modes)
+	 * @returns Promise resolving to fix report describing changes made and statistics
+	 *
+	 * @example
+	 * ```typescript
+	 * // Auto-fix with file cache for path conversions
+	 * const report = await manager.fix("docs/readme.md", {
+	 *   scope: "/path/to/docs"
+	 * });
+	 * console.log(report); // "Applied 3 fixes to docs/readme.md..."
+	 *
+	 * // Fix without cache (only anchor format fixes)
+	 * const report = await manager.fix("docs/readme.md");
+	 * ```
 	 */
-	async fix(filePath, options = {}) {
+	async fix(filePath: string, options: CliValidateOptions = {}): Promise<string> {
 		try {
 			// Import fs for file operations
 			const { readFileSync, writeFileSync } = await import("node:fs");
@@ -557,7 +756,7 @@ export class CitationManager {
 
 			// Find all fixable issues: warnings (path conversion) and errors (anchor fixes)
 			const fixableLinks = validationResults.links.filter(
-				(link) =>
+				(link: any) =>
 					(link.validation.status === "warning" &&
 						link.validation.pathConversion) ||
 					(link.validation.status === "error" &&
@@ -579,7 +778,7 @@ export class CitationManager {
 			let fixesApplied = 0;
 			let pathFixesApplied = 0;
 			let anchorFixesApplied = 0;
-			const fixes = [];
+			const fixes: FixRecord[] = [];
 
 			// Process all fixable links
 			for (const link of fixableLinks) {
@@ -587,7 +786,7 @@ export class CitationManager {
 				let fixType = "";
 
 				// Apply path conversion if available
-				if (link.validation.pathConversion) {
+				if (link.validation.status !== "valid" && link.validation.pathConversion) {
 					newCitation = this.applyPathConversion(
 						newCitation,
 						link.validation.pathConversion,
@@ -654,14 +853,20 @@ export class CitationManager {
 
 				return output.join("\n");
 			}
-			return `WARNING: Found ${fixableResults.length} fixable citations but could not apply fixes`;
+			return `WARNING: Found ${fixableLinks.length} fixable citations but could not apply fixes`;
 		} catch (error) {
-			return `ERROR: ${error.message}`;
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `ERROR: ${errorMessage}`;
 		}
 	}
 
-	// Apply path conversion to citation
-	applyPathConversion(citation, pathConversion) {
+	/**
+	 * Apply path conversion to citation
+	 * @param citation - Citation text to modify
+	 * @param pathConversion - Path conversion object
+	 * @returns Citation with converted path
+	 */
+	private applyPathConversion(citation: string, pathConversion: PathConversion): string {
 		return citation.replace(
 			pathConversion.original,
 			pathConversion.recommended,
@@ -674,19 +879,23 @@ export class CitationManager {
 	 * Extracts header mappings from validator suggestion string.
 	 * Format: "Available headers: \"Vision Statement\" → #Vision Statement, ..."
 	 *
-	 * @param {string} suggestion - Suggestion message from validator
-	 * @returns {Array<Object>} Array of { text, anchor } header objects
+	 * @param suggestion - Suggestion message from validator
+	 * @returns Array of header objects with text and anchor
 	 */
-	parseAvailableHeaders(suggestion) {
+	private parseAvailableHeaders(suggestion: string): HeaderObject[] {
 		const headerRegex = /"([^"]+)"\s*→\s*#([^,]+)/g;
 		return [...suggestion.matchAll(headerRegex)].map((match) => ({
-			text: match[1].trim(),
-			anchor: `#${match[2].trim()}`,
+			text: (match[1] || "").trim(),
+			anchor: `#${(match[2] || "").trim()}`,
 		}));
 	}
 
-	// Normalize anchor for fuzzy matching (removes # and hyphens)
-	normalizeAnchorForMatching(anchor) {
+	/**
+	 * Normalize anchor for fuzzy matching (removes # and hyphens)
+	 * @param anchor - Anchor text to normalize
+	 * @returns Normalized anchor
+	 */
+	private normalizeAnchorForMatching(anchor: string): string {
 		return anchor.replace("#", "").replace(/-/g, " ").toLowerCase();
 	}
 
@@ -696,11 +905,11 @@ export class CitationManager {
 	 * Matches normalized broken anchor against available headers using exact
 	 * or punctuation-stripped comparison.
 	 *
-	 * @param {string} brokenAnchor - Anchor that wasn't found
-	 * @param {Array<Object>} availableHeaders - Available headers with { text, anchor }
-	 * @returns {Object|undefined} Best matching header or undefined
+	 * @param brokenAnchor - Anchor that wasn't found
+	 * @param availableHeaders - Available headers
+	 * @returns Best matching header or undefined
 	 */
-	findBestHeaderMatch(brokenAnchor, availableHeaders) {
+	private findBestHeaderMatch(brokenAnchor: string, availableHeaders: HeaderObject[]): HeaderObject | undefined {
 		const searchText = this.normalizeAnchorForMatching(brokenAnchor);
 		return availableHeaders.find(
 			(header) =>
@@ -710,8 +919,12 @@ export class CitationManager {
 		);
 	}
 
-	// URL-encode anchor text (spaces to %20, periods to %2E)
-	urlEncodeAnchor(headerText) {
+	/**
+	 * URL-encode anchor text (spaces to %20, periods to %2E)
+	 * @param headerText - Header text to encode
+	 * @returns URL-encoded anchor
+	 */
+	private urlEncodeAnchor(headerText: string): string {
 		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
 	}
 
@@ -722,11 +935,11 @@ export class CitationManager {
 	 * - Obsidian compatibility: kebab-case to raw header format
 	 * - Missing anchors: fuzzy match to available headers
 	 *
-	 * @param {string} citation - Original citation text
-	 * @param {Object} link - Enriched link object with validation metadata
-	 * @returns {string} Citation with corrected anchor or original if no fix found
+	 * @param citation - Original citation text
+	 * @param link - Link object with validation metadata
+	 * @returns Citation with corrected anchor or original
 	 */
-	applyAnchorFix(citation, link) {
+	private applyAnchorFix(citation: string, link: any): string {
 		const suggestionMatch = link.validation.suggestion.match(
 			/Use raw header format for better Obsidian compatibility: #(.+)$/,
 		);
@@ -773,7 +986,7 @@ export class CitationManager {
  * Maps common synonyms and typos to correct commands/options.
  * Used by custom error handler to provide helpful suggestions.
  */
-const semanticSuggestionMap = {
+const semanticSuggestionMap: Record<string, string[]> = {
 	// Command synonyms
 	check: ["validate"],
 	verify: ["validate"],
@@ -796,7 +1009,7 @@ const semanticSuggestionMap = {
 	dir: ["--scope"],
 };
 
-const program = new Command();
+const program: Command = new Command();
 
 program
 	.name("citation-manager")
@@ -805,9 +1018,9 @@ program
 
 // Configure custom error output with semantic suggestions
 program.configureOutput({
-	outputError: (str, write) => {
+	outputError: (str: string, write: (str: string) => void) => {
 		const match = str.match(/unknown (?:command|option) '([^']+)'/);
-		if (match) {
+		if (match && match[1]) {
 			const input = match[1].replace(/^--?/, "");
 			const suggestions = semanticSuggestionMap[input];
 
@@ -857,7 +1070,7 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (file, options) => {
+	.action(async (file: string, options: CliValidateOptions) => {
 		const manager = new CitationManager();
 		let result;
 
@@ -907,11 +1120,12 @@ Output includes:
   - anchors: Available anchor points (headers and blocks)
 `,
 	)
-	.action(async (file) => {
+	.action(async (file: string) => {
 		const manager = new CitationManager();
-		const ast = await manager.parser.parseFile(file);
+		const ast = await (manager as any).parser.parseFile(file);
 		console.log(JSON.stringify(ast, null, 2));
 	});
+
 
 // Pattern: Extract command with links subcommand
 const extractCmd = program
@@ -944,14 +1158,15 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (sourceFile, options) => {
+	.action(async (sourceFile: string, options: CliExtractOptions) => {
 		// Pattern: Delegate to CitationManager orchestrator
 		const manager = new CitationManager();
 
 		try {
 			await manager.extractLinks(sourceFile, options);
 		} catch (error) {
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	});
@@ -977,7 +1192,7 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (targetFile, headerName, options) => {
+	.action(async (targetFile: string, headerName: string, options: CliExtractOptions) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
 
@@ -998,7 +1213,8 @@ Exit Codes:
 			// Note: Error exit codes set by extractHeader() method
 		} catch (error) {
 			// Decision: Unexpected errors use exit code 2
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	});
@@ -1024,7 +1240,7 @@ Exit Codes:
   2  System error (permission denied, parse error)
 `,
 	)
-	.action(async (targetFile, options) => {
+	.action(async (targetFile: string, options: CliExtractOptions) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
 
@@ -1041,7 +1257,8 @@ Exit Codes:
 			// Note: Error exit codes set by extractFile() method
 		} catch (error) {
 			// Decision: Unexpected errors use exit code 2
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	});
@@ -1051,7 +1268,7 @@ Exit Codes:
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const realPath = realpathSync(process.argv[1]);
+const realPath = realpathSync(process.argv[1] || "");
 const realPathAsUrl = pathToFileURL(realPath).href;
 
 if (import.meta.url === realPathAsUrl) {

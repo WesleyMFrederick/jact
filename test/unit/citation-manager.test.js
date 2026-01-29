@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { join } from "node:path";
-import { CitationManager } from "../../src/citation-manager.js";
+import { CitationManager } from "../../dist/citation-manager.js";
 
 describe("CitationManager - Component Instantiation", () => {
 	it("should instantiate ContentExtractor via factory", () => {

@@ -69,4 +69,5 @@ export interface ValidationSummary {
 export interface ValidationResult {
   summary: ValidationSummary;
   links: EnrichedLinkObject[];
+  validationTime?: string;
 }

@@ -1,7 +1,7 @@
 // Add to tools/citation-manager/test/component-factory.test.js
 import { describe, it, expect } from "vitest";
 import { createContentExtractor } from "../src/factories/componentFactory.js";
-import { ContentExtractor } from "../dist/core/ContentExtractor/ContentExtractor.js";
+import { ContentExtractor } from "../src/core/ContentExtractor/ContentExtractor.js";
 
 describe("createContentExtractor", () => {
 	it("should create ContentExtractor with default strategies", () => {
