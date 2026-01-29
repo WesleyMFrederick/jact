@@ -23,7 +23,7 @@
  */
 
 import { Command } from "commander";
-import type { ValidationResult, EnrichedLinkObject } from "./types/validationTypes.js";
+import type { ValidationResult, EnrichedLinkObject, ValidationMetadata } from "./types/validationTypes.js";
 import type { OutgoingLinksExtractedContent } from "./types/contentExtractorTypes.js";
 import {
 	createCitationValidator,
@@ -86,6 +86,7 @@ interface PathConversion {
 	original: string;
 	recommended: string;
 }
+
 
 /**
  * Main application class for citation management operations
@@ -173,10 +174,11 @@ export class CitationManager {
 			}
 			return this.formatForCLI(result);
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
 			if (options.format === "json") {
 				return JSON.stringify(
 					{
-						error: error.message,
+						error: errorMessage,
 						file: filePath,
 						success: false,
 					},
@@ -184,7 +186,7 @@ export class CitationManager {
 					2,
 				);
 			}
-			return `ERROR: ${error.message}`;
+			return `ERROR: ${errorMessage}`;
 		}
 	}
 
@@ -201,18 +203,18 @@ export class CitationManager {
 	private filterResultsByLineRange(result: any, lineRange: string): any {
 		const { startLine, endLine } = this.parseLineRange(lineRange);
 
-		const filteredLinks = result.links.filter((link) => {
+		const filteredLinks = result.links.filter((link: any) => {
 			return link.line >= startLine && link.line <= endLine;
 		});
 
 		const filteredSummary = {
 			total: filteredLinks.length,
-			valid: filteredLinks.filter((link) => link.validation.status === "valid")
+			valid: filteredLinks.filter((link: any) => link.validation.status === "valid")
 				.length,
-			errors: filteredLinks.filter((link) => link.validation.status === "error")
+			errors: filteredLinks.filter((link: any) => link.validation.status === "error")
 				.length,
 			warnings: filteredLinks.filter(
-				(link) => link.validation.status === "warning",
+				(link: any) => link.validation.status === "warning",
 			).length,
 		};
 
@@ -264,11 +266,11 @@ export class CitationManager {
 		if (result.summary.errors > 0) {
 			lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
 			result.links
-				.filter((link) => link.validation.status === "error")
-				.forEach((link, index) => {
+				.filter((link: any) => link.validation.status === "error")
+				.forEach((link: any, index: number) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "error")
+						result.links.filter((link: any) => link.validation.status === "error")
 							.length -
 							1;
 					const prefix = isLast ? "└─" : "├─";
@@ -285,11 +287,11 @@ export class CitationManager {
 		if (result.summary.warnings > 0) {
 			lines.push(`WARNINGS (${result.summary.warnings})`);
 			result.links
-				.filter((link) => link.validation.status === "warning")
-				.forEach((link, index) => {
+				.filter((link: any) => link.validation.status === "warning")
+				.forEach((link: any, index: number) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "warning")
+						result.links.filter((link: any) => link.validation.status === "warning")
 							.length -
 							1;
 					const prefix = isLast ? "└─" : "├─";
@@ -305,11 +307,11 @@ export class CitationManager {
 		if (result.summary.valid > 0) {
 			lines.push(`VALID CITATIONS (${result.summary.valid})`);
 			result.links
-				.filter((link) => link.validation.status === "valid")
-				.forEach((link, index) => {
+				.filter((link: any) => link.validation.status === "valid")
+				.forEach((link: any, index: number) => {
 					const isLast =
 						index ===
-						result.links.filter((link) => link.validation.status === "valid")
+						result.links.filter((link: any) => link.validation.status === "valid")
 							.length -
 							1;
 					const prefix = isLast ? "└─" : "├─";
@@ -360,7 +362,7 @@ export class CitationManager {
 	 * @param {Object} options - CLI options (scope, fullFiles)
 	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
 	 */
-	async extractLinks(sourceFile, options) {
+	async extractLinks(sourceFile: string, options: ExtractOptions): Promise<void> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -376,7 +378,7 @@ export class CitationManager {
 			if (validationResult.summary.errors > 0) {
 				console.error("Validation errors found:");
 				const errors = enrichedLinks.filter(
-					(l) => l.validation.status === "error",
+					(l: any) => l.validation.status === "error",
 				);
 				for (const link of errors) {
 					console.error(`  Line ${link.line}: ${link.validation.error}`);
@@ -401,7 +403,8 @@ export class CitationManager {
 				process.exitCode = 1;
 			}
 		} catch (error) {
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	}
@@ -421,7 +424,7 @@ export class CitationManager {
 	 * @param {Object} options - CLI options (scope)
 	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
 	 */
-	async extractHeader(targetFile, headerName, options) {
+	async extractHeader(targetFile: string, headerName: string, options: ExtractOptions): Promise<any> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -441,21 +444,26 @@ export class CitationManager {
 				targetFile,
 			);
 
-			// Extract validation metadata from result
-			const validation = {
-				status: validationResult.status,
-			};
-
-			if (validationResult.error) {
-				validation.error = validationResult.error;
-			}
-
-			if (validationResult.suggestion) {
-				validation.suggestion = validationResult.suggestion;
-			}
-
-			if (validationResult.pathConversion) {
-				validation.pathConversion = validationResult.pathConversion;
+			// Extract validation metadata from result - build proper union type
+			let validation: ValidationMetadata;
+			if (validationResult.status === "error") {
+				validation = {
+					status: "error",
+					error: validationResult.error || "",
+					suggestion: validationResult.suggestion,
+					pathConversion: validationResult.pathConversion,
+				};
+			} else if (validationResult.status === "warning") {
+				validation = {
+					status: "warning",
+					error: validationResult.error || "",
+					suggestion: validationResult.suggestion,
+					pathConversion: validationResult.pathConversion,
+				};
+			} else {
+				validation = {
+					status: "valid",
+				};
 			}
 
 			// Add validation property to link object
@@ -464,7 +472,9 @@ export class CitationManager {
 			// Decision: Check validation status before extraction (error handling)
 			if (syntheticLink.validation.status === "error") {
 				// Boundary: Error output to stderr
-				console.error("Validation failed:", syntheticLink.validation.error);
+				// Type narrowing allows accessing error property
+				const errorMsg = syntheticLink.validation.error;
+				console.error("Validation failed:", errorMsg);
 				if (syntheticLink.validation.suggestion) {
 					console.error("Suggestion:", syntheticLink.validation.suggestion);
 				}
@@ -485,7 +495,8 @@ export class CitationManager {
 			return result;
 		} catch (error) {
 			// Decision: System errors use exit code 2
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	}
@@ -504,7 +515,7 @@ export class CitationManager {
 	 * @param {Object} options - CLI options (scope, format)
 	 * @returns {Promise<Object>} OutgoingLinksExtractedContent structure
 	 */
-	async extractFile(targetFile, options) {
+	async extractFile(targetFile: string, options: ExtractOptions): Promise<any> {
 		try {
 			// Decision: Build file cache if --scope provided
 			if (options.scope) {
@@ -523,21 +534,26 @@ export class CitationManager {
 				targetFile,
 			);
 
-			// Extract validation metadata from result
-			const validation = {
-				status: validationResult.status,
-			};
-
-			if (validationResult.error) {
-				validation.error = validationResult.error;
-			}
-
-			if (validationResult.suggestion) {
-				validation.suggestion = validationResult.suggestion;
-			}
-
-			if (validationResult.pathConversion) {
-				validation.pathConversion = validationResult.pathConversion;
+			// Extract validation metadata from result - build proper union type
+			let validation: ValidationMetadata;
+			if (validationResult.status === "error") {
+				validation = {
+					status: "error",
+					error: validationResult.error || "",
+					suggestion: validationResult.suggestion,
+					pathConversion: validationResult.pathConversion,
+				};
+			} else if (validationResult.status === "warning") {
+				validation = {
+					status: "warning",
+					error: validationResult.error || "",
+					suggestion: validationResult.suggestion,
+					pathConversion: validationResult.pathConversion,
+				};
+			} else {
+				validation = {
+					status: "valid",
+				};
 			}
 
 			// Add validation property to link object
@@ -560,7 +576,9 @@ export class CitationManager {
 			// Decision: Check validation status before extraction (error handling)
 			if (syntheticLink.validation.status === "error") {
 				// Boundary: Error output to stderr
-				console.error("Validation failed:", syntheticLink.validation.error);
+				// Type narrowing allows accessing error property
+				const errorMsg = syntheticLink.validation.error;
+				console.error("Validation failed:", errorMsg);
 				if (syntheticLink.validation.suggestion) {
 					console.error("Suggestion:", syntheticLink.validation.suggestion);
 				}
@@ -581,7 +599,8 @@ export class CitationManager {
 			return result;
 		} catch (error) {
 			// Decision: System errors use exit code 2
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	}
@@ -600,7 +619,7 @@ export class CitationManager {
 	 * @param {string} [options.scope] - Scope folder for file cache
 	 * @returns {Promise<string>} Fix report with changes made
 	 */
-	async fix(filePath, options = {}) {
+	async fix(filePath: string, options: ValidateOptions = {}): Promise<string> {
 		try {
 			// Import fs for file operations
 			const { readFileSync, writeFileSync } = await import("node:fs");
@@ -623,7 +642,7 @@ export class CitationManager {
 
 			// Find all fixable issues: warnings (path conversion) and errors (anchor fixes)
 			const fixableLinks = validationResults.links.filter(
-				(link) =>
+				(link: any) =>
 					(link.validation.status === "warning" &&
 						link.validation.pathConversion) ||
 					(link.validation.status === "error" &&
@@ -645,7 +664,7 @@ export class CitationManager {
 			let fixesApplied = 0;
 			let pathFixesApplied = 0;
 			let anchorFixesApplied = 0;
-			const fixes = [];
+			const fixes: FixRecord[] = [];
 
 			// Process all fixable links
 			for (const link of fixableLinks) {
@@ -720,9 +739,10 @@ export class CitationManager {
 
 				return output.join("\n");
 			}
-			return `WARNING: Found ${fixableResults.length} fixable citations but could not apply fixes`;
+			return `WARNING: Found ${fixableLinks.length} fixable citations but could not apply fixes`;
 		} catch (error) {
-			return `ERROR: ${error.message}`;
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return `ERROR: ${errorMessage}`;
 		}
 	}
 
@@ -751,8 +771,8 @@ export class CitationManager {
 	private parseAvailableHeaders(suggestion: string): HeaderObject[] {
 		const headerRegex = /"([^"]+)"\s*→\s*#([^,]+)/g;
 		return [...suggestion.matchAll(headerRegex)].map((match) => ({
-			text: match[1].trim(),
-			anchor: `#${match[2].trim()}`,
+			text: (match[1] || "").trim(),
+			anchor: `#${(match[2] || "").trim()}`,
 		}));
 	}
 
@@ -852,7 +872,7 @@ export class CitationManager {
  * Maps common synonyms and typos to correct commands/options.
  * Used by custom error handler to provide helpful suggestions.
  */
-const semanticSuggestionMap = {
+const semanticSuggestionMap: Record<string, string[]> = {
 	// Command synonyms
 	check: ["validate"],
 	verify: ["validate"],
@@ -886,7 +906,7 @@ program
 program.configureOutput({
 	outputError: (str, write) => {
 		const match = str.match(/unknown (?:command|option) '([^']+)'/);
-		if (match) {
+		if (match && match[1]) {
 			const input = match[1].replace(/^--?/, "");
 			const suggestions = semanticSuggestionMap[input];
 
@@ -936,7 +956,7 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (file, options) => {
+	.action(async (file: string, options: any) => {
 		const manager = new CitationManager();
 		let result;
 
@@ -986,9 +1006,9 @@ Output includes:
   - anchors: Available anchor points (headers and blocks)
 `,
 	)
-	.action(async (file) => {
+	.action(async (file: string) => {
 		const manager = new CitationManager();
-		const ast = await manager.parser.parseFile(file);
+		const ast = await (manager as any).parser.parseFile(file);
 		console.log(JSON.stringify(ast, null, 2));
 	});
 
@@ -1023,14 +1043,15 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (sourceFile, options) => {
+	.action(async (sourceFile: string, options: any) => {
 		// Pattern: Delegate to CitationManager orchestrator
 		const manager = new CitationManager();
 
 		try {
 			await manager.extractLinks(sourceFile, options);
 		} catch (error) {
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	});
@@ -1056,7 +1077,7 @@ Exit Codes:
   2  System error (file not found, permission denied)
 `,
 	)
-	.action(async (targetFile, headerName, options) => {
+	.action(async (targetFile: string, headerName: string, options: any) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
 
@@ -1077,7 +1098,8 @@ Exit Codes:
 			// Note: Error exit codes set by extractHeader() method
 		} catch (error) {
 			// Decision: Unexpected errors use exit code 2
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	});
@@ -1103,7 +1125,7 @@ Exit Codes:
   2  System error (permission denied, parse error)
 `,
 	)
-	.action(async (targetFile, options) => {
+	.action(async (targetFile: string, options: any) => {
 		// Integration: Create CitationManager instance
 		const manager = new CitationManager();
 
@@ -1120,7 +1142,8 @@ Exit Codes:
 			// Note: Error exit codes set by extractFile() method
 		} catch (error) {
 			// Decision: Unexpected errors use exit code 2
-			console.error("ERROR:", error.message);
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
 	});
@@ -1130,7 +1153,7 @@ Exit Codes:
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const realPath = realpathSync(process.argv[1]);
+const realPath = realpathSync(process.argv[1] || "");
 const realPathAsUrl = pathToFileURL(realPath).href;
 
 if (import.meta.url === realPathAsUrl) {
