@@ -6,18 +6,18 @@ Confirms a link is valid by checking if the file exists (path + file name) and i
 ### Problem
 1. Links and anchors identified by the [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) have no guarantee that paths point to existing files or anchors correspond to real headers/blocks. ^P1
 2. [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) contains link information about the source and target document we do not want to re-build or repeat in other consumers ([One Source Of Truth](../../../../../resume-coach/design-docs/Architecture%20Principles.md#^one-source-of-truth)) ^P2
-1. Creating a separate validation result object duplicates 80% of link metadata (source paths, target paths, line numbers). ^P2-1
+   1. Creating a separate validation result object duplicates 80% of link metadata (source paths, target paths, line numbers). ^P2-1
 3. If errors occur in the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor), it is challenging to determine if the errors are due to invalid link or invalid content (missing, malformed, etc) ^P3
 
 ### Solution
 The [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) component validates link paths and anchors are valid by:
 1. consuming [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade instances from the [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) ^S1
-1. verifying target file and anchor exist using [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade query methods ^S1-1
+   1. verifying target file and anchor exist using [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade query methods ^S1-1
 2. enriching/extending [**`LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) directly by adding a [**`CitationValidator.ValidationMetadata`**](#ValidationMetadata%20Type%20(Discriminated%20Union)) property ^S2
 3. The [**`CitationValidator.ValidationResult`**](#ValidationResult%20Interface) output:
-1. is consumed by the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) for extraction eligibility analysis ^S3
-2. extends [**`LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) via the [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface) interface, and contains [**`ValidationMetadata`**)](#ValidationMetadata%20Type%20(Discriminated%20Union)) statuses, errors, and fix suggestions
-3. eliminates data duplication (80% reduction) by adding validation property instead of creating separate result objects
+   1. is consumed by the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) for extraction eligibility analysis ^S3
+   2. extends [**`LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) via the [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface) interface, and contains [**`ValidationMetadata`**)](#ValidationMetadata%20Type%20(Discriminated%20Union)) statuses, errors, and fix suggestions
+   3. eliminates data duplication (80% reduction) by adding validation property instead of creating separate result objects
 
 ### Impact
 
@@ -212,11 +212,11 @@ interface ParsedFileCacheInterface {
 ```typescript
 interface FileCacheInterface {
   /**
-	* Resolve a short filename to its absolute path.
-	*/
+ * Resolve a short filename to its absolute path.
+ */
   resolveFile(filename: string): {
     found: boolean;
-    path: string | null;
+    path?: string | null;
     fuzzyMatch?: boolean;
     message?: string;
     reason?: string
@@ -265,7 +265,6 @@ CitationValidator.validateSingleCitation(link: LinkObject, contextFile?: string)
 | `@param`   | `link: LinkObject`                                           | Link to validate (synthetic or from parser)             |
 | `@param`   | `contextFile?: string`                                       | Optional source context for path resolution             |
 | `@returns` | [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface)  | Input LinkObject with added `validation` property       |
-
 
 ---
 
@@ -439,6 +438,39 @@ export type ValidationMetadata =
 ```
 
 > **Note**: TypeScript narrows `ValidationMetadata` based on `status` checks. When `status === "error"`, TypeScript makes `error` property available without additional type guards.
+
+## Validation Status Rules
+
+The validator assigns one of three statuses to each link: `valid`, `warning`, or `error`. The rules below define when each status is used.
+
+### Status: `valid`
+
+- File exists at the expected relative path
+- Anchor (if present) exists in the target document
+
+### Status: `warning`
+
+- File **not found** at the relative path, but file cache resolves it to a file **in a different directory**
+- Anchor (if present) exists in the resolved file
+- Includes a `pathConversion` suggestion with the correct relative path
+- **Rationale**: The link works, but the path is ambiguous — a different file with the same name in another directory could match instead
+
+### Status: `error`
+
+- File not found (no resolution strategy succeeded)
+- File found but anchor does not exist (regardless of how the file was resolved)
+- Pattern syntax is invalid (caret, emphasis, wiki-style)
+- **Key rule**: A broken anchor is always an error, even if the file was resolved via cross-directory cache lookup
+
+### Status Decision Matrix
+
+| File Found? | Same Directory? | Anchor OK? | Status      |
+| :---------- | :-------------- | :--------- | :---------- |
+| ✅           | ✅ Same dir      | ✅          | **valid**   |
+| ✅           | ✅ Same dir      | ❌          | **error**   |
+| ✅           | ❌ Different dir  | ✅          | **warning** |
+| ✅           | ❌ Different dir  | ❌          | **error**   |
+| ❌           | —               | —          | **error**   |
 
 ## Testing Strategy
 

@@ -452,8 +452,8 @@ export class CitationValidator {
 									? `${crossDirMessage}. ${anchorMessage}`
 									: anchorMessage;
 
-								// For same-directory, use "error"; for cross-directory, use "warning"
-								const status = isDirectoryMatch ? "error" : "warning";
+								// Broken anchor is always an error regardless of how the file was resolved
+								const status = "error" as const;
 
 								return this.createValidationResult(
 									citation,
