@@ -96,12 +96,12 @@ The CLI includes a `semanticSuggestionMap` constant that maps common user mistak
 
 ```javascript
 const semanticSuggestionMap = {
-	// Command synonyms
-	check: ['validate'],
-	verify: ['validate'],
-	lint: ['validate'],
-	parse: ['ast'],
-	// ... etc
+ // Command synonyms
+ check: ['validate'],
+ verify: ['validate'],
+ lint: ['validate'],
+ parse: ['ast'],
+ // ... etc
 };
 ```
 
@@ -132,7 +132,7 @@ tools/citation-manager/
 
 ### Ideal Structure (Future Refactoring)
 
-Following the Component Folder pattern from [File Naming Patterns](../../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%20Patterns):
+Following the Component Folder pattern from [File Naming Patterns](../../../../../design-docs/Architecture%20-%20Baseline.md#File%20Naming%)
 
 ```text
 tools/citation-manager/
@@ -1104,7 +1104,7 @@ _Reference_: [Technical Debt: CLI Subprocess Testing Buffer Limits](../../../../
 - ⚠️ Scattered file I/O operations (documented tech debt)
 - ⚠️ CLI Orchestrator has mixed responsibilities
 
-_Related Technical Debt_: [Scattered File I/O Operations](../features/20251003-content-aggregation/content-aggregation-architecture.md#Scattered%20File%20I/O%20Operations)
+_Related Technical Debt_: [Scattered File I/O Operations](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Scattered File I/O Operations>)
 
 ---
 
@@ -1238,7 +1238,7 @@ fi
 - ⚠️ CLI coordinates 3-4 component calls (acceptable orchestration complexity)
 - ⚠️ Shared ParsedFileCache dependency (mitigated by infrastructure-level caching)
 
-_Reference_: [Epic 2 Whiteboard - Why This Design Is Correct](../features/20251003-content-aggregation/content-aggregation-prd.md#Why%20This%20Design%20Is%20Correct)
+_Reference_: [Epic 2 Whiteboard - Why This Design Is Correct](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Why This Design Is Correct>)
 
 ---
 
@@ -1356,7 +1356,7 @@ class FileSystemManager is
 
 **Estimated Effort**: 8-12 hours (component creation + refactoring + test updates)
 
-_Reference_: [Content Aggregation Architecture - Scattered File I/O Operations](../features/20251003-content-aggregation/content-aggregation-architecture.md#Scattered%20File%20I/O%20Operations)
+_Reference_: [Content Aggregation Architecture - Scattered File I/O Operations](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Scattered File I/O Operations>)
 
 ---
 
@@ -1403,13 +1403,13 @@ citation-manager validate file.md --format json | jq '.links[].target.path.absol
 
 **Estimated Effort**: 2-3 hours (deprecation warning + documentation + removal)
 
-_Reference_: [PRD US2.7 - Remove Deprecated base-paths Command](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%202.7%20Remove%20Deprecated%20base-paths%20Command)
+_Reference_: [PRD US2.7 - Remove Deprecated base-paths Command](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 2.7 Remove Deprecated base-paths Command>)
 
 ---
 
 ## Related Documentation
 
-- [Content Aggregation Architecture - CLI Orchestrator Component](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.CLI%20Orchestrator)
+- [Content Aggregation Architecture - CLI Orchestrator Component](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.CLI Orchestrator>)
 - [Content Extractor Implementation Guide](Content%20Extractor%20Implementation%20Guide.md)
 - [CitationValidator Implementation Guide](CitationValidator%20Implementation%20Guide.md)
 - [ParsedFileCache Implementation Guide](ParsedFileCache%20Implementation%20Guide.md)
@@ -1417,13 +1417,13 @@ _Reference_: [PRD US2.7 - Remove Deprecated base-paths Command](../features/2025
 - [Architecture Principles](../../../../../design-docs/Architecture%20Principles.md)
 
 **User Stories**:
-- [US2.3: Implement `extract links` Subcommand](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%202.3%20Implement%20extract%20links%20Subcommand)
-- [US2.4: Implement `extract header` Subcommand](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%202.4%20Implement%20extract%20header%20Subcommand)
-- [US2.5: Implement `extract file` Subcommand](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%202.5%20Implement%20extract%20file%20Subcommand)
-- [US2.6: Add Comprehensive Help Documentation](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%202.6%20Add%20Comprehensive%20Help%20Documentation%20to%20CLI%20Commands)
-- [US2.7: Remove Deprecated base-paths Command](../features/20251003-content-aggregation/content-aggregation-prd.md#Story%202.7%20Remove%20Deprecated%20base-paths%20Command)
+- [US2.3: Implement `extract links` Subcommand](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 2.3 Implement extract links Subcommand>)
+- [US2.4: Implement `extract header` Subcommand](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 2.4 Implement extract header Subcommand>)
+- [US2.5: Implement `extract file` Subcommand](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 2.5 Implement extract file Subcommand>)
+- [US2.6: Add Comprehensive Help Documentation](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 2.6 Add Comprehensive Help Documentation to CLI Commands>)
+- [US2.7: Remove Deprecated base-paths Command](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 2.7 Remove Deprecated base-paths Command>)
 
 **Epic 2 Whiteboard**:
-- [Architectural Decision: ContentExtractor Responsibility Boundaries](../features/20251003-content-aggregation/content-aggregation-prd.md#Architectural%20Decision%20ContentExtractor%20Responsibility%20Boundaries)
-- [Component Responsibilities - LinkObjectFactory](../features/20251003-content-aggregation/content-aggregation-prd.md#LinkObjectFactory%20(Level%204%20Code%20Detail%20of%20CLI%20Orchestrator))
-- [Why This Design Is Correct](../features/20251003-content-aggregation/content-aggregation-prd.md#Why%20This%20Design%20Is%20Correct)
+- [Architectural Decision: ContentExtractor Responsibility Boundaries](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Architectural Decision ContentExtractor Responsibility Boundaries>)
+- [Component Responsibilities - LinkObjectFactory](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#LinkObjectFactory (Level 4 Code Detail of CLI Orchestrator)>)
+- [Why This Design Is Correct](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Why This Design Is Correct>)

@@ -1,4 +1,4 @@
-import { MarkdownParser } from "../src/MarkdownParser.js";
+import { MarkdownParser } from "../src/MarkdownParser.ts";
 import fs from "fs";
 
 const filePath =

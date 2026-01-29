@@ -11,9 +11,15 @@
 	"scripts": {
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"start": "node src/citation-manager.js"
+		"start": "node src/citation-manager.js",
+		"validate:ts-conversion": "node --loader ts-node/esm scripts/validate-typescript-conversion.ts"
 	},
-	"keywords": ["citation", "validator", "markdown", "obsidian"],
+	"keywords": [
+		"citation",
+		"validator",
+		"markdown",
+		"obsidian"
+	],
 	"author": "",
 	"license": "ISC",
 	"dependencies": {
@@ -21,6 +27,7 @@
 		"marked": "^15.0.12"
 	},
 	"devDependencies": {
+		"@types/node": "^24.10.1",
 		"vitest": "^3.2.4"
 	}
 }

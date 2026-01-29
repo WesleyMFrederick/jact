@@ -8,7 +8,7 @@ const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const FIXTURES_DIR = join(__dirname, "..", "fixtures", "extract-file");
-const CLI_PATH = join(__dirname, "../../src/citation-manager.js");
+const CLI_PATH = join(__dirname, "../../dist/citation-manager.js");
 
 describe("CLI extract file subcommand - Basic Functionality", () => {
 	it("should extract entire file content successfully", async () => {

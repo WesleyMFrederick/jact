@@ -8,16 +8,11 @@ const __dirname = path.dirname(__filename);
 
 describe("CLI - extract header command", () => {
 	it("should extract specified header from target file", async () => {
-		// Fixture: US2.3 implementation plan as realistic test document
+		// Fixture: US2.3 implementation plan from test fixtures
 		const targetFile = path.resolve(
 			__dirname,
 			"..",
-			"..",
-			"design-docs",
-			"features",
-			"20251003-content-aggregation",
-			"user-stories",
-			"us2.3-implement-extract-links-subcommand",
+			"fixtures",
 			"us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
 		const headerName =
@@ -25,8 +20,8 @@ describe("CLI - extract header command", () => {
 
 		// When: Run extract header command
 		const output = runCLI(
-			`node tools/citation-manager/src/citation-manager.js extract header "${targetFile}" "${headerName}"`,
-			{ captureStderr: false },
+			`node dist/citation-manager.js extract header "${targetFile}" "${headerName}"`,
+			{ captureStderr: true },
 		);
 
 		// Then: Output contains OutgoingLinksExtractedContent JSON
@@ -44,12 +39,7 @@ describe("CLI - extract header command", () => {
 		const targetFile = path.resolve(
 			__dirname,
 			"..",
-			"..",
-			"design-docs",
-			"features",
-			"20251003-content-aggregation",
-			"user-stories",
-			"us2.3-implement-extract-links-subcommand",
+			"fixtures",
 			"us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
 		const invalidHeader = "Nonexistent Header Name";
@@ -58,7 +48,7 @@ describe("CLI - extract header command", () => {
 		let exitCode;
 		try {
 			runCLI(
-				`node tools/citation-manager/src/citation-manager.js extract header "${targetFile}" "${invalidHeader}"`,
+				`node dist/citation-manager.js extract header "${targetFile}" "${invalidHeader}"`,
 			);
 		} catch (error) {
 			// Pattern: Capture exit code from error
@@ -75,12 +65,7 @@ describe("CLI - extract header command", () => {
 		const targetFile = path.resolve(
 			__dirname,
 			"..",
-			"..",
-			"design-docs",
-			"features",
-			"20251003-content-aggregation",
-			"user-stories",
-			"us2.3-implement-extract-links-subcommand",
+			"fixtures",
 			"us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
 		const similarHeader = "Task 1: LinkObjectFactory"; // Partial match
@@ -89,7 +74,7 @@ describe("CLI - extract header command", () => {
 		let stdout;
 		try {
 			runCLI(
-				`node tools/citation-manager/src/citation-manager.js extract header "${targetFile}" "${similarHeader}"`,
+				`node dist/citation-manager.js extract header "${targetFile}" "${similarHeader}"`,
 			);
 		} catch (error) {
 			stdout = error.stdout;
@@ -106,7 +91,7 @@ describe("CLI Help Documentation", () => {
 	it("should show extract header in top-level help", async () => {
 		// When: Request top-level extract help
 		const output = runCLI(
-			"node tools/citation-manager/src/citation-manager.js extract --help",
+			"node dist/citation-manager.js extract --help",
 		);
 
 		// Then: Help lists header subcommand
@@ -118,7 +103,7 @@ describe("CLI Help Documentation", () => {
 	it("should show detailed help for extract header subcommand", async () => {
 		// When: Request subcommand help
 		const output = runCLI(
-			"node tools/citation-manager/src/citation-manager.js extract header --help",
+			"node dist/citation-manager.js extract header --help",
 		);
 
 		// Then: Detailed usage and examples shown

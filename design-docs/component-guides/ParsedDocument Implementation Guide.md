@@ -1,247 +1,350 @@
 # ParsedDocument Implementation Guide
 
-This guide provides the Level 4 (Code) details for the **`ParsedDocument`** facade, which is the facade wrapper implemented in User Story 1.7.
+## Overview
 
-## Problem
+Wraps parser output in a facade providing stable query methods for anchor validation, link retrieval, and content extraction for consumption by downstream components.
 
-Consumers like the `CitationValidator` are tightly coupled to the internal structure of the [**`MarkdownParser.Output.DataContract`**](../../../../../resume-coach/design-docs/examples/component-guides/Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts). This makes the `CitationValidator` complex, forces it to contain data-querying logic, and makes any future change to the parser's output a breaking change for all consumers.
+### Problem
+1. Consumers like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) are tightly coupled to the internal structure of [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface), making them complex and forcing them to contain data-querying logic. ^P1
+2. Any change to the parser's output structure becomes a breaking change for all consumers. ^P2
+3. Direct data structure access violates encapsulation and makes the system brittle to refactoring. ^P3
 
-## Solution
+### Solution
+The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade provides a stable query interface by:
+1. encapsulating the raw [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) and hiding internal data structures from all consumers (addresses [P1](#^P1)) ^S1
+2. providing method-based query APIs for anchors, links, and content that decouple consumers from parser internals (addresses [P1](#^P1), [P2](#^P2)) ^S2
+3. enabling parser refactoring without breaking consumer code (addresses [P2](#^P2), [P3](#^P3)) ^S3
 
-The **`ParsedDocument`** facade is a wrapper class that encapsulates the raw [**`MarkdownParser.Output.DataContract`**](../../../../../resume-coach/design-docs/examples/component-guides/Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts). It provides a stable, method-based API for querying links, anchors, and content, hiding the complex internal data structures from all consumers. This simplifies consumer logic and isolates the system from future changes to the underlying parser.
+![ParsedDocument facade wrapping MarkdownParser output to provide stable query interface](Pasted%20image%2020251205180009.png)
+
+### Impact
+
+| Problem ID | Problem | Solution ID | Solution | Impact | Principles | How Principle Applies |
+| :--------: | ------- | :---------: | -------- | ------ | ---------- | --------------------- |
+| [P1](#^P1) | Tight coupling to parser internals | [S1](#^S1), [S2](#^S2) | Facade with query methods | Zero direct data structure access | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Expose clean API; hide implementation |
+| [P2](#^P2) | Breaking changes propagate | [S2](#^S2), [S3](#^S3) | Stable method-based API | Parser refactoring doesn't break consumers | [Modular Design](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^modular-design-principles-definition) | Replaceable parts via interfaces |
+| [P3](#^P3) | Brittle to refactoring | [S1](#^S1), [S3](#^S3) | Encapsulated data access | System resilient to internal changes | [Access-Pattern Fit](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^access-pattern-fit) | Data structures aligned with query patterns |
+
+---
 
 ## Structure
 
-The [**`ParsedFileCache`**](../../../../../resume-coach/design-docs/examples/component-guides/ParsedFileCache%20Implementation%20Guide.md#Output%20Contract) is responsible for creating `ParsedDocument` instances. Consumers like `CitationValidator` and `ContentExtractor` depend on the `ParsedDocument` interface for all data access.
+### Class Diagram
+
+[**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md#Public%20Contracts) creates `ParsedDocument` instances. Consumers like [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md) and [**`ContentExtractor`**](Content%20Extractor%20Implementation%20Guide.md) depend on the `ParsedDocument` facade for all data access.
 
 ```mermaid
 classDiagram
     direction LR
 
     class ParsedFileCache {
+        <<service>>
         +resolveParsedFile(filePath): Promise~ParsedDocument~
     }
 
     class ParsedDocument {
-        <<Facade>>
-        -data: MarkdownParserOutputDataContract
+        <<facade>>
         +hasAnchor(anchorId): boolean
-        +findSimilarAnchors(anchorId): string
-        +getLinks(): Link[]
-        +extractSection(headingText): string
-        +extractBlock(anchorId): string
+        +findSimilarAnchors(anchorId): string[]
+        +getAnchorIds(): string[]
+        +getLinks(): LinkObject[]
+        +extractSection(headingText, level): string | null
+        +extractBlock(anchorId): string | null
         +extractFullContent(): string
     }
 
     class CitationValidator {
-        +validateFile(filePath)
+        <<class>>
+        +validateFile(filePath): ValidationResult
     }
 
     class ContentExtractor {
-        +extract(link)
+        <<class>>
+        +extractContent(links): ExtractedContent
     }
 
-    class MarkdownParserOutputDataContract {
+    class ParserOutput {
+        <<data>>
         +filePath: string
         +content: string
-        +links: Link[]
-        +anchors: Anchor[]
-        +tokens: object[]
+        +tokens: Token[]
+        +links: LinkObject[]
+        +anchors: AnchorObject[]
     }
 
-    ParsedFileCache --> ParsedDocument : creates and returns
-    CitationValidator --> ParsedDocument : uses
-    ContentExtractor --> ParsedDocument : uses
-    ParsedDocument o-- MarkdownParserOutputDataContract : wraps
+    ParsedFileCache ..> ParsedDocument : «creates»
+    CitationValidator --> ParsedDocument : «uses»
+    ContentExtractor --> ParsedDocument : «uses»
+    ParsedDocument o-- ParserOutput : «wraps»
 ```
 
-1. [MarkdownParser.Output.DataContract](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The raw data object being wrapped
-2. **ParsedDocument**: The facade providing query methods (this guide)
-3. [CitationValidator](CitationValidator%20Implementation%20Guide.md): Consumer using anchor/link query methods
-4. [Citation Manager.ContentExtractor](../features/20251003-content-aggregation/content-aggregation-architecture.md#Citation%20Manager.ContentExtractor): Consumer using content extraction methods
+1. [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache): Service that creates `ParsedDocument` instances
+2. [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument): Facade providing query methods (this guide)
+3. [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator): Consumer using anchor/link query methods
+4. [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor): Consumer using content extraction methods
+5. [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface): Data contract being wrapped
 
-## File Structure
+---
+### File Structure
 
 ```text
 tools/citation-manager/
-└── src/
-    └── ParsedDocument.js    # Facade class with query and extraction methods
+├── src/
+│   ├── ParsedDocument.ts                      // Facade implementation (~355 lines)
+│   │   ├── hasAnchor()                        // Anchor existence check
+│   │   ├── findSimilarAnchors()               // Fuzzy matching for suggestions
+│   │   ├── getAnchorIds()                     // Lazy-loaded anchor cache
+│   │   ├── getLinks()                         // Link array passthrough
+│   │   ├── extractFullContent()               // Raw content accessor
+│   │   ├── extractSection()                   // Token-walking section extraction
+│   │   └── extractBlock()                     // Line-based block extraction
+│   │
+│   └── types/
+│       └── citationTypes.ts                   // TypeScript type definitions
+│
+└── test/
+    ├── parsed-document.test.js                // Unit tests for facade methods
+    ├── parsed-document-extraction.test.js     // Section/block extraction tests
+    ├── poc-block-extraction.test.js           // POC validation for block extraction
+    │
+    └── integration/
+        └── citation-validator-parsed-document.test.js  // Integration with CitationValidator
 ```
 
-**Architecture Notes:**
-- Maintained as single facade class per Facade Pattern
-- Future refactoring may extract operations following Action-Based Organization if complexity warrants
-- Current structure prioritizes encapsulation and interface stability
-
+---
 ## Public Contracts
 
-### Input Contract
-1. **`parserOutput`** (object): A complete `MarkdownParser.Output.DataContract` object produced by the `MarkdownParser`.
+### Constructor
 
-### Output Contract (Public Methods)
-The facade exposes a set of query methods for consumers.
+```typescript
+new ParsedDocument(
+  parserOutput: ParserOutput  // Complete MarkdownParser.Output.DataContract
+)
+```
 
-#### Anchor Queries
-- [**`hasAnchor(anchorId: string): boolean`**](#`hasAnchor(anchorId%20string)%20boolean`): Returns `true` or `false` if an anchor ID exists in the document. This method encapsulates all complex matching logic, including direct, URL-decoded, and flexible markdown matching.
-- **`findSimilarAnchors(anchorId: string): string`**: Returns a formatted suggestion string (e.g., "Did you mean...") when an anchor is not found, encapsulating all suggestion-generation logic.
+| Type     | Value           | Comment                      |
+| :------- | :-------------- | :--------------------------- |
+| `@param` | `ParserOutput`  | [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) produced by MarkdownParser |
 
-#### Link Queries
-- **`getLinks(): LinkObject[]`**: Returns the full array of `LinkObject`s from the document for consumers that need to iterate over all links.
+---
 
-#### Content Extraction
-- **`extractSection(headingText: string, headingLevel: number): string | null`**: Returns the string content for a specific section by encapsulating the complex token-walking logic.
-- **`extractBlock(anchorId: string): string | null`**: Returns the string content for a specific block reference (e.g., `^my-block-id`).
-- **`extractFullContent(): string`**: A simple getter that returns the entire raw content of the document as a string.
+### hasAnchor(anchorId)
+
+```typescript
+/**
+ * Check if specific anchor exists in document.
+ * Encapsulates all complex matching logic including direct, URL-decoded, and flexible markdown matching.
+ */
+ParsedDocument.hasAnchor(anchorId: string) → boolean
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@param`   | `anchorId: string` | Anchor ID to check (raw or URL-encoded format) |
+| `@returns` | `boolean`       | True if anchor found, false otherwise |
+
+---
+
+### findSimilarAnchors(anchorId)
+
+```typescript
+/**
+ * Find anchors similar to given anchor ID using fuzzy matching.
+ * Returns suggestions for use when anchor is not found.
+ */
+ParsedDocument.findSimilarAnchors(anchorId: string) → string[]
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@param`   | `anchorId: string` | Target anchor ID to find matches for |
+| `@returns` | `string[]`      | Array of similar anchor IDs sorted by similarity (max 5 results) |
+
+---
+
+### getAnchorIds()
+
+```typescript
+/**
+ * Get all available anchor IDs in the document.
+ * Result cached after first call for performance.
+ */
+ParsedDocument.getAnchorIds() → string[]
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@returns` | `string[]`      | Array containing both `id` and `urlEncodedId` variants for all anchors |
+
+---
+
+### getLinks()
+
+```typescript
+/**
+ * Get all links in the document.
+ * Returns direct reference to internal array for performance.
+ */
+ParsedDocument.getLinks() → LinkObject[]
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@returns` | `LinkObject[]`  | Array of all [**`LinkObject`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface)s from document |
+
+---
+
+### extractSection(headingText, headingLevel)
+
+```typescript
+/**
+ * Extract content under specific heading until next same-or-higher level heading.
+ * Encapsulates complex token-walking logic for section boundary detection.
+ */
+ParsedDocument.extractSection(headingText: string, headingLevel: number) → string | null
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@param`   | `headingText: string` | Exact text of heading to extract (case-sensitive) |
+| `@param`   | `headingLevel: number` | Heading level (1-6, where 1 is `#`, 2 is `##`, etc.) |
+| `@returns` | `string \| null` | Section content including heading and nested content, or null if not found |
+
+---
+
+### extractBlock(anchorId)
+
+```typescript
+/**
+ * Extract single line containing specific block anchor.
+ * Filters by anchorType="block" for type safety.
+ */
+ParsedDocument.extractBlock(anchorId: string) → string | null
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@param`   | `anchorId: string` | Block anchor ID without `^` prefix (e.g., "FR1" for `^FR1`) |
+| `@returns` | `string \| null` | Single line content containing block anchor, or null if not found |
+
+---
+
+### extractFullContent()
+
+```typescript
+/**
+ * Get complete file content.
+ * Simple accessor for raw content string.
+ */
+ParsedDocument.extractFullContent() → string
+```
+
+| Type       | Value           | Comment                        |
+| :--------- | :-------------- | :----------------------------- |
+| `@returns` | `string`        | Full content string from document |
+
+---
 
 ## Pseudocode
 
-This [Psuedocode - Medium Level -Implementation Ready Patterns](../../../../design-docs/Psuedocode%20Style%20Guide.md#MEDIUM-IMPLEMENTATION%20Implementation-Ready%20Patterns), showing the core facade pattern and query method implementations.
+High-level architectural patterns showing the Facade pattern, lazy loading, and content extraction strategies.
 
-```tsx
-// The ParsedDocument class, providing a stable query interface over parser output
-class ParsedDocument is
-  private field _data: MarkdownParser.Output.DataContract
-  private field _cachedAnchorIds: string[] = null
+```typescript
+/**
+ * Facade Pattern: ParsedDocument wraps parser output and provides stable query interface
+ *
+ * Key Patterns:
+ * - Encapsulation: Parser output stored privately, never exposed
+ * - Lazy Loading: Anchor IDs computed and cached on first access
+ * - Query Methods: Stable interface decouples consumers from parser internals
+ */
+class ParsedDocument {
+  private _data: ParserOutput           // Pattern: Private encapsulation
+  private _cachedAnchorIds: string[]    // Pattern: Lazy-loaded cache
 
-  // Constructor accepts and wraps the raw parser output
-  constructor ParsedDocument(parserOutput: MarkdownParser.Output.DataContract) is
-    // Encapsulation: Store raw data privately, never expose directly
+  constructor(parserOutput: ParserOutput) {
+    // Pattern: Dependency injection of parser output
     this._data = parserOutput
+  }
 
-  // === PUBLIC METHODS ===
+  // === ANCHOR QUERY PATTERNS ===
 
-  // --- Anchor Queries ---
+  hasAnchor(anchorId: string): boolean {
+    // Pattern: Dual-key lookup (id + urlEncodedId) for flexible matching
+    // Decision: Check both formats to handle Obsidian encoding variations
+  }
 
-  // Check if an anchor exists using direct and flexible matching
-  public method hasAnchor(anchorId: string): boolean is
-    // Logic: Checks both raw `id` and `urlEncodedId` for a direct match.
-    // This is the primary, high-performance method for validation.
-    return this._data.anchors.some(anchor =>
-      anchor.id == anchorId || anchor.urlEncodedId == anchorId
-    )
+  findSimilarAnchors(anchorId: string): string[] {
+    // Pattern: Fuzzy matching with threshold filtering
+    // Integration: Uses lazy-loaded anchor cache
+    // Algorithm: Levenshtein distance with 0.3 similarity threshold
+    // Returns: Top 5 matches sorted by similarity score
+  }
 
-  // Find anchors similar to a given anchor ID for generating suggestions
-  public method findSimilarAnchors(anchorId: string): string[] is
-    // Complexity Encapsulation: Hides the fuzzy matching algorithm from consumers.
-    field allIds = this._getAnchorIds()
-    return this._fuzzyMatch(anchorId, allIds)
+  getAnchorIds(): string[] {
+    // Pattern: Lazy loading with cache-aside
+    // Decision: Build unique set of id + urlEncodedId on first call
+  }
 
-  // --- Link Queries ---
+  // === LINK QUERY PATTERNS ===
 
-  // Get all links found in the document
-  public method getLinks(): Link[] is
-    return this._data.links
+  getLinks(): LinkObject[] {
+    // Pattern: Direct passthrough to encapsulated data
+    // Boundary: Returns reference to internal array (consumers must not mutate)
+  }
 
-  // --- Content Extraction ---
+  // === CONTENT EXTRACTION PATTERNS ===
 
-  // Get the entire raw content of the document as a string
-  public method extractFullContent(): string is
-    return this._data.content
+  extractFullContent(): string {
+    // Pattern: Simple accessor for raw content
+    // Boundary: Returns reference to internal string
+  }
 
-  // Extract content for a specific section by heading text
-  public method extractSection(headingText: string, headingLevel: number): string | null is
-    // Phase 1: Walk tokens to build ordered list and find target heading
-    // Uses walkTokens pattern (child before sibling) for in-order traversal
-    field orderedTokens = []
-    field targetToken = null
-    field targetIndex = -1
+  extractSection(headingText: string, headingLevel: number): string | null {
+    // Pattern: Three-phase content extraction
+    // Phase 1 - Token Traversal: Recursive walk to flatten tree and locate target
+    //   - Decision: Use child-before-sibling order for proper nesting
+    //   - Decision: Skip recursion for tokens with inclusive .raw (heading, paragraph)
+    // Phase 2 - Boundary Detection: Find next same-or-higher level heading
+    //   - Decision: Default to end-of-file if no boundary found
+    // Phase 3 - Content Reconstruction: Join token.raw from slice
+    //   - Integration: Relies on marked.js token.raw for source reconstruction
+  }
 
-    method walkTokens(tokenList) is
-      foreach (token in tokenList) do
-        field currentIndex = orderedTokens.length
-        orderedTokens.push(token)
+  extractBlock(anchorId: string): string | null {
+    // Pattern: Anchor-based line extraction
+    // Decision: Filter by anchorType="block" for type safety
+    // Integration: Uses 1-based line numbers from parser
+    // Boundary: Validates line index before extraction
+    // Limitation: Single line only (future: multi-line block support)
+  }
 
-        // Check if this is our target heading
-        if (targetToken == null &&
-            token.type == "heading" &&
-            token.depth == headingLevel &&
-            token.text == headingText) then
-          targetToken = token
-          targetIndex = currentIndex
+  // === PRIVATE HELPER PATTERNS ===
 
-        // Process nested tokens (child before sibling)
-        if (token.tokens != null) then
-          walkTokens(token.tokens)
+  private _getAnchorIds(): string[] {
+    // Pattern: Lazy initialization with null check
+    // Decision: Cache computed result for repeated queries
+  }
 
-    walkTokens(this._data.tokens)
+  private _fuzzyMatch(target: string, candidates: string[]): string[] {
+    // Pattern: Similarity scoring with threshold filtering
+    // Algorithm: Levenshtein distance for edit-based similarity
+    // Decision: 0.3 threshold balances recall vs precision
+  }
 
-    // Return null if heading not found
-    if (targetToken == null) then
-      return null
+  private _calculateSimilarity(str1: string, str2: string): number {
+    // Algorithm: Levenshtein distance with normalization
+    // Decision: Case-insensitive comparison for user-friendly matching
+    // Returns: 0.0 (different) to 1.0 (identical)
+  }
 
-    // Phase 2: Find section boundary (next same-or-higher level heading)
-    field endIndex = orderedTokens.length
-    for (i = targetIndex + 1; i < orderedTokens.length; i++) do
-      field token = orderedTokens[i]
-      if (token.type == "heading" && token.depth <= headingLevel) then
-        endIndex = i
-        break
-
-    // Phase 3: Extract tokens and reconstruct content from token.raw
-    field sectionTokens = orderedTokens.slice(targetIndex, endIndex)
-    field content = sectionTokens.map(t => t.raw).join("")
-
-    return content
-
-  // Extract content for a specific block reference by anchor ID
-  public method extractBlock(anchorId: string): string | null is
-    // Find anchor with matching ID and anchorType === "block"
-    field anchor = this._data.anchors.find(a =>
-      a.anchorType == "block" && a.id == anchorId
-    )
-
-    if (anchor == null) then
-      return null
-
-    // Split content into lines (anchor.line is 1-based)
-    field lines = this._data.content.split("\n")
-    field lineIndex = anchor.line - 1
-
-    // Validate line index is within bounds
-    if (lineIndex < 0 || lineIndex >= lines.length) then
-      return null
-
-    // Extract single line containing block anchor
-    field blockContent = lines[lineIndex]
-
-    return blockContent
-
-
-  // === INTERNAL (PRIVATE) HELPERS ===
-
-  // Get all anchor IDs, including both id and urlEncodedId variants, for fuzzy matching
-  private method _getAnchorIds(): string[] is
-    // Performance: Lazy-loads and caches the result on the first call
-    if (this._cachedAnchorIds == null) then
-      field ids = new Set<string>()
-      foreach (anchor in this._data.anchors) do
-        ids.add(anchor.id)
-        // Include urlEncodedId if it's different from the raw id
-        if (anchor.urlEncodedId && anchor.urlEncodedId != anchor.id) then
-          ids.add(anchor.urlEncodedId)
-      this._cachedAnchorIds = Array.from(ids)
-    return this._cachedAnchorIds
-
-  // Fuzzy matching implementation to find similar strings
-  private method _fuzzyMatch(target: string, candidates: string[]): string[] is
-    // Implementation: Uses Levenshtein distance for similarity calculation
-    field matches = new array of object
-    foreach (candidate in candidates) do
-      field similarity = this._calculateSimilarity(target, candidate)
-      if (similarity > 0.3) then  // 30% similarity threshold for higher recall
-        matches.add({ candidate: candidate, score: similarity })
-
-    matches.sort((a, b) => b.score - a.score)
-    return matches.map(m => m.candidate).slice(0, 5) // Return top 5 suggestions
-
-  // Levenshtein distance similarity calculation
-  private method _calculateSimilarity(str1: string, str2: string): number is
-    // Implementation: Full Levenshtein distance algorithm with case-insensitive comparison
-    // Edge cases: identical strings return 1.0, empty strings return 0.0
-    // Algorithm: Dynamic programming matrix for edit distance calculation
-    // Normalization: Distance normalized by max string length: 1 - (distance / maxLength)
-    // Returns a value between 0 (completely different) and 1 (identical)
-    // Actual implementation in ParsedDocument.js lines 180-219
+  private _tokenIncludesChildrenInRaw(tokenType: string): boolean {
+    // Decision: Determine if token.raw includes nested content
+    // Pattern: Type-based dispatch to avoid duplicate content extraction
+    // Inclusive types: heading, paragraph, text, code, html
+    // Structural types: list, blockquote, table (require recursion)
+  }
+}
 ```
 
 ## Method Contracts
@@ -309,59 +412,30 @@ public method extractFullContent(): string is
   - Includes all nested lower-level headings (e.g., H3/H4 within H2 section)
   - Last section includes all remaining content to end of file
 - **Example**: `extractSection("Overview", 2)` → `"## Overview\n\nContent here...\n### Subsection\n..."`
-- **Proof Of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-section-extraction.test.js`
+- **Tests**: `test/parsed-document-extraction.test.js` validates section extraction behavior
 
-**Pseudocode:**
+**Pattern Overview:**
 
 ```typescript
 /**
- * Extract content for a specific section by heading text and level.
- * Integration: Uses marked.js token tree for structural navigation.
+ * Three-Phase Content Extraction Pattern
  *
- * @param headingText - Exact heading text to find
- * @param headingLevel - Heading depth (1-6)
- * @returns Section content string or null if not found
+ * Phase 1 - Token Traversal:
+ * Pattern: Recursive tree walk with child-before-sibling ordering
+ * Decision: Flatten nested token tree into ordered array
+ * Integration: Uses marked.js token structure with .tokens for nesting
+ * Critical: Skip recursion for tokens where .raw includes children (heading, paragraph)
+ *
+ * Phase 2 - Boundary Detection:
+ * Pattern: Sequential scan for section terminator
+ * Decision: Next same-or-higher level heading marks section end
+ * Edge Case: No boundary found → extract to end of file
+ *
+ * Phase 3 - Content Reconstruction:
+ * Pattern: Array slice and string join
+ * Integration: Concatenate token.raw properties for source-accurate output
+ * Benefit: Preserves original markdown formatting exactly
  */
-extractSection(headingText: string, headingLevel: number): string | null {
-  // Phase 1: Flatten token tree and locate target heading
-  const orderedTokens = [];
-  let targetIndex = -1;
-
-  const walkTokens = (tokenList) => {
-    for (const token of tokenList) {
-      orderedTokens.push(token);
-
-      // Found our target heading?
-      if (token.type === 'heading' &&
-          token.depth === headingLevel &&
-          token.text === headingText) {
-        targetIndex = orderedTokens.length - 1;
-      }
-
-      // Recurse into nested tokens (child-before-sibling traversal)
-      if (token.tokens) walkTokens(token.tokens);
-    }
-  };
-
-  walkTokens(this._data.tokens);
-
-  // Not found? Return null
-  if (targetIndex === -1) return null;
-
-  // Phase 2: Find section boundary (next same-or-higher level heading)
-  let endIndex = orderedTokens.length;  // Default: to end of file
-  for (let i = targetIndex + 1; i < orderedTokens.length; i++) {
-    const token = orderedTokens[i];
-    if (token.type === 'heading' && token.depth <= headingLevel) {
-      endIndex = i;
-      break;
-    }
-  }
-
-  // Phase 3: Reconstruct content from token.raw properties
-  const sectionTokens = orderedTokens.slice(targetIndex, endIndex);
-  return sectionTokens.map(t => t.raw).join('');
-}
 ```
 
 #### `extractBlock(anchorId: string): string | null`
@@ -380,184 +454,64 @@ extractSection(headingText: string, headingLevel: number): string | null {
 - **Note**: Currently extracts single line only. Future iterations may expand to handle multi-line paragraphs or list items.
 - **Proof Of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-block-extraction.test.js`
 
-**Pseudocode:**
+**Pattern Overview:**
 
 ```typescript
 /**
- * Extract content for a specific block reference by anchor ID.
- * Integration: Uses anchor metadata from MarkdownParser output.
+ * Anchor-Based Line Extraction Pattern
  *
- * @param anchorId - Block anchor ID without ^ prefix
- * @returns Single line content string or null if not found
+ * Anchor Lookup:
+ * Pattern: Type-discriminated search in anchors array
+ * Decision: Filter by anchorType="block" for type safety
+ * Integration: Uses anchor metadata from MarkdownParser output
+ *
+ * Line Positioning:
+ * Pattern: 1-based to 0-based index conversion
+ * Integration: Anchor.line property contains 1-based line number
+ * Boundary: Split content by newlines for line-based access
+ *
+ * Validation:
+ * Decision: Validate line index within bounds before extraction
+ * Edge Cases: Return null for missing anchor or out-of-bounds index
+ *
+ * Limitation:
+ * Current: Single line extraction only
+ * Future: May expand to multi-line block support (full paragraph/list item)
  */
-extractBlock(anchorId: string): string | null {
-  // --- Anchor Lookup ---
-  // Integration: Query anchors array from parser output
-  const anchor = this._data.anchors.find(a =>
-    a.anchorType === 'block' && a.id === anchorId
-  );
-
-  // Decision: Return null if block anchor not found (edge case handling)
-  if (!anchor) return null;
-
-  // --- Line Positioning ---
-  // Boundary: Split raw content into lines for line-based extraction
-  const lines = this._data.content.split('\n');
-  const lineIndex = anchor.line - 1;  // Pattern: Convert 1-based to 0-based indexing
-
-  // Decision: Validate line index within bounds (edge case handling)
-  if (lineIndex < 0 || lineIndex >= lines.length) return null;
-
-  // --- Content Extraction ---
-  return lines[lineIndex];
-}
 ```
 
 ## Testing Strategy
 
-Tests for the `ParsedDocument` facade must validate that each query method correctly transforms and filters the internal data structures.
+**Pattern**: Behavioral validation of facade methods using BDD-style tests with Given-When-Then structure.
 
-### Test Structure
+**TypeScript Configuration:**
+- Test files: `.test.ts` extension with Vitest
+- Import pattern: `import ParsedDocument from "../../dist/ParsedDocument.js"` (compiled output)
+- Type validation: Epic 3 TypeScript conversion standards (`scripts/validate-typescript-conversion.js`)
 
-```tsx
-// Test pattern: BDD-style behavioral validation for the public facade methods
-describe("ParsedDocument", () => {
+### Test Coverage Patterns
 
-  // Test anchor existence check, which is a primary public method
-  it("hasAnchor should correctly validate existence using both id and urlEncodedId", () => {
-    // Given: A ParsedDocument with an anchor that has two ID formats
-    const parserOutput = {
-      anchors: [
-        { anchorType: "header", id: "Test Header", urlEncodedId: "Test%20Header" }
-      ]
-    };
-    const parsedDoc = new ParsedDocument(parserOutput);
+**Anchor Query Methods** - Validate dual-key matching and fuzzy search:
+- `hasAnchor()`: Test both `id` and `urlEncodedId` matching
+- `findSimilarAnchors()`: Validate Levenshtein distance threshold and scoring
+- `getAnchorIds()`: Verify lazy loading and cache behavior
 
-    // When/Then: The hasAnchor method should return true for both ID formats
-    expect(parsedDoc.hasAnchor("Test Header")).toBe(true);
-    expect(parsedDoc.hasAnchor("Test%20Header")).toBe(true);
-    expect(parsedDoc.hasAnchor("NonExistent")).toBe(false);
-  });
+**Link Query Methods** - Validate passthrough and filtering:
+- `getLinks()`: Verify complete array return without transformation
 
-  // Test the public method for generating suggestions
-  it("findSimilarAnchors should return a sorted list of suggested matches", () => {
-    // Given: A ParsedDocument with several anchors
-    const parserOutput = {
-      anchors: [
-        { id: "Story 1.7: Implementation", urlEncodedId: null },
-        { id: "Story 1.6: Refactoring", urlEncodedId: null },
-        { id: "Story 2.1: New Feature", urlEncodedId: null }
-      ]
-    };
-    const parsedDoc = new ParsedDocument(parserOutput);
+**Content Extraction Methods** - Validate complex token walking:
+- `extractSection()`: Test boundary detection (same/higher level headings), nested content inclusion, null returns
+- `extractBlock()`: Test anchor type filtering, line number conversion, bounds validation, null returns
+- `extractFullContent()`: Verify direct content passthrough
 
-    // When: findSimilarAnchors() is called with a partial or misspelled ID
-    const suggestions = parsedDoc.findSimilarAnchors("Story 1.7");
+### Test File Locations
 
-    // Then: It returns a list of potential matches, sorted by relevance
-    expect(suggestions[0]).toBe("Story 1.7: Implementation");
-    expect(suggestions).toContain("Story 1.6: Refactoring");
-  });
+**Source of Truth**: Actual test implementations in:
+- Unit tests: `test/parsed-document.test.js`, `test/parsed-document-extraction.test.js`
+- Integration tests: `test/integration/citation-validator-parsed-document.test.js`
+- POC validation: `test/poc-block-extraction.test.js`
 
-  // Test the public method for retrieving all links
-  it("getLinks should return the complete array of link objects", () => {
-    // Given: A ParsedDocument with a known set of links
-    const mockLinks = [
-      { scope: "cross-document", target: { path: { raw: "other.md" } } },
-      { scope: "internal", target: { anchor: "section" } }
-    ];
-    const parserOutput = { links: mockLinks };
-    const parsedDoc = new ParsedDocument(parserOutput);
-
-    // When: getLinks() is called
-    const links = parsedDoc.getLinks();
-
-    // Then: It returns the exact array of link objects
-    expect(links).toHaveLength(2);
-    expect(links).toEqual(mockLinks);
-  });
-
-  // Test the public method for full content extraction
-  it("extractFullContent should return the complete, raw content string", () => {
-    // Given: A ParsedDocument with a known content string
-    const mockContent = "# Test Document\n\nThis is test content.";
-    const parserOutput = { content: mockContent };
-    const parsedDoc = new ParsedDocument(parserOutput);
-
-    // When: extractFullContent() is called
-    const content = parsedDoc.extractFullContent();
-
-    // Then: It returns the exact content string
-    expect(content).toBe(mockContent);
-  });
-
-  // Test content extraction methods
-  it("extractSection should extract section content by heading text and level", () => {
-    // Given: A ParsedDocument with tokenized sections
-    const parserOutput = {
-      tokens: [
-        { type: "heading", depth: 2, text: "First Section", raw: "## First Section\n" },
-        { type: "paragraph", raw: "Section content here.\n" },
-        { type: "heading", depth: 3, text: "Subsection", raw: "### Subsection\n" },
-        { type: "paragraph", raw: "Nested content.\n" },
-        { type: "heading", depth: 2, text: "Second Section", raw: "## Second Section\n" }
-      ]
-    };
-    const parsedDoc = new ParsedDocument(parserOutput);
-
-    // When: extractSection() is called with heading text and level
-    const section = parsedDoc.extractSection("First Section", 2);
-
-    // Then: It returns the section content including nested headings
-    expect(section).toContain("## First Section");
-    expect(section).toContain("Section content here");
-    expect(section).toContain("### Subsection");
-    expect(section).toContain("Nested content");
-    expect(section).not.toContain("Second Section");
-  });
-
-  it("extractSection should return null when heading not found", () => {
-    // Given: A ParsedDocument with sections
-    const parserOutput = { tokens: [{ type: "heading", depth: 2, text: "Existing", raw: "## Existing\n" }] };
-    const parsedDoc = new ParsedDocument(parserOutput);
-
-    // When: extractSection() is called with non-existent heading
-    const section = parsedDoc.extractSection("Non-Existent", 2);
-
-    // Then: It returns null
-    expect(section).toBeNull();
-  });
-
-  it("extractBlock should extract single line by anchor ID", () => {
-    // Given: A ParsedDocument with block anchors
-    const parserOutput = {
-      content: "Line 1\nThis is important content. ^important-block\nLine 3",
-      anchors: [
-        { anchorType: "block", id: "important-block", line: 2, column: 28 }
-      ]
-    };
-    const parsedDoc = new ParsedDocument(parserOutput);
-
-    // When: extractBlock() is called with anchor ID
-    const block = parsedDoc.extractBlock("important-block");
-
-    // Then: It returns the line containing the block anchor
-    expect(block).toBe("This is important content. ^important-block");
-  });
-
-  it("extractBlock should return null when anchor not found", () => {
-    // Given: A ParsedDocument with block anchors
-    const parserOutput = { content: "Some content", anchors: [{ anchorType: "block", id: "existing", line: 1 }] };
-    const parsedDoc = new ParsedDocument(parserOutput);
-
-    // When: extractBlock() is called with non-existent anchor
-    const block = parsedDoc.extractBlock("non-existent");
-
-    // Then: It returns null
-    expect(block).toBeNull();
-  });
-});
-```
+**See actual tests for implementation details** - this guide documents WHAT to test and WHY, test files show HOW.
 
 ## Content Extraction Methods
 
@@ -577,7 +531,7 @@ The `extractSection()` and `extractBlock()` methods are fully implemented with a
 - Last section automatically includes all remaining content to end of file
 - Returns `null` when heading not found
 
-**Proof of Concept**: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/cc-workflows/tools/citation-manager/test/poc-section-extraction.test.js`
+**Tests**: `test/parsed-document-extraction.test.js` validates section extraction behavior
 
 ### Block Extraction Algorithm (Implemented)
 
@@ -599,6 +553,8 @@ The `extractSection()` and `extractBlock()` methods are fully implemented with a
 
 ### Incomplete Facade Encapsulation for Advanced Queries
 
+**GitHub Issue**: [#35](https://github.com/WesleyMFrederick/cc-workflows/issues/35) - CitationValidator helpers require direct anchor access, breaking facade encapsulation
+
 **Status**: Technical debt created by US1.7, remains as low-priority technical debt (extraction methods work correctly)
 
 **Issue**: CitationValidator helper methods require direct `_data.anchors` access for metadata-dependent operations:
@@ -614,6 +570,23 @@ The `extractSection()` and `extractBlock()` methods are fully implemented with a
 **Workaround**: Helper methods access `parsedDoc._data.anchors` directly. This is acceptable as a low-priority technical debt since the core extraction functionality works correctly.
 
 **Resolution**: Future work may extend facade with metadata-aware query methods to eliminate remaining coupling, but this is not currently prioritized.
+
+---
+
+## Technical Debt
+
+```github-query
+outputType: table
+queryType: issue
+org: WesleyMFrederick
+repo: cc-workflows
+query: "is:issue label:component:ParsedDocument"
+sort: number
+direction: asc
+columns: [number, status, title, labels, created, updated]
+```
+
+---
 
 ## Design Notes
 
@@ -640,30 +613,46 @@ The `extractSection()` and `extractBlock()` methods are fully implemented with a
 ### ParsedFileCache Integration
 The `ParsedFileCache` wraps parser output in `ParsedDocument` before caching:
 
-```javascript
-const parsePromise = this.markdownParser.parseFile(filePath)
-const parsedDocPromise = parsePromise.then(contract =>
-  new ParsedDocument(contract)
-)
-this.cache.set(cacheKey, parsedDocPromise)
+```typescript
+// Cache miss - parse file and wrap in facade
+const parsePromise = this.parser.parseFile(cacheKey);
+
+const parsedDocPromise = parsePromise.then(
+  (parserOutput: ParserOutput) => new ParsedDocument(parserOutput)
+);
+
+// Store Promise IMMEDIATELY to deduplicate concurrent requests
+this.cache.set(cacheKey, parsedDocPromise);
+
+// Cleanup failed parses to allow retry
+parsedDocPromise.catch(() => {
+  this.cache.delete(cacheKey);
+});
+
+return parsedDocPromise;
 ```
 
 ### CitationValidator Integration
 The `CitationValidator` uses facade methods instead of direct data access:
 
-```javascript
-// Before US1.7:
+```typescript
+// Before US1.7: Direct data structure access
 const anchorExists = parsed.anchors.some(a => a.id === anchor)
 
-// After US1.7:
+// After US1.7: Facade method encapsulates complexity
 const anchorExists = parsedDoc.hasAnchor(anchor)
 ```
 
 ### ContentExtractor Integration
-The `ContentExtractor` uses extraction methods:
+The `ContentExtractor` uses extraction methods for content retrieval:
 
-```javascript
+```typescript
+// Extract section content by heading
 const section = parsedDoc.extractSection(headingText, headingLevel)
+
+// Extract block content by anchor ID
 const block = parsedDoc.extractBlock(anchorId)
+
+// Extract full file content
 const fullContent = parsedDoc.extractFullContent()
 ```

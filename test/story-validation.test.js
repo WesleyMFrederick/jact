@@ -5,7 +5,7 @@ import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "src", "citation-manager.js");
+const citationManagerPath = join(__dirname, "..", "dist", "citation-manager.js");
 
 describe("Story File Validation with Scope", () => {
 	it("should validate story file with mixed valid and broken citations", async () => {
