@@ -1,4 +1,4 @@
-import { ExtractionStrategy } from "./ExtractionStrategy.js";
+import { ExtractionStrategy } from "./ExtractionStrategy.ts";
 
 /**
  * Strategy checking for %%stop-extract-link%% marker.
