@@ -2,7 +2,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { CitationValidator } from "../src/CitationValidator.js";
-import { MarkdownParser } from "../src/MarkdownParser.js";
+import { MarkdownParser } from "../src/core/MarkdownParser/index.js";
 import { ParsedFileCache } from "../src/ParsedFileCache.js";
 import ParsedDocument from "../src/ParsedDocument.js";
 import {

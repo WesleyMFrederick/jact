@@ -199,28 +199,8 @@ export class CitationValidator {
 		// 3. Enrich each link with validation metadata (parallel execution)
 		await Promise.all(
 			links.map(async (link: LinkObject) => {
-				const result = await this.validateSingleCitation(link, filePath);
-
-				// Build discriminated union based on status
-				let validation: ValidationMetadata;
-
-				if (result.status === "valid") {
-					// Valid variant: only status field
-					validation = { status: "valid" };
-				} else {
-					// Error/Warning variant: status + error + optional fields
-					validation = {
-						status: result.status as "error" | "warning",
-						error: result.error ?? "Unknown validation error",
-						...(result.suggestion && { suggestion: result.suggestion }),
-						...(result.pathConversion && {
-							pathConversion: result.pathConversion,
-						}),
-					};
-				}
-
-				// ENRICHMENT: Add validation property in-place
-				(link as EnrichedLinkObject).validation = validation;
+				// validateSingleCitation enriches link in-place and returns it
+				await this.validateSingleCitation(link, filePath);
 			}),
 		);
 
@@ -247,11 +227,40 @@ export class CitationValidator {
 	/**
 	 * Validate a single citation link.
 	 * Classifies pattern type and delegates to appropriate validator.
-	 * @param citation - LinkObject to validate
+	 * Enriches the input LinkObject in-place with validation metadata.
+	 * @param citation - LinkObject to validate (enriched in-place)
 	 * @param contextFile - Source file path for relative path resolution
-	 * @returns Validation result with status and suggestions
+	 * @returns The same LinkObject enriched with validation property
 	 */
 	async validateSingleCitation(
+		citation: LinkObject,
+		contextFile?: string,
+	): Promise<EnrichedLinkObject> {
+		const result = await this._validateSingleCitationInternal(citation, contextFile);
+
+		// Transform internal result → ValidationMetadata (enrichment pattern)
+		let validation: ValidationMetadata;
+		if (result.status === "valid") {
+			validation = { status: "valid" };
+		} else {
+			validation = {
+				status: result.status as "error" | "warning",
+				error: result.error ?? "Unknown validation error",
+				...(result.suggestion && { suggestion: result.suggestion }),
+				...(result.pathConversion && { pathConversion: result.pathConversion }),
+			};
+		}
+
+		// ENRICHMENT: Add validation property in-place
+		(citation as EnrichedLinkObject).validation = validation;
+		return citation as EnrichedLinkObject;
+	}
+
+	/**
+	 * Internal validation logic - returns flat result for internal use.
+	 * @internal
+	 */
+	private async _validateSingleCitationInternal(
 		citation: LinkObject,
 		contextFile?: string,
 	): Promise<SingleCitationValidationResult> {
@@ -266,6 +275,8 @@ export class CitationValidator {
 				return await this.validateCrossDocumentLink(citation, contextFile);
 			case "WIKI_STYLE":
 				return this.validateWikiStyleLink(citation);
+			case "INTERNAL_ANCHOR":
+				return await this.validateInternalAnchorLink(citation, contextFile);
 			default:
 				return this.createValidationResult(
 					citation,
@@ -277,7 +288,7 @@ export class CitationValidator {
 	}
 
 	private classifyPattern(citation: LinkObject): string {
-		// Pattern precedence: CARET > EMPHASIS > CROSS_DOCUMENT > WIKI_STYLE
+		// Pattern precedence: CARET > EMPHASIS > CROSS_DOCUMENT > WIKI_STYLE > INTERNAL_ANCHOR
 
 		// Caret references are now internal links with block anchorType
 		if (citation.scope === "internal" && citation.anchorType === "block") {
@@ -302,6 +313,15 @@ export class CitationValidator {
 				return "EMPHASIS_MARKED";
 			}
 			return "CROSS_DOCUMENT";
+		}
+
+		// Markdown internal header anchors: [text](#Heading)
+		if (
+			citation.linkType === "markdown" &&
+			citation.scope === "internal" &&
+			citation.anchorType === "header"
+		) {
+			return "INTERNAL_ANCHOR";
 		}
 
 		return "UNKNOWN_PATTERN";
@@ -443,8 +463,8 @@ export class CitationValidator {
 									? `${crossDirMessage}. ${anchorMessage}`
 									: anchorMessage;
 
-								// For same-directory, use "error"; for cross-directory, use "warning"
-								const status = isDirectoryMatch ? "error" : "warning";
+								// Broken anchor is always an error regardless of how the file was resolved
+								const status = "error" as const;
 
 								return this.createValidationResult(
 									citation,
@@ -571,6 +591,42 @@ export class CitationValidator {
 	): SingleCitationValidationResult {
 		// Wiki-style links are internal references, always valid for now
 		// Could add anchor existence checking in the future
+		return this.createValidationResult(citation, "valid");
+	}
+
+	private async validateInternalAnchorLink(
+		citation: LinkObject,
+		sourceFile?: string,
+	): Promise<SingleCitationValidationResult> {
+		// Validate markdown internal anchor: [text](#Heading)
+		if (!sourceFile) {
+			return this.createValidationResult(
+				citation,
+				"error",
+				"Cannot validate internal anchor without source file context",
+			);
+		}
+
+		const anchor = citation.target.anchor;
+		if (!anchor) {
+			return this.createValidationResult(
+				citation,
+				"error",
+				"Internal anchor link missing anchor fragment",
+			);
+		}
+
+		// Validate anchor exists in source file
+		const anchorExists = await this.validateAnchorExists(anchor, sourceFile);
+		if (!anchorExists.valid) {
+			return this.createValidationResult(
+				citation,
+				"error",
+				`Anchor not found: #${anchor}`,
+				anchorExists.suggestion,
+			);
+		}
+
 		return this.createValidationResult(citation, "valid");
 	}
 

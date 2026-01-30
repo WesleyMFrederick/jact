@@ -4,14 +4,16 @@
 	"description": "Citation link validator and manager for Obsidian markdown files",
 	"type": "module",
 	"private": true,
-	"main": "src/citation-manager.js",
+	"main": "dist/citation-manager.js",
 	"bin": {
-		"citation-manager": "./src/citation-manager.js"
+		"citation-manager": "./dist/citation-manager.js"
 	},
 	"scripts": {
+		"build": "tsc",
+		"prepublishOnly": "npm run build",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"start": "node src/citation-manager.js",
+		"start": "node dist/citation-manager.js",
 		"validate:ts-conversion": "node --loader ts-node/esm scripts/validate-typescript-conversion.ts"
 	},
 	"keywords": [

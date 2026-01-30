@@ -1,4 +1,8 @@
+# Component Guides
+
 %% Begin Waypoint %%
+- **whiteboards**
+  - [[markdown-parser-whiteboard]]
 - [[CitationValidator Implementation Guide]]
 - [[CLI Architecture Overview]]
 - [[CLI Orchestrator Implementation Guide]]

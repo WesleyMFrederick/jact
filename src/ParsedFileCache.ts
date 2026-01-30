@@ -1,7 +1,7 @@
 import { normalize, resolve } from "node:path";
 import ParsedDocument from "./ParsedDocument.js";
 import type { ParserOutput } from "./types/citationTypes.js";
-import type { MarkdownParser } from "./MarkdownParser.js";
+import type { MarkdownParser } from "./core/MarkdownParser/index.js";
 
 /**
  * Promise-based cache for parsed markdown files

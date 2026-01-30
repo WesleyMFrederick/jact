@@ -44,17 +44,46 @@ class ParsedDocument {
 	 * Check if anchor exists in document
 	 *
 	 * Checks both id and urlEncodedId properties to handle all anchor formats.
+	 * Also handles URL-decoded comparisons for Obsidian anchors with stripped characters (colons, etc).
 	 *
 	 * @param {string} anchorId - Anchor ID to check (either id or urlEncodedId format)
 	 * @returns {boolean} True if anchor exists in document
 	 */
 	hasAnchor(anchorId: string): boolean {
-		// Check both id and urlEncodedId for match
-		return this._data.anchors.some(
-			(a) =>
-				a.id === anchorId ||
-				(a.anchorType === "header" && a.urlEncodedId === anchorId),
-		);
+		// Try decoding the input anchor for comparison
+		let decodedAnchorId: string;
+		try {
+			decodedAnchorId = decodeURIComponent(anchorId);
+		} catch {
+			decodedAnchorId = anchorId;
+		}
+
+		return this._data.anchors.some((a) => {
+			// Direct match on id
+			if (a.id === anchorId) return true;
+
+			// Match on urlEncodedId (header anchors only)
+			if (a.anchorType === "header" && a.urlEncodedId === anchorId) return true;
+
+			// Decoded comparison: strip Obsidian-invalid chars from id and compare
+			if (a.anchorType === "header") {
+				// Decode the urlEncodedId for comparison
+				let decodedUrlEncodedId: string;
+				try {
+					decodedUrlEncodedId = decodeURIComponent(a.urlEncodedId);
+				} catch {
+					decodedUrlEncodedId = a.urlEncodedId;
+				}
+				if (decodedUrlEncodedId === decodedAnchorId) return true;
+
+				// Also try: strip colons from id and compare to decoded anchor
+				const idWithoutColons = a.id.replace(/:/g, "").replace(/\s+/g, " ").trim();
+				const decodedWithoutColons = decodedAnchorId.replace(/:/g, "").replace(/\s+/g, " ").trim();
+				if (idWithoutColons === decodedWithoutColons) return true;
+			}
+
+			return false;
+		});
 	}
 
 	/**
@@ -121,8 +150,10 @@ class ParsedDocument {
 		// Phase 0: Look up heading level if not provided
 		let targetLevel = headingLevel;
 		if (targetLevel === undefined) {
+			// Normalize both input and heading text for Obsidian character comparison
+			const normalizedInput = this._normalizeObsidianHeading(headingText);
 			const headingMeta = this._data.headings.find(
-				(h) => h.text === headingText,
+				(h) => this._normalizeObsidianHeading(h.text) === normalizedInput,
 			);
 			if (!headingMeta) return null;
 			targetLevel = headingMeta.level;
@@ -132,15 +163,18 @@ class ParsedDocument {
 		const orderedTokens: any[] = [];
 		let targetIndex = -1;
 
+		// Normalize heading text once for comparison
+		const normalizedHeadingText = this._normalizeObsidianHeading(headingText);
+
 		const walkTokens = (tokenList: any) => {
 			for (const token of tokenList) {
 				const currentIndex = orderedTokens.length;
 				orderedTokens.push(token);
 
-				// Found our target heading?
+				// Found our target heading? Use normalized comparison for Obsidian characters
 				if (
 					token.type === "heading" &&
-					token.text === headingText &&
+					this._normalizeObsidianHeading(token.text) === normalizedHeadingText &&
 					token.depth === targetLevel
 				) {
 					targetIndex = currentIndex;
@@ -207,6 +241,27 @@ class ParsedDocument {
 	}
 
 	// === PRIVATE HELPER METHODS ===
+
+	/**
+	 * Normalize heading text using Obsidian's link anchor rules
+	 *
+	 * Obsidian removes invalid characters when creating link anchors: # | ^ : %% [[ ]]
+	 * This function applies the same normalization for heading text comparison.
+	 *
+	 * @private
+	 * @param {string} text - Raw heading text
+	 * @returns {string} Normalized text matching Obsidian link anchor format
+	 */
+	private _normalizeObsidianHeading(text: string): string {
+		return text
+			.replace(/:/g, "")      // Remove colons
+			.replace(/#/g, "")      // Remove hash
+			.replace(/\|/g, "")     // Remove pipe
+			.replace(/\^/g, "")     // Remove caret
+			.replace(/%%/g, "")     // Remove comment markers
+			.replace(/\[\[/g, "")   // Remove wiki open
+			.replace(/\]\]/g, "");  // Remove wiki close
+	}
 
 	/**
 	 * Check if token type includes children content in its raw property
