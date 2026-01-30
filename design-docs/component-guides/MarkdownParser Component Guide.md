@@ -309,16 +309,9 @@ export interface LinkObject {
 }
 ```
 
-#### Extraction Marker Examples
+#### Extraction Markers
 
-The `extractionMarker` property captures optional control markers that appear after links, used by `ContentExtractor` to override default extraction eligibility:
-
-| Markdown | extractionMarker Value |
-|----------|----------------------|
-| `[link](file.md)%%force-extract%%` | `{ fullMatch: '%%force-extract%%', innerText: 'force-extract' }` |
-| `[link](file.md) %%stop-extract-link%%` | `{ fullMatch: '%%stop-extract-link%%', innerText: 'stop-extract-link' }` |
-| `[link](file.md)<!-- force-extract -->` | `{ fullMatch: '<!-- force-extract -->', innerText: 'force-extract' }` |
-| `[link](file.md)` | `null` |
+> Owned by ContentExtractor. See [**`Default Strategy Precedence`**](ContentExtractor%20Component%20Guide.md#Factory%20Function) for marker behavior and strategy precedence rules.
 
 #### ValidationMetadata Type
 
