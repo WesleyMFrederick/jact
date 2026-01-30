@@ -6,8 +6,8 @@
 - [[CitationValidator Implementation Guide]]
 - [[CLI Architecture Overview]]
 - [[CLI Orchestrator Implementation Guide]]
-- [[Content Extractor Implementation Guide]]
-- [[Markdown Parser Implementation Guide]]
+- [[ContentExtractor Component Guide]]
+- [[MarkdownParser Component Guide]]
 - [[ParsedDocument Implementation Guide]]
 - [[ParsedFileCache Implementation Guide]]
 

@@ -87,7 +87,7 @@ graph TB
 - **Path(s):** `tools/citation-manager/src/citation-manager.js`
 - **Technology:** `Node.js` class, `Commander.js` CLI framework, ESM modules
 - **Technology Status:** Production
-- **Description:** CLI entry point orchestrating all citation management operations. Parses commands (`validate`, `ast`, `base-paths`, `fix`, `extract links`, `extract header`, `extract file`), coordinates workflow execution, formats output for CLI/JSON display, and implements auto-fix logic for broken citations and paths. Orchestrates distinct workflows for different extraction modes: **`extract links`** discovers links via validator from source files, while **`extract header`** and **`extract file`** create synthetic links internally for direct content extraction. Delegates to [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor) for all extraction workflows and outputs JSON results to stdout. See [ContentExtractor Workflow Component Interaction](component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction) for extraction orchestration patterns.
+- **Description:** CLI entry point orchestrating all citation management operations. Parses commands (`validate`, `ast`, `base-paths`, `fix`, `extract links`, `extract header`, `extract file`), coordinates workflow execution, formats output for CLI/JSON display, and implements auto-fix logic for broken citations and paths. Orchestrates distinct workflows for different extraction modes: **`extract links`** discovers links via validator from source files, while **`extract header`** and **`extract file`** create synthetic links internally for direct content extraction. Delegates to [**`ContentExtractor`**](#Citation%20Manager.ContentExtractor) for all extraction workflows and outputs JSON results to stdout. See [ContentExtractor Workflow Component Interaction](component-guides/ContentExtractor%20Component%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction) for extraction orchestration patterns.
 - **Implement Guide**: [CLI Orchestrator Implementation Guide](component-guides/CLI%20Orchestrator%20Implementation%20Guide.md)
 
 ##### Interactions
@@ -132,7 +132,7 @@ The component's primary responsibility is to orchestrate workflow coordination b
   - ESM modules
 - **Technology Status:** Production
 - **Description:** Parses markdown files to extract AST representation of document structure. Identifies cross-document links (multiple pattern types), extracts headings and anchors (including Obsidian block refs and caret syntax), generates single anchor per header with dual ID properties (raw text and URL-encoded) for Obsidian compatibility (US1.6). This component's output (`MarkdownParser.Output.DataContract`) is encapsulated by the `ParsedDocument` facade before being consumed by other components.
-- **Implementation Guide**: [Markdown Parser Implementation Guide](component-guides/Markdown%20Parser%20Implementation%20Guide.md) for the detailed data contract schema and examples
+- **Implementation Guide**: [MarkdownParser Component Guide](component-guides/MarkdownParser%20Component%20Guide.md) for the detailed data contract schema and examples
 
 ##### Interactions
 - _reads_ markdown files directly from file system (synchronous)
@@ -140,7 +140,7 @@ The component's primary responsibility is to orchestrate workflow coordination b
 - _provides_ structured AST data to `CLI Orchestrator` and `Citation Validator` (synchronous)
 
 ##### Boundaries
-![Boundaries](component-guides/Markdown%20Parser%20Implementation%20Guide.md#Boundaries)
+![Boundaries](component-guides/MarkdownParser%20Component%20Guide.md#Boundaries)
 
 The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** aware of the `ParsedDocument` facade that wraps its output. The component is **not** responsible for:
 - Validating the existence or accessibility of file paths.
@@ -253,7 +253,7 @@ The facade exposes query methods that return transformed/filtered data from the 
   - ESM modules
 - **Technology Status:** ✅ Implemented (US2.2 Complete - 2025-10-23), ✅ Enhanced (US2.2a Complete - 2025-10-28)
 - **Description:** Orchestrates content extraction and deduplication workflow for pre-validated links. Receives enriched LinkObjects from CLI (containing validation metadata), filters out internal links (scope='internal') before processing (US2.2 AC15), analyzes link eligibility using Strategy Pattern, retrieves content from target documents via `ParsedDocument` facade methods, and deduplicates extracted content using SHA-256 content-based hashing (US2.2a). Returns `OutgoingLinksExtractedContent` object with indexed content structure that minimizes token usage by storing identical content only once.
-- **Implementation Guide**: [Content Extractor Implementation Guide](component-guides/Content%20Extractor%20Implementation%20Guide.md)
+- **Implementation Guide**: [ContentExtractor Component Guide](component-guides/ContentExtractor%20Component%20Guide.md)
 
 ##### Interactions
 - _is consumed by_ the `CLI Orchestrator` via `extractContent(enrichedLinks, cliFlags)` method to perform content aggregation (asynchronous).
@@ -341,7 +341,7 @@ sequenceDiagram
 - **Fix Logic Location**: The `fix` logic remains within the `CLI Orchestrator`, operating on the final validation results.
 
 ### `extract` Command Component Sequence Diagram
-![ContentExtractor Workflow Component Interaction](component-guides/Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction)
+![ContentExtractor Workflow Component Interaction](component-guides/ContentExtractor%20Component%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction)
 
 ### Facade Pattern at npm Script Level (US2.7)
 
@@ -636,7 +636,7 @@ tools/citation-manager/test/
 - Test AnchorObject structure (`anchorType`, `id`, `urlEncodedId`, `rawText`) - US1.6 dual ID schema
 - Verify enum constraints and required fields
 - Verify single anchor per header with no duplicates (US1.6)
-- Reference: [Markdown Parser Implementation Guide](component-guides/Markdown%20Parser%20Implementation%20Guide.md)
+- Reference: [MarkdownParser Component Guide](component-guides/MarkdownParser%20Component%20Guide.md)
 
 **Cache Unit Tests** (6 tests - US1.5):
 - Cache hit/miss behavior

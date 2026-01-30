@@ -125,7 +125,7 @@ npm run citation:extract <file-path> [-- --options]
 3. Extracts content from target documents via ParsedDocument facade
 4. Returns array of results with status, source link, and content/error details
 
-**Detailed Guide**: [Content Extractor Implementation Guide](Content%20Extractor%20Implementation%20Guide.md)
+**Detailed Guide**: [ContentExtractor Component Guide](ContentExtractor%20Component%20Guide.md)
 
 ---
 
@@ -151,7 +151,7 @@ npm run citation:ast <file-path>
 - Understanding markdown structure
 - Validating link extraction
 
-**Detailed Guide**: [Markdown Parser Implementation Guide](Markdown%20Parser%20Implementation%20Guide.md)
+**Detailed Guide**: [MarkdownParser Component Guide](MarkdownParser%20Component%20Guide.md)
 
 ---
 
@@ -404,7 +404,7 @@ console.log(JSON.stringify(results, null, 2));
 
 **Error Handling**: Individual link failures produce `OutgoingLinksExtractedContent` objects with `status: 'error'`, allowing batch processing to continue
 
-**Integration Point**: See [CLI Integration in Content Extractor Guide](Content%20Extractor%20Implementation%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
+**Integration Point**: See [CLI Integration in Content Extractor Guide](ContentExtractor%20Component%20Guide.md#ContentExtractor%20Workflow%20Component%20Interaction%20Diagram)
 
 ---
 
@@ -536,7 +536,7 @@ program
 - **Error handling**: Try-catch with stderr output and exit code 1
 - **Output format**: JSON only (US2.3 scope, formatted output deferred)
 
-**Link to Implementation**: [Content Extractor Implementation Guide](Content%20Extractor%20Implementation%20Guide.md)
+**Link to Implementation**: [ContentExtractor Component Guide](ContentExtractor%20Component%20Guide.md)
 
 ---
 
@@ -824,7 +824,7 @@ program
 - Custom output templates
 - Interactive extraction mode
 
-**Reference**: [Content Extractor Future Work](Content%20Extractor%20Implementation%20Guide.md#Future%20Work)
+**Reference**: [Content Extractor Future Work](ContentExtractor%20Component%20Guide.md#Future%20Work)
 
 ---
 
@@ -856,11 +856,11 @@ program
 
 ## Related Files
 
-- [Content Extractor Implementation Guide](Content%20Extractor%20Implementation%20Guide.md) - Extract command details
+- [ContentExtractor Component Guide](ContentExtractor%20Component%20Guide.md) - Extract command details
 - [CitationValidator Implementation Guide](CitationValidator%20Implementation%20Guide.md) - Validate command details
 - [ParsedFileCache Implementation Guide](ParsedFileCache%20Implementation%20Guide.md) - Caching strategy
 - [ParsedDocument Implementation Guide](ParsedDocument%20Implementation%20Guide.md) - Query facade
-- [Markdown Parser Implementation Guide](Markdown%20Parser%20Implementation%20Guide.md) - AST generation
+- [MarkdownParser Component Guide](MarkdownParser%20Component%20Guide.md) - AST generation
 - [Architecture Principles](../../../../ARCHITECTURE-PRINCIPLES.md) - Core design principles
 - [Architecture - Baseline](../../../../ARCHITECTURE.md) - File naming patterns
 

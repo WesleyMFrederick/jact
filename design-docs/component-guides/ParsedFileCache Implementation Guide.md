@@ -6,7 +6,7 @@ Caches parsed markdown files as ParsedDocument facades, ensuring each file is pa
 
 ### Problem
 
-1. Components like [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md) and [**`ContentExtractor`**](Content%20Extractor%20Implementation%20Guide.md) need access to parsed file data during validation runs. ^P1
+1. Components like [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md) and [**`ContentExtractor`**](ContentExtractor%20Component%20Guide.md) need access to parsed file data during validation runs. ^P1
 2. Without caching, the same file could be parsed repeatedly, causing significant I/O and CPU overhead. ^P2
 3. The system needs a single broker to manage parsed file access with concurrent request deduplication. ^P3
 
@@ -14,7 +14,7 @@ Caches parsed markdown files as ParsedDocument facades, ensuring each file is pa
 
 The [**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md) provides centralized parsed file access by:
 1. implementing the [[#Read-Through Cache with Promise Deduplication Pattern|Read-Through Cache pattern]] with Promise-based deduplication (addresses [P2](#^P2), [P3](#^P3)) ^S1
-2. wrapping [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts) in [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) facade before caching (addresses [P1](#^P1)) ^S2
+2. wrapping [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#Data%20Contracts) in [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) facade before caching (addresses [P1](#^P1)) ^S2
 3. using normalized absolute paths as cache keys to prevent duplicate entries for same file (addresses [P2](#^P2)) ^S3
 
 ![ParsedFileCache managing ParsedDocument instances with read-through caching](Pasted%20image%2020251205175951.png)
@@ -84,9 +84,9 @@ classDiagram
     MarkdownParser ..> ParserOutput : «returns»
 ```
 
-1. [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The data contract returned by parser.
+1. [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#Data%20Contracts): The data contract returned by parser.
 2. [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md): Facade providing query methods over parser output.
-3. [**`MarkdownParser`**](Markdown%20Parser%20Implementation%20Guide.md): Parser class that produces `ParserOutput` on cache miss.
+3. [**`MarkdownParser`**](MarkdownParser%20Component%20Guide.md): Parser class that produces `ParserOutput` on cache miss.
 4. [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md): Example consumer of the cache.
 5. [**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md): Cache orchestrator with Promise deduplication.
 
@@ -143,7 +143,7 @@ interface MarkdownParser {
 | Type       | Value                   | Comment                                                          |
 | :--------- | :---------------------- | :--------------------------------------------------------------- |
 | `@param`   | `filePath: string`      | Absolute path to markdown file to parse                          |
-| `@returns` | `Promise<ParserOutput>` | [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts) data contract |
+| `@returns` | `Promise<ParserOutput>` | [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#Data%20Contracts) data contract |
 
 ---
 

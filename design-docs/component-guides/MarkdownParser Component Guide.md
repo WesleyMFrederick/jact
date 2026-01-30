@@ -1,4 +1,4 @@
-# Markdown Parser Implementation Guide
+# MarkdownParser Component Guide
 
 ## Overview
 Parses markdown files into structured objects containing outgoing links and header/anchors for consumption by downstream components.
@@ -10,22 +10,22 @@ Parses markdown files into structured objects containing outgoing links and head
 
 ### Solution
 The [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) component provides centralized markdown parsing by:
-1. accepting a file path, reading the document, and applying parsing strategies to produce a comprehensive [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) object ^S1
+1. accepting a file path, reading the document, and applying parsing strategies to produce a comprehensive [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface) object ^S1
 2. wrapping output in the [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade before consumption, decoupling consumers from parser internals ([P1](#^P1)) ^S2
-3. producing two primary collections: [**`LinkObject[]`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) and [**`AnchorObject[]`**](Markdown%20Parser%20Implementation%20Guide.md#AnchorObject%20Type%20(Discriminated%20Union)), centralizing parsing logic and eliminating regex duplication ([P2](#^P2), [P3](#^P3)) ^S3
+3. producing two primary collections: [**`LinkObject[]`**](MarkdownParser%20Component%20Guide.md#LinkObject%20Interface) and [**`AnchorObject[]`**](MarkdownParser%20Component%20Guide.md#AnchorObject%20Type%20(Discriminated%20Union)), centralizing parsing logic and eliminating regex duplication ([P2](#^P2), [P3](#^P3)) ^S3
 
 ### Impact
 
 | Problem ID | Problem | Solution ID | Solution | Impact | Principles | How Principle Applies |
 | :--------: | ------- | :---------: | -------- | ------ | ---------- | --------------------- |
-| [P1](#^P1) | Components need structured representation | [S1](#^S1), [S2](#^S2) | Single parse with comprehensive [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) + facade wrapping | Fewer errors navigating data; stable consumer interface | [Data Model First](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^data-model-first) | Clean data structures lead to clean code; structured output prevents navigation errors |
+| [P1](#^P1) | Components need structured representation | [S1](#^S1), [S2](#^S2) | Single parse with comprehensive [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface) + facade wrapping | Fewer errors navigating data; stable consumer interface | [Data Model First](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^data-model-first) | Clean data structures lead to clean code; structured output prevents navigation errors |
 | [P2](#^P2) | Regex duplication across components | [S3](#^S3) | Centralized link/anchor extraction | 100% reduction in duplicated parsing logic (0 regex per consumer vs N) | [Single Responsibility](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^single-responsibility) | Parser parses; consumers consume - each component has one clear concern |
 | [P3](#^P3) | No reliable transformer | [S1](#^S1) | DI-enabled [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) class | Flexible testing (mock fs for unit, real fs for integration) | [Dependency Abstraction](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^dependency-abstraction) | Depend on FileSystemInterface abstraction, not concrete node:fs |
-| [P1](#^P1) | Type safety for anchors | [S3](#^S3) | TypeScript discriminated unions ([**`AnchorObject`**](Markdown%20Parser%20Implementation%20Guide.md#AnchorObject%20Type%20(Discriminated%20Union))) | Impossible to represent invalid anchor states | [Illegal States Unrepresentable](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable) | Header vs block enforced at type level; invalid combinations cannot compile |
+| [P1](#^P1) | Type safety for anchors | [S3](#^S3) | TypeScript discriminated unions ([**`AnchorObject`**](MarkdownParser%20Component%20Guide.md#AnchorObject%20Type%20(Discriminated%20Union))) | Impossible to represent invalid anchor states | [Illegal States Unrepresentable](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable) | Header vs block enforced at type level; invalid combinations cannot compile |
 
 ### Boundaries
 
-The component is exclusively responsible for transforming a raw markdown string into the structured **MarkdownParser.Output.DataContract**. Its responsibilities are strictly limited to syntactic analysis. The component is **not** aware of the `ParsedDocument` facade that wraps its output. The component is **not** responsible for:
+The component is exclusively responsible for transforming a raw markdown string into the structured [**`ParserOutput`**](#ParserOutput%20Interface). Its responsibilities are strictly limited to syntactic analysis. The component is **not** aware of the `ParsedDocument` facade that wraps its output. The component is **not** responsible for:
 - Validating the existence or accessibility of file paths.
 - Verifying the semantic correctness of links or anchors.
 - Interpreting or executing any code within the document.
@@ -82,7 +82,7 @@ classDiagram
     ParserOutput *-- AnchorObject
 ```
 
-1. [**`ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts): The composite object returned by the parser.
+1. [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#Data%20Contracts): The composite object returned by the parser.
 2. [**``LinkObject``**](#LinkObject%20Interface): The data object representing an outgoing link.
 3. [**`AnchorObject`**](#AnchorObject%20Type%20(Discriminated%20Union)): The data object representing a potential link target.
 4. [**`CitationManager.MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser): The class that orchestrates the parsing process. The guide you are reading.
@@ -93,18 +93,23 @@ classDiagram
 ```text
 tools/citation-manager/
 ├── src/
-│   ├── MarkdownParser.ts                              // TypeScript implementation
-│   │   ├── FileSystemInterface                        // Dependency injection interface
-│   │   ├── parseFile()                                // Main orchestrator → ParserOutput
-│   │   ├── extractLinks()                             // Link extraction → LinkObject[]
-│   │   ├── extractAnchors()                           // Anchor extraction → AnchorObject[]
-│   │   ├── extractHeadings()                          // Heading extraction → HeadingObject[]
-│   │   └── helpers                                    // Inline helper methods
-│   │       ├── determineAnchorType()                  // Anchor type classification
-│   │       ├── resolvePath()                          // Path resolution
-│   │       ├── _detectExtractionMarker()              // Extraction marker detection
-│   │       ├── containsMarkdown()                     // Markdown pattern detection
-│   │       └── toKebabCase()                          // String formatting
+│   ├── core/
+│   │   └── MarkdownParser/
+│   │       ├── MarkdownParser.ts                      // Main class orchestrator
+│   │       │   ├── FileSystemInterface                // DI interface
+│   │       │   ├── parseFile()                        // Entry point → ParserOutput
+│   │       │   ├── extractLinks()                     // Delegates to extractLinks.ts
+│   │       │   ├── extractAnchors()                   // Delegates to extractAnchors.ts
+│   │       │   └── extractHeadings()                  // Delegates to extractHeadings.ts
+│   │       │
+│   │       ├── extractLinks.ts                        // Link extraction implementation
+│   │       ├── extractAnchors.ts                      // Anchor extraction implementation
+│   │       ├── extractHeadings.ts                     // Heading extraction implementation
+│   │       ├── createLinkObject.ts                    // LinkObject factory
+│   │       ├── detectExtractionMarker.ts              // Extraction marker detection
+│   │       ├── determineAnchorType.ts                 // Anchor type classification
+│   │       ├── resolvePath.ts                         // Path resolution utility
+│   │       └── index.ts                               // Module exports
 │   │
 │   ├── types/
 │   │   ├── citationTypes.ts                           // Parser output type definitions
@@ -128,7 +133,7 @@ tools/citation-manager/
         └── complex-headers.md                         // Anchor extraction test data
 ```
 
-**Technical Debt**: The current monolithic structure violates the project's action-based file naming patterns. See [Issue #18](https://github.com/WesleyMFrederick/cc-workflows/issues/18) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Organization).
+**Technical Debt**: Refactored to action-based file organization (Issue #18 complete). Aligns with [ContentExtractor's structure](ContentExtractor%20Component%20Guide.md#File%20Organization).
 
 ---
 ## Public Contracts
@@ -304,18 +309,9 @@ export interface LinkObject {
 }
 ```
 
-#### Extraction Marker Examples
+#### Extraction Markers
 
-The `extractionMarker` property captures optional control markers that appear after links, used by `ContentExtractor` to override default extraction eligibility:
-
-| Markdown | extractionMarker Value |
-|----------|----------------------|
-| `[link](file.md)%%force-extract%%` | `{ fullMatch: '%%force-extract%%', innerText: 'force-extract' }` |
-| `[link](file.md) %%stop-extract-link%%` | `{ fullMatch: '%%stop-extract-link%%', innerText: 'stop-extract-link' }` |
-| `[link](file.md)<!-- force-extract -->` | `{ fullMatch: '<!-- force-extract -->', innerText: 'force-extract' }` |
-| `[link](file.md)` | `null` |
-
-**Note**: See [Issue 5: Hardcoded Extraction Marker Detection](#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20MVP%20Tech%20Debt) for MVP technical debt discussion.
+> Owned by ContentExtractor. See [**`Default Strategy Precedence`**](ContentExtractor%20Component%20Guide.md#Factory%20Function) for marker behavior and strategy precedence rules.
 
 #### ValidationMetadata Type
 
@@ -431,7 +427,7 @@ export interface HeadingObject {
         "anchor": null
       },
       "text": "Implementation Guide",
-      "fullMatch": "[Implementation Guide](test-target.md)",
+      "fullMatch": "&#91;Implementation Guide](test-target.md)",
       "line": 11,
       "column": 3,
       "extractionMarker": null

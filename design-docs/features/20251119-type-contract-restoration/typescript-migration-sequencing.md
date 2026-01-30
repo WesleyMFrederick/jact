@@ -86,7 +86,7 @@ _Commit:_ 78965246e4ae7acc5aeebea1b3ac138f83b6d089
 - MarkdownParser (~640 lines) - lexer + custom extraction
 
 **Component/Module Guides**:
-- [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md)
+- [MarkdownParser Component Guide](../../component-guides/MarkdownParser%20Component%20Guide.md)
 
 **Deliverables**:
 - ✅ MarkdownParser.ts with Token types from @types/marked
@@ -176,7 +176,7 @@ _Commit:_ 5754f3e
 - Strategy implementations (5 files) - eligibility evaluation chain
 
 **Component/Module Guides**:
-- [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
+- [ContentExtractor Component Guide](../../component-guides/ContentExtractor%20Component%20Guide.md)
 
 **Deliverables**:
 - ✅ ContentExtractor.ts with strategy chain typed

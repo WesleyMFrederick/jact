@@ -5,13 +5,13 @@
 Wraps parser output in a facade providing stable query methods for anchor validation, link retrieval, and content extraction for consumption by downstream components.
 
 ### Problem
-1. Consumers like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) are tightly coupled to the internal structure of [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface), making them complex and forcing them to contain data-querying logic. ^P1
+1. Consumers like the [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) are tightly coupled to the internal structure of [**`MarkdownParser.ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface), making them complex and forcing them to contain data-querying logic. ^P1
 2. Any change to the parser's output structure becomes a breaking change for all consumers. ^P2
 3. Direct data structure access violates encapsulation and makes the system brittle to refactoring. ^P3
 
 ### Solution
 The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade provides a stable query interface by:
-1. encapsulating the raw [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) and hiding internal data structures from all consumers (addresses [P1](#^P1)) ^S1
+1. encapsulating the raw [**`MarkdownParser.ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface) and hiding internal data structures from all consumers (addresses [P1](#^P1)) ^S1
 2. providing method-based query APIs for anchors, links, and content that decouple consumers from parser internals (addresses [P1](#^P1), [P2](#^P2)) ^S2
 3. enabling parser refactoring without breaking consumer code (addresses [P2](#^P2), [P3](#^P3)) ^S3
 
@@ -31,7 +31,7 @@ The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manage
 
 ### Class Diagram
 
-[**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md#Public%20Contracts) creates `ParsedDocument` instances. Consumers like [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md) and [**`ContentExtractor`**](Content%20Extractor%20Implementation%20Guide.md) depend on the `ParsedDocument` facade for all data access.
+[**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md#Public%20Contracts) creates `ParsedDocument` instances. Consumers like [**`CitationValidator`**](CitationValidator%20Implementation%20Guide.md) and [**`ContentExtractor`**](ContentExtractor%20Component%20Guide.md) depend on the `ParsedDocument` facade for all data access.
 
 ```mermaid
 classDiagram
@@ -82,7 +82,7 @@ classDiagram
 2. [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument): Facade providing query methods (this guide)
 3. [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator): Consumer using anchor/link query methods
 4. [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor): Consumer using content extraction methods
-5. [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface): Data contract being wrapped
+5. [**`MarkdownParser.ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface): Data contract being wrapped
 
 ---
 ### File Structure
@@ -124,7 +124,7 @@ new ParsedDocument(
 
 | Type     | Value           | Comment                      |
 | :------- | :-------------- | :--------------------------- |
-| `@param` | `ParserOutput`  | [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) produced by MarkdownParser |
+| `@param` | `ParserOutput`  | [**`MarkdownParser.ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface) produced by MarkdownParser |
 
 ---
 
@@ -190,7 +190,7 @@ ParsedDocument.getLinks() → LinkObject[]
 
 | Type       | Value           | Comment                        |
 | :--------- | :-------------- | :----------------------------- |
-| `@returns` | `LinkObject[]`  | Array of all [**`LinkObject`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface)s from document |
+| `@returns` | `LinkObject[]`  | Array of all [**`LinkObject`**](MarkdownParser%20Component%20Guide.md#LinkObject%20Interface)s from document |
 
 ---
 

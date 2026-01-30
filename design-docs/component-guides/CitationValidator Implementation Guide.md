@@ -5,7 +5,7 @@ Confirms a link is valid by checking if the file exists (path + file name) and i
 
 ### Problem
 1. Links and anchors identified by the [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) have no guarantee that paths point to existing files or anchors correspond to real headers/blocks. ^P1
-2. [**`MarkdownParser.ParserOutput`**](Markdown%20Parser%20Implementation%20Guide.md#ParserOutput%20Interface) contains link information about the source and target document we do not want to re-build or repeat in other consumers ([One Source Of Truth](../../../../ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth)) ^P2
+2. [**`MarkdownParser.ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface) contains link information about the source and target document we do not want to re-build or repeat in other consumers ([One Source Of Truth](../../../../ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth)) ^P2
    1. Creating a separate validation result object duplicates 80% of link metadata (source paths, target paths, line numbers). ^P2-1
 3. If errors occur in the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor), it is challenging to determine if the errors are due to invalid link or invalid content (missing, malformed, etc) ^P3
 
@@ -13,10 +13,10 @@ Confirms a link is valid by checking if the file exists (path + file name) and i
 The [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) component validates link paths and anchors are valid by:
 1. consuming [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade instances from the [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) ^S1
    1. verifying target file and anchor exist using [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade query methods ^S1-1
-2. enriching/extending [**`LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) directly by adding a [**`CitationValidator.ValidationMetadata`**](#ValidationMetadata%20Type%20(Discriminated%20Union)) property ^S2
+2. enriching/extending [**`LinkObjects`**](MarkdownParser%20Component%20Guide.md#LinkObject%20Interface) directly by adding a [**`CitationValidator.ValidationMetadata`**](#ValidationMetadata%20Type%20(Discriminated%20Union)) property ^S2
 3. The [**`CitationValidator.ValidationResult`**](#ValidationResult%20Interface) output:
    1. is consumed by the [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) for extraction eligibility analysis ^S3
-   2. extends [**`LinkObjects`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface) via the [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface) interface, and contains [**`ValidationMetadata`**)](#ValidationMetadata%20Type%20(Discriminated%20Union)) statuses, errors, and fix suggestions
+   2. extends [**`LinkObjects`**](MarkdownParser%20Component%20Guide.md#LinkObject%20Interface) via the [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface) interface, and contains [**`ValidationMetadata`**)](#ValidationMetadata%20Type%20(Discriminated%20Union)) statuses, errors, and fix suggestions
    3. eliminates data duplication (80% reduction) by adding validation property instead of creating separate result objects
 
 ### Impact
@@ -25,7 +25,7 @@ The [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Man
 | :--------: | ------------------------------------------- | :------------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | [P1](#^P1) | Validate target paths                       |   [S1](#^S1)   | [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) as existence check                                                               | 66% reduction in filesystem calls (1 vs 3)                             | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Use [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache) API, not raw `node:fs` calls     |
 | [P1](#^P1) | Validate target anchors                     | [S1.1](#^S1-1) | [**`ParsedDocument.hasAnchor()`**](ParsedDocument%20Implementation%20Guide.md#Anchor%20Query%20Methods) on fetched doc | 100% reduction in direct data access (0 vs 4)                          | [Black Box Interfaces](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^black-box-interfaces) | Use[**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) API, not raw `_data.anchors` access |
-| [P2](#^P2) | Avoid link metadata duplication             |   [S2](#^S2)   | Enrichment pattern (add validation to [**`LinkObject`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface))                                                  | 80% reduction in data duplication (1 property vs 8 fields              | [One Source of Truth](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^one-source-of-truth)   | Mutate original, not copy-then-extend                                                                                                |
+| [P2](#^P2) | Avoid link metadata duplication             |   [S2](#^S2)   | Enrichment pattern (add validation to [**`LinkObject`**](MarkdownParser%20Component%20Guide.md#LinkObject%20Interface))                                                  | 80% reduction in data duplication (1 property vs 8 fields              | [One Source of Truth](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^one-source-of-truth)   | Mutate original, not copy-then-extend                                                                                                |
 | [P3](#^P3) | Distinguish link errors from content errors |   [S3](#^S3)   | Pre-validation before extraction                                                                                                                                                 | 100% link errors caught before ContentExtractor (0 ambiguous failures) | [Single Responsibility](../../../../ARCHITECTURE-PRINCIPLES.md#^single-responsibility)                                  | Validator validates links;<br>Extractor extracts content;                                                                            |
 
 ---
@@ -117,7 +117,7 @@ classDiagram
 2. [**`FileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.File%20Cache): Dependency for short filename lookups.
 3. [**`ParsedFileCache`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedFileCache): Dependency that returns [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) instances.
 4. [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument): Facade providing query methods over parser output.
-5. [**`LinkObject`**](Markdown%20Parser%20Implementation%20Guide.md#LinkObject%20Interface): Input data from parser (link metadata).
+5. [**`LinkObject`**](MarkdownParser%20Component%20Guide.md#LinkObject%20Interface): Input data from parser (link metadata).
 6. [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface): LinkObject extended with validation property.
 7. [**`ValidationMetadata`**](#ValidationMetadata%20Type%20(Discriminated%20Union)): Discriminated union (valid | error | warning).
 8. [**`ValidationResult`**](#ValidationResult%20Interface): Output containing summary + enriched links.
@@ -166,7 +166,7 @@ tools/citation-manager/
         └── anchor-matching-source.md             // Cross-document anchor tests
 ```
 
-**Technical Debt**: The current monolithic structure violates the project's action-based file naming patterns. See [Issue #41](https://github.com/WesleyMFrederick/cc-workflows/issues/41) for proposed component folder refactoring that would align with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Organization).
+**Technical Debt**: The current monolithic structure violates the project's action-based file naming patterns. See [Issue #41](https://github.com/WesleyMFrederick/cc-workflows/issues/41) for proposed component folder refactoring that would align with [ContentExtractor's structure](ContentExtractor%20Component%20Guide.md#File%20Organization).
 
 ---
 ## Public Contracts
@@ -514,7 +514,7 @@ tools/citation-manager/src/
 1. **Single Responsibility**: Each validator handles one pattern type
 2. **Testability**: Unit test individual validators in isolation
 3. **Maintainability**: Locate and modify specific validation logic easily
-4. **Consistency**: Aligns with [ContentExtractor's structure](Content%20Extractor%20Implementation%20Guide.md#File%20Organization)
+4. **Consistency**: Aligns with [ContentExtractor's structure](ContentExtractor%20Component%20Guide.md#File%20Organization)
 5. **US1.8 Clarity**: Enrichment logic separated from validation logic
 
 **Alignment with Architecture Principles**:
