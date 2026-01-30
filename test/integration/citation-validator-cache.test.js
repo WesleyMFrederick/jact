@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CitationValidator } from "../../src/CitationValidator.js";
-import { MarkdownParser } from "../../src/MarkdownParser.js";
+import { MarkdownParser } from "../../src/core/MarkdownParser/index.js";
 import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 
 const __filename = fileURLToPath(import.meta.url);

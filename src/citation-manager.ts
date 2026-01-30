@@ -33,7 +33,7 @@ import {
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
-import type { MarkdownParser } from "./MarkdownParser.js";
+import type { MarkdownParser } from "./core/MarkdownParser/index.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { FileCache } from "./FileCache.js";
 import type { CitationValidator } from "./CitationValidator.js";

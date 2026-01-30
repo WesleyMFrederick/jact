@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import ParsedDocument from "../src/ParsedDocument.js";
-import { MarkdownParser } from "../src/MarkdownParser.ts";
+import { MarkdownParser } from "../src/core/MarkdownParser/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

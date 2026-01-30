@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { CitationValidator } from "../CitationValidator.js";
 import { FileCache } from "../FileCache.js";
-import { MarkdownParser } from "../MarkdownParser.js";
+import { MarkdownParser } from "../core/MarkdownParser/index.js";
 import { ParsedFileCache } from "../ParsedFileCache.js";
 import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.js";
 import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { MarkdownParser } from "../../src/MarkdownParser.ts";
+import { MarkdownParser } from "../../src/core/MarkdownParser/index.js";
 import { createContentExtractor } from "../../src/factories/componentFactory.js";
 import fs from "node:fs";
 import path from "node:path";

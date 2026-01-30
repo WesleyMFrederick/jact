@@ -3,7 +3,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { CitationValidator } from "../../src/CitationValidator.js";
+<<<<<<< HEAD
 import { MarkdownParser } from "../../src/MarkdownParser.js";
+=======
+import { MarkdownParser } from "../../src/core/MarkdownParser/index.js";
+>>>>>>> main
 import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 import { LinkObjectFactory } from "../../src/factories/LinkObjectFactory.js";
 
