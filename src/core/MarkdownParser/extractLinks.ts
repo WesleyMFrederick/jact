@@ -58,6 +58,62 @@ function isDuplicateLink(
 }
 
 /**
+ * Check if a position in a line is inside inline code (backticks).
+ * Handles escaped backticks but not complex nesting scenarios.
+ */
+function isInsideInlineCode(line: string, position: number): boolean {
+	let inCode = false;
+	let i = 0;
+
+	while (i < line.length && i < position) {
+		const char = line[i];
+		const prevChar = i > 0 ? line[i - 1] : "";
+
+		// Check for unescaped backtick
+		if (char === "`" && prevChar !== "\\") {
+			inCode = !inCode;
+		}
+		i++;
+	}
+
+	return inCode;
+}
+
+/**
+ * Build a set of line numbers that are inside code blocks.
+ * Uses a state machine to track fenced code block boundaries.
+ * Lines inside code blocks should be excluded from regex-based link extraction.
+ */
+function getCodeBlockLines(lines: string[]): Set<number> {
+	const codeLines = new Set<number>();
+	let inCodeBlock = false;
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (line === undefined) continue;
+
+		// Check for fence markers (``` or ~~~)
+		const trimmed = line.trim();
+		if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+			if (inCodeBlock) {
+				// Closing fence - add this line too
+				codeLines.add(i + 1); // 1-based line number
+				inCodeBlock = false;
+			} else {
+				// Opening fence
+				codeLines.add(i + 1); // 1-based line number
+				inCodeBlock = true;
+			}
+		} else if (inCodeBlock) {
+			// We're inside a code block
+			codeLines.add(i + 1); // 1-based line number
+		}
+	}
+
+	return codeLines;
+}
+
+/**
  * Walk marked.js tokens recursively to extract standard markdown links.
  * Handles: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
  */
@@ -69,6 +125,11 @@ function extractLinksFromTokens(
 ): void {
 	const walkTokens = (tokenList: Token[]): void => {
 		for (const token of tokenList) {
+			// Skip code blocks and inline code spans - links inside are code examples, not citations
+			if (token.type === "code" || token.type === "codespan") {
+				continue;
+			}
+
 			if (isLinkToken(token)) {
 				const href = token.href;
 				const text = token.text;
@@ -166,6 +227,12 @@ function extractMarkdownLinksRegex(
 		const anchor = match[3] ?? null;
 		const fullMatch = match[0];
 
+		// Skip if inside inline code (backticks)
+		if (isInsideInlineCode(line, match.index)) {
+			match = linkPattern.exec(line);
+			continue;
+		}
+
 		// Skip if already extracted by token parser using robust deduplication
 		const alreadyExtracted = isDuplicateLink(
 			{ rawPath, anchor, line: index + 1, column: match.index },
@@ -199,6 +266,12 @@ function extractMarkdownLinksRegex(
 		const text = match[1] ?? "";
 		const anchor = match[2] ?? "";
 		const fullMatch = match[0];
+
+		// Skip if inside inline code (backticks)
+		if (isInsideInlineCode(line, match.index)) {
+			match = internalAnchorRegex.exec(line);
+			continue;
+		}
 
 		// Skip if already extracted using robust deduplication
 		const alreadyExtracted = isDuplicateLink(
@@ -242,28 +315,31 @@ function extractMarkdownLinksRegex(
 			const anchor = match[3] ?? null;
 			const fullMatch = match[0];
 
-			// Skip if already extracted using robust deduplication
-			const alreadyExtracted = isDuplicateLink(
-				{ rawPath, anchor, line: index + 1, column: match.index },
-				links
-			);
-			if (!alreadyExtracted) {
-				const linkObject = createLinkObject({
-					linkType: "markdown",
-					scope: "cross-document",
-					anchor,
-					rawPath,
-					sourceAbsolutePath,
-					text,
-					fullMatch,
-					line: index + 1,
-					column: match.index,
-					extractionMarker: detectExtractionMarker(
-						line,
-						match.index + fullMatch.length
-					),
-				});
-				links.push(linkObject);
+			// Skip if inside inline code (backticks)
+			if (!isInsideInlineCode(line, match.index)) {
+				// Skip if already extracted using robust deduplication
+				const alreadyExtracted = isDuplicateLink(
+					{ rawPath, anchor, line: index + 1, column: match.index },
+					links
+				);
+				if (!alreadyExtracted) {
+					const linkObject = createLinkObject({
+						linkType: "markdown",
+						scope: "cross-document",
+						anchor,
+						rawPath,
+						sourceAbsolutePath,
+						text,
+						fullMatch,
+						line: index + 1,
+						column: match.index,
+						extractionMarker: detectExtractionMarker(
+							line,
+							match.index + fullMatch.length
+						),
+					});
+					links.push(linkObject);
+				}
 			}
 		}
 		match = relativeDocRegex.exec(line);
@@ -283,6 +359,12 @@ function extractCiteLinks(
 	const citePattern = /\[cite:\s*([^\]]+)\]/g;
 	let match = citePattern.exec(line);
 	while (match !== null) {
+		// Skip if inside inline code (backticks)
+		if (isInsideInlineCode(line, match.index)) {
+			match = citePattern.exec(line);
+			continue;
+		}
+
 		const rawPath = (match[1] ?? "").trim();
 		const text = `cite: ${rawPath}`;
 
@@ -319,6 +401,12 @@ function extractWikiCrossDocLinks(
 	const wikiCrossDocRegex = /\[\[([^#\]]+\.md)(#([^|]+?))?\|([^\]]+)\]\]/g;
 	let match = wikiCrossDocRegex.exec(line);
 	while (match !== null) {
+		// Skip if inside inline code (backticks)
+		if (isInsideInlineCode(line, match.index)) {
+			match = wikiCrossDocRegex.exec(line);
+			continue;
+		}
+
 		const rawPath = match[1] ?? "";
 		const anchor = match[3] ?? null;
 		const text = match[4] ?? "";
@@ -356,6 +444,12 @@ function extractWikiInternalLinks(
 	const wikiRegex = /\[\[#([^|]+)\|([^\]]+)\]\]/g;
 	let match = wikiRegex.exec(line);
 	while (match !== null) {
+		// Skip if inside inline code (backticks)
+		if (isInsideInlineCode(line, match.index)) {
+			match = wikiRegex.exec(line);
+			continue;
+		}
+
 		const anchor = match[1] ?? "";
 		const text = match[2] ?? "";
 
@@ -392,6 +486,12 @@ function extractCaretLinks(
 	const caretRegex = /\^([A-Za-z0-9-]+)/g;
 	let match = caretRegex.exec(line);
 	while (match !== null) {
+		// Skip if inside inline code (backticks)
+		if (isInsideInlineCode(line, match.index)) {
+			match = caretRegex.exec(line);
+			continue;
+		}
+
 		const anchor = match[1] ?? "";
 
 		// Skip semantic version patterns (^14.0.1, ^v1.2.3, etc)
@@ -445,8 +545,17 @@ export function extractLinks(content: string, sourcePath: string): LinkObject[] 
 	const tokens = marked.lexer(content);
 	extractLinksFromTokens(tokens, lines, sourceAbsolutePath, links);
 
+	// Build set of line numbers inside code blocks to skip in regex extraction
+	const codeBlockLines = getCodeBlockLines(lines);
+
 	// Phase 2: Regex extraction for patterns not in CommonMark or not caught by token parser
 	lines.forEach((line, index) => {
+		// Skip lines inside code blocks - they contain code examples, not real links
+		const lineNumber = index + 1;
+		if (codeBlockLines.has(lineNumber)) {
+			return;
+		}
+
 		// Regex fallback for markdown links with non-URL-encoded anchors
 		// (CommonMark only recognizes URL-encoded anchors, but Obsidian allows raw spaces/colons)
 		extractMarkdownLinksRegex(line, index, sourceAbsolutePath, links);

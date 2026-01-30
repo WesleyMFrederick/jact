@@ -2,7 +2,7 @@
 
 %% Begin Waypoint %%
 - **whiteboards**
-  - [[markdown-parser-whiteboard]]
+	- [[markdown-parser-whiteboard]]
 - [[CitationValidator Implementation Guide]]
 - [[CLI Architecture Overview]]
 - [[CLI Orchestrator Implementation Guide]]
