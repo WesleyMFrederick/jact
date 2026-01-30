@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-<<<<<<< HEAD
-import { MarkdownParser } from "../src/MarkdownParser.js";
-=======
 import { MarkdownParser } from "../src/core/MarkdownParser/index.js";
->>>>>>> main
 
 const mockFs = { readFileSync: () => "" };
 
