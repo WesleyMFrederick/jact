@@ -590,15 +590,20 @@ export class CitationManager {
 
 			// --- Phase 1: Synthetic Link Creation ---
 			// Pattern: Use factory to create unvalidated LinkObject for full file
+			// Fix(#63): Resolve targetFile to absolute BEFORE creating synthetic link
+			// so target.path.raw is absolute. path.resolve() with an absolute second
+			// arg ignores the first, preventing duplicate segments in resolveTargetPath()
+			const { resolve } = await import("node:path");
+			const absoluteTargetFile = resolve(targetFile);
 			const factory = new LinkObjectFactory();
-			const syntheticLink = factory.createFileLink(targetFile);
+			const syntheticLink = factory.createFileLink(absoluteTargetFile);
 
 			// --- Phase 2: Validation ---
 			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
 			// Integration: CitationValidator enriches link in-place with validation metadata
 			const enrichedLink = await this.validator.validateSingleCitation(
 				syntheticLink,
-				targetFile,
+				absoluteTargetFile,
 			);
 
 			// Decision: Apply path conversion if validator found file via cache
