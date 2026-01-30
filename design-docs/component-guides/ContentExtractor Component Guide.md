@@ -968,7 +968,7 @@ The ContentExtractor component follows the workspace testing principle of **"Rea
 - Custom user strategies enabled
 
 **Status**: Deferred to future enhancement
-**Related**: [MarkdownParser Issue 5 - Hardcoded Extraction Marker Detection](Markdown%20Parser%20Implementation%20Guide.md#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20(MVP%20Tech%20Debt))
+**Related**: [MarkdownParser Issue 5 - Hardcoded Extraction Marker Detection](MarkdownParser%20Component%20Guide.md#Issue%205%20Hardcoded%20Extraction%20Marker%20Detection%20(MVP%20Tech%20Debt))
 
 ### Issue 3: Deferred US2.3 CLI Features (Future Enhancement)
 

@@ -455,7 +455,7 @@ export type AnchorObject =
 - Header anchors ALWAYS set `urlEncodedId` (verified in baseline commit 1c571e0, line 462-471)
 - Block anchors NEVER have `urlEncodedId` property (verified in baseline, lines 349, 371, 393)
 
-**Reference**: [Markdown Parser Data Contracts](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts)
+**Reference**: [Markdown Parser Data Contracts](../../component-guides/MarkdownParser%20Component%20Guide.md#Data%20Contracts)
 
 ---
 
@@ -512,7 +512,7 @@ interface OutgoingLinksExtractedContent {
 
 **Validation**: Already typed, verify usage matches during conversion
 
-**Reference**: [Content Extractor Data Contracts](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
+**Reference**: [Content Extractor Data Contracts](../../component-guides/ContentExtractor%20Component%20Guide.md)
 
 ---
 
@@ -855,9 +855,9 @@ npm run build               # Must generate .js + .d.ts
 ### Component Contracts
 
 - **Component Guides**: [component-guides](../../component-guides/component-guides.md) - Contract specifications
-- **MarkdownParser Guide**: [Markdown Parser Implementation Guide](../../component-guides/Markdown%20Parser%20Implementation%20Guide.md)
+- **MarkdownParser Guide**: [MarkdownParser Component Guide](../../component-guides/MarkdownParser%20Component%20Guide.md)
 - **CitationValidator Guide**: [CitationValidator Implementation Guide](../../component-guides/CitationValidator%20Implementation%20Guide.md)
-- **ContentExtractor Guide**: [Content Extractor Implementation Guide](../../component-guides/Content%20Extractor%20Implementation%20Guide.md)
+- **ContentExtractor Guide**: [ContentExtractor Component Guide](../../component-guides/ContentExtractor%20Component%20Guide.md)
 
 ### Architecture Standards
 

@@ -371,7 +371,7 @@ VALIDATION FAILED - Please fix errors before committing
 
 #### Extraction Output Format (US2.2a)
 
-See [Content Extractor Implementation Guide - OutgoingLinksExtractedContent Schema](Content%20Extractor%20Implementation%20Guide.md#OutgoingLinksExtractedContent%20Schema) for complete structure.
+See [Content Extractor Implementation Guide - OutgoingLinksExtractedContent Schema](ContentExtractor%20Component%20Guide.md#OutgoingLinksExtractedContent%20Schema) for complete structure.
 
 **Summary:**
 - **extractedContentBlocks**: Index mapping contentId (SHA-256 hash) to deduplicated content
@@ -1410,7 +1410,7 @@ _Reference_: [PRD US2.7 - Remove Deprecated base-paths Command](<../.archive/fea
 ## Related Documentation
 
 - [Content Aggregation Architecture - CLI Orchestrator Component](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.CLI Orchestrator>)
-- [Content Extractor Implementation Guide](Content%20Extractor%20Implementation%20Guide.md)
+- [ContentExtractor Component Guide](ContentExtractor%20Component%20Guide.md)
 - [CitationValidator Implementation Guide](CitationValidator%20Implementation%20Guide.md)
 - [ParsedFileCache Implementation Guide](ParsedFileCache%20Implementation%20Guide.md)
 - [ParsedDocument Implementation Guide](../../../../../resume-coach/design-docs/examples/component-guides/ParsedDocument%20Implementation%20Guide.md)

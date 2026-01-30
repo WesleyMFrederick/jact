@@ -45,7 +45,7 @@ export type LinkScope = 'internal' | 'cross-document';  // Changed from 'externa
 **Decision**: ✅ **Adopt 'cross-document'** - aligns with working baseline
 
 **Solution Validation:**
-- [Markdown Parser Implementation Guide - Data Contracts](../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md#Data%20Contracts)
+- [Markdown Parser Implementation Guide - Data Contracts](../../../component-guides/MarkdownParser%20Component%20Guide.md#Data%20Contracts)
 - `tools/citation-manager/src/MarkdownParser.js:103` (assigns `'cross-document'`)
 - `tools/citation-manager/src/MarkdownParser.js:149` (assigns `'cross-document'`)
 - `tools/citation-manager/src/MarkdownParser.js:202` (assigns `'cross-document'`)
@@ -246,7 +246,7 @@ async enrichLinkWithValidation(link: LinkObject): Promise<EnrichedLinkObject> {
 **Decision**: ✅ **Create minimal interfaces** - Strategy, CliFlags, document discriminated union pattern
 
 **Solution Validation:**
-- [Content Extractor Implementation Guide - Strategy Pattern](../../../component-guides/Content%20Extractor%20Implementation%20Guide.md#Strategy%20Pattern)
+- [Content Extractor Implementation Guide - Strategy Pattern](../../../component-guides/ContentExtractor%20Component%20Guide.md#Strategy%20Pattern)
 - [CitationValidator Implementation Guide - ValidationResult Output Contract](../../../component-guides/CitationValidator%20Implementation%20Guide.md#`CitationValidator.ValidationResult.Output.DataContract`%20JSON%20Schema)
 - `tools/citation-manager/src/core/ContentExtractor/analyzeEligibility.js:13` (strategy.getDecision usage)
 - `tools/citation-manager/src/core/ContentExtractor/extractLinksContent.js:10,19,68` (cliFlags parameter)
@@ -396,7 +396,7 @@ interface MarkedToken {
 **Decision**: ✅ **Prefer @types/marked** - use minimal interface only if import fails
 
 **Solution Validation:**
-- [Markdown Parser Implementation Guide - MarkdownParser.Output.DataContract](../../../component-guides/Markdown%20Parser%20Implementation%20Guide.md#MarkdownParser.Output.DataContract:%20How%20Tokens,%20Links,%20and%20Anchors%20Are%20Populated)
+- [Markdown Parser Implementation Guide - MarkdownParser.Output.DataContract](../../../component-guides/MarkdownParser%20Component%20Guide.md#MarkdownParser.Output.DataContract:%20How%20Tokens,%20Links,%20and%20Anchors%20Are%20Populated)
 - `tools/citation-manager/src/MarkdownParser.js:58,63` (tokens = marked.lexer(), tokens property in output)
 
 ---
