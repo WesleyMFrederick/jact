@@ -1,4 +1,4 @@
-import type { Token } from "marked";
+import type { Token, Tokens } from "marked";
 import { marked } from "marked";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
@@ -14,12 +14,12 @@ function hasNestedTokens(token: Token): token is Token & { tokens: Token[] } {
 /**
  * Type guard for link tokens from marked.js
  */
-function isLinkToken(token: Token): token is Token & { href: string; text: string; raw: string } {
+function isLinkToken(token: Token): token is Tokens.Link {
 	return (
 		token.type === "link" &&
-		typeof (token as any).href === "string" &&
-		typeof (token as any).text === "string" &&
-		typeof (token as any).raw === "string"
+		typeof (token as Tokens.Link).href === "string" &&
+		typeof (token as Tokens.Link).text === "string" &&
+		typeof (token as Tokens.Link).raw === "string"
 	);
 }
 
@@ -193,8 +193,8 @@ function extractLinksFromTokens(
 				walkTokens(token.tokens);
 			}
 			// Also check items (list items have items property)
-			if ("items" in token && Array.isArray((token as any).items)) {
-				for (const item of (token as any).items) {
+			if ("items" in token && Array.isArray((token as Tokens.List).items)) {
+				for (const item of (token as Tokens.List).items) {
 					if (hasNestedTokens(item)) {
 						walkTokens(item.tokens);
 					}
