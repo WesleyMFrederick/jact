@@ -260,7 +260,9 @@ class ParsedDocument {
 			.replace(/\^/g, "")     // Remove caret
 			.replace(/%%/g, "")     // Remove comment markers
 			.replace(/\[\[/g, "")   // Remove wiki open
-			.replace(/\]\]/g, "");  // Remove wiki close
+			.replace(/\]\]/g, "")   // Remove wiki close
+			.replace(/\s+/g, " ")   // Collapse whitespace (matches URL-encoded anchor generation)
+			.trim();
 	}
 
 	/**
