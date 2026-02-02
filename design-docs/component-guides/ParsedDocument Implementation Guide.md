@@ -580,7 +580,7 @@ outputType: table
 queryType: issue
 org: WesleyMFrederick
 repo: cc-workflows
-query: "is:issue label:component:ParsedDocument"
+query: "is:issue label:component:ParsedDocument state:open"
 sort: number
 direction: asc
 columns: [number, status, title, labels, created, updated]
