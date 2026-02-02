@@ -121,6 +121,14 @@ export class CitationValidator {
 		}
 	}
 
+	private isDirectory(path: string): boolean {
+		try {
+			return existsSync(path) && statSync(path).isDirectory();
+		} catch (_error: unknown) {
+			return false;
+		}
+	}
+
 	private isObsidianAbsolutePath(path: string): boolean {
 		// Detect Obsidian absolute paths like "0_SoftwareDevelopment/..."
 		return /^[A-Za-z0-9_-]+\//.test(path) && !isAbsolute(path);
@@ -236,7 +244,10 @@ export class CitationValidator {
 		citation: LinkObject,
 		contextFile?: string,
 	): Promise<EnrichedLinkObject> {
-		const result = await this._validateSingleCitationInternal(citation, contextFile);
+		const result = await this._validateSingleCitationInternal(
+			citation,
+			contextFile,
+		);
 
 		// Transform internal result → ValidationMetadata (enrichment pattern)
 		let validation: ValidationMetadata;
@@ -396,6 +407,18 @@ export class CitationValidator {
 			citation.target.path.raw ?? "",
 			sourceFile ?? "",
 		);
+
+		// Check if target resolves to a directory (folder link detection)
+		// Use targetPath (resolved) as authoritative; fall back to standardPath only when targetPath doesn't exist
+		const directoryCheckPath = existsSync(targetPath) ? targetPath : standardPath;
+		if (this.isDirectory(directoryCheckPath)) {
+			return this.createValidationResult(
+				citation,
+				"warning",
+				`Link points to a folder, not a file: ${citation.target.path.raw}`,
+				"Link to a specific file inside the folder (e.g., folder/index.md) or create an index.md in the target folder",
+			);
+		}
 
 		// Check if target file exists
 		if (!existsSync(targetPath)) {

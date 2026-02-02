@@ -1,3 +1,4 @@
+import type { Token } from "marked";
 import type {
 	ParserOutput,
 	LinkObject,
@@ -160,13 +161,13 @@ class ParsedDocument {
 		}
 
 		// Phase 1: Flatten token tree and locate target heading
-		const orderedTokens: any[] = [];
+		const orderedTokens: Token[] = [];
 		let targetIndex = -1;
 
 		// Normalize heading text once for comparison
 		const normalizedHeadingText = this._normalizeObsidianHeading(headingText);
 
-		const walkTokens = (tokenList: any) => {
+		const walkTokens = (tokenList: Token[]) => {
 			for (const token of tokenList) {
 				const currentIndex = orderedTokens.length;
 				orderedTokens.push(token);
@@ -183,7 +184,7 @@ class ParsedDocument {
 				// Recurse into nested tokens ONLY if token.raw doesn't already include child content
 				// Skip for: heading, paragraph (their .raw includes full content with inline formatting)
 				// Recurse for: list, list_item, blockquote, table (structural tokens where .raw is minimal)
-				if (token.tokens && !this._tokenIncludesChildrenInRaw(token.type)) {
+				if ("tokens" in token && token.tokens && !this._tokenIncludesChildrenInRaw(token.type)) {
 					walkTokens(token.tokens);
 				}
 			}
@@ -195,12 +196,13 @@ class ParsedDocument {
 		if (targetIndex === -1) return null;
 
 		// Phase 2: Find section boundary (next same-or-higher level heading)
-		const targetHeadingLevel = orderedTokens[targetIndex].depth;
+		const targetToken = orderedTokens[targetIndex];
+		const targetHeadingLevel = targetToken?.type === "heading" ? targetToken.depth : 1;
 		let endIndex = orderedTokens.length; // Default: to end of file
 
 		for (let i = targetIndex + 1; i < orderedTokens.length; i++) {
 			const token = orderedTokens[i];
-			if (token.type === "heading" && token.depth <= targetHeadingLevel) {
+			if (token?.type === "heading" && token.depth <= targetHeadingLevel) {
 				endIndex = i;
 				break;
 			}
