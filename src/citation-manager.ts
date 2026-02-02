@@ -34,6 +34,7 @@ import {
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 import type { MarkdownParser } from "./core/MarkdownParser/index.js";
+import type { ParserOutput } from "./types/citationTypes.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { FileCache } from "./FileCache.js";
 import type { CitationValidator } from "./CitationValidator.js";
@@ -125,6 +126,14 @@ export class CitationManager {
 		this.contentExtractor = createContentExtractor(
 			this.parsedFileCache, // Share cache with validator
 		);
+	}
+
+	/**
+	 * Parse a markdown file and return its full AST with extracted metadata.
+	 * Used by the `ast` CLI command to expose parser internals for debugging.
+	 */
+	async getAst(filePath: string): Promise<ParserOutput> {
+		return this.parser.parseFile(filePath);
 	}
 
 	/**
@@ -1077,7 +1086,7 @@ Output includes:
 	)
 	.action(async (file: string) => {
 		const manager = new CitationManager();
-		const ast = await (manager as any).parser.parseFile(file);
+		const ast = await manager.getAst(file);
 		console.log(JSON.stringify(ast, null, 2));
 	});
 

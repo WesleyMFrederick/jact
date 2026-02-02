@@ -277,6 +277,75 @@ describe("ParsedDocument Content Extraction", () => {
 			expect(section).toContain("Test: A | B ^ C");
 		});
 
+		it("should match URL-decoded anchor with collapsed whitespace against heading with colon (Issue #14)", () => {
+			// Given: Document with heading "Level 3: Components"
+			// URL-encoded anchor: "Level%203%20Components" (colon removed, spaces collapsed)
+			// After decodeUrlAnchor: "Level 3 Components" (single space)
+			// Heading after colon removal: "Level 3 Components" (double space from ": " → " ")
+			// Bug: These don't match because normalization doesn't collapse whitespace
+			const parserOutput = {
+				content: "## Level 3: Components\n\nComponent details here.\n\n## Next Section",
+				tokens: [
+					{
+						type: "heading",
+						depth: 2,
+						text: "Level 3: Components",
+						raw: "## Level 3: Components\n",
+					},
+					{ type: "paragraph", raw: "\nComponent details here.\n\n" },
+					{
+						type: "heading",
+						depth: 2,
+						text: "Next Section",
+						raw: "## Next Section",
+					},
+				],
+				headings: [
+					{ text: "Level 3: Components", level: 2 },
+					{ text: "Next Section", level: 2 },
+				],
+			};
+			const doc = new ParsedDocument(parserOutput);
+
+			// When: Extract using decoded URL anchor (single space, as ContentExtractor does)
+			const section = doc.extractSection("Level 3 Components");
+
+			// Then: Should match the heading and extract section
+			expect(section).not.toBeNull();
+			expect(section).toContain("Level 3: Components");
+			expect(section).toContain("Component details here");
+			expect(section).not.toContain("Next Section");
+		});
+
+		it("should match URL-decoded anchor with collapsed whitespace for multiple special chars (Issue #14)", () => {
+			// Given: Heading with multiple Obsidian-invalid chars creating whitespace gaps
+			// "Story 1.5: Cache | Design" → remove : and | → "Story 1.5 Cache  Design"
+			// But URL-encoded form collapses: "Story%201.5%20Cache%20Design" → decoded: "Story 1.5 Cache Design"
+			const parserOutput = {
+				content: "## Story 1.5: Cache | Design\n\nDesign content.",
+				tokens: [
+					{
+						type: "heading",
+						depth: 2,
+						text: "Story 1.5: Cache | Design",
+						raw: "## Story 1.5: Cache | Design\n",
+					},
+					{ type: "paragraph", raw: "\nDesign content." },
+				],
+				headings: [
+					{ text: "Story 1.5: Cache | Design", level: 2 },
+				],
+			};
+			const doc = new ParsedDocument(parserOutput);
+
+			// When: Extract using URL-decoded form (whitespace collapsed)
+			const section = doc.extractSection("Story 1.5 Cache Design");
+
+			// Then: Should match
+			expect(section).not.toBeNull();
+			expect(section).toContain("Story 1.5: Cache | Design");
+		});
+
 		it("should still match headings without Obsidian invalid characters (backward compatibility)", () => {
 			// Given: Document with normal heading (no invalid characters)
 			const parserOutput = {

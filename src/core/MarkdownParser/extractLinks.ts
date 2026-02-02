@@ -1,4 +1,4 @@
-import type { Token } from "marked";
+import type { Token, Tokens } from "marked";
 import { marked } from "marked";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
@@ -14,12 +14,12 @@ function hasNestedTokens(token: Token): token is Token & { tokens: Token[] } {
 /**
  * Type guard for link tokens from marked.js
  */
-function isLinkToken(token: Token): token is Token & { href: string; text: string; raw: string } {
+function isLinkToken(token: Token): token is Tokens.Link {
 	return (
 		token.type === "link" &&
-		typeof (token as any).href === "string" &&
-		typeof (token as any).text === "string" &&
-		typeof (token as any).raw === "string"
+		typeof (token as Tokens.Link).href === "string" &&
+		typeof (token as Tokens.Link).text === "string" &&
+		typeof (token as Tokens.Link).raw === "string"
 	);
 }
 
@@ -41,8 +41,9 @@ function findPosition(raw: string, lines: string[]): { line: number; column: num
 
 /**
  * Deduplication helper: check if a link was already extracted.
- * Uses multi-property matching to handle variations in encoding/whitespace.
- * Compares: rawPath, anchor, line, column (stricter than fullMatch alone)
+ * Uses position-based matching (line + column) to prevent duplicate extraction
+ * when the token parser and regex fallback extract the same link with different
+ * anchor encodings (e.g., nested parens causing truncation in one extractor).
  */
 function isDuplicateLink(
 	candidate: { rawPath: string | null; anchor: string | null; line: number; column: number },
@@ -50,8 +51,6 @@ function isDuplicateLink(
 ): boolean {
 	return existingLinks.some(
 		l =>
-			l.target.path.raw === candidate.rawPath &&
-			l.target.anchor === candidate.anchor &&
 			l.line === candidate.line &&
 			l.column === candidate.column
 	);
@@ -193,8 +192,8 @@ function extractLinksFromTokens(
 				walkTokens(token.tokens);
 			}
 			// Also check items (list items have items property)
-			if ("items" in token && Array.isArray((token as any).items)) {
-				for (const item of (token as any).items) {
+			if ("items" in token && Array.isArray((token as Tokens.List).items)) {
+				for (const item of (token as Tokens.List).items) {
 					if (hasNestedTokens(item)) {
 						walkTokens(item.tokens);
 					}
@@ -218,8 +217,8 @@ function extractMarkdownLinksRegex(
 	links: LinkObject[]
 ): void {
 	// Pattern for markdown links: [text](path#anchor)
-	// Permissive anchor pattern allows spaces, colons, parens
-	const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(?:#((?:[^()]|\([^)]*\))+))?\)/g;
+	// Permissive anchor pattern allows spaces, colons, parens (supports 2 levels of nesting)
+	const linkPattern = /\[([^\]]+)\]\(([^)#]+\.md)(?:#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+))?\)/g;
 	let match = linkPattern.exec(line);
 	while (match !== null) {
 		const text = match[1] ?? "";
@@ -259,8 +258,8 @@ function extractMarkdownLinksRegex(
 		match = linkPattern.exec(line);
 	}
 
-	// Internal anchor links: [text](#anchor) with permissive anchor
-	const internalAnchorRegex = /\[([^\]]+)\]\(#((?:[^()]|\([^)]*\))+)\)/g;
+	// Internal anchor links: [text](#anchor) with permissive anchor (supports 2 levels of nesting)
+	const internalAnchorRegex = /\[([^\]]+)\]\(#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+)\)/g;
 	match = internalAnchorRegex.exec(line);
 	while (match !== null) {
 		const text = match[1] ?? "";
@@ -300,7 +299,7 @@ function extractMarkdownLinksRegex(
 	}
 
 	// Relative doc links without .md extension: [text](path/to/file#anchor)
-	const relativeDocRegex = /\[([^\]]+)\]\(([^)]*\/[^)#]+)(?:#((?:[^()]|\([^)]*\))+))?\)/g;
+	const relativeDocRegex = /\[([^\]]+)\]\(([^)]*\/[^)#]+)(?:#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+))?\)/g;
 	match = relativeDocRegex.exec(line);
 	while (match !== null) {
 		const filepath = match[2] ?? "";
