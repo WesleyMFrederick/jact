@@ -17,7 +17,7 @@ The [**`ParsedFileCache`**](ParsedFileCache%20Implementation%20Guide.md) provide
 2. wrapping [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#Data%20Contracts) in [**`ParsedDocument`**](ParsedDocument%20Implementation%20Guide.md) facade before caching (addresses [P1](#^P1)) ^S2
 3. using normalized absolute paths as cache keys to prevent duplicate entries for same file (addresses [P2](#^P2)) ^S3
 
-![ParsedFileCache managing ParsedDocument instances with read-through caching](Pasted%20image%2020251205175951.png)
+![ParsedFileCache managing ParsedDocument instances with read-through caching](assets/Pasted%20image%2020251205175951.png)
 ### Impact
 
 | Problem ID | Problem | Solution ID | Solution | Impact | Principles | How Principle Applies |

@@ -15,7 +15,7 @@ The [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manage
 2. providing method-based query APIs for anchors, links, and content that decouple consumers from parser internals (addresses [P1](#^P1), [P2](#^P2)) ^S2
 3. enabling parser refactoring without breaking consumer code (addresses [P2](#^P2), [P3](#^P3)) ^S3
 
-![ParsedDocument facade wrapping MarkdownParser output to provide stable query interface](Pasted%20image%2020251205180009.png)
+![ParsedDocument facade wrapping MarkdownParser output to provide stable query interface](assets/Pasted%20image%2020251205180009.png)
 
 ### Impact
 

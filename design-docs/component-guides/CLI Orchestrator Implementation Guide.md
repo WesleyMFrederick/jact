@@ -1,6 +1,6 @@
 # CLI Orchestrator Implementation Guide
 
-This guide provides the Level 4 (Code) details for the **CLI Orchestrator** component. It documents the ideal/target state based on Epic 2 Whiteboard architectural decisions, including command orchestration patterns, the LinkObjectFactory helper, and output formatting logic.
+Coordinates citation validation and extraction workflows from command-line arguments, formatting results as CLI tree or JSON for consumption by users and automation.​​​​​​​​​​​​​​​​
 
 ## Problem
 

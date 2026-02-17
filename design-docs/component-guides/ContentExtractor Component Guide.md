@@ -1,37 +1,42 @@
 <!-- markdownlint-disable MD025 -->
 <!-- markdownlint-disable  -->
-# Content Extractor Implementation Guide
+# ContentExtractor Component Guide
 
-This document expands on [ContentExtractor component definition](<../.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Citation Manager.ContentExtractor>) from Level 3 architecture.
+## Overview
+Orchestrates content extraction from target documents by applying eligibility strategies, retrieving target content, and deduplicating results into indexed output for LLM consumption.
 
-## Document Sequence
-Better Sequence:
+### Problem
+1. The [**`CLI Orchestrator`**](<../ARCHITECTURE-Citation-Manager.md#Citation Manager.CLI Orchestrator>) needs to transform pre-validated links into extracted content optimized for LLM consumption, but validation and extraction are distinct concerns requiring separation. ^P1
+2. Eligibility rules for what content to extract (markers, anchors, CLI flags) would be scattered and inflexible if hardcoded in the orchestrator or individual components. ^P2
+3. Multiple links referencing identical content would waste LLM tokens without centralized deduplication and aggregation. ^P3
 
-  1. Purpose and Scope → "Why does this exist?"
-  2. Component Workflow → "What does it orchestrate?" (the sequence diagram)
-  3. Public Contracts → "How do I use it?" (constructor, methods, schemas)
-  4. Architecture Patterns → "Why is it designed this way?"
-  5. Implementation Details → Deep dives (algorithms, pseudocode)
+### Solution
+The [**`ContentExtractor`**](<../ARCHITECTURE-Citation-Manager.md#Citation Manager.ContentExtractor>) component provides content extraction orchestration by:
+1. accepting pre-validated [**`EnrichedLinkObject[]`**](CitationValidator%20Component%20Guide.md#EnrichedLinkObject) from the CLI, retrieving content via [**`ParsedDocument`**](<../ARCHITECTURE-Citation-Manager.md#Citation Manager.ParsedDocument>) facade methods, and aggregating results into [**`OutgoingLinksExtractedContent`**](#OutgoingLinksExtractedContent%20Schema) ([P1](#^P1)) ^S1
+2. encapsulating eligibility rules in interchangeable [**`ExtractionStrategy`**](#Strategy%20Pattern) objects evaluated in precedence order (Stop → Force → Section → CliFlag), enabling rule extension without modifying the orchestrator ([P2](#^P2)) ^S2
+3. deduplicating extracted content using SHA-256 content-based hashing, storing unique blocks once with origin tracking to minimize LLM token usage ([P3](#^P3)) ^S3
 
-  Reasoning:
+### Impact
 
-  The workflow diagram tells the orchestration story:
-- Shows validation → eligibility → extraction → deduplication flow
-- Illustrates SOURCE vs TARGET document distinction
-- Reveals the Strategy Pattern and Validation Enrichment in action
-- Provides mental model BEFORE seeing method signatures
+| Problem ID | Problem | Solution ID | Solution | Impact | Principles | How Principle Applies |
+| :--------: | ------- | :---------: | -------- | ------ | ---------- | --------------------- |
+| [P1](#^P1) | Extraction needs separation from validation | [S1](#^S1) | Accepts pre-validated links, returns [**`OutgoingLinksExtractedContent`**](#OutgoingLinksExtractedContent%20Schema) | Clear phase boundary; CLI orchestrates sequence, extractor focuses on retrieval | [Single Responsibility](ARCHITECTURE-PRINCIPLES.md#^single-responsibility) | Validator validates; Extractor extracts—each component has one concern |
+| [P1](#^P1) | Extractor needs content from target documents | [S1](#^S1) | Retrieves content via [**`ParsedDocument`**](<../ARCHITECTURE-Citation-Manager.md#Citation Manager.ParsedDocument>) facade | Extractor decoupled from parser internals; facade changes don't break extraction | [Black Box Interfaces](ARCHITECTURE-PRINCIPLES.md#^black-box-interfaces) | Depends on facade API, not raw ParserOutput structure |
+| [P2](#^P2) | Eligibility rules scattered and inflexible | [S2](#^S2) | Strategy Pattern with precedence array | Rules testable in isolation; add new strategies without modifying orchestrator | [Extension Over Modification](ARCHITECTURE-PRINCIPLES.md#^extension-over-modification) | New eligibility rules added by creating strategy class, not editing existing code |
+| [P2](#^P2) | Complex conditional logic for eligibility | [S2](#^S2) | Chain of Responsibility with first-match wins | Precedence explicit via array position; no nested if-else branches | [Composition Over Inheritance](ARCHITECTURE-PRINCIPLES.md#^composition-over-inheritance) | Behavior composed from strategy objects, not inherited from base classes |
+| [P3](#^P3) | Duplicate content wastes LLM tokens | [S3](#^S3) | SHA-256 content-based hashing with [**`extractedContentBlocks`**](#OutgoingLinksExtractedContent%20Schema) index | Identical content stored once; stats track compression ratio | [One Source of Truth](ARCHITECTURE-PRINCIPLES.md#^one-source-of-truth) | Each unique content block exists exactly once; links reference by contentId |
+| [P3](#^P3) | Need to track which links produced which content | [S3](#^S3) | Origin tracking in [**`processedLinks`**](#OutgoingLinksExtractedContent%20Schema) array | Full traceability from source link to extracted content block | [Explicit Relationships](ARCHITECTURE-PRINCIPLES.md#^explicit-relationships) | contentId encodes link→content relationship directly, not via scattered lookups |
 
-  After seeing "ContentExtractor calls CitationValidator, then loops through links calling ParsedDocument methods," the contract extractLinksContent(sourceFilePath, cliFlags): Promise\<ExtractionResult\> makes immediate sense.
+### Boundaries
 
-  Without the workflow first, readers see schemas like OutgoingLinksExtractedContent and have to mentally reconstruct how that structure gets built.
+The component is exclusively responsible for orchestrating content extraction from pre-validated links into the [**`OutgoingLinksExtractedContent`**](#OutgoingLinksExtractedContent%20Schema) structure. Its responsibilities are strictly limited to extraction orchestration and deduplication. The component is **not** responsible for:
+- Link discovery or validation (expects pre-validated links from CLI Orchestrator)
+- Parsing markdown (delegated to MarkdownParser via ParsedFileCache)
+- Navigating parser output structures (delegated to ParsedDocument facade)
+- Reading files from disk (delegated to ParsedFileCache)
+- Final output formatting or file writing (delegated to CLI Orchestrator)
 
-Revised Public Contracts Section Flow (Reusable Template):
 
-  1. Instantiation → Constructor signature, DI pattern, factory function usage, dependency defaults
-  2. Primary Operations → Main methods with signatures, parameters, return types
-  3. Output Contracts → Detailed schemas of what operations return
-  4. Error Handling → Status values, error message formats, failure scenarios
-  
 ## Purpose and Scope
 
 The **`ContentExtractor`** component is responsible for:
