@@ -1405,6 +1405,17 @@ citation-manager validate file.md --format json | jq '.links[].target.path.absol
 
 _Reference_: [PRD US2.7 - Remove Deprecated base-paths Command](<../.archive/features/20251003-content-aggregation/content-aggregation-prd.md#Story 2.7 Remove Deprecated base-paths Command>)
 
+```github-query
+outputType: table
+queryType: issue
+org: WesleyMFrederick
+repo: cc-workflows
+query: "is:issue label:component:CLIOrchestrator"
+sort: number
+direction: asc
+columns: [number, status, title, labels, created, updated]
+```
+
 ---
 
 ## Related Documentation

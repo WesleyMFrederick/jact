@@ -100,6 +100,7 @@ graph TB
 - **`extract links` workflow:** _calls_ `citationValidator.validateFile(sourceFile)` to discover and validate links, then _passes_ enriched links to `contentExtractor.extractContent(enrichedLinks, cliFlags)` (asynchronous).
 - **`extract header/file` workflow:** _creates_ synthetic LinkObjects internally (Level 4 implementation detail via LinkObjectFactory helper), _validates_ synthetic links via `citationValidator.validateSingleCitation()`, then _passes_ validated links to `contentExtractor.extractContent()` (asynchronous).
 - _reads and writes_ markdown files directly for the `--fix` operation (synchronous).
+- _uses_ internal SessionCache helper for `extract links --session` cache deduplication via `checkExtractCache()` and `writeExtractCache()` (synchronous).
 - _outputs_ formatted results to stdout/stderr (synchronous).
 
 ##### Boundaries
@@ -114,6 +115,14 @@ The component's primary responsibility is to orchestrate workflow coordination b
 - **Methods**: `createHeaderLink(targetPath, headerName)`, `createFileLink(targetPath)`
 - **Boundaries**: Creates LinkObject structures, handles path normalization, does NOT validate or extract content
 - **Justification**: Factory's only role is adapting CLI string inputs into LinkObject data contract for orchestration workflows
+
+**SessionCache** (Internal Helper):
+- **Purpose**: Session-scoped deduplication for `extract links` via file-based marker cache
+- **Location**: `tools/citation-manager/src/cache/checkExtractCache.ts`
+- **Scope**: Level 4 code detail - internal helper for CLI Orchestrator, NOT a separate Level 3 component
+- **Functions**: `checkExtractCache(sessionId, filePath, cacheDir)`, `writeExtractCache(sessionId, filePath, cacheDir)`
+- **Boundaries**: Checks/writes marker files only, does NOT perform extraction
+- **Implementation Guide**: [SessionCache Component Guide](component-guides/SessionCache%20Component%20Guide.md)
 
 ##### Input Public Contract
 1. **Command-line arguments** (`process.argv`), provided by the user, which define the requested command and its options.
@@ -458,6 +467,8 @@ tools/citation-manager/
 │   ├── MarkdownParser.js            # Parser (MarkdownParser.Output.DataContract)
 │   ├── FileCache.js                 # Filename-to-path resolution cache
 │   ├── ParsedFileCache.js           # Parsed file object cache (US1.5)
+│   ├── cache/
+│   │   └── checkExtractCache.ts     # SessionCache: session dedup marker files (Level 4)
 │   ├── core/
 │   │   └── ContentExtractor/        # ContentExtractor component (US2.2)
 │   │       ├── ContentExtractor.js              # Main orchestrator class
