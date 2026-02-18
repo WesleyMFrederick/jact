@@ -77,4 +77,12 @@ describe("MarkdownParser — Internal Link Extraction (#33)", () => {
     const internalLinks = result.links.filter(l => l.scope === "internal");
     expect(internalLinks.length).toBe(0);
   });
+
+  it("should not extract vscode protocol links", async () => {
+    const content = '[citation-manager.ts](vscode://file//Users/test/tools/citation-manager/src/citation-manager.ts)';
+    const parser = new MarkdownParser(mockFs(content));
+    const result = await parser.parseFile("/test/source.md");
+
+    expect(result.links.length).toBe(0);
+  });
 });
