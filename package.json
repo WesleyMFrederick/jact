@@ -1,12 +1,11 @@
 {
-	"name": "@cc-workflows/citation-manager",
+	"name": "jact",
 	"version": "1.0.0",
-	"description": "Citation link validator and manager for Obsidian markdown files",
+	"description": "Just Another Context Tool - Citation link validator and manager for markdown files",
 	"type": "module",
-	"private": true,
 	"main": "dist/citation-manager.js",
 	"bin": {
-		"citation-manager": "./dist/citation-manager.js"
+		"jact": "./dist/citation-manager.js"
 	},
 	"scripts": {
 		"build": "tsc",
@@ -14,7 +13,14 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"start": "node dist/citation-manager.js",
-		"validate:ts-conversion": "node --loader ts-node/esm scripts/validate-typescript-conversion.ts"
+		"validate:ts-conversion": "node --loader ts-node/esm scripts/validate-typescript-conversion.ts",
+		"citation:validate": "node ./dist/citation-manager.js validate",
+		"citation:ast": "node ./dist/citation-manager.js ast",
+		"citation:base-paths": "sh -c 'node ./dist/citation-manager.js extract links \"$1\" 2>/dev/null | jq -r \".outgoingLinksReport.processedLinks[] | select(.sourceLink.target.path.absolute) | .sourceLink.target.path.absolute\" | sort -u' --",
+		"citation:extract": "node ./dist/citation-manager.js extract links",
+		"citation:extract:content": "sh -c 'node ./dist/citation-manager.js extract links \"$1\" | jq \".extractedContentBlocks\"' --",
+		"citation:extract:header": "sh -c 'node ./dist/citation-manager.js extract header \"$1\" \"$2\"' --",
+		"citation:fix": "node ./dist/citation-manager.js validate --fix"
 	},
 	"keywords": [
 		"citation",

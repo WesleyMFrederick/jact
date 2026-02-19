@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
 import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import { CitationManager } from "../../dist/citation-manager.js";
 
 describe("CitationManager - Component Instantiation", () => {
@@ -22,7 +22,7 @@ describe("CitationManager - extractLinks() Phase 1", () => {
 		const manager = new CitationManager();
 		const sourceFile = join(
 			process.cwd(),
-			"tools/citation-manager/test/fixtures/section-extraction/links.md",
+			"test/fixtures/section-extraction/links.md",
 		);
 
 		// When: Call extractLinks Phase 1
@@ -43,7 +43,7 @@ describe("CitationManager - extractLinks() Phase 2", () => {
 		const manager = new CitationManager();
 		const sourceFile = join(
 			process.cwd(),
-			"tools/citation-manager/test/fixtures/section-extraction/links.md",
+			"test/fixtures/section-extraction/links.md",
 		);
 		const options = { fullFiles: true };
 
@@ -65,7 +65,7 @@ describe("CitationManager - extractLinks() Phase 3", () => {
 		const manager = new CitationManager();
 		const sourceFile = join(
 			process.cwd(),
-			"tools/citation-manager/test/fixtures/section-extraction/links.md",
+			"test/fixtures/section-extraction/links.md",
 		);
 
 		// When: Call extractLinks
@@ -85,7 +85,7 @@ describe("CitationManager - extractHeader()", () => {
 		// Fixture: Use US2.3 plan as realistic test document
 		const targetFile = join(
 			process.cwd(),
-			"tools/citation-manager/test/fixtures/us2.3-implement-extract-links-subcommand-implement-plan.md",
+			"test/fixtures/us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
 		const headerName =
 			"Task 10: CitationManager - extractLinks() Phase 1 Validation";

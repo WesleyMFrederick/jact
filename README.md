@@ -1,6 +1,6 @@
-# Citation Manager
+# jact - Just Another Context Tool
 
-A citation validation and management tool for markdown files that enforces Obsidian-friendly cross-document links and proper anchor patterns. Features comprehensive three-tier validation with enhanced warning detection and automated citation correction capabilities.
+A citation validation and management tool for markdown files that enforces cross-document links and proper anchor patterns. Features comprehensive three-tier validation with enhanced warning detection and automated citation correction capabilities.
 
 ## Installation
 
@@ -9,14 +9,14 @@ A citation validation and management tool for markdown files that enforces Obsid
 npm install
 
 # Build TypeScript and link CLI globally
-npm run build -w tools/citation-manager
-npm link -w tools/citation-manager
+npm run build
+npm link
 
 # Verify CLI is available
-citation-manager --help
+jact --help
 ```
 
-> **Note:** Source is TypeScript (`src/*.ts`), compiled to `dist/*.js`. After any TS changes, re-run `npm run build -w tools/citation-manager` to update the CLI. The `citation-validator.sh` hook depends on the global `citation-manager` binary being current.
+> **Note:** Source is TypeScript (`src/*.ts`), compiled to `dist/*.js`. After any TS changes, re-run `npm run build` to update the CLI.
 
 ## Features
 
@@ -80,7 +80,7 @@ npm run citation:validate path/to/file.md -- --lines 148-160 --scope /path/to/pr
 npm run citation:validate path/to/file.md -- --fix --scope /path/to/project/docs
 
 # Direct CLI usage
-# node utility-scripts/citation-links/citation-manager.js validate path/to/file.md --lines 157 --scope /path/to/docs
+# node utility-scripts/citation-links/jact.js validate path/to/file.md --lines 157 --scope /path/to/docs
 ```
 
 ### Enhanced Fix Command
@@ -98,7 +98,7 @@ npm run citation:validate path/to/file.md -- --fix --dry-run --scope /path/to/pr
 npm run citation:validate path/to/file.md -- --fix --format json --scope /path/to/project/docs
 
 # Direct CLI usage with enhanced options
-node utility-scripts/citation-links/citation-manager.js validate path/to/file.md --fix --backup --scope /path/to/docs
+node utility-scripts/citation-links/jact.js validate path/to/file.md --fix --backup --scope /path/to/docs
 ```
 
 ### View AST and Extracted Data
@@ -108,7 +108,7 @@ node utility-scripts/citation-links/citation-manager.js validate path/to/file.md
 npm run citation:ast path/to/file.md
 
 # Direct CLI usage
-node utility-scripts/citation-links/citation-manager.js ast path/to/file.md
+node utility-scripts/citation-links/jact.js ast path/to/file.md
 ```
 
 ### Extract Base Paths (Facade Pattern)
@@ -130,13 +130,13 @@ Extract entire file content directly without requiring a source document contain
 
 ```bash
 # Extract complete file content
-node tools/citation-manager/src/citation-manager.js extract file docs/architecture.md
+node tools/jact/src/jact.js extract file docs/architecture.md
 
 # Extract with scope restriction for filename resolution
-node tools/citation-manager/src/citation-manager.js extract file architecture.md --scope ./docs
+node tools/jact/src/jact.js extract file architecture.md --scope ./docs
 
 # Pipe output to jq for content filtering
-node tools/citation-manager/src/citation-manager.js extract file file.md | jq '.extractedContentBlocks'
+node tools/jact/src/jact.js extract file file.md | jq '.extractedContentBlocks'
 ```
 
 **Output Format**: JSON OutgoingLinksExtractedContent structure with deduplicated content blocks

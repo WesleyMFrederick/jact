@@ -5,7 +5,7 @@ import { runCLI } from "../helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const workspaceRoot = join(__dirname, "..", "..", "..", "..");
+const workspaceRoot = join(__dirname, "..", "..");
 
 /**
  * US2.7: Base-Paths NPM Script Integration Tests
