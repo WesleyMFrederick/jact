@@ -410,7 +410,9 @@ export class CitationValidator {
 
 		// Check if target resolves to a directory (folder link detection)
 		// Use targetPath (resolved) as authoritative; fall back to standardPath only when targetPath doesn't exist
-		const directoryCheckPath = existsSync(targetPath) ? targetPath : standardPath;
+		const directoryCheckPath = existsSync(targetPath)
+			? targetPath
+			: standardPath;
 		if (this.isDirectory(directoryCheckPath)) {
 			return this.createValidationResult(
 				citation,
@@ -449,6 +451,14 @@ export class CitationValidator {
 									"error",
 									`Anchor not found: #${citation.target.anchor}`,
 									`${anchorExists.suggestion} (Note: ${cacheResult.message})`,
+								);
+							}
+							if (anchorExists.matchedAs === "block-ref-missing-caret") {
+								return this.createValidationResult(
+									citation,
+									"warning",
+									null,
+									anchorExists.suggestion,
 								);
 							}
 						}
@@ -493,6 +503,14 @@ export class CitationValidator {
 									citation,
 									status,
 									combinedMessage,
+									anchorExists.suggestion,
+								);
+							}
+							if (anchorExists.matchedAs === "block-ref-missing-caret") {
+								return this.createValidationResult(
+									citation,
+									"warning",
+									null,
 									anchorExists.suggestion,
 								);
 							}
@@ -585,6 +603,16 @@ export class CitationValidator {
 					anchorExists.suggestion,
 				);
 			}
+
+			// Issue #81: Warn when block anchor matched without caret prefix
+			if (anchorExists.matchedAs === "block-ref-missing-caret") {
+				return this.createValidationResult(
+					citation,
+					"warning",
+					null,
+					anchorExists.suggestion,
+				);
+			}
 		}
 
 		// Return warning with path conversion suggestion if cross-directory
@@ -646,6 +674,20 @@ export class CitationValidator {
 				citation,
 				"error",
 				`Anchor not found: #${anchor}`,
+				anchorExists.suggestion,
+			);
+		}
+
+		// Issue #81: Warn when block anchor matched without caret prefix
+		// Skip for caret-ref definitions (^anchor) — they ARE the block anchor, not a reference
+		if (
+			anchorExists.matchedAs === "block-ref-missing-caret" &&
+			!citation.fullMatch.startsWith("^")
+		) {
+			return this.createValidationResult(
+				citation,
+				"warning",
+				null,
 				anchorExists.suggestion,
 			);
 		}
@@ -725,6 +767,7 @@ export class CitationValidator {
 	private async validateAnchorExists(
 		anchor: string,
 		targetFile: string,
+		options?: { isBlockRef?: boolean },
 	): Promise<{ valid: boolean; suggestion?: string; matchedAs?: string }> {
 		try {
 			const targetParsedDoc =
@@ -732,6 +775,26 @@ export class CitationValidator {
 
 			// Direct match - use facade method
 			if (targetParsedDoc.hasAnchor(anchor)) {
+				// Check if this matched a block anchor without caret prefix (Issue #81)
+				// Return valid with warning — the link resolves but should use #^anchor format
+				if (!anchor.startsWith("^") && !options?.isBlockRef) {
+					const matchedBlockAnchor = targetParsedDoc.data.anchors.find(
+						(a) => a.anchorType === "block" && a.id === anchor,
+					);
+					if (matchedBlockAnchor) {
+						const hasHeaderMatch = targetParsedDoc.data.anchors.some(
+							(a) => a.anchorType === "header" && a.id === anchor,
+						);
+						if (!hasHeaderMatch) {
+							return {
+								valid: true,
+								matchedAs: "block-ref-missing-caret",
+								suggestion: `Use #^${anchor} for block anchor references`,
+							};
+						}
+					}
+				}
+
 				// Check if this is a kebab-case anchor that has a raw header equivalent
 				const obsidianBetterSuggestion = this.suggestObsidianBetterFormat(
 					anchor,
@@ -900,6 +963,10 @@ export class CitationValidator {
 			.replace(/\*/g, "") // Remove italic markers
 			.replace(/==([^=]+)==/g, "$1") // Remove highlight markers
 			.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Remove links, keep text
+			.replace(/:/g, " ") // Colon → space (matches Obsidian heading anchor behavior)
+			.replace(/\\/g, "") // Strip backslash escape chars
+			.replace(/[\[\]]/g, "") // Strip lone bracket chars
+			.replace(/ {2,}/g, " ") // Collapse multiple spaces
 			.trim();
 	}
 
