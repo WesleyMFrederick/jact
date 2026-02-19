@@ -20,7 +20,8 @@
 		"citation:extract": "node ./dist/citation-manager.js extract links",
 		"citation:extract:content": "sh -c 'node ./dist/citation-manager.js extract links \"$1\" | jq \".extractedContentBlocks\"' --",
 		"citation:extract:header": "sh -c 'node ./dist/citation-manager.js extract header \"$1\" \"$2\"' --",
-		"citation:fix": "node ./dist/citation-manager.js validate --fix"
+		"citation:fix": "node ./dist/citation-manager.js validate --fix",
+		"postinstall": "git submodule update --init --recursive"
 	},
 	"keywords": [
 		"citation",
@@ -35,7 +36,10 @@
 		"marked": "^17.0.1"
 	},
 	"devDependencies": {
+		"@biomejs/biome": "^2.4.3",
 		"@types/node": "^24.10.1",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.9.3",
 		"vitest": "^3.2.4"
 	}
 }
