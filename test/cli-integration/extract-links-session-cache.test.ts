@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-const CLI_PATH = join(__dirname, "../../dist/citation-manager.js");
+const CLI_PATH = join(__dirname, "../../dist/jact.js");
 
 describe("extract links --session (cache integration)", () => {
 	let testDir: string;

@@ -90,7 +90,7 @@ describe("ParsedDocument Content Extraction", () => {
 			// Then: Should extract the correct section
 			expect(section).not.toBeNull();
 			expect(section).toContain("## Overview (tl;dr)");
-			expect(section).toContain("Citation Manager"); // Content from the section
+			expect(section).toContain("**Baseline:**"); // Content from the section
 			expect(section).not.toContain("## Goals"); // Next level 2 section
 		});
 

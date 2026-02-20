@@ -1,13 +1,13 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { CitationManager } from "../../dist/citation-manager.js";
+import { JactCli } from "../../dist/jact.js";
 
-describe("CitationManager - Component Instantiation", () => {
+describe("JactCli - Component Instantiation", () => {
 	it("should instantiate ContentExtractor via factory", () => {
-		// Given: CitationManager constructor
+		// Given: JactCli constructor
 
-		// When: Create CitationManager instance
-		const manager = new CitationManager();
+		// When: Create JactCli instance
+		const manager = new JactCli();
 
 		// Then: ContentExtractor created and accessible
 		// Verification: Factory wiring complete
@@ -15,11 +15,11 @@ describe("CitationManager - Component Instantiation", () => {
 	});
 });
 
-describe("CitationManager - extractLinks() Phase 1", () => {
+describe("JactCli - extractLinks() Phase 1", () => {
 	it("should validate source file and extract enriched links", async () => {
-		// Given: CitationManager and source file with links
+		// Given: JactCli and source file with links
 		const consoleSpy = vi.spyOn(console, "log");
-		const manager = new CitationManager();
+		const manager = new JactCli();
 		const sourceFile = join(
 			process.cwd(),
 			"test/fixtures/section-extraction/links.md",
@@ -36,11 +36,11 @@ describe("CitationManager - extractLinks() Phase 1", () => {
 	});
 });
 
-describe("CitationManager - extractLinks() Phase 2", () => {
+describe("JactCli - extractLinks() Phase 2", () => {
 	it("should pass enriched links to ContentExtractor with CLI flags", async () => {
 		// Given: Source file and fullFiles flag
 		const consoleSpy = vi.spyOn(console, "log");
-		const manager = new CitationManager();
+		const manager = new JactCli();
 		const sourceFile = join(
 			process.cwd(),
 			"test/fixtures/section-extraction/links.md",
@@ -58,11 +58,11 @@ describe("CitationManager - extractLinks() Phase 2", () => {
 	});
 });
 
-describe("CitationManager - extractLinks() Phase 3", () => {
+describe("JactCli - extractLinks() Phase 3", () => {
 	it("should output OutgoingLinksExtractedContent JSON to stdout", async () => {
 		// Given: Console.log spy
 		const consoleSpy = vi.spyOn(console, "log");
-		const manager = new CitationManager();
+		const manager = new JactCli();
 		const sourceFile = join(
 			process.cwd(),
 			"test/fixtures/section-extraction/links.md",
@@ -80,7 +80,7 @@ describe("CitationManager - extractLinks() Phase 3", () => {
 	});
 });
 
-describe("CitationManager - extractHeader()", () => {
+describe("JactCli - extractHeader()", () => {
 	it("should orchestrate synthetic link creation, validation, and extraction", async () => {
 		// Fixture: Use US2.3 plan as realistic test document
 		const targetFile = join(
@@ -90,8 +90,8 @@ describe("CitationManager - extractHeader()", () => {
 		const headerName =
 			"Task 10: CitationManager - extractLinks() Phase 1 Validation";
 
-		// Given: CitationManager with real components
-		const manager = new CitationManager();
+		// Given: JactCli with real components
+		const manager = new JactCli();
 
 		// When: Extract specific header from target file
 		const result = await manager.extractHeader(targetFile, headerName, {});

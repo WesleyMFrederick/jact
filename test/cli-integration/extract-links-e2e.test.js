@@ -9,7 +9,7 @@ describe("Extract Links - End-to-End Integration", () => {
 
 		// When: Execute extract links with --full-files flag
 		const output = execSync(
-			`node dist/citation-manager.js extract links "${sourceFile}" --full-files`,
+			`node dist/jact.js extract links "${sourceFile}" --full-files`,
 			{ encoding: "utf8" },
 		);
 

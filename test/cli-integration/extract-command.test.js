@@ -9,17 +9,17 @@ const FIXTURES_DIR = join(__dirname, "..", "fixtures");
 
 describe("Extract Command - Infrastructure", () => {
 	it("should register extract links command with Commander", () => {
-		// Given: citation-manager CLI
+		// Given: jact CLI
 
 		// When: Request help for extract links command
 		const output = execSync(
-			"node dist/citation-manager.js extract links --help",
+			"node dist/jact.js extract links --help",
 			{ encoding: "utf8" },
 		);
 
 		// Then: Extract links command help displays
 		// Verification: Commander registered extract links command
-		expect(output).toContain("Usage: citation-manager extract links");
+		expect(output).toContain("Usage: jact extract links");
 		expect(output).toContain("<source-file>");
 		expect(output).toContain(
 			"Extract content from all links in source document",
@@ -29,16 +29,16 @@ describe("Extract Command - Infrastructure", () => {
 
 describe("Extract Links Subcommand - Registration", () => {
 	it("should register extract links subcommand with required arguments", () => {
-		// Given: citation-manager CLI with extract command
+		// Given: jact CLI with extract command
 
 		// When: Request help for extract links
 		const output = execSync(
-			"node dist/citation-manager.js extract links --help",
+			"node dist/jact.js extract links --help",
 			{ encoding: "utf8" },
 		);
 
 		// Then: Subcommand help displays with arguments and options
-		expect(output).toContain("citation-manager extract links");
+		expect(output).toContain("jact extract links");
 		expect(output).toContain("<source-file>");
 		expect(output).toContain("--scope <folder>");
 		expect(output).toContain("--format <type>");
@@ -47,18 +47,18 @@ describe("Extract Links Subcommand - Registration", () => {
 });
 
 describe("Extract Links - CLI Orchestration", () => {
-	it("should call CitationManager.extractLinks() from CLI action", () => {
+	it("should call JactCli.extractLinks() from CLI action", () => {
 		// Given: Test fixture with valid links
 		const fixtureFile = join(FIXTURES_DIR, "section-extraction", "links.md");
 
 		// When: Execute extract links command
 		const output = execSync(
-			`node dist/citation-manager.js extract links ${fixtureFile}`,
+			`node dist/jact.js extract links ${fixtureFile}`,
 			{ encoding: "utf8" },
 		);
 
 		// Then: JSON output returned
-		// Verification: CLI wired to CitationManager method
+		// Verification: CLI wired to JactCli method
 		const result = JSON.parse(output);
 		expect(result.extractedContentBlocks).toBeDefined();
 		expect(result.outgoingLinksReport).toBeDefined();
@@ -77,7 +77,7 @@ describe("Extract Links - Validation Error Reporting", () => {
 		let output;
 		try {
 			output = execSync(
-				`node dist/citation-manager.js extract links "${fixtureFile}" 2>&1`,
+				`node dist/jact.js extract links "${fixtureFile}" 2>&1`,
 				{ encoding: "utf8" },
 			);
 		} catch (error) {
@@ -100,7 +100,7 @@ describe("Extract Links - Full Files Flag", () => {
 
 		// When: Execute with --full-files flag
 		const output = execSync(
-			`node dist/citation-manager.js extract links "${fixtureFile}" --full-files`,
+			`node dist/jact.js extract links "${fixtureFile}" --full-files`,
 			{ encoding: "utf8" },
 		);
 
@@ -121,7 +121,7 @@ describe("Extract Links - Full Files Flag", () => {
 		let output;
 		try {
 			output = execSync(
-				`node dist/citation-manager.js extract links "${fixtureFile}"`,
+				`node dist/jact.js extract links "${fixtureFile}"`,
 				{ encoding: "utf8" },
 			);
 		} catch (error) {
@@ -142,7 +142,7 @@ describe("Extract Links - Exit Codes", () => {
 
 		// When: Execute extract links command and check exit code
 		const result = execSync(
-			`node dist/citation-manager.js extract links "${fixtureFile}" > /dev/null 2>&1; echo $?`,
+			`node dist/jact.js extract links "${fixtureFile}" > /dev/null 2>&1; echo $?`,
 			{ encoding: "utf8" },
 		);
 
@@ -157,7 +157,7 @@ describe("Extract Links - Exit Codes", () => {
 
 		// When: Execute extract links command without --full-files flag
 		const result = execSync(
-			`node dist/citation-manager.js extract links "${fixtureFile}" > /dev/null 2>&1; echo $?`,
+			`node dist/jact.js extract links "${fixtureFile}" > /dev/null 2>&1; echo $?`,
 			{ encoding: "utf8" },
 		);
 
@@ -169,11 +169,11 @@ describe("Extract Links - Exit Codes", () => {
 
 describe("Extract Command - Help Documentation", () => {
 	it("should display comprehensive help for extract command", () => {
-		// Given: citation-manager CLI
+		// Given: jact CLI
 
 		// When: Request help for extract command
 		const output = execSync(
-			"node dist/citation-manager.js extract --help",
+			"node dist/jact.js extract --help",
 			{ encoding: "utf8" },
 		);
 
@@ -187,16 +187,16 @@ describe("Extract Command - Help Documentation", () => {
 
 describe("Extract Links - Help Documentation", () => {
 	it("should display detailed help for extract links subcommand", () => {
-		// Given: citation-manager CLI
+		// Given: jact CLI
 
 		// When: Request help for extract links
 		const output = execSync(
-			"node dist/citation-manager.js extract links --help",
+			"node dist/jact.js extract links --help",
 			{ encoding: "utf8" },
 		);
 
 		// Then: Help includes usage, options, examples, and exit codes
-		expect(output).toContain("Usage: citation-manager extract links");
+		expect(output).toContain("Usage: jact extract links");
 		expect(output).toContain("Options:");
 		expect(output).toContain("--scope");
 		expect(output).toContain("--full-files");

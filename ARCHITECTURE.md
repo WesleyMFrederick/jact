@@ -1,7 +1,7 @@
 # CC Workflows Workspace - Architecture
 
 <critical-instruction>
-**Critial LLM Initialization Instructions**: When first reading this file, you MUST IMMEDIATELY run citation manager to extract base paths: `npm run citation:extract:content {{this-file-path}}`
+**Critial LLM Initialization Instructions**: When first reading this file, you MUST IMMEDIATELY run jact to extract base paths: `npm run jact:extract:content {{this-file-path}}`
 </critical-instruction>
 
 **Purpose**:
@@ -46,7 +46,7 @@ Read [ARCHITECTURE-PRINCIPLES](ARCHITECTURE-PRINCIPLES.md) %% force-extract %%
 
 ### Architectural and System Design
 
-- **Architecture Pattern:** Monorepo (multi-package workspace) — a single repo acting as a [centralized, single source of truth](ARCHITECTURE-PRINCIPLES.md#^foundation-reuse) for multiple, distinct development utilities. The first tool is the `citation-manager`.
+- **Architecture Pattern:** Monorepo (multi-package workspace) — a single repo acting as a [centralized, single source of truth](ARCHITECTURE-PRINCIPLES.md#^foundation-reuse) for multiple, distinct development utilities. The first tool is the `jact`.
 
 - **System Design:** tooling monorepo hosting a multi-command CLI with shared packages for test/build. This is a toolkit of independent tools that consume common services like [testing (FR2)](design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-prd.md#^FR2)and [builds (FR3)](design-docs/features/20250928-cc-workflows-workspace-scaffolding/cc-workflows-workspace-prd.md#^FR3)—not a single linear pipeline.
 
@@ -58,7 +58,7 @@ Read [ARCHITECTURE-PRINCIPLES](ARCHITECTURE-PRINCIPLES.md) %% force-extract %%
 
 ### Key Software Design Patterns
 
-- [**Modular Component Design**](ARCHITECTURE-PRINCIPLES.md#^modular-design-principles-definition): - each tool (e.g., citation-manager) is isolated for independent evolution and migration, while shared utilities live in shared packages.
+- [**Modular Component Design**](ARCHITECTURE-PRINCIPLES.md#^modular-design-principles-definition): - each tool (e.g., jact) is isolated for independent evolution and migration, while shared utilities live in shared packages.
 
 ### Key Characteristics
 - **Primary Language**: TypeScript with strict type checking, compiled to JavaScript for execution
@@ -139,7 +139,7 @@ graph LR
             direction TB
             style tools fill:transparent, stroke:#555555
 
-            toolPackages["<div style='font-weight: bold'>Tool Packages</div><div style='font-size: 85%; margin-top: 0px'>[Node.js, Commander]</div><div style='font-size: 85%; margin-top:10px'>CLI tools for workflow automation (citation-manager, etc.)</div>"]
+            toolPackages["<div style='font-weight: bold'>Tool Packages</div><div style='font-size: 85%; margin-top: 0px'>[Node.js, Commander]</div><div style='font-size: 85%; margin-top:10px'>CLI tools for workflow automation (jact, etc.)</div>"]
             style toolPackages fill:#438dd5,stroke:#2e6295,color:#ffffff
         end
 
@@ -197,7 +197,7 @@ graph LR
   - Markdown validation and processing
   - Content transformation and extraction
   - Code analysis and formatting
-  - _Citation Manager is the first production tool in this container_
+  - _JACT is the first production tool in this container_
 - **User Value:** Reusable, type-safe, tested tools vs. scattered, inconsistent scripts across projects
 - **Interactions:**
   - _is used by_ Developer and AI Assistants
@@ -208,7 +208,7 @@ graph LR
 
 Component-level architecture (C4 Level 3) is defined within each tool's own architecture documentation, not at the workspace level. This approach enforces our **Modular Design Principles** by treating each tool as a self-contained container, keeping the workspace architecture focused on system-level boundaries.
 
-See the [content-aggregation-architecture](tools/citation-manager/design-docs/.archive/features/20251003-content-aggregation/content-aggregation-architecture.md)  for a reference implementation.
+See the [content-aggregation-architecture](tools/jact/design-docs/.archive/features/20251003-content-aggregation/content-aggregation-architecture.md)  for a reference implementation.
 
 ---
 ## Component Interfaces and Data Contracts
@@ -232,7 +232,7 @@ cc-workflows/
 ├── packages/                         # Shared, reusable libraries (e.g., common utilities)
 │   └── shared-utils/               # (Future) For code shared between multiple tools
 ├── tools/                            # Houses the individual, isolated CLI tools
-│   └── citation-manager/             # The first tool being migrated into the workspace
+│   └── jact/             # The first tool being migrated into the workspace
 │       ├── src/                      # Source code for the tool
 │       ├── test/                     # Tests specific to the tool
 │       └── package.json              # Tool-specific dependencies and scripts
@@ -259,7 +259,7 @@ design-docs/                           # Workspace-level (cross-cutting)
 **Tool-specific location (for comparison):**
 
 ```plaintext
-tools/citation-manager/
+tools/jact/
 └── design-docs/                       # Tool-specific features
     └── features/
         └── {{YYYYMMDD}}-{{feature-name}}/
@@ -293,7 +293,7 @@ The workspace supports two documentation patterns based on feature complexity:
 ##### Directory Structure
 
 ```plaintext
-tools/citation-manager/
+tools/jact/
 ├── design-docs/                      # Tool-level design documentation
 │   ├── Overview.md                   # Tool baseline overview
 │   ├── Principles.md                 # Tool-specific principles
@@ -328,7 +328,7 @@ tools/citation-manager/
 
 ##### Core File Types
 
-- **Tool Scripts**: Executable entry points for tools must use **`kebab-case.ts`** (e.g., `citation-manager.ts`)
+- **Tool Scripts**: Executable entry points for tools must use **`kebab-case.ts`** (e.g., `jact.ts`)
 - **Source Modules**: Implementation files should use **`camelCase.ts`** following transformation naming (e.g., `parseMarkdown.ts`, `validateCitations.ts`, `generateReport.ts`)
 - **Data Contracts**: Type definition files use **`camelCase.ts`** with `Types` suffix (e.g., `citationTypes.ts`, `validationTypes.ts`)
 - **Test Files**: Test files mirror the module name with **`.test.ts`** suffix (e.g., `parseMarkdown.test.ts`)
@@ -491,7 +491,7 @@ This project follows JavaScript/TypeScript naming conventions with one strategic
 This project follows TypeScript naming conventions aligned with our [Action-Based File Organization](ARCHITECTURE-PRINCIPLES.md#^action-based-file-organization-definition) principle.
 
 - **Files**: File naming depends on purpose:
-  - **Tool Scripts** (executable entry points): Use **kebab-case.ts** (e.g., `citation-manager.ts`, `ask-enhanced.ts`)
+  - **Tool Scripts** (executable entry points): Use **kebab-case.ts** (e.g., `jact.ts`, `ask-enhanced.ts`)
   - **Implementation Modules** (transformation operations): Use **camelCase.ts** named by their primary transformation (e.g., `parseMarkdown.ts`, `validateCitations.ts`, `extractContent.ts`)
   - **Rationale**: File names describe operations that transform data, following [Transformation Naming](ARCHITECTURE-PRINCIPLES.md#^transformation-naming)
 
@@ -628,7 +628,7 @@ Our strategy distinguishes between cross-cutting workspace functionality and too
 - **Scope**: Validation of tool-specific functionality and user story acceptance criteria.
 - **Goal**: To **prove the tool's functionality works as specified**. Treat the tool as a system and verify it produces expected results.
 - **Investment**: Minimal and focused, adhering to the lean **0.3:1 to 0.5:1 test-to-code ratio.**
-- **Reference Implementation**: See citation-manager test suite as the established pattern for tool-level testing.
+- **Reference Implementation**: See jact test suite as the established pattern for tool-level testing.
 
 ### Test Implementation and Conventions
 
@@ -709,7 +709,7 @@ import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { describe, test } from 'node:test';
 
-describe('Citation Manager Integration Tests', () => {
+describe('JACT Integration Tests', () => {
   test('should validate citations in valid-citations.md successfully', async () => {
     // Given: A markdown file with valid citations exists in test fixtures
     const testFile = join(__dirname, 'fixtures', 'valid-citations.md');
@@ -744,7 +744,7 @@ describe('Citation Manager Integration Tests', () => {
 - Reserve subprocess testing for true E2E scenarios (argument parsing, exit codes)
 - Aligns test architecture with production architecture (both use same code path)
 
-**Reference**: [Bug 3: Buffer Limit Resolution](tools/citation-manager/design-docs/.archive/features/20251003-content-aggregation/user-stories/us1.8-implement-validation-enrichment-pattern/bug3-buffer-limit-resolution.md)
+**Reference**: [Bug 3: Buffer Limit Resolution](tools/jact/design-docs/.archive/features/20251003-content-aggregation/user-stories/us1.8-implement-validation-enrichment-pattern/bug3-buffer-limit-resolution.md)
 
 ###### CLI Testing: stdout/stderr Separation Pattern
 
@@ -766,20 +766,20 @@ The `cli-runner.ts` helper supports both capture modes:
 ```typescript
 // For JSON output - capture only stdout (default: captureStderr=true)
 const output = runCLI(
-  `node dist/citation-manager.js validate file.md --format json`,
+  `node dist/jact.js validate file.md --format json`,
   { captureStderr: false }  // Don't mix stderr into stdout
 );
 const result = JSON.parse(output); // Clean JSON parsing
 
 // For text output - capture both streams
 const output = runCLI(
-  `node citation-manager.js validate file.md`,
+  `node jact.js validate file.md`,
   { captureStderr: true }  // Merge stderr for full output
 );
 expect(output).toContain('Validation errors found'); // Check errors
 ```
 
-**Example - Citation Manager**:
+**Example - JACT**:
 
 ```javascript
 // Production code correctly separates streams
@@ -800,7 +800,7 @@ it('should validate with JSON format', () => {
 
   // When: Execute with JSON format (stderr not captured)
   const output = runCLI(
-    `node citation-manager.js validate "${testFile}" --format json`,
+    `node jact.js validate "${testFile}" --format json`,
     { captureStderr: false }
   );
 
@@ -810,18 +810,18 @@ it('should validate with JSON format', () => {
 });
 ```
 
-**Rationale**: This pattern matches real-world usage where users pipe JSON to other tools (`citation-manager validate file.md --format json | jq .summary`) or redirect output (`citation-manager validate file.md > report.txt 2> errors.log`). Tests must verify this separation works correctly.
+**Rationale**: This pattern matches real-world usage where users pipe JSON to other tools (`jact validate file.md --format json | jq .summary`) or redirect output (`jact validate file.md > report.txt 2> errors.log`). Tests must verify this separation works correctly.
 
 ##### Component Integration Testing (DI Required)
 
 When testing component collaboration, use constructor dependency injection to pass in real dependencies (not mocks).
 
-**Note:** This example represents the target architecture after refactoring citation-manager to implement DI ([technical debt](<tools/citation-manager/design-docs/.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Dependency Management>)) and factory pattern ([mitigation strategy](#Constructor-Based%20DI%20Wiring%20Overhead)).
+**Note:** This example represents the target architecture after refactoring jact to implement DI ([technical debt](<tools/jact/design-docs/.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Dependency Management>)) and factory pattern ([mitigation strategy](#Constructor-Based%20DI%20Wiring%20Overhead)).
 
 **Production Code - USES Factory:**
 
 ```javascript
-// File: tools/citation-manager/src/citation-manager.js (CLI entry point)
+// File: tools/jact/src/jact.js (CLI entry point)
 import { createCitationValidator } from './factories/componentFactory.js';
 
 const validator = createCitationValidator(scopeDirectory);
@@ -832,7 +832,7 @@ const results = await validator.validateFile(filePath);
 Use factory as the default. This aligns with our integraiton testing strategy
 
 ```javascript
-// File: tools/citation-manager/test/validation.test.js
+// File: tools/jact/test/validation.test.js
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { createCitationValidator } from '../src/factories/componentFactory.js';
@@ -858,7 +858,7 @@ describe('CitationValidator Integration Tests', () => {
 Use only when you need to mock a dependency for more comprehensive unit testing (i.e. a cross cutting concern). Otherwise, we favor integration testing to deliver quickly.
 
 ```javascript
-// File: tools/citation-manager/test/validation.test.js
+// File: tools/jact/test/validation.test.js
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CitationValidator } from '../src/CitationValidator.js';
@@ -894,13 +894,13 @@ describe('CitationValidator Integration Tests', () => {
 
 **The ONLY difference:** How the validator is created. The factory just wires dependencies - assertions are identical.
 
-**Factory Location:** Tool-level (`tools/citation-manager/src/factories/`). Only promotes to workspace-level when multiple tools share component instantiation patterns.
+**Factory Location:** Tool-level (`tools/jact/src/factories/`). Only promotes to workspace-level when multiple tools share component instantiation patterns.
 
 **Key Distinction:** CLI tests use `execSync()` to test from outside (no DI needed). Component tests use constructor injection to validate collaboration with real dependencies (DI required).
 
 ### Citation-Manager: Reference Test Structure
 
-The citation-manager tool provides the established pattern for tool-level testing within the workspace. See [Citation Manager Testing Strategy](<tools/citation-manager/design-docs/.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Testing Strategy>) for complete test structure and principles.
+The jact tool provides the established pattern for tool-level testing within the workspace. See [JACT Testing Strategy](<tools/jact/design-docs/.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Testing Strategy>) for complete test structure and principles.
 
 ---
 
@@ -1017,9 +1017,9 @@ The workspace provides a **shared Vitest testing framework** that discovers and 
 
 The workspace establishes a consistent pattern for executing tool CLIs through **root-level npm scripts**, providing centralized command discovery and parameter passing.
 
-- **Root Script Orchestration**: The root `package.json` defines npm scripts that execute workspace package CLIs from compiled output via `node` commands (e.g., `"citation:validate": "node tools/citation-manager/dist/citation-manager.js validate"`). This makes all tool commands discoverable via `npm run`.
+- **Root Script Orchestration**: The root `package.json` defines npm scripts that execute workspace package CLIs from compiled output via `node` commands (e.g., `"jact:validate": "node tools/jact/dist/jact.js validate"`). This makes all tool commands discoverable via `npm run`.
 - **Compilation Requirement**: Tools must be compiled (`npm run build`) before execution, as CLIs run from `dist/` directories containing compiled JavaScript.
-- **Parameter Passing**: CLI arguments are passed to the target script using the standard `--` separator convention (e.g., `npm run citation:validate -- file.md`).
+- **Parameter Passing**: CLI arguments are passed to the target script using the standard `--` separator convention (e.g., `npm run jact:validate -- file.md`).
 
 #### Bin Configuration (TypeScript Tools)
 
@@ -1032,7 +1032,7 @@ TypeScript tools configure their `bin` field to point directly to the compiled o
 **Implementation:**
 
 ```typescript
-// src/citation-manager.ts (source)
+// src/jact.ts (source)
 #!/usr/bin/env node
 // CLI implementation
 ```
@@ -1041,12 +1041,12 @@ TypeScript tools configure their `bin` field to point directly to the compiled o
 
 ```json
 {
-  "main": "dist/src/citation-manager.js",
+  "main": "dist/src/jact.js",
   "bin": {
-    "citation-manager": "./dist/src/citation-manager.js"
+    "jact": "./dist/src/jact.js"
   },
   "scripts": {
-    "postbuild": "chmod +x dist/src/citation-manager.js"
+    "postbuild": "chmod +x dist/src/jact.js"
   }
 }
 ```
@@ -1058,7 +1058,7 @@ TypeScript tools configure their `bin` field to point directly to the compiled o
 - Postbuild script ensures executable permissions
 
 **Test Pattern:**
-Tests reference the dist file directly (e.g., `node tools/citation-manager/dist/src/citation-manager.js --help`)
+Tests reference the dist file directly (e.g., `node tools/jact/dist/src/jact.js --help`)
 
 ### Error Handling and Logging
 
@@ -1074,7 +1074,7 @@ Use **Dependency Injection (DI)** as a foundational pattern to achieve a modular
 
 While DI makes it possible to inject mock dependencies for isolated unit testing, our testing philosophy explicitly prioritizes integration tests that verify real component interactions. Therefore, the workspace adheres to the **"Real Systems, Fake Fixtures"** principle, which includes a **"zero-tolerance policy for mocking"** application components. Our strategy is to use DI to inject _real_ dependencies during testing to gain the highest confidence that our components work together correctly.
 
-For example, the `CitationValidator` should receive its `MarkdownParser` dependency via its constructor. During testing, we will pass in the _real_ `MarkdownParser` to ensure the validation logic works with the actual parsing output. This gives us confidence that the integrated system functions as expected. The existing `citation-manager` code, which does not fully use DI, has been [identified as technical debt](<tools/citation-manager/design-docs/.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Dependency Management>) to be refactored to align with this principle.
+For example, the `CitationValidator` should receive its `MarkdownParser` dependency via its constructor. During testing, we will pass in the _real_ `MarkdownParser` to ensure the validation logic works with the actual parsing output. This gives us confidence that the integrated system functions as expected. The existing `jact` code, which does not fully use DI, has been [identified as technical debt](<tools/jact/design-docs/.archive/features/20251003-content-aggregation/content-aggregation-architecture.md#Dependency Management>) to be refactored to align with this principle.
 
 ### Tool Distribution and Linking
 
@@ -1094,20 +1094,20 @@ The npm link pattern creates symlinks in two steps:
 1. **Create Global Link** (from tool directory):
 
    ```bash
-   cd /path/to/cc-workflows/tools/citation-manager
+   cd /path/to/cc-workflows/tools/jact
    npm link
    ```
 
-   Creates symlink: `/opt/homebrew/lib/node_modules/@cc-workflows/citation-manager` → tool directory
+   Creates symlink: `/opt/homebrew/lib/node_modules/@cc-workflows/jact` → tool directory
 
 2. **Link to External Project** (from consuming project):
 
    ```bash
    cd /path/to/external-project
-   npm link "@cc-workflows/citation-manager"
+   npm link "@cc-workflows/jact"
    ```
 
-   Creates symlink: `node_modules/@cc-workflows/citation-manager` → global package
+   Creates symlink: `node_modules/@cc-workflows/jact` → global package
 
 **Result:** Changes to the tool in cc-workflows workspace are immediately available in the external project without rebuilding or republishing.
 
@@ -1116,7 +1116,7 @@ The npm link pattern creates symlinks in two steps:
 **Technical Implementation:** Workspace tools must properly detect when executed via symlink (npm link or `node_modules/.bin`). The CLI entry point uses `realpathSync()` to resolve symlinks before comparing execution paths:
 
 ```javascript
-// citation-manager.js
+// jact.js
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -1145,7 +1145,7 @@ if (import.meta.url === realPathAsUrl) {
 
 - **Status**: Accepted
 - **Date**: 2025-09-25
-- **Context**: The project requires a monorepo structure to centralize multiple development tools and eliminate code duplication, starting with the `citation-manager`. The solution needed to have low initial overhead and strong performance for a small number of packages (5-10) while integrating natively with the Node.js ecosystem.
+- **Context**: The project requires a monorepo structure to centralize multiple development tools and eliminate code duplication, starting with the `jact`. The solution needed to have low initial overhead and strong performance for a small number of packages (5-10) while integrating natively with the Node.js ecosystem.
 - **Decision**: We will use **NPM Workspaces** as the foundational technology for managing the `cc-workflows` monorepo. It will be the primary mechanism for handling shared dependencies, running scripts across packages, and linking local packages together.
 - **Consequences**:
   - **Positive**: The approach has **low overhead**, as it requires no third-party dependencies and aligns with our **Simplicity First** principle.
@@ -1158,8 +1158,8 @@ if (import.meta.url === realPathAsUrl) {
 
 - **Status**: Accepted
 - **Date**: 2024-11-12
-- **Context**: The workspace reached a stable foundation with established testing patterns and operational tooling. As complexity grows and more tools are added, the risk of runtime type errors increases. JavaScript's dynamic typing provides flexibility but defers error detection to runtime or test execution, increasing debugging cycles. The citation-manager tool has ~58 files (10 source, 48 tests) with complex data flows between components, making it an ideal candidate for type safety validation before expanding the workspace further.
-- **Decision**: Adopt **TypeScript as the primary development language** for all workspace tools, with strict type checking enabled. All new tools must be written in TypeScript, and existing tools will be migrated following the Infrastructure-First pattern validated with citation-manager as the pilot.
+- **Context**: The workspace reached a stable foundation with established testing patterns and operational tooling. As complexity grows and more tools are added, the risk of runtime type errors increases. JavaScript's dynamic typing provides flexibility but defers error detection to runtime or test execution, increasing debugging cycles. The jact tool has ~58 files (10 source, 48 tests) with complex data flows between components, making it an ideal candidate for type safety validation before expanding the workspace further.
+- **Decision**: Adopt **TypeScript as the primary development language** for all workspace tools, with strict type checking enabled. All new tools must be written in TypeScript, and existing tools will be migrated following the Infrastructure-First pattern validated with jact as the pilot.
 - **Alternatives Considered**:
   - **JSDoc + Type Checking**: Provides gradual typing without compilation step, but offers weaker type guarantees and inferior IDE support
   - **Flow**: Facebook's type system with similar capabilities, but smaller ecosystem and uncertain long-term support
@@ -1172,7 +1172,7 @@ if (import.meta.url === realPathAsUrl) {
   - **Positive**: **Architecture principle alignment** - strengthens Data-First Design, Fail Fast, and Self-Contained Naming principles
   - **Negative**: **Build step required** - adds compilation before execution, though mitigated by HMR during development
   - **Negative**: **Learning curve** for team members unfamiliar with TypeScript (minimal for experienced JavaScript developers)
-  - **Negative**: **Migration effort** - 58 files in citation-manager require conversion, though Infrastructure-First approach minimizes risk
+  - **Negative**: **Migration effort** - 58 files in jact require conversion, though Infrastructure-First approach minimizes risk
 
 ### ADR-003: Vite for Development Infrastructure
 

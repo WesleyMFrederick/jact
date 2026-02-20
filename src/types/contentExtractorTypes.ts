@@ -103,7 +103,7 @@ export interface OutgoingLinksExtractedContent {
 
 /**
  * CLI validate command options.
- * Integration: Passed to CitationManager.validate() and .fix() methods.
+ * Integration: Passed to JactCli.validate() and .fix() methods.
  */
 export interface CliValidateOptions {
 	format?: "cli" | "json";
@@ -114,7 +114,7 @@ export interface CliValidateOptions {
 
 /**
  * CLI extract command options.
- * Integration: Passed to CitationManager.extractLinks/Header/File methods.
+ * Integration: Passed to JactCli.extractLinks/Header/File methods.
  */
 export interface CliExtractOptions {
 	scope?: string;

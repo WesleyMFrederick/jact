@@ -26,28 +26,28 @@ npm run test:watch    # Run tests in watch mode
 ### Citation Tool Commands
 ```bash
 # Validate citations (CLI output)
-npm run citation:validate path/to/file.md
+npm run jact:validate path/to/file.md
 
 # Validate with JSON output
-npm run citation:validate path/to/file.md -- --format json
+npm run jact:validate path/to/file.md -- --format json
 
 # Validate with line filtering
-npm run citation:validate path/to/file.md -- --lines 150-160
+npm run jact:validate path/to/file.md -- --lines 150-160
 
 # Validate with folder scope (smart filename resolution)
-npm run citation:validate path/to/file.md -- --scope /path/to/project/docs
+npm run jact:validate path/to/file.md -- --scope /path/to/project/docs
 
 # Auto-fix broken citations
-npm run citation:validate path/to/file.md -- --fix --scope /path/to/docs
+npm run jact:validate path/to/file.md -- --fix --scope /path/to/docs
 
 # View AST and extracted data
-npm run citation:ast path/to/file.md
+npm run jact:ast path/to/file.md
 
 # Extract base paths
-npm run citation:base-paths path/to/file.md
+npm run jact:base-paths path/to/file.md
 
 # Extract content from links
-npm run citation:extract path/to/file.md
+npm run jact:extract path/to/file.md
 
 # Direct CLI usage (after npm link)
 jact validate path/to/file.md --lines 157 --scope /path/to/docs
@@ -59,7 +59,7 @@ jact validate path/to/file.md --lines 157 --scope /path/to/docs
 The tool follows a **layered architecture** with dependency injection via factory pattern:
 
 ```
-CLI Orchestrator (citation-manager.ts)
+CLI Orchestrator (jact.ts)
     ↓
 Component Factories (componentFactory.ts)
     ↓
@@ -75,7 +75,7 @@ Core Components:
 
 ```
 src/
-├── citation-manager.ts           # CLI entry point, command orchestration
+├── jact.ts           # CLI entry point, command orchestration
 ├── CitationValidator.ts          # Link/anchor validation logic
 ├── FileCache.ts                  # File path resolution and caching
 ├── ParsedDocument.ts             # Facade over MarkdownParser output
@@ -135,7 +135,7 @@ npm run test:watch    # Watch mode for development
 ```
 test/
 ├── unit/                           # Component unit tests
-│   ├── citation-manager-*.test.ts
+│   ├── jact-*.test.ts
 │   ├── factories/
 │   └── types/
 ├── integration/                    # End-to-end workflow tests

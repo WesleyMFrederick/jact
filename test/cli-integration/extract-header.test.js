@@ -20,7 +20,7 @@ describe("CLI - extract header command", () => {
 
 		// When: Run extract header command
 		const output = runCLI(
-			`node dist/citation-manager.js extract header "${targetFile}" "${headerName}"`,
+			`node dist/jact.js extract header "${targetFile}" "${headerName}"`,
 			{ captureStderr: true },
 		);
 
@@ -48,7 +48,7 @@ describe("CLI - extract header command", () => {
 		let exitCode;
 		try {
 			runCLI(
-				`node dist/citation-manager.js extract header "${targetFile}" "${invalidHeader}"`,
+				`node dist/jact.js extract header "${targetFile}" "${invalidHeader}"`,
 			);
 		} catch (error) {
 			// Pattern: Capture exit code from error
@@ -74,7 +74,7 @@ describe("CLI - extract header command", () => {
 		let stdout;
 		try {
 			runCLI(
-				`node dist/citation-manager.js extract header "${targetFile}" "${similarHeader}"`,
+				`node dist/jact.js extract header "${targetFile}" "${similarHeader}"`,
 			);
 		} catch (error) {
 			stdout = error.stdout;
@@ -91,7 +91,7 @@ describe("CLI Help Documentation", () => {
 	it("should show extract header in top-level help", async () => {
 		// When: Request top-level extract help
 		const output = runCLI(
-			"node dist/citation-manager.js extract --help",
+			"node dist/jact.js extract --help",
 		);
 
 		// Then: Help lists header subcommand
@@ -103,7 +103,7 @@ describe("CLI Help Documentation", () => {
 	it("should show detailed help for extract header subcommand", async () => {
 		// When: Request subcommand help
 		const output = runCLI(
-			"node dist/citation-manager.js extract header --help",
+			"node dist/jact.js extract header --help",
 		);
 
 		// Then: Detailed usage and examples shown
@@ -115,7 +115,7 @@ describe("CLI Help Documentation", () => {
 
 		// Then: Examples section included
 		expect(output).toContain("Examples:");
-		expect(output).toContain("citation-manager extract header");
+		expect(output).toContain("jact extract header");
 
 		// Then: Exit codes documented
 		expect(output).toContain("Exit Codes:");

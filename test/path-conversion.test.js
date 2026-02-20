@@ -6,7 +6,7 @@ import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "dist", "citation-manager.js");
+const citationManagerPath = join(__dirname, "..", "dist", "jact.js");
 
 describe("Path Conversion Calculation", () => {
 	it("should calculate correct relative path for cross-directory resolution", () => {

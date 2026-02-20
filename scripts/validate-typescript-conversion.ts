@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { runCLI } from "../test/helpers/cli-runner.js";
 
 /**
@@ -343,7 +343,7 @@ function validateCompiledOutput(filePath: string): ValidationResult {
  * e.g., src/core/file.ts -> test/core/file.test.ts
  */
 function convertPathToTestFile(filePath: string): string {
-	const relativePath = filePath.replace(/.*\/tools\/citation-manager\//, "");
+	const relativePath = relative(getProjectRoot(), filePath);
 	const withoutExt = relativePath.replace(/\.(ts|js)$/, "");
 	const testPath = withoutExt.replace(/^src\//, "test/");
 	return resolve(getProjectRoot(), `${testPath}.test.ts`);
@@ -354,19 +354,19 @@ function convertPathToTestFile(filePath: string): string {
  * e.g., src/core/file.ts -> dist/core/file.js or .d.ts
  */
 function convertPathToDistFile(filePath: string, ext: ".js" | ".d.ts"): string {
-	const relativePath = filePath.replace(/.*\/tools\/citation-manager\//, "");
+	const relativePath = relative(getProjectRoot(), filePath);
 	const withoutExt = relativePath.replace(/\.(ts|js)$/, "");
 	const distPath = withoutExt.replace(/^src\//, "dist/");
 	return resolve(getProjectRoot(), `${distPath}${ext}`);
 }
 
 /**
- * Get the project root directory (citation-manager)
+ * Get the project root directory (jact)
  */
 function getProjectRoot(): string {
 	// Get the directory containing this script
 	const scriptDir = dirname(resolve(import.meta.url.replace(/^file:\/\//, "")));
-	// Go up to the citation-manager root
+	// Go up to the jact root
 	return dirname(scriptDir);
 }
 

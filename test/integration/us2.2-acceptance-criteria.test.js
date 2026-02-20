@@ -1,4 +1,4 @@
-// tools/citation-manager/test/integration/us2.2-acceptance-criteria.test.js
+// tools/jact/test/integration/us2.2-acceptance-criteria.test.js
 import { describe, it, expect } from "vitest";
 import { createContentExtractor } from "../../src/factories/componentFactory.js";
 import { ContentExtractor } from "../../src/core/ContentExtractor/ContentExtractor.js";

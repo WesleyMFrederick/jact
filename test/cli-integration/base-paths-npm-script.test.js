@@ -10,18 +10,18 @@ const workspaceRoot = join(__dirname, "..", "..");
 /**
  * US2.7: Base-Paths NPM Script Integration Tests
  *
- * Tests the citation:base-paths npm script which extracts unique absolute paths
+ * Tests the jact:base-paths npm script which extracts unique absolute paths
  * from citations in markdown files. The script uses `extract links` instead of
  * `validate` to avoid the 64KB buffer limit issue.
  */
-describe("citation:base-paths npm script (US2.7)", () => {
+describe("jact:base-paths npm script (US2.7)", () => {
 	it("should extract base paths from simple test file", () => {
 		// Given: Test file with multiple citations
 		const testFile = join(__dirname, "..", "fixtures", "enhanced-citations.md");
 
 		// When: Execute npm script (extract links → jq → sort -u)
 		const output = runCLI(
-			`npm run --silent citation:base-paths "${testFile}"`,
+			`npm run --silent jact:base-paths "${testFile}"`,
 			{ cwd: workspaceRoot },
 		);
 
@@ -52,7 +52,7 @@ describe("citation:base-paths npm script (US2.7)", () => {
 
 		// When: Execute npm script using extract links (bypasses buffer limit)
 		const output = runCLI(
-			`npm run --silent citation:base-paths "${testFile}"`,
+			`npm run --silent jact:base-paths "${testFile}"`,
 			{ cwd: workspaceRoot },
 		);
 
@@ -84,7 +84,7 @@ describe("citation:base-paths npm script (US2.7)", () => {
 
 		// When: Execute npm script
 		const output = runCLI(
-			`npm run --silent citation:base-paths "${testFile}"`,
+			`npm run --silent jact:base-paths "${testFile}"`,
 			{ cwd: workspaceRoot },
 		);
 
@@ -108,7 +108,7 @@ describe("citation:base-paths npm script (US2.7)", () => {
 
 		// When: Execute npm script with jq filter
 		const output = runCLI(
-			`npm run --silent citation:base-paths "${testFile}"`,
+			`npm run --silent jact:base-paths "${testFile}"`,
 			{ cwd: workspaceRoot },
 		);
 

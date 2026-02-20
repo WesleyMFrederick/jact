@@ -1,7 +1,7 @@
 /**
  * Component Factory - Dependency injection and component creation
  *
- * Provides factory functions for creating citation-manager components with proper
+ * Provides factory functions for creating jact components with proper
  * dependency injection. Enables testability by allowing dependency override while
  * providing sensible defaults for production use.
  *

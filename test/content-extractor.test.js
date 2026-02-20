@@ -1,4 +1,4 @@
-// tools/citation-manager/test/content-extractor.test.js
+// tools/jact/test/content-extractor.test.js
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";

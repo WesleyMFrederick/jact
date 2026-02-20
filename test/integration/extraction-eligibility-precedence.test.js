@@ -1,4 +1,4 @@
-// tools/citation-manager/test/integration/extraction-eligibility-precedence.test.js
+// tools/jact/test/integration/extraction-eligibility-precedence.test.js
 import { describe, it, expect } from "vitest";
 import { createContentExtractor } from "../../src/factories/componentFactory.js";
 

@@ -1,4 +1,4 @@
-// tools/citation-manager/test/analyze-eligibility.test.js
+// tools/jact/test/analyze-eligibility.test.js
 import { describe, it, expect } from "vitest";
 import {
 	analyzeEligibility,

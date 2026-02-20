@@ -1,4 +1,4 @@
-# Citation Manager — Test Guide
+# JACT — Test Guide
 
 ## Import Strategy
 
@@ -10,10 +10,10 @@ Tests import from `dist/` (compiled output), not `src/` (TypeScript source).
 
 ```javascript
 // Correct — import compiled output
-import { CitationManager } from "../dist/citation-manager.js";
+import { JactCli } from "../dist/jact.js";
 
 // Wrong — TypeScript source not directly executable by test runner
-import { CitationManager } from "../src/citation-manager.ts";
+import { JactCli } from "../src/jact.ts";
 ```
 
 **Build before testing**: Run `npx tsc --build` if `dist/` is stale.

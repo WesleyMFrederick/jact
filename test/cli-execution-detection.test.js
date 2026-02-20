@@ -7,14 +7,14 @@ import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "dist", "citation-manager.js");
+const citationManagerPath = join(__dirname, "..", "dist", "jact.js");
 
 describe("CLI Execution Detection via Symlink", () => {
 	let symlinkPath;
 
 	beforeEach(() => {
 		// Create unique symlink path for this test run
-		symlinkPath = join(tmpdir(), `citation-manager-test-${Date.now()}`);
+		symlinkPath = join(tmpdir(), `jact-test-${Date.now()}`);
 	});
 
 	afterEach(() => {
@@ -31,7 +31,7 @@ describe("CLI Execution Detection via Symlink", () => {
 		// Problem: import.meta.url === `file://${process.argv[1]}` fails with symlinks
 		// Solution: Use realpathSync() to resolve symlinks before comparing
 
-		// Create symlink to citation-manager
+		// Create symlink to jact
 		symlinkSync(citationManagerPath, symlinkPath);
 
 		// Execute via symlink (simulates npm link behavior)

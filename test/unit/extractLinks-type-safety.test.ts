@@ -23,12 +23,12 @@ function collectTsFiles(dir: string): string[] {
 }
 
 /**
- * Type safety tests for tools/citation-manager/src/
+ * Type safety tests for tools/jact/src/
  *
  * Ensures zero explicit `any` usage across the entire source directory.
  * Covers both biome lint violations and raw `as any` assertions.
  */
-describe("citation-manager src/ type safety — no explicit any", () => {
+describe("jact src/ type safety — no explicit any", () => {
 	it("contains zero noExplicitAny biome violations across all src/ files", () => {
 		let output: string;
 		try {

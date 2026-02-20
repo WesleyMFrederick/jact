@@ -6,9 +6,9 @@ import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "dist", "citation-manager.js");
+const citationManagerPath = join(__dirname, "..", "dist", "jact.js");
 
-describe("Citation Manager Integration Tests", () => {
+describe("JACT Integration Tests", () => {
 	it("should validate citations in valid-citations.md successfully", async () => {
 		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 

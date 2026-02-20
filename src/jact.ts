@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Citation Manager CLI - Command-line tool for markdown citation validation
+ * JACT CLI - Command-line tool for markdown citation validation
  *
  * Main CLI application providing citation validation, fixing, AST inspection,
  * and base path extraction for markdown files. Integrates MarkdownParser,
@@ -19,7 +19,7 @@
  * - Automatic path and anchor fixing (--fix flag)
  * - Exit codes for CI/CD integration (0=success, 1=validation errors, 2=file not found)
  *
- * @module citation-manager
+ * @module jact
  */
 
 import { Command } from "commander";
@@ -47,7 +47,7 @@ import type {
 	ValidationResult,
 } from "./types/validationTypes.js";
 
-const CACHE_DIR = ".citation-manager/claude-cache";
+const CACHE_DIR = ".jact/claude-cache";
 
 /**
  * Options for validation operations.
@@ -110,7 +110,7 @@ interface PathConversion {
  * fixing, AST inspection, and path extraction. Handles CLI output formatting and
  * error reporting.
  */
-export class CitationManager {
+export class JactCli {
 	private parser: MarkdownParser;
 	private parsedFileCache: ParsedFileCache;
 	private fileCache: FileCache;
@@ -118,7 +118,7 @@ export class CitationManager {
 	private contentExtractor: ContentExtractor;
 
 	/**
-	 * Initialize citation manager with all required components
+	 * Initialize jact with all required components
 	 *
 	 * Creates and wires together parser, caches, and validator using factory functions.
 	 */
@@ -1013,7 +1013,7 @@ const semanticSuggestionMap: Record<string, string[]> = {
 const program: Command = new Command();
 
 program
-	.name("citation-manager")
+	.name("jact")
 	.description("Citation validation and management tool for markdown files")
 	.version("1.0.0");
 
@@ -1060,10 +1060,10 @@ program
 		"after",
 		`
 Examples:
-    $ citation-manager validate docs/design.md
-    $ citation-manager validate file.md --format json
-    $ citation-manager validate file.md --lines 100-200
-    $ citation-manager validate file.md --fix --scope ./docs
+    $ jact validate docs/design.md
+    $ jact validate file.md --format json
+    $ jact validate file.md --lines 100-200
+    $ jact validate file.md --fix --scope ./docs
 
 Exit Codes:
   0  All citations valid
@@ -1072,7 +1072,7 @@ Exit Codes:
 `,
 	)
 	.action(async (file: string, options: CliValidateOptions) => {
-		const manager = new CitationManager();
+		const manager = new JactCli();
 		let result: string;
 
 		if (options.fix) {
@@ -1110,9 +1110,9 @@ program
 		"after",
 		`
 Examples:
-    $ citation-manager ast docs/design.md
-    $ citation-manager ast file.md | jq '.links'
-    $ citation-manager ast file.md | jq '.anchors | length'
+    $ jact ast docs/design.md
+    $ jact ast file.md | jq '.links'
+    $ jact ast file.md | jq '.anchors | length'
 
 Output includes:
   - tokens: Markdown AST from marked.js parser
@@ -1122,7 +1122,7 @@ Output includes:
 `,
 	)
 	.action(async (file: string) => {
-		const manager = new CitationManager();
+		const manager = new JactCli();
 		const ast = await manager.getAst(file);
 		console.log(JSON.stringify(ast, null, 2));
 	});
@@ -1151,11 +1151,11 @@ extractCmd
 		"after",
 		`
 Examples:
-    $ citation-manager extract links docs/design.md
-    $ citation-manager extract links docs/design.md --full-files
-    $ citation-manager extract links docs/design.md --scope ./docs
-    $ citation-manager extract links docs/design.md --session abc123
-    $ citation-manager extract links file.md | jq '.stats.compressionRatio'
+    $ jact extract links docs/design.md
+    $ jact extract links docs/design.md --full-files
+    $ jact extract links docs/design.md --scope ./docs
+    $ jact extract links docs/design.md --session abc123
+    $ jact extract links file.md | jq '.stats.compressionRatio'
 
 Exit Codes:
   0  At least one link extracted successfully (or cache hit with --session)
@@ -1172,8 +1172,8 @@ Exit Codes:
 			}
 		}
 
-		// Pattern: Delegate to CitationManager orchestrator
-		const manager = new CitationManager();
+		// Pattern: Delegate to JactCli orchestrator
+		const manager = new JactCli();
 
 		try {
 			await manager.extractLinks(sourceFile, options);
@@ -1201,9 +1201,9 @@ extractCmd
 		"after",
 		`
 Examples:
-    $ citation-manager extract header plan.md "Task 1: Implementation"
-    $ citation-manager extract header docs/guide.md "Overview" --scope ./docs
-    $ citation-manager extract header file.md "Design" | jq '.extractedContentBlocks'
+    $ jact extract header plan.md "Task 1: Implementation"
+    $ jact extract header docs/guide.md "Overview" --scope ./docs
+    $ jact extract header file.md "Design" | jq '.extractedContentBlocks'
 
 Exit Codes:
   0  Header extracted successfully
@@ -1217,11 +1217,11 @@ Exit Codes:
 			headerName: string,
 			options: CliExtractOptions,
 		) => {
-			// Integration: Create CitationManager instance
-			const manager = new CitationManager();
+			// Integration: Create JactCli instance
+			const manager = new JactCli();
 
 			try {
-				// Pattern: Delegate to CitationManager orchestration method
+				// Pattern: Delegate to JactCli orchestration method
 				const result = await manager.extractHeader(
 					targetFile,
 					headerName,
@@ -1255,10 +1255,10 @@ extractCmd
 		"after",
 		`
 Examples:
-    $ citation-manager extract file docs/architecture.md
-    $ citation-manager extract file architecture.md --scope ./docs
-    $ citation-manager extract file file.md | jq '.extractedContentBlocks'
-    $ citation-manager extract file file.md | jq '.stats'
+    $ jact extract file docs/architecture.md
+    $ jact extract file architecture.md --scope ./docs
+    $ jact extract file file.md | jq '.extractedContentBlocks'
+    $ jact extract file file.md | jq '.stats'
 
 Exit Codes:
   0  File extracted successfully
@@ -1267,11 +1267,11 @@ Exit Codes:
 `,
 	)
 	.action(async (targetFile: string, options: CliExtractOptions) => {
-		// Integration: Create CitationManager instance
-		const manager = new CitationManager();
+		// Integration: Create JactCli instance
+		const manager = new JactCli();
 
 		try {
-			// Pattern: Delegate to CitationManager orchestration method
+			// Pattern: Delegate to JactCli orchestration method
 			const result = await manager.extractFile(targetFile, options);
 
 			// Decision: Output JSON to stdout if extraction succeeded

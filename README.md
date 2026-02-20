@@ -22,7 +22,7 @@ jact --help
 
 ### Three-Tier Validation System
 
-The citation manager implements a comprehensive validation approach with three distinct status levels:
+The jact implements a comprehensive validation approach with three distinct status levels:
 
 #### 1. Errors (Critical Issues)
 - **File Not Found**: Target file does not exist in filesystem
@@ -56,28 +56,28 @@ The citation manager implements a comprehensive validation approach with three d
 
 ```bash
 # Validate citations in a markdown file (CLI output)
-npm run citation:validate path/to/file.md
+npm run jact:validate path/to/file.md
 
 # Get JSON output for programmatic use
-npm run citation:validate path/to/file.md -- --format json
+npm run jact:validate path/to/file.md -- --format json
 
 # Validate specific line range
-npm run citation:validate path/to/file.md -- --lines 150-160
+npm run jact:validate path/to/file.md -- --lines 150-160
 
 # Validate single line
-npm run citation:validate path/to/file.md -- --lines 157
+npm run jact:validate path/to/file.md -- --lines 157
 
 # Combine line filtering with JSON output
-npm run citation:validate path/to/file.md -- --lines 157 --format json
+npm run jact:validate path/to/file.md -- --lines 157 --format json
 
 # Validate with folder scope (smart filename resolution)
-npm run citation:validate path/to/file.md -- --scope /path/to/project/docs
+npm run jact:validate path/to/file.md -- --scope /path/to/project/docs
 
 # Combine scope with line filtering
-npm run citation:validate path/to/file.md -- --lines 148-160 --scope /path/to/project/docs
+npm run jact:validate path/to/file.md -- --lines 148-160 --scope /path/to/project/docs
 
 # Auto-fix kebab-case anchors to raw header format for better Obsidian compatibility
-npm run citation:validate path/to/file.md -- --fix --scope /path/to/project/docs
+npm run jact:validate path/to/file.md -- --fix --scope /path/to/project/docs
 
 # Direct CLI usage
 # node utility-scripts/citation-links/jact.js validate path/to/file.md --lines 157 --scope /path/to/docs
@@ -89,13 +89,13 @@ The fix command provides comprehensive citation correction with warning detectio
 
 ```bash
 # Basic fix with automatic backup creation
-npm run citation:validate path/to/file.md -- --fix --scope /path/to/project/docs
+npm run jact:validate path/to/file.md -- --fix --scope /path/to/project/docs
 
 # Fix with dry-run mode to preview changes
-npm run citation:validate path/to/file.md -- --fix --dry-run --scope /path/to/project/docs
+npm run jact:validate path/to/file.md -- --fix --dry-run --scope /path/to/project/docs
 
 # Fix with JSON output for detailed reporting
-npm run citation:validate path/to/file.md -- --fix --format json --scope /path/to/project/docs
+npm run jact:validate path/to/file.md -- --fix --format json --scope /path/to/project/docs
 
 # Direct CLI usage with enhanced options
 node utility-scripts/citation-links/jact.js validate path/to/file.md --fix --backup --scope /path/to/docs
@@ -105,7 +105,7 @@ node utility-scripts/citation-links/jact.js validate path/to/file.md --fix --bac
 
 ```bash
 # Show parsed AST and extracted citation data
-npm run citation:ast path/to/file.md
+npm run jact:ast path/to/file.md
 
 # Direct CLI usage
 node utility-scripts/citation-links/jact.js ast path/to/file.md
@@ -117,10 +117,10 @@ The base-paths command is implemented as an npm script facade that wraps the val
 
 ```bash
 # Extract distinct base paths from citations
-npm run citation:base-paths path/to/file.md
+npm run jact:base-paths path/to/file.md
 ```
 
-This is equivalent to: `npm run citation:validate path/to/file.md -- --format json | jq -r '.links[] | select(.target.path.absolute) | .target.path.absolute' | sort -u`
+This is equivalent to: `npm run jact:validate path/to/file.md -- --format json | jq -r '.links[] | select(.target.path.absolute) | .target.path.absolute' | sort -u`
 
 **Rationale**: With the Validation Enrichment Pattern (US1.8), LinkObjects include target.path.absolute directly. The facade preserves the convenient interface while eliminating redundant code.
 
@@ -229,10 +229,10 @@ The citation validator can automatically fix kebab-case anchors to use raw heade
 
 ```bash
 # Auto-fix kebab-case citations in a file
-npm run citation:validate path/to/file.md -- --fix --scope /path/to/docs
+npm run jact:validate path/to/file.md -- --fix --scope /path/to/docs
 
 # Check what would be fixed without making changes
-npm run citation:validate path/to/file.md -- --scope /path/to/docs
+npm run jact:validate path/to/file.md -- --scope /path/to/docs
 ```
 
 **Benefits of Raw Header Format:**
@@ -500,7 +500,7 @@ When using `--scope <folder>`, the tool builds a cache of all markdown files in 
 
 ```bash
 # Enable smart resolution for design-docs folder
-npm run citation:validate story.md -- --scope /path/to/design-docs
+npm run jact:validate story.md -- --scope /path/to/design-docs
 ```
 
 **Benefits:**
@@ -550,7 +550,7 @@ The tool automatically detects and resolves symlinked directories:
 
 ```bash
 # Works with symlinked documentation folders
-npm run citation:validate /path/to/symlinked/docs/story.md
+npm run jact:validate /path/to/symlinked/docs/story.md
 ```
 
 **Resolution Strategy:**
@@ -611,7 +611,7 @@ Supports Obsidian's absolute path format:
 
 The tool consists of:
 
-- **CitationManager**: Main orchestrator with CLI interface
+- **JactCli**: Main orchestrator with CLI interface
 - **MarkdownParser**: AST generation using `marked` library
 - **CitationValidator**: Pattern validation and file existence checking
 
@@ -623,7 +623,7 @@ The tool consists of:
 
 ```bash
 # Validate project documentation
-npm run citation:validate ./project-docs/user-guide.md -- --scope ./project-docs
+npm run jact:validate ./project-docs/user-guide.md -- --scope ./project-docs
 ```
 
 **Sample Output:**
@@ -657,7 +657,7 @@ RECOMMENDATIONS:
 
 ```bash
 # Fix citations with automatic path conversion and backup
-npm run citation:validate ./legacy-docs/migration-guide.md -- --fix --scope ./legacy-docs --format json
+npm run jact:validate ./legacy-docs/migration-guide.md -- --fix --scope ./legacy-docs --format json
 ```
 
 **Sample JSON Output:**
@@ -698,7 +698,7 @@ npm run citation:validate ./legacy-docs/migration-guide.md -- --fix --scope ./le
 
 ```bash
 # Validate with structured output for CI processing
-npm run citation:validate ./docs --format json > citation-report.json
+npm run jact:validate ./docs --format json > citation-report.json
 
 # Process results programmatically
 node -e "
@@ -712,7 +712,7 @@ if (errors > 0) {
 
 if (warnings > 0) {
   console.log(\`⚠️  ${warnings} citation warnings found (review recommended)\`);
-  console.log('Consider running: npm run citation:validate ./docs -- --fix');
+  console.log('Consider running: npm run jact:validate ./docs -- --fix');
 }
 
 console.log('✅ Citation validation passed');
@@ -725,10 +725,10 @@ console.log('✅ Citation validation passed');
 
 ```bash
 # Weekly citation health check
-npm run citation:validate ./ObsidianVault -- --scope ./ObsidianVault --format json > weekly-report.json
+npm run jact:validate ./ObsidianVault -- --scope ./ObsidianVault --format json > weekly-report.json
 
 # Auto-fix common issues while preserving backups
-npm run citation:validate ./ObsidianVault/daily-notes -- --fix --backup --scope ./ObsidianVault
+npm run jact:validate ./ObsidianVault/daily-notes -- --fix --backup --scope ./ObsidianVault
 ```
 
 **Expected Benefits:**

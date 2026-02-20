@@ -40,7 +40,7 @@ npx tsc --build || {
 # Checkpoint 8a: No Duplicate Type Definitions
 echo ""
 echo "✓ Checkpoint 8a: No Duplicate Type Definitions..."
-duplicates=$(grep -r "^interface LinkObject\|^type LinkObject\|^interface ValidationMetadata\|^type ValidationMetadata" tools/citation-manager/src/ --exclude-dir=types 2>/dev/null || true)
+duplicates=$(grep -r "^interface LinkObject\|^type LinkObject\|^interface ValidationMetadata\|^type ValidationMetadata" src/ --exclude-dir=types 2>/dev/null || true)
 if [ -n "$duplicates" ]; then
   echo "❌ Duplicate type definitions found:"
   echo "$duplicates"
