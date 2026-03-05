@@ -138,7 +138,12 @@ function extractLinksFromTokens(
 			}
 
 			if (isLinkToken(token)) {
-				const href = token.href;
+				// Strip surrounding backticks from href — footnote reference definitions
+				// like `[^S-001]: `/path/file.md`` produce href with literal backticks.
+				const href =
+					token.href.startsWith('`') && token.href.endsWith('`')
+						? token.href.slice(1, -1)
+						: token.href;
 				const text = token.text;
 				const raw = token.raw;
 
