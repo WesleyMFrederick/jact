@@ -141,7 +141,7 @@ function extractLinksFromTokens(
 				// Strip surrounding backticks from href — footnote reference definitions
 				// like `[^S-001]: `/path/file.md`` produce href with literal backticks.
 				const href =
-					token.href.startsWith('`') && token.href.endsWith('`')
+					token.href.startsWith("`") && token.href.endsWith("`")
 						? token.href.slice(1, -1)
 						: token.href;
 				const text = token.text;
@@ -177,7 +177,9 @@ function extractLinksFromTokens(
 						rawPath = href.substring(0, hashIndex);
 						anchor = href.substring(hashIndex + 1);
 					} else {
-						rawPath = href;
+						// Strip trailing line-range suffix (e.g. ":17-36" or ":5")
+						// from footnote paths before resolution
+						rawPath = href.replace(/:\d+(-\d+)?$/, "");
 					}
 				}
 

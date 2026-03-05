@@ -44,7 +44,7 @@ describe("extractLinks — backtick footnote paths (issue #11)", () => {
 		const link = crossDocLinks[0];
 		expect(link?.target.path.raw).not.toMatch(/`/);
 		expect(link?.target.path.raw).toBe(
-			"/Users/wes/project/design-docs/Gemini-LBNL-Prompt.md:17-36",
+			"/Users/wes/project/design-docs/Gemini-LBNL-Prompt.md",
 		);
 	});
 
