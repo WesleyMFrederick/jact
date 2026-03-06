@@ -1,6 +1,6 @@
 # jact - Just Another Context Tool
 
-A citation validation and management tool for markdown files that enforces cross-document links and proper anchor patterns. Features comprehensive three-tier validation with enhanced warning detection and automated citation correction capabilities.
+A citation validation and management tool for markdown files that enforces cross-document links and proper anchor patterns. Features three-tier validation with warning detection and (limited) automated citation correction capabilities.
 
 ## Installation
 
