@@ -75,7 +75,7 @@ export class CitationValidator {
 		this.patterns = {
 			CARET_SYNTAX: {
 				regex:
-					/^\^([A-Za-z]{2,3}\d+(?:-\d+[a-z]?(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Za-z]+\d+|MVP-P\d+|[a-z][a-z0-9-]+[a-z0-9])$/,
+					/^\^([A-Za-z]{2,3}\d+(?:-\d+[a-z]?(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Za-z]+\d+|MVP-P\d+|[a-zA-Z][a-zA-Z0-9-]+[a-zA-Z0-9])$/,
 				examples: [
 					"^FR1",
 					"^US1-1AC1",
@@ -85,6 +85,8 @@ export class CitationValidator {
 					"^black-box-interfaces",
 					"^first-section-intro",
 					"^deep-heading",
+					"^F-LK-003",
+					"^A-004",
 				],
 				description:
 					"Caret syntax for requirements/criteria (numbered) and Obsidian block references (text-based)",
@@ -965,7 +967,7 @@ export class CitationValidator {
 			.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Remove links, keep text
 			.replace(/:/g, " ") // Colon → space (matches Obsidian heading anchor behavior)
 			.replace(/\\/g, "") // Strip backslash escape chars
-			.replace(/[\[\]]/g, "") // Strip lone bracket chars
+			.replace(/[[\]]/g, "") // Strip lone bracket chars
 			.replace(/ {2,}/g, " ") // Collapse multiple spaces
 			.trim();
 	}
