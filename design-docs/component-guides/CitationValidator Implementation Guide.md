@@ -139,7 +139,8 @@ tools/citation-manager/
 │   │       ├── resolveTargetPath()               // Path resolution strategies
 │   │       ├── validateAnchorExists()            // Anchor existence check
 │   │       ├── generateSuggestion()              // Fuzzy match suggestions
-│   │       └── classifyLinkPattern()             // Link pattern classification
+│   │       ├── classifyLinkPattern()             // Link pattern classification
+│   │       └── detectNestedBacktickCodeblocks()  // File-level diagnostic: nested codeblocks
 │   │
 │   ├── types/
 │   │   └── validationTypes.ts                    // Validation type definitions
