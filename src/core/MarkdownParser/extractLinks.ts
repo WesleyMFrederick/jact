@@ -147,11 +147,12 @@ function extractLinksFromTokens(
 				const text = token.text;
 				const raw = token.raw;
 
-				// Skip external and protocol links (http/https/vscode)
+				// Skip external and protocol links (http/https/vscode/mailto)
 				if (
 					href.startsWith("http://") ||
 					href.startsWith("https://") ||
-					href.startsWith("vscode://")
+					href.startsWith("vscode://") ||
+					href.startsWith("mailto:")
 				) {
 					// Recurse into children regardless
 					if (hasNestedTokens(token)) {
