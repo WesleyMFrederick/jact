@@ -1,7 +1,7 @@
 // src/types/citationTypes.ts
 
-import type { Token } from 'marked';
-import type { ValidationMetadata } from './validationTypes.js';
+import type { Token } from "marked";
+import type { ValidationMetadata } from "./validationTypes.js";
 
 /**
  * Link scope classification for citation validation.
@@ -78,7 +78,6 @@ export interface LinkObject {
 	validation?: ValidationMetadata;
 }
 
-
 /**
  * Anchor object representing a potential link target in a markdown document.
  * Created by MarkdownParser.extractAnchors().
@@ -146,6 +145,17 @@ export interface HeadingObject {
 }
 
 /**
+ * FileDiagnostic - File-level structural warning or error
+ * For issues not tied to a specific link (e.g., nested codeblocks)
+ */
+export interface FileDiagnostic {
+	line: number;
+	status: "warning" | "error";
+	message: string;
+	suggestion?: string;
+}
+
+/**
  * Parser output contract from MarkdownParser.parseFile().
  * Contains complete structural representation of a markdown document.
  */
@@ -167,4 +177,7 @@ export interface ParserOutput {
 
 	/** All anchors (potential link targets) in document */
 	anchors: AnchorObject[];
+
+	/** File-level structural diagnostics (e.g., nested codeblocks) */
+	diagnostics: FileDiagnostic[];
 }

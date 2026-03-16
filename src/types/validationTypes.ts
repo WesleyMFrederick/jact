@@ -7,7 +7,10 @@
  * Reference: CitationValidator Component Guide - Output Contract
  */
 
-import type { LinkObject } from "./citationTypes.js";
+import type { FileDiagnostic, LinkObject } from "./citationTypes.js";
+
+// Re-export FileDiagnostic from citationTypes (canonical definition)
+export type { FileDiagnostic };
 
 /**
  * PathConversion metadata for path auto-fix suggestions
@@ -58,17 +61,6 @@ export interface ValidationSummary {
 	valid: number;
 	warnings: number;
 	errors: number;
-}
-
-/**
- * FileDiagnostic - File-level structural warning or error
- * For issues not tied to a specific link (e.g., nested codeblocks)
- */
-export interface FileDiagnostic {
-	line: number;
-	status: "warning" | "error";
-	message: string;
-	suggestion?: string;
 }
 
 /**
