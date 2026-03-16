@@ -1,11 +1,16 @@
 import type { readFileSync } from "node:fs";
 import type { Token } from "marked";
 import { marked } from "marked";
-import type { ParserOutput, LinkObject, HeadingObject, AnchorObject } from "../../types/citationTypes.js";
-import { extractLinks } from "./extractLinks.js";
-import { extractHeadings } from "./extractHeadings.js";
-import { extractAnchors } from "./extractAnchors.js";
+import type {
+	AnchorObject,
+	HeadingObject,
+	LinkObject,
+	ParserOutput,
+} from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
+import { extractAnchors } from "./extractAnchors.js";
+import { extractHeadings } from "./extractHeadings.js";
+import { extractLinks } from "./extractLinks.js";
 
 /**
  * File system interface for dependency injection.

@@ -139,13 +139,15 @@ tools/citation-manager/
 │   │       ├── resolveTargetPath()               // Path resolution strategies
 │   │       ├── validateAnchorExists()            // Anchor existence check
 │   │       ├── generateSuggestion()              // Fuzzy match suggestions
-│   │       └── classifyLinkPattern()             // Link pattern classification
+│   │       ├── classifyLinkPattern()             // Link pattern classification
+│   │       └── detectNestedBacktickCodeblocks()  // File-level diagnostic: nested codeblocks
 │   │
 │   ├── types/
 │   │   └── validationTypes.ts                    // Validation type definitions
 │   │       ├── ValidationMetadata                // Discriminated union (status-based)
 │   │       ├── EnrichedLinkObject                // LinkObject + validation property
-│   │       └── ValidationResult                  // { summary, links } output
+│   │       ├── FileDiagnostic                    // File-level structural warning/error
+│   │       └── ValidationResult                  // { summary, links, diagnostics } output
 │   │
 │   └── factories/
 │       └── componentFactory.js                   // Factory instantiates CitationValidator with DI
@@ -278,11 +280,14 @@ TypeScript interfaces defining validator output structure. Source: `src/types/va
 export interface ValidationResult {
   summary: ValidationSummary;
   links: EnrichedLinkObject[];
+  diagnostics: FileDiagnostic[];
+  validationTime?: string;
 }
 ```
 
 - [**`ValidationSummary`**](#ValidationSummary%20Interface)
 - [**`EnrichedLinkObject`**](#EnrichedLinkObject%20Interface)
+- [**`FileDiagnostic`**](#FileDiagnostic%20Interface)
 
 #### ValidationSummary Interface
 
@@ -324,6 +329,37 @@ export type ValidationMetadata =
 ```
 
 > **Note**: TypeScript narrows `ValidationMetadata` based on `status` checks. When `status === "error"`, TypeScript makes `error` property available without additional type guards.
+
+#### FileDiagnostic Interface
+
+File-level structural warnings or errors not tied to a specific link. Used for issues like nested backtick codeblocks that affect document structure.
+
+```typescript
+export interface FileDiagnostic {
+  /** Line number where the issue was detected (1-based) */
+  line: number;
+  /** Severity level */
+  status: "warning" | "error";
+  /** Description of the structural issue */
+  message: string;
+  /** Optional fix suggestion */
+  suggestion?: string;
+}
+```
+
+**Source**: `src/types/validationTypes.ts`
+
+**Integration with ValidationSummary**: Diagnostic warning and error counts are merged into `ValidationSummary.warnings` and `ValidationSummary.errors` respectively, so callers see a single aggregate count combining both link-level and file-level issues.
+
+#### detectNestedBacktickCodeblocks()
+
+Private helper called during step 4 of `validateFile()`. Scans the file content for backtick codeblocks nested inside other backtick codeblocks and returns a `FileDiagnostic[]` for each detected nesting issue.
+
+- **Called by**: `validateFile()` (step 4, after link enrichment)
+- **Returns**: `FileDiagnostic[]` with `status: "warning"` for each nested codeblock detected
+- **Source**: `src/CitationValidator.ts` (line 716)
+
+---
 
 ## Validation Status Rules
 

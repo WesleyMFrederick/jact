@@ -22,17 +22,20 @@
  * @module jact
  */
 
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import type { CitationValidator } from "./CitationValidator.js";
-import type { FileCache } from "./FileCache.js";
-import type { ParsedFileCache } from "./ParsedFileCache.js";
 import {
 	checkExtractCache,
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
+import {
+	detectNestedCodeblocks,
+	type NestedCodeblockWarning,
+} from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import type { MarkdownParser } from "./core/MarkdownParser/index.js";
-import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
+import type { FileCache } from "./FileCache.js";
 import {
 	createCitationValidator,
 	createContentExtractor,
@@ -40,6 +43,8 @@ import {
 	createMarkdownParser,
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
+import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
+import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type { OutgoingLinksExtractedContent } from "./types/contentExtractorTypes.js";
 import type {
@@ -204,6 +209,10 @@ export class JactCli {
 
 			result.validationTime = `${((endTime - startTime) / 1000).toFixed(1)}s`;
 
+			// Detect nested backtick codeblocks (CLI-only diagnostic)
+			const fileContent = readFileSync(filePath, "utf8");
+			const nestedCodeblockWarnings = detectNestedCodeblocks(fileContent);
+
 			// Apply line range filtering if specified
 			if (options.lines) {
 				const filteredResult = this.filterResultsByLineRange(
@@ -213,13 +222,13 @@ export class JactCli {
 				if (options.format === "json") {
 					return this.formatAsJSON(filteredResult);
 				}
-				return this.formatForCLI(filteredResult);
+				return this.formatForCLI(filteredResult, nestedCodeblockWarnings);
 			}
 
 			if (options.format === "json") {
 				return this.formatAsJSON(result);
 			}
-			return this.formatForCLI(result);
+			return this.formatForCLI(result, nestedCodeblockWarnings);
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
@@ -304,13 +313,14 @@ export class JactCli {
 	 * @param result - Validation result object
 	 * @returns Formatted CLI output
 	 */
-	// biome-ignore lint/suspicious/noExplicitAny: pre-existing untyped formatter — discriminated union narrowing across chained methods needs refactor
-	private formatForCLI(result: any): string {
+	private formatForCLI(
+		result: ValidationResult & { lineRange?: string },
+		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
+	): string {
 		const lines: string[] = [];
 		lines.push("Citation Validation Report");
 		lines.push("==========================");
 		lines.push("");
-		lines.push(`File: ${result.file}`);
 		if (result.lineRange) {
 			lines.push(`Line Range: ${result.lineRange}`);
 		}
@@ -320,47 +330,65 @@ export class JactCli {
 		if (result.summary.errors > 0) {
 			lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
 			const errorLinks = result.links.filter(
-				(link: any) => link.validation.status === "error",
+				(link) => link.validation.status === "error",
 			);
-			errorLinks.forEach((link: any, index: number) => {
+			for (const [index, link] of errorLinks.entries()) {
 				const isLast = index === errorLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-				lines.push(`│  └─ ${link.validation.error}`);
-				if (link.validation.suggestion) {
-					lines.push(`│  └─ Suggestion: ${link.validation.suggestion}`);
+				if (link.validation.status === "error") {
+					lines.push(`│  └─ ${link.validation.error}`);
+					if (link.validation.suggestion) {
+						lines.push(`│  └─ Suggestion: ${link.validation.suggestion}`);
+					}
 				}
 				if (!isLast) lines.push("│");
-			});
+			}
 			lines.push("");
 		}
 
 		if (result.summary.warnings > 0) {
 			lines.push(`WARNINGS (${result.summary.warnings})`);
 			const warnLinks = result.links.filter(
-				(link: any) => link.validation.status === "warning",
+				(link) => link.validation.status === "warning",
 			);
-			warnLinks.forEach((link: any, index: number) => {
+			for (const [index, link] of warnLinks.entries()) {
 				const isLast = index === warnLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-				if (link.validation.suggestion) {
+				if (
+					link.validation.status === "warning" &&
+					link.validation.suggestion
+				) {
 					lines.push(`│  └─ ${link.validation.suggestion}`);
 				}
 				if (!isLast) lines.push("│");
-			});
+			}
 			lines.push("");
 		}
 
 		if (result.summary.valid > 0) {
 			lines.push(`VALID CITATIONS (${result.summary.valid})`);
 			const validLinks = result.links.filter(
-				(link: any) => link.validation.status === "valid",
+				(link) => link.validation.status === "valid",
 			);
-			validLinks.forEach((link: any, index: number) => {
+			for (const [index, link] of validLinks.entries()) {
 				const isLast = index === validLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
+			}
+			lines.push("");
+		}
+
+		if (nestedCodeblockWarnings.length > 0) {
+			lines.push(
+				`NESTED CODEBLOCK WARNINGS (${nestedCodeblockWarnings.length})`,
+			);
+			nestedCodeblockWarnings.forEach((warning, index) => {
+				const isLast = index === nestedCodeblockWarnings.length - 1;
+				const prefix = isLast ? "└─" : "├─";
+				lines.push(`${prefix} Line ${warning.line}: ${warning.message}`);
+				if (!isLast) lines.push("│");
 			});
 			lines.push("");
 		}
@@ -370,6 +398,11 @@ export class JactCli {
 		lines.push(`- Valid: ${result.summary.valid}`);
 		lines.push(`- Warnings: ${result.summary.warnings}`);
 		lines.push(`- Critical errors: ${result.summary.errors}`);
+		if (nestedCodeblockWarnings.length > 0) {
+			lines.push(
+				`- Nested codeblock warnings: ${nestedCodeblockWarnings.length}`,
+			);
+		}
 		lines.push(`- Validation time: ${result.validationTime}`);
 		lines.push("");
 
@@ -377,9 +410,14 @@ export class JactCli {
 			lines.push(
 				`VALIDATION FAILED - Fix ${result.summary.errors} critical errors`,
 			);
-		} else if (result.summary.warnings > 0) {
+		} else if (
+			result.summary.warnings > 0 ||
+			nestedCodeblockWarnings.length > 0
+		) {
+			const totalWarnings =
+				result.summary.warnings + nestedCodeblockWarnings.length;
 			lines.push(
-				`VALIDATION PASSED WITH WARNINGS - ${result.summary.warnings} issues to review`,
+				`VALIDATION PASSED WITH WARNINGS - ${totalWarnings} issues to review`,
 			);
 		} else {
 			lines.push("ALL CITATIONS VALID");
