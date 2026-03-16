@@ -1,4 +1,11 @@
-import type { FileDiagnostic } from "../../types/validationTypes.js";
+/**
+ * Result from nested codeblock detection.
+ * Simple internal type — not part of shared data contracts.
+ */
+export interface NestedCodeblockWarning {
+	line: number;
+	message: string;
+}
 
 /**
  * Detect backtick codeblocks nested inside other backtick codeblocks.
@@ -7,10 +14,12 @@ import type { FileDiagnostic } from "../../types/validationTypes.js";
  * (backtick inside tilde) from invalid nesting (backtick inside backtick).
  *
  * @param content - Full markdown file content
- * @returns Array of diagnostics for detected nesting issues
+ * @returns Array of warnings for detected nesting issues
  */
-export function detectNestedCodeblocks(content: string): FileDiagnostic[] {
-	const diagnostics: FileDiagnostic[] = [];
+export function detectNestedCodeblocks(
+	content: string,
+): NestedCodeblockWarning[] {
+	const warnings: NestedCodeblockWarning[] = [];
 	const lines = content.split("\n");
 
 	let inFenceType: "backtick" | "tilde" | null = null;
@@ -37,34 +46,29 @@ export function detectNestedCodeblocks(content: string): FileDiagnostic[] {
 			}
 		} else if (inFenceType === "backtick") {
 			if (isBacktickFence) {
-				// Another backtick fence inside a backtick block
-				// If the trimmed line has a language specifier (e.g., ```typescript), it's an inner opening
+				// If the line has a language specifier (e.g., ```typescript), it's an inner opening
 				const hasLangSpec = trimmed.length > 3 && !trimmed.endsWith("```");
 				if (hasLangSpec) {
-					// Inner opening backtick fence — this is the nested problem
-					diagnostics.push({
+					// Inner opening backtick fence — nested problem
+					warnings.push({
 						line: i + 1,
-						status: "warning",
-						message: `Nested backtick codeblock detected inside backtick block opened at line ${outerBacktickLine}`,
-						suggestion:
-							"Wrap the outer code block with ~~~ (tilde fences) instead of ``` to allow backtick blocks inside",
+						message: `Nested backtick codeblock detected inside backtick block opened at line ${outerBacktickLine}. Wrap the outer code block with ~~~ (tilde fences) instead.`,
 					});
-					// The outer block is now effectively broken, reset state
+					// Outer block is effectively broken, reset state
 					inFenceType = null;
 				} else {
 					// Closing backtick fence — normal close
 					inFenceType = null;
 				}
 			}
-			// Tilde fence inside backtick block — ignored (not part of our detection)
 		} else if (inFenceType === "tilde") {
 			if (isTildeFence) {
 				// Closing tilde fence
 				inFenceType = null;
 			}
-			// Backtick fence inside tilde block — valid nesting, no diagnostic
+			// Backtick fence inside tilde block — valid nesting, no warning
 		}
 	}
 
-	return diagnostics;
+	return warnings;
 }

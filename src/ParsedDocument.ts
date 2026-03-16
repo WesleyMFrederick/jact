@@ -1,7 +1,6 @@
 import type { Token } from "marked";
 import type {
 	AnchorObject,
-	FileDiagnostic,
 	LinkObject,
 	ParserOutput,
 } from "./types/citationTypes.js";

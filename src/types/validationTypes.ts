@@ -7,10 +7,7 @@
  * Reference: CitationValidator Component Guide - Output Contract
  */
 
-import type { FileDiagnostic, LinkObject } from "./citationTypes.js";
-
-// Re-export FileDiagnostic from citationTypes (canonical definition)
-export type { FileDiagnostic };
+import type { LinkObject } from "./citationTypes.js";
 
 /**
  * PathConversion metadata for path auto-fix suggestions
@@ -72,6 +69,5 @@ export interface ValidationSummary {
 export interface ValidationResult {
 	summary: ValidationSummary;
 	links: EnrichedLinkObject[];
-	diagnostics: FileDiagnostic[];
 	validationTime?: string;
 }

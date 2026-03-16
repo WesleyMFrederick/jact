@@ -8,7 +8,6 @@ import type {
 	ParserOutput,
 } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
-import { detectNestedCodeblocks } from "./detectNestedCodeblocks.js";
 import { extractAnchors } from "./extractAnchors.js";
 import { extractHeadings } from "./extractHeadings.js";
 import { extractLinks } from "./extractLinks.js";
@@ -85,7 +84,6 @@ export class MarkdownParser {
 			links: this.extractLinks(content, filePath),
 			headings,
 			anchors: this.extractAnchors(content, headings),
-			diagnostics: detectNestedCodeblocks(content),
 		};
 	}
 

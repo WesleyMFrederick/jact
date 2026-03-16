@@ -22,17 +22,17 @@
  * @module jact
  */
 
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import type { CitationValidator } from "./CitationValidator.js";
-import type { FileCache } from "./FileCache.js";
-import type { ParsedFileCache } from "./ParsedFileCache.js";
 import {
 	checkExtractCache,
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
+import { detectNestedCodeblocks } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import type { MarkdownParser } from "./core/MarkdownParser/index.js";
-import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
+import type { FileCache } from "./FileCache.js";
 import {
 	createCitationValidator,
 	createContentExtractor,
@@ -40,6 +40,8 @@ import {
 	createMarkdownParser,
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
+import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
+import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type { OutgoingLinksExtractedContent } from "./types/contentExtractorTypes.js";
 import type {
