@@ -724,41 +724,9 @@ export class CitationValidator {
 
 		const lines = content.split("\n");
 
-		// Track fence state: which type of fence opened the current block
+		// Detect backtick fences nested inside other backtick fences.
+		// Track fence type to distinguish valid nesting (backtick inside tilde) from invalid.
 		let inFenceType: "backtick" | "tilde" | null = null;
-
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
-			if (line === undefined) continue;
-			const trimmed = line.trim();
-
-			const isBacktickFence = trimmed.startsWith("```");
-			const isTildeFence = trimmed.startsWith("~~~");
-
-			if (!isBacktickFence && !isTildeFence) continue;
-
-			if (inFenceType === null) {
-				// Opening a new fence
-				inFenceType = isBacktickFence ? "backtick" : "tilde";
-			} else if (
-				(inFenceType === "backtick" && isBacktickFence) ||
-				(inFenceType === "tilde" && isTildeFence)
-			) {
-				// Closing fence matches opening type — close the block
-				inFenceType = null;
-			} else if (inFenceType === "backtick" && isBacktickFence) {
-				// This case is already handled above (closing)
-			} else if (inFenceType === "tilde" && isBacktickFence) {
-				// Backtick inside tilde — valid nesting, skip
-			} else if (inFenceType === "backtick" && isTildeFence) {
-				// Tilde inside backtick — valid nesting, skip
-			}
-		}
-
-		// Second pass: detect the actual nesting problem
-		// A nested backtick occurs when a backtick fence appears inside another backtick fence
-		// Simple approach: track backtick fences and detect when an inner one causes premature closing
-		inFenceType = null;
 		let outerBacktickLine = 0;
 
 		for (let i = 0; i < lines.length; i++) {
