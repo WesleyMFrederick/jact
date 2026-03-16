@@ -1000,21 +1000,6 @@ export class CitationValidator {
 		return null;
 	}
 
-	private generateAnchorSuggestions(
-		anchor: string,
-		availableAnchors: string[],
-	): string[] {
-		// Simple similarity matching - could be enhanced with fuzzy matching
-		const searchTerm = anchor.toLowerCase();
-		return availableAnchors
-			.filter(
-				(a) =>
-					a.toLowerCase().includes(searchTerm) ||
-					searchTerm.includes(a.toLowerCase()),
-			)
-			.slice(0, 5);
-	}
-
 	/**
 	 * Check if the source file and target file are in the same directory.
 	 * Used to detect cross-directory resolutions that should trigger warnings.

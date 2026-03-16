@@ -1,7 +1,7 @@
 // src/types/citationTypes.ts
 
-import type { Token } from 'marked';
-import type { ValidationMetadata } from './validationTypes.js';
+import type { Token } from "marked";
+import type { ValidationMetadata } from "./validationTypes.js";
 
 /**
  * Link scope classification for citation validation.
@@ -77,7 +77,6 @@ export interface LinkObject {
 	/** Validation metadata (enriched during validation) */
 	validation?: ValidationMetadata;
 }
-
 
 /**
  * Anchor object representing a potential link target in a markdown document.

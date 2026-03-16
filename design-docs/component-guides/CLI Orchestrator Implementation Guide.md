@@ -825,6 +825,12 @@ field result = await this.contentExtractor.extractContent([validatedLink], { ...
     return JSON.stringify(result, null, 2)
 ```
 
+### Diagnostics in ValidationResult
+
+`ValidationResult` now includes a `diagnostics: FileDiagnostic[]` field containing file-level structural warnings and errors (e.g., nested backtick codeblocks). Diagnostic warning/error counts are merged into `ValidationSummary` totals, so `summary.warnings` and `summary.errors` reflect both link-level and file-level issues.
+
+> **Known gap**: Diagnostics are returned in the `ValidationResult` but are **not yet rendered** in CLI output. Neither the CLI tree format (`formatForCLI`) nor the JSON format (`formatAsJSON`) displays individual diagnostic entries. The summary counts include diagnostics, but the diagnostic details (line, message, suggestion) are not surfaced to the user. This is a known follow-up item.
+
 ---
 
 ## Commander.js Integration

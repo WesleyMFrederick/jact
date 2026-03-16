@@ -214,6 +214,19 @@ sequenceDiagram
 
 ```
 
+#### Protocol Skip List
+
+`extractLinks` filters out external and protocol-prefixed links before creating `LinkObject` entries. Links with any of the following prefixes are skipped (not included in `ParserOutput.links[]`):
+
+- `http://`
+- `https://`
+- `vscode://`
+- `mailto:`
+
+This ensures only local document references (relative paths, internal anchors, wiki-links) are returned to callers. The skip occurs early in token processing; child tokens of skipped links are still recursed into for nested link discovery.
+
+**Source**: `src/core/MarkdownParser/extractLinks.ts` (lines 150-155)
+
 ---
 ## Data Contracts
 

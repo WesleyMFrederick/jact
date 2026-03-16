@@ -1,8 +1,8 @@
 import type { Token } from "marked";
 import type {
-	ParserOutput,
-	LinkObject,
 	AnchorObject,
+	LinkObject,
+	ParserOutput,
 } from "./types/citationTypes.js";
 
 /**
@@ -78,8 +78,14 @@ class ParsedDocument {
 				if (decodedUrlEncodedId === decodedAnchorId) return true;
 
 				// Also try: strip colons from id and compare to decoded anchor
-				const idWithoutColons = a.id.replace(/:/g, "").replace(/\s+/g, " ").trim();
-				const decodedWithoutColons = decodedAnchorId.replace(/:/g, "").replace(/\s+/g, " ").trim();
+				const idWithoutColons = a.id
+					.replace(/:/g, "")
+					.replace(/\s+/g, " ")
+					.trim();
+				const decodedWithoutColons = decodedAnchorId
+					.replace(/:/g, "")
+					.replace(/\s+/g, " ")
+					.trim();
 				if (idWithoutColons === decodedWithoutColons) return true;
 			}
 
@@ -175,7 +181,8 @@ class ParsedDocument {
 				// Found our target heading? Use normalized comparison for Obsidian characters
 				if (
 					token.type === "heading" &&
-					this._normalizeObsidianHeading(token.text) === normalizedHeadingText &&
+					this._normalizeObsidianHeading(token.text) ===
+						normalizedHeadingText &&
 					token.depth === targetLevel
 				) {
 					targetIndex = currentIndex;
@@ -184,7 +191,11 @@ class ParsedDocument {
 				// Recurse into nested tokens ONLY if token.raw doesn't already include child content
 				// Skip for: heading, paragraph (their .raw includes full content with inline formatting)
 				// Recurse for: list, list_item, blockquote, table (structural tokens where .raw is minimal)
-				if ("tokens" in token && token.tokens && !this._tokenIncludesChildrenInRaw(token.type)) {
+				if (
+					"tokens" in token &&
+					token.tokens &&
+					!this._tokenIncludesChildrenInRaw(token.type)
+				) {
 					walkTokens(token.tokens);
 				}
 			}
@@ -197,7 +208,8 @@ class ParsedDocument {
 
 		// Phase 2: Find section boundary (next same-or-higher level heading)
 		const targetToken = orderedTokens[targetIndex];
-		const targetHeadingLevel = targetToken?.type === "heading" ? targetToken.depth : 1;
+		const targetHeadingLevel =
+			targetToken?.type === "heading" ? targetToken.depth : 1;
 		let endIndex = orderedTokens.length; // Default: to end of file
 
 		for (let i = targetIndex + 1; i < orderedTokens.length; i++) {
@@ -256,14 +268,14 @@ class ParsedDocument {
 	 */
 	private _normalizeObsidianHeading(text: string): string {
 		return text
-			.replace(/:/g, "")      // Remove colons
-			.replace(/#/g, "")      // Remove hash
-			.replace(/\|/g, "")     // Remove pipe
-			.replace(/\^/g, "")     // Remove caret
-			.replace(/%%/g, "")     // Remove comment markers
-			.replace(/\[\[/g, "")   // Remove wiki open
-			.replace(/\]\]/g, "")   // Remove wiki close
-			.replace(/\s+/g, " ")   // Collapse whitespace (matches URL-encoded anchor generation)
+			.replace(/:/g, "") // Remove colons
+			.replace(/#/g, "") // Remove hash
+			.replace(/\|/g, "") // Remove pipe
+			.replace(/\^/g, "") // Remove caret
+			.replace(/%%/g, "") // Remove comment markers
+			.replace(/\[\[/g, "") // Remove wiki open
+			.replace(/\]\]/g, "") // Remove wiki close
+			.replace(/\s+/g, " ") // Collapse whitespace (matches URL-encoded anchor generation)
 			.trim();
 	}
 
