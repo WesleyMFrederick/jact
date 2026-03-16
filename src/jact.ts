@@ -313,9 +313,8 @@ export class JactCli {
 	 * @param result - Validation result object
 	 * @returns Formatted CLI output
 	 */
-	// biome-ignore lint/suspicious/noExplicitAny: pre-existing untyped formatter — discriminated union narrowing across chained methods needs refactor
 	private formatForCLI(
-		result: any,
+		result: ValidationResult,
 		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
 	): string {
 		const lines: string[] = [];
@@ -332,9 +331,9 @@ export class JactCli {
 		if (result.summary.errors > 0) {
 			lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
 			const errorLinks = result.links.filter(
-				(link: any) => link.validation.status === "error",
+				(link) => link.validation.status === "error",
 			);
-			errorLinks.forEach((link: any, index: number) => {
+			errorLinks.forEach((link, index) => {
 				const isLast = index === errorLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
@@ -350,9 +349,9 @@ export class JactCli {
 		if (result.summary.warnings > 0) {
 			lines.push(`WARNINGS (${result.summary.warnings})`);
 			const warnLinks = result.links.filter(
-				(link: any) => link.validation.status === "warning",
+				(link) => link.validation.status === "warning",
 			);
-			warnLinks.forEach((link: any, index: number) => {
+			warnLinks.forEach((link, index) => {
 				const isLast = index === warnLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
@@ -367,12 +366,25 @@ export class JactCli {
 		if (result.summary.valid > 0) {
 			lines.push(`VALID CITATIONS (${result.summary.valid})`);
 			const validLinks = result.links.filter(
-				(link: any) => link.validation.status === "valid",
+				(link) => link.validation.status === "valid",
 			);
-			validLinks.forEach((link: any, index: number) => {
+			validLinks.forEach((link, index) => {
 				const isLast = index === validLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
+			});
+			lines.push("");
+		}
+
+		if (nestedCodeblockWarnings.length > 0) {
+			lines.push(
+				`NESTED CODEBLOCK WARNINGS (${nestedCodeblockWarnings.length})`,
+			);
+			nestedCodeblockWarnings.forEach((warning, index) => {
+				const isLast = index === nestedCodeblockWarnings.length - 1;
+				const prefix = isLast ? "└─" : "├─";
+				lines.push(`${prefix} Line ${warning.line}: ${warning.message}`);
+				if (!isLast) lines.push("│");
 			});
 			lines.push("");
 		}
@@ -382,6 +394,11 @@ export class JactCli {
 		lines.push(`- Valid: ${result.summary.valid}`);
 		lines.push(`- Warnings: ${result.summary.warnings}`);
 		lines.push(`- Critical errors: ${result.summary.errors}`);
+		if (nestedCodeblockWarnings.length > 0) {
+			lines.push(
+				`- Nested codeblock warnings: ${nestedCodeblockWarnings.length}`,
+			);
+		}
 		lines.push(`- Validation time: ${result.validationTime}`);
 		lines.push("");
 
@@ -389,9 +406,14 @@ export class JactCli {
 			lines.push(
 				`VALIDATION FAILED - Fix ${result.summary.errors} critical errors`,
 			);
-		} else if (result.summary.warnings > 0) {
+		} else if (
+			result.summary.warnings > 0 ||
+			nestedCodeblockWarnings.length > 0
+		) {
+			const totalWarnings =
+				result.summary.warnings + nestedCodeblockWarnings.length;
 			lines.push(
-				`VALIDATION PASSED WITH WARNINGS - ${result.summary.warnings} issues to review`,
+				`VALIDATION PASSED WITH WARNINGS - ${totalWarnings} issues to review`,
 			);
 		} else {
 			lines.push("ALL CITATIONS VALID");
