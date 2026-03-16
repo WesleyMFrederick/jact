@@ -1,9 +1,10 @@
-import { existsSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type ParsedDocument from "./ParsedDocument.js";
 import type { AnchorObject, LinkObject } from "./types/citationTypes.js";
 import type {
 	EnrichedLinkObject,
+	FileDiagnostic,
 	PathConversion,
 	ValidationMetadata,
 	ValidationResult,
@@ -214,23 +215,34 @@ export class CitationValidator {
 			}),
 		);
 
-		// 4. Generate summary from enriched links
+		// 4. Run file-level diagnostics (e.g., nested codeblock detection)
+		const diagnostics = this.detectNestedBacktickCodeblocks(filePath);
+
+		// 5. Generate summary from enriched links + diagnostics
 		const enrichedLinks = links as unknown as ValidationResult["links"];
+		const diagnosticWarnings = diagnostics.filter(
+			(d) => d.status === "warning",
+		).length;
+		const diagnosticErrors = diagnostics.filter(
+			(d) => d.status === "error",
+		).length;
 		const summary: ValidationSummary = {
 			total: enrichedLinks.length,
 			valid: enrichedLinks.filter((link) => link.validation.status === "valid")
 				.length,
-			warnings: enrichedLinks.filter(
-				(link) => link.validation.status === "warning",
-			).length,
-			errors: enrichedLinks.filter((link) => link.validation.status === "error")
-				.length,
+			warnings:
+				enrichedLinks.filter((link) => link.validation.status === "warning")
+					.length + diagnosticWarnings,
+			errors:
+				enrichedLinks.filter((link) => link.validation.status === "error")
+					.length + diagnosticErrors,
 		};
 
-		// 5. Return enriched links + summary (no separate results array)
+		// 6. Return enriched links + diagnostics + summary
 		return {
 			summary,
 			links: enrichedLinks,
+			diagnostics,
 		};
 	}
 
@@ -697,6 +709,112 @@ export class CitationValidator {
 		return this.createValidationResult(citation, "valid");
 	}
 
+	/**
+	 * Detect backtick codeblocks nested inside other backtick codeblocks.
+	 * Returns diagnostics for each detected nesting issue.
+	 */
+	private detectNestedBacktickCodeblocks(filePath: string): FileDiagnostic[] {
+		const diagnostics: FileDiagnostic[] = [];
+		let content: string;
+		try {
+			content = readFileSync(filePath, "utf-8");
+		} catch {
+			return diagnostics;
+		}
+
+		const lines = content.split("\n");
+
+		// Track fence state: which type of fence opened the current block
+		let inFenceType: "backtick" | "tilde" | null = null;
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			if (line === undefined) continue;
+			const trimmed = line.trim();
+
+			const isBacktickFence = trimmed.startsWith("```");
+			const isTildeFence = trimmed.startsWith("~~~");
+
+			if (!isBacktickFence && !isTildeFence) continue;
+
+			if (inFenceType === null) {
+				// Opening a new fence
+				inFenceType = isBacktickFence ? "backtick" : "tilde";
+			} else if (
+				(inFenceType === "backtick" && isBacktickFence) ||
+				(inFenceType === "tilde" && isTildeFence)
+			) {
+				// Closing fence matches opening type — close the block
+				inFenceType = null;
+			} else if (inFenceType === "backtick" && isBacktickFence) {
+				// This case is already handled above (closing)
+			} else if (inFenceType === "tilde" && isBacktickFence) {
+				// Backtick inside tilde — valid nesting, skip
+			} else if (inFenceType === "backtick" && isTildeFence) {
+				// Tilde inside backtick — valid nesting, skip
+			}
+		}
+
+		// Second pass: detect the actual nesting problem
+		// A nested backtick occurs when a backtick fence appears inside another backtick fence
+		// Simple approach: track backtick fences and detect when an inner one causes premature closing
+		inFenceType = null;
+		let outerBacktickLine = 0;
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			if (line === undefined) continue;
+			const trimmed = line.trim();
+
+			const isBacktickFence = trimmed.startsWith("```");
+			const isTildeFence =
+				trimmed.startsWith("~~~") && !trimmed.startsWith("```");
+
+			if (!isBacktickFence && !isTildeFence) continue;
+
+			if (inFenceType === null) {
+				// Opening a new code block
+				if (isBacktickFence) {
+					inFenceType = "backtick";
+					outerBacktickLine = i + 1; // 1-based
+				} else {
+					inFenceType = "tilde";
+				}
+			} else if (inFenceType === "backtick") {
+				if (isBacktickFence) {
+					// Another backtick fence inside a backtick block
+					// Check if this is really a closing fence or an inner opening
+					// If the trimmed line has a language specifier (e.g., ```typescript), it's an inner opening
+					const hasLangSpec = trimmed.length > 3 && !trimmed.endsWith("```");
+					if (hasLangSpec) {
+						// Inner opening backtick fence — this is the nested problem
+						diagnostics.push({
+							line: i + 1,
+							status: "warning",
+							message: `Nested backtick codeblock detected inside backtick block opened at line ${outerBacktickLine}`,
+							suggestion:
+								"Wrap the outer code block with ~~~ (tilde fences) instead of ``` to allow backtick blocks inside",
+						});
+						// The outer block is now effectively broken, reset state
+						inFenceType = null;
+					} else {
+						// Closing backtick fence — normal close
+						inFenceType = null;
+					}
+				}
+				// Tilde fence inside backtick block — ignored (not part of our detection)
+			} else if (inFenceType === "tilde") {
+				if (isTildeFence) {
+					// Closing tilde fence
+					inFenceType = null;
+				}
+				// Backtick fence inside tilde block — valid nesting, no diagnostic
+			}
+		}
+
+		return diagnostics;
+	}
+
 	private resolveTargetPath(relativePath: string, sourceFile: string): string {
 		// Decode URL encoding in paths (e.g., %20 becomes space)
 		const decodedRelativePath = decodeURIComponent(relativePath);
@@ -998,21 +1116,6 @@ export class CitationValidator {
 		}
 
 		return null;
-	}
-
-	private generateAnchorSuggestions(
-		anchor: string,
-		availableAnchors: string[],
-	): string[] {
-		// Simple similarity matching - could be enhanced with fuzzy matching
-		const searchTerm = anchor.toLowerCase();
-		return availableAnchors
-			.filter(
-				(a) =>
-					a.toLowerCase().includes(searchTerm) ||
-					searchTerm.includes(a.toLowerCase()),
-			)
-			.slice(0, 5);
 	}
 
 	/**
