@@ -206,6 +206,10 @@ export class JactCli {
 
 			result.validationTime = `${((endTime - startTime) / 1000).toFixed(1)}s`;
 
+			// Detect nested backtick codeblocks (CLI-only diagnostic)
+			const fileContent = readFileSync(filePath, "utf8");
+			const nestedCodeblockWarnings = detectNestedCodeblocks(fileContent);
+
 			// Apply line range filtering if specified
 			if (options.lines) {
 				const filteredResult = this.filterResultsByLineRange(
@@ -215,13 +219,13 @@ export class JactCli {
 				if (options.format === "json") {
 					return this.formatAsJSON(filteredResult);
 				}
-				return this.formatForCLI(filteredResult);
+				return this.formatForCLI(filteredResult, nestedCodeblockWarnings);
 			}
 
 			if (options.format === "json") {
 				return this.formatAsJSON(result);
 			}
-			return this.formatForCLI(result);
+			return this.formatForCLI(result, nestedCodeblockWarnings);
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
