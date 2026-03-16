@@ -30,7 +30,10 @@ import {
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
-import { detectNestedCodeblocks } from "./core/MarkdownParser/detectNestedCodeblocks.js";
+import {
+	detectNestedCodeblocks,
+	type NestedCodeblockWarning,
+} from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import type { MarkdownParser } from "./core/MarkdownParser/index.js";
 import type { FileCache } from "./FileCache.js";
 import {
@@ -311,7 +314,10 @@ export class JactCli {
 	 * @returns Formatted CLI output
 	 */
 	// biome-ignore lint/suspicious/noExplicitAny: pre-existing untyped formatter — discriminated union narrowing across chained methods needs refactor
-	private formatForCLI(result: any): string {
+	private formatForCLI(
+		result: any,
+		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
+	): string {
 		const lines: string[] = [];
 		lines.push("Citation Validation Report");
 		lines.push("==========================");
