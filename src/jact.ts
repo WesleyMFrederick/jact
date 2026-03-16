@@ -314,14 +314,13 @@ export class JactCli {
 	 * @returns Formatted CLI output
 	 */
 	private formatForCLI(
-		result: ValidationResult,
+		result: ValidationResult & { lineRange?: string },
 		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
 	): string {
 		const lines: string[] = [];
 		lines.push("Citation Validation Report");
 		lines.push("==========================");
 		lines.push("");
-		lines.push(`File: ${result.file}`);
 		if (result.lineRange) {
 			lines.push(`Line Range: ${result.lineRange}`);
 		}
@@ -333,16 +332,18 @@ export class JactCli {
 			const errorLinks = result.links.filter(
 				(link) => link.validation.status === "error",
 			);
-			errorLinks.forEach((link, index) => {
+			for (const [index, link] of errorLinks.entries()) {
 				const isLast = index === errorLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-				lines.push(`│  └─ ${link.validation.error}`);
-				if (link.validation.suggestion) {
-					lines.push(`│  └─ Suggestion: ${link.validation.suggestion}`);
+				if (link.validation.status === "error") {
+					lines.push(`│  └─ ${link.validation.error}`);
+					if (link.validation.suggestion) {
+						lines.push(`│  └─ Suggestion: ${link.validation.suggestion}`);
+					}
 				}
 				if (!isLast) lines.push("│");
-			});
+			}
 			lines.push("");
 		}
 
@@ -351,15 +352,18 @@ export class JactCli {
 			const warnLinks = result.links.filter(
 				(link) => link.validation.status === "warning",
 			);
-			warnLinks.forEach((link, index) => {
+			for (const [index, link] of warnLinks.entries()) {
 				const isLast = index === warnLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-				if (link.validation.suggestion) {
+				if (
+					link.validation.status === "warning" &&
+					link.validation.suggestion
+				) {
 					lines.push(`│  └─ ${link.validation.suggestion}`);
 				}
 				if (!isLast) lines.push("│");
-			});
+			}
 			lines.push("");
 		}
 
@@ -368,11 +372,11 @@ export class JactCli {
 			const validLinks = result.links.filter(
 				(link) => link.validation.status === "valid",
 			);
-			validLinks.forEach((link, index) => {
+			for (const [index, link] of validLinks.entries()) {
 				const isLast = index === validLinks.length - 1;
 				const prefix = isLast ? "└─" : "├─";
 				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-			});
+			}
 			lines.push("");
 		}
 
