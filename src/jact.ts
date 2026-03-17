@@ -23,7 +23,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { Command } from "commander";
+import { Command, Option } from "commander";
 import type { CitationValidator } from "./CitationValidator.js";
 import {
 	checkExtractCache,
@@ -44,9 +44,13 @@ import {
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
+import { formatExtractResult } from "./formatExtractResult.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
-import type { OutgoingLinksExtractedContent } from "./types/contentExtractorTypes.js";
+import type {
+	CliExtractOptions,
+	OutgoingLinksExtractedContent,
+} from "./types/contentExtractorTypes.js";
 import type {
 	EnrichedLinkObject,
 	ValidationResult,
@@ -64,15 +68,7 @@ interface CliValidateOptions {
 	fix?: boolean;
 }
 
-/**
- * Options for extraction and file operations.
- */
-interface CliExtractOptions {
-	scope?: string;
-	format?: string;
-	fullFiles?: boolean;
-	session?: string;
-}
+// D-003: CliExtractOptions imported from ./types/contentExtractorTypes.js (canonical type)
 
 /**
  * Line range parsed from input string.
@@ -1234,7 +1230,11 @@ extractCmd
 	.argument("<target-file>", "Markdown file to extract from")
 	.argument("<header-name>", "Exact header text to extract")
 	.option("--scope <folder>", "Limit file resolution scope")
-	.option("--format <type>", "Output format (json)", "json")
+	.addOption(
+		new Option("--format <type>", "Output format")
+			.choices(["markdown", "json"])
+			.default("markdown"),
+	)
 	.addHelpText(
 		"after",
 		`
@@ -1266,10 +1266,11 @@ Exit Codes:
 					options,
 				);
 
-				// Decision: Output JSON to stdout if extraction succeeded
+				// D-001: Format output based on --format flag (default: markdown)
 				if (result) {
-					// Boundary: JSON output to stdout
-					console.log(JSON.stringify(result, null, 2));
+					console.log(
+						formatExtractResult(result, options.format ?? "markdown"),
+					);
 					process.exitCode = 0;
 				}
 				// Note: Error exit codes set by extractHeader() method

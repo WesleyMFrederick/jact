@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { runCLI } from "../helpers/cli-runner.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { runCLI } from "../helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,7 +20,7 @@ describe("CLI - extract header command", () => {
 
 		// When: Run extract header command
 		const output = runCLI(
-			`node dist/jact.js extract header "${targetFile}" "${headerName}"`,
+			`node dist/jact.js extract header "${targetFile}" "${headerName}" --format json`,
 			{ captureStderr: true },
 		);
 
@@ -90,9 +90,7 @@ describe("CLI - extract header command", () => {
 describe("CLI Help Documentation", () => {
 	it("should show extract header in top-level help", async () => {
 		// When: Request top-level extract help
-		const output = runCLI(
-			"node dist/jact.js extract --help",
-		);
+		const output = runCLI("node dist/jact.js extract --help");
 
 		// Then: Help lists header subcommand
 		// Verification: US2.4 AC10 top-level help
@@ -102,9 +100,7 @@ describe("CLI Help Documentation", () => {
 
 	it("should show detailed help for extract header subcommand", async () => {
 		// When: Request subcommand help
-		const output = runCLI(
-			"node dist/jact.js extract header --help",
-		);
+		const output = runCLI("node dist/jact.js extract header --help");
 
 		// Then: Detailed usage and examples shown
 		// Verification: US2.4 AC10 subcommand help
