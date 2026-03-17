@@ -1,5 +1,8 @@
-import type { LinkObject } from './citationTypes.js';
-import type { EnrichedLinkObject, ValidationResult } from './validationTypes.js';
+import type { LinkObject } from "./citationTypes.js";
+import type {
+	EnrichedLinkObject,
+	ValidationResult,
+} from "./validationTypes.js";
 
 /**
  * CLI flags affecting content extraction behavior.
@@ -17,7 +20,7 @@ export interface CliFlags {
 export interface ExtractionEligibilityStrategy {
 	getDecision(
 		link: LinkObject,
-		cliFlags: CliFlags
+		cliFlags: CliFlags,
 	): { eligible: boolean; reason: string } | null;
 }
 
@@ -118,8 +121,9 @@ export interface CliValidateOptions {
  */
 export interface CliExtractOptions {
 	scope?: string;
-	format?: string;
+	format?: "markdown" | "json";
 	fullFiles?: boolean;
+	session?: string;
 }
 
 /**

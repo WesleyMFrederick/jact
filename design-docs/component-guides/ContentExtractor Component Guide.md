@@ -977,7 +977,7 @@ The ContentExtractor component follows the workspace testing principle of **"Rea
 
 ### Issue 3: Deferred US2.3 CLI Features (Future Enhancement)
 
-**Description**: Output formatting, file writing, and --output option deferred from US2.3 acceptance criteria.
+**Description**: File writing and --output option deferred. Output formatting partially implemented: `extract header` defaults to markdown. `extract links` and `extract file` remain JSON-only.
 
 **Deferred Features**:
 - **Output Formatting (AC5)**: `--format` option for json/markdown/summary output styles
@@ -995,8 +995,8 @@ The ContentExtractor component follows the workspace testing principle of **"Rea
 **Future Implementation Path**:
 1. Implement basic `--output <file>` for write-to-file
 2. Add `--append` modifier for append mode with JSON merging
-3. Add `--format` option for alternative output styles (markdown, summary, table)
-4. Ensure backward compatibility (stdout JSON remains default)
+3. ~~Add `--format` option for alternative output styles~~ — Partially done: `extract header` supports `--format markdown|json` (default: markdown). Extend to `extract links` and `extract file` when needed.
+4. Ensure backward compatibility (stdout JSON remains default for extract links/file)
 
 **Status**: Documented for future Epic 2 iterations or separate enhancement epic
 **Deferral Date**: 2025-10-28 (US2.3 scope reduction)

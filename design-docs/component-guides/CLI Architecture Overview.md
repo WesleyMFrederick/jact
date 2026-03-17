@@ -687,11 +687,11 @@ process.exit(parsed.summary?.errors > 0 ? 1 : 0);
 ### MVP-First Approach
 ^[cite: ../../../../design-docs/Architecture Principles.md#^mvp-first]
 
-**Application**: Extract command (US2.3) outputs raw JSON to stdout, deferring formatted output and file writing to future work. Validates concept (content extraction workflow) without over-engineering output layer.
+**Application**: Extract header defaults to raw markdown output for Claude Code skill injection. JSON available via `--format json`. Extract links and extract file retain JSON default.
 
 **Scope Decisions**:
-- **Included**: JSON output to stdout (proves extraction works)
-- **Deferred**: Formatted markdown output, file writing, custom templates
+- **Included**: Markdown default for extract header, JSON opt-in via --format json
+- **Deferred**: File writing, custom templates, markdown default for extract links/file
 
 ---
 

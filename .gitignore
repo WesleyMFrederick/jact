@@ -36,12 +36,9 @@ Thumbs.db
 # Claude-trace specific
 .claude-trace/
 *.jsonl
-.claude/
-.claude/settings.local.json
 
-# Keep .claude/ directory but ignore .jsonl files within it
-!.claude/
-.claude/**/*.jsonl
+# Claude Code plugin (copied from local hub)
+.claude/
 
 # Logs
 logs/
