@@ -178,9 +178,9 @@ function extractLinksFromTokens(
 						rawPath = href.substring(0, hashIndex);
 						anchor = href.substring(hashIndex + 1);
 					} else {
-						// Strip trailing line-range suffix (e.g. ":17-36" or ":5")
-						// from footnote paths before resolution
-						rawPath = href.replace(/:\d+(-\d+)?$/, "");
+						// Strip trailing line-reference suffix from footnote paths before resolution.
+						// Supports: ":17", ":17-36", ":L57", ":L57-L61", ":L57,L61", ":L57,L61,L65"
+						rawPath = href.replace(/:L?\d+([,-]L?\d+)*$/, "");
 					}
 				}
 
