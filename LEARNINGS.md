@@ -6,3 +6,10 @@
 - [F-ID: During TDD, run tests directly after editing .ts source. Only build when verifying CLI behavior or before commit.]
 
 [^L-001]: User correction: "Always build after making changes. Is vite set up to autobuild"
+
+### 2. Always run npm run build after tests pass (2026-03-25 10:58)
+- [OBS: User friction — "did you build jact? I always want you to build it after tests pass so other repos can use it"]
+- [F-ID: jact is consumed by other repos via `npm link`. The linked binary points to `dist/`, so a stale build means other repos get stale behavior.]
+- **Rule: After tests pass, ALWAYS run `npm run build`. No exceptions. Other repos depend on the compiled output.**
+
+[^L-002]: User correction: "did you build jact? I always want you to build it after tests pass so other repos can use it"
