@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 
 /**
@@ -7,8 +8,15 @@ import { dirname, isAbsolute, resolve } from "node:path";
  * @param sourceAbsolutePath - The absolute path of the source file
  * @returns Absolute path or null if resolution fails
  */
-export function resolvePath(rawPath: string, sourceAbsolutePath: string): string | null {
+export function resolvePath(
+	rawPath: string,
+	sourceAbsolutePath: string,
+): string | null {
 	if (!rawPath || !sourceAbsolutePath) return null;
+
+	if (rawPath.startsWith("~/")) {
+		rawPath = resolve(homedir(), rawPath.slice(2));
+	}
 
 	if (isAbsolute(rawPath)) {
 		return rawPath;
