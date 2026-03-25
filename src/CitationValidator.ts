@@ -1,4 +1,5 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type ParsedDocument from "./ParsedDocument.js";
 import type { AnchorObject, LinkObject } from "./types/citationTypes.js";
@@ -700,6 +701,14 @@ export class CitationValidator {
 	private resolveTargetPath(relativePath: string, sourceFile: string): string {
 		// Decode URL encoding in paths (e.g., %20 becomes space)
 		const decodedRelativePath = decodeURIComponent(relativePath);
+
+		// Strategy 0: Expand tilde to home directory (e.g., ~/.claude/...)
+		if (decodedRelativePath.startsWith("~/")) {
+			const expandedPath = resolve(homedir(), decodedRelativePath.slice(2));
+			if (this.isFile(expandedPath)) {
+				return expandedPath;
+			}
+		}
 
 		// Strategy 1: Standard relative path resolution with decoded path
 		const sourceDir = dirname(sourceFile);
