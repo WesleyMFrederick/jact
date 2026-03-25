@@ -13,3 +13,11 @@
 - **Rule: After tests pass, ALWAYS run `npm run build`. No exceptions. Other repos depend on the compiled output.**
 
 [^L-002]: User correction: "did you build jact? I always want you to build it after tests pass so other repos can use it"
+
+### 3. "Push to PR" means commit + push + create PR in one flow (2026-03-25 11:15)
+- [OBS: User said "push to pr" — expected commit, push, and PR creation as a single uninterrupted flow]
+- [OBS: I stopped after push to ask "want me to create a PR?" which broke the flow]
+- [F-ID: "push to pr" is a compound instruction. Execute all steps: commit → push → create PR. Do not pause to ask between steps.]
+- **Rule: When user says "push to pr", execute the full pipeline without stopping to ask.**
+
+[^L-003]: User correction: "push to pr" followed by "#USER-FRICTION:" and "What did I originally fucking ask you to do?"
