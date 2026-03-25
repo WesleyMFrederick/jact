@@ -21,3 +21,12 @@
 - **Rule: When user says "push to pr", execute the full pipeline without stopping to ask.**
 
 [^L-003]: User correction: "push to pr" followed by "#USER-FRICTION:" and "What did I originally fucking ask you to do?"
+
+### 4. Never make commits after pushing a PR without including them in the PR (2026-03-25 11:25)
+- [OBS: Made a LEARNINGS commit after pushing PR #24. User merged before the new push landed. Commit stranded on dead branch.]
+- [OBS: Attempted `git branch -D` to clean up, which would have destroyed the stranded commit. Sandbox hook blocked it.]
+- [F-ID: Any commit made after a PR push must either: (a) be pushed to the same PR before merge, or (b) go on a new branch with its own PR.]
+- [F-ID: Sandboxed recovery for stranded commits: `git checkout -b new-branch stranded-branch` → `git rebase main` → push → new PR.]
+- **Rule: Do not make local commits between pushing a PR and confirming it's merged. If you must, push immediately.**
+
+[^L-004]: User correction: explained that force-deleting the branch would lose the learning, and asked how to resolve while sandboxed
