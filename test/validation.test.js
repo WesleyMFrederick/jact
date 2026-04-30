@@ -20,9 +20,8 @@ describe("JACT Integration Tests", () => {
 				},
 			);
 
-			expect(output).toContain("ALL CITATIONS VALID");
-			expect(output).toContain("Total citations:");
-			expect(output).toContain("Validation time:");
+			// Minimal default output: single OK line (SC-1)
+			expect(output).toMatch(/^OK: \d+ citations valid$/m);
 		} catch (error) {
 			// If execSync throws, it means non-zero exit code
 			expect.fail(
@@ -41,8 +40,9 @@ describe("JACT Integration Tests", () => {
 			expect.fail("Should have failed validation for broken links");
 		} catch (error) {
 			const output = error.stdout || "";
-			expect(output).toContain("VALIDATION FAILED");
-			expect(output).toContain("CRITICAL ERRORS");
+			// Minimal default output: errors block + FAILED line (SC-2)
+			expect(output).toContain("ERRORS (");
+			expect(output).toContain("FAILED:");
 			expect(output).toContain("File not found");
 		}
 	});
@@ -296,7 +296,7 @@ describe("JACT Integration Tests", () => {
 
 		try {
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --verbose`,
 				{
 					cwd: __dirname,
 				},
