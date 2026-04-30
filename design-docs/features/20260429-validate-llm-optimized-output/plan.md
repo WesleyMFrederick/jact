@@ -19,6 +19,26 @@ When an LLM runs `jact validate <file> --scope <root>`, the default stdout/stder
 5. **Exit codes unchanged.** 0 / 1 / 2 still mean success / validation errors / system error.
 6. **No regressions.** All existing tests pass after being updated to reflect the new default contract.
 
+## Constraints
+
+%% *Last Modified: 04/29/26 23:16:49* %%
+
+### Hard (immediate failure if violated)
+
+%% *Last Modified: 04/29/26 23:16:49* %%
+
+- `--format json` output shape is unchanged — JSON consumers must not break
+- Exit codes 0 / 1 / 2 are preserved exactly
+- `--fix` behavior and output are unchanged
+- `ast`, `extract`, `base-paths` commands are untouched
+
+### Soft (discouraged)
+
+%% *Last Modified: 04/29/26 23:16:49* %%
+
+- `--verbose` must restore the *current* output byte-for-byte — no reformatting, no symbol changes
+- No color or symbol changes to any output mode
+
 ## Context
 
 %% *Last Modified: 04/29/26 22:26:55* %%
