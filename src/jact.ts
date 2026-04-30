@@ -66,6 +66,7 @@ interface CliValidateOptions {
 	lines?: string;
 	format?: string;
 	fix?: boolean;
+	verbose?: boolean;
 }
 
 // D-003: CliExtractOptions imported from ./types/contentExtractorTypes.js (canonical type)
@@ -186,9 +187,12 @@ export class JactCli {
 
 			// Build file cache if scope is provided
 			if (options.scope) {
-				const cacheStats = this.fileCache.buildCache(options.scope);
-				// Only show cache messages in non-JSON mode
-				if (options.format !== "json") {
+				const cacheStats = this.fileCache.buildCache(
+					options.scope,
+					options.verbose ?? false,
+				);
+				// Only show cache messages in verbose, non-JSON mode
+				if (options.verbose && options.format !== "json") {
 					console.log(
 						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 					);
@@ -218,13 +222,21 @@ export class JactCli {
 				if (options.format === "json") {
 					return this.formatAsJSON(filteredResult);
 				}
-				return this.formatForCLI(filteredResult, nestedCodeblockWarnings);
+				return this.formatForCLI(
+					filteredResult,
+					nestedCodeblockWarnings,
+					options.verbose ?? false,
+				);
 			}
 
 			if (options.format === "json") {
 				return this.formatAsJSON(result);
 			}
-			return this.formatForCLI(result, nestedCodeblockWarnings);
+			return this.formatForCLI(
+				result,
+				nestedCodeblockWarnings,
+				options.verbose ?? false,
+			);
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
@@ -312,7 +324,12 @@ export class JactCli {
 	private formatForCLI(
 		result: ValidationResult & { lineRange?: string },
 		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
+		verbose = false,
 	): string {
+		if (!verbose) {
+			return this.formatForCLIMinimal(result, nestedCodeblockWarnings);
+		}
+
 		const lines: string[] = [];
 		lines.push("Citation Validation Report");
 		lines.push("==========================");
@@ -417,6 +434,81 @@ export class JactCli {
 			);
 		} else {
 			lines.push("ALL CITATIONS VALID");
+		}
+
+		return lines.join("\n");
+	}
+
+	/**
+	 * Minimal (LLM-optimized) CLI formatter — default output.
+	 *
+	 * Emits only errors and warnings. Clean files produce a single "OK:" line.
+	 * Designed to minimize token consumption for LLM-driven repair workflows.
+	 */
+	private formatForCLIMinimal(
+		result: ValidationResult & { lineRange?: string },
+		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
+	): string {
+		const lines: string[] = [];
+
+		if (result.summary.errors > 0) {
+			lines.push(`ERRORS (${result.summary.errors})`);
+			const errorLinks = result.links.filter(
+				(link) => link.validation.status === "error",
+			);
+			for (const link of errorLinks) {
+				lines.push(`- Line ${link.line}: ${link.fullMatch}`);
+				if (link.validation.status === "error") {
+					lines.push(`  error: ${link.validation.error}`);
+					if (link.validation.suggestion) {
+						lines.push(`  suggestion: ${link.validation.suggestion}`);
+					}
+				}
+			}
+			lines.push("");
+		}
+
+		const totalWarnings =
+			result.summary.warnings + nestedCodeblockWarnings.length;
+
+		if (totalWarnings > 0) {
+			lines.push(`WARNINGS (${totalWarnings})`);
+			const warnLinks = result.links.filter(
+				(link) => link.validation.status === "warning",
+			);
+			for (const link of warnLinks) {
+				lines.push(`- Line ${link.line}: ${link.fullMatch}`);
+				if (
+					link.validation.status === "warning" &&
+					link.validation.suggestion
+				) {
+					lines.push(`  suggestion: ${link.validation.suggestion}`);
+				}
+			}
+			for (const w of nestedCodeblockWarnings) {
+				lines.push(`- Line ${w.line}: ${w.message}`);
+			}
+			lines.push("");
+		}
+
+		if (result.summary.errors > 0) {
+			// Errors → FAILED (exit 1)
+			const parts = [
+				`${result.summary.errors} ${result.summary.errors === 1 ? "error" : "errors"}`,
+			];
+			if (totalWarnings > 0) {
+				parts.push(
+					`${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"}`,
+				);
+			}
+			lines.push(`FAILED: ${parts.join(", ")}`);
+		} else if (totalWarnings > 0) {
+			// Warnings only → OK with note (exit 0, preserves exit code contract)
+			lines.push(
+				`OK: ${result.summary.total} citations valid (${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"})`,
+			);
+		} else {
+			lines.push(`OK: ${result.summary.total} citations valid`);
 		}
 
 		return lines.join("\n");
@@ -1090,12 +1182,22 @@ program
 		"--fix",
 		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections",
 	)
+	.option(
+		"--verbose",
+		"show full validation report: all valid citations, duplicate-filename warnings, summary block (default: minimal output with only errors/warnings)",
+		false,
+	)
 	.addHelpText(
 		"after",
 		`
+Default Output (no --verbose):
+  Clean file:      "OK: <N> citations valid"
+  Errors/warnings: ERRORS (n) and/or WARNINGS (n) blocks with line, link, error, suggestion; ends with "FAILED: X errors, Y warnings"
+
 Examples:
-    $ jact validate docs/design.md
-    $ jact validate file.md --format json
+    $ jact validate docs/design.md                   # minimal output (default)
+    $ jact validate docs/design.md --verbose         # full report with valid-citation tree
+    $ jact validate file.md --format json            # JSON output (unchanged)
     $ jact validate file.md --lines 100-200
     $ jact validate file.md --fix --scope ./docs
 
@@ -1130,7 +1232,12 @@ Exit Codes:
 				if (result.includes("ERROR:")) {
 					process.exit(2); // File not found or other errors
 				} else {
-					process.exit(result.includes("VALIDATION FAILED") ? 1 : 0);
+					// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
+					process.exit(
+						result.includes("FAILED:") || result.includes("VALIDATION FAILED")
+							? 1
+							: 0,
+					);
 				}
 			}
 		}
