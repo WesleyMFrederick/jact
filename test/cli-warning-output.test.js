@@ -17,7 +17,7 @@ describe("CLI Warning Output Display Tests", () => {
 
 		try {
 			output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}" --verbose`,
 				{
 					cwd: __dirname,
 				},
@@ -58,7 +58,7 @@ describe("CLI Warning Output Display Tests", () => {
 
 		try {
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}" --verbose`,
 				{
 					cwd: __dirname,
 				},
@@ -97,7 +97,7 @@ describe("CLI Warning Output Display Tests", () => {
 
 		try {
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}" --verbose`,
 				{
 					cwd: __dirname,
 				},
@@ -152,7 +152,7 @@ describe("CLI Warning Output Display Tests", () => {
 
 		try {
 			output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}" --verbose`,
 				{
 					cwd: __dirname,
 				},
@@ -192,7 +192,7 @@ describe("CLI Warning Output Display Tests", () => {
 
 		try {
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}" --verbose`,
 				{
 					cwd: __dirname,
 				},

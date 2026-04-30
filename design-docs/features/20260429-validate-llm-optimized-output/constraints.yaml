@@ -1,0 +1,40 @@
+constraints:
+  hard:
+    # Hard constraints: immediate failure if violated
+    - id: C-H1
+      dimension: scope
+      description: "--format json output shape is unchanged"
+      rationale: JSON consumers filter what they need — breaking the shape breaks downstream tooling
+      test: "jact validate <file> --format json | jq keys matches baseline"
+
+    - id: C-H2
+      dimension: scope
+      description: "Exit codes 0 / 1 / 2 are preserved exactly"
+      rationale: Scripts and CI pipelines branch on exit codes — any change silently breaks them
+      test: "exit code assertions in test suite"
+
+    - id: C-H3
+      dimension: scope
+      description: "--fix behavior and output are unchanged"
+      rationale: --fix is a separate command path; this change must not touch it
+      test: "existing --fix tests pass without modification"
+
+    - id: C-H4
+      dimension: scope
+      description: "ast, extract, base-paths commands are untouched"
+      rationale: Out of scope; unintended side effects are high risk
+      test: "existing command tests pass without modification"
+
+  soft:
+    # Soft constraints: discouraged, not disqualifying
+    - id: C-S1
+      dimension: quality
+      description: "--verbose must restore current output byte-for-byte"
+      rationale: Users relying on verbose format for scripting or diffing should see no change
+      risk_if_violated: "Low — verbose is opt-in, but surprises erode trust"
+
+    - id: C-S2
+      dimension: quality
+      description: "No color or symbol changes to any output mode"
+      rationale: Cosmetic changes outside scope; introduces noise in diffs and test assertions
+      risk_if_violated: "Low — but adds unnecessary test churn"
