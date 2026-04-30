@@ -52,10 +52,13 @@ describe("CLI Execution Detection via Symlink", () => {
 
 		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 
-		// Execute validate command via symlink
-		const result = runCLI(`node ${symlinkPath} validate "${testFile}"`, {
-			cwd: __dirname,
-		});
+		// Execute validate command via symlink (--verbose to get full report)
+		const result = runCLI(
+			`node ${symlinkPath} validate "${testFile}" --verbose`,
+			{
+				cwd: __dirname,
+			},
+		);
 
 		// Should produce validation output
 		expect(result).toContain("Citation Validation Report");
