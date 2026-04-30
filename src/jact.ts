@@ -187,9 +187,12 @@ export class JactCli {
 
 			// Build file cache if scope is provided
 			if (options.scope) {
-				const cacheStats = this.fileCache.buildCache(options.scope);
-				// Only show cache messages in non-JSON mode
-				if (options.format !== "json") {
+				const cacheStats = this.fileCache.buildCache(
+					options.scope,
+					options.verbose ?? false,
+				);
+				// Only show cache messages in verbose, non-JSON mode
+				if (options.verbose && options.format !== "json") {
 					console.log(
 						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 					);
@@ -488,19 +491,22 @@ export class JactCli {
 			lines.push("");
 		}
 
-		if (result.summary.errors > 0 || totalWarnings > 0) {
-			const parts: string[] = [];
-			if (result.summary.errors > 0) {
-				parts.push(
-					`${result.summary.errors} ${result.summary.errors === 1 ? "error" : "errors"}`,
-				);
-			}
+		if (result.summary.errors > 0) {
+			// Errors → FAILED (exit 1)
+			const parts = [
+				`${result.summary.errors} ${result.summary.errors === 1 ? "error" : "errors"}`,
+			];
 			if (totalWarnings > 0) {
 				parts.push(
 					`${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"}`,
 				);
 			}
 			lines.push(`FAILED: ${parts.join(", ")}`);
+		} else if (totalWarnings > 0) {
+			// Warnings only → OK with note (exit 0, preserves exit code contract)
+			lines.push(
+				`OK: ${result.summary.total} citations valid (${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"})`,
+			);
 		} else {
 			lines.push(`OK: ${result.summary.total} citations valid`);
 		}
@@ -1176,12 +1182,22 @@ program
 		"--fix",
 		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections",
 	)
+	.option(
+		"--verbose",
+		"show full validation report: all valid citations, duplicate-filename warnings, summary block (default: minimal output with only errors/warnings)",
+		false,
+	)
 	.addHelpText(
 		"after",
 		`
+Default Output (no --verbose):
+  Clean file:      "OK: <N> citations valid"
+  Errors/warnings: ERRORS (n) and/or WARNINGS (n) blocks with line, link, error, suggestion; ends with "FAILED: X errors, Y warnings"
+
 Examples:
-    $ jact validate docs/design.md
-    $ jact validate file.md --format json
+    $ jact validate docs/design.md                   # minimal output (default)
+    $ jact validate docs/design.md --verbose         # full report with valid-citation tree
+    $ jact validate file.md --format json            # JSON output (unchanged)
     $ jact validate file.md --lines 100-200
     $ jact validate file.md --fix --scope ./docs
 
@@ -1216,7 +1232,12 @@ Exit Codes:
 				if (result.includes("ERROR:")) {
 					process.exit(2); // File not found or other errors
 				} else {
-					process.exit(result.includes("VALIDATION FAILED") ? 1 : 0);
+					// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
+					process.exit(
+						result.includes("FAILED:") || result.includes("VALIDATION FAILED")
+							? 1
+							: 0,
+					);
 				}
 			}
 		}

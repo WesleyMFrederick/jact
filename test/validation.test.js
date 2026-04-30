@@ -106,7 +106,7 @@ describe("JACT Integration Tests", () => {
 
 		try {
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --lines 13-14`,
+				`node "${citationManagerPath}" validate "${testFile}" --lines 13-14 --verbose`,
 				{
 					cwd: __dirname,
 				},
@@ -130,7 +130,7 @@ describe("JACT Integration Tests", () => {
 
 		try {
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --scope "${scopeFolder}" --verbose`,
 				{
 					cwd: __dirname,
 				},
@@ -185,7 +185,7 @@ describe("JACT Integration Tests", () => {
 
 		try {
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}" --lines 7`,
+				`node "${citationManagerPath}" validate "${testFile}" --lines 7 --verbose`,
 				{
 					cwd: __dirname,
 				},
@@ -206,7 +206,7 @@ describe("JACT Integration Tests", () => {
 
 		try {
 			const output = runCLI(
-				`node "${citationManagerPath}" validate "${testFile}"`,
+				`node "${citationManagerPath}" validate "${testFile}" --verbose`,
 				{
 					cwd: __dirname,
 				},
