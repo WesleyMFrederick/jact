@@ -15,18 +15,18 @@
 
 ---
 
-## Phase 2: Tests
+## Phase 2: Tests ✅
 
-%% *Last Modified: 04/29/26 23:22:49* %%
+%% *Last Modified: 04/29/26 23:35:17* %%
 
 *Encode success criteria as measurement instruments — write BEFORE implementation*
 
-- [ ] Add new test: clean file → exact `OK: N citations valid` (asserts SC-1)
-- [ ] Add new test: broken file → `ERRORS (` + `FAILED:` present, `VALID CITATIONS` + `SUMMARY:` absent (asserts SC-2)
-- [ ] Update `test/validation.test.js` lines 23, 44, 306 → add `--verbose` OR rewrite for SC-1/SC-2 contract
-- [ ] Update `test/cli-warning-output.test.js` lines 68, 89, 112-129, 179 → add `--verbose` (keeps SC-3 coverage)
-- [ ] Update `test/cli-execution-detection.test.js:61-62` → assert `OK:` default OR add `--verbose`
-- [ ] Run `npm test` — confirm RED (implementation not done)
+- [x] Add new test: clean file → exact `OK: N citations valid` (asserts SC-1)
+- [x] Add new test: broken file → `ERRORS (` + `FAILED:` present, `VALID CITATIONS` + `SUMMARY:` absent (asserts SC-2)
+- [x] Update `test/validation.test.js` lines 23, 44, 306 → add `--verbose` OR rewrite for SC-1/SC-2 contract
+- [x] Update `test/cli-warning-output.test.js` lines 68, 89, 112-129, 179 → add `--verbose` (keeps SC-3 coverage)
+- [x] Update `test/cli-execution-detection.test.js:61-62` → assert `OK:` default OR add `--verbose`
+- [x] Run `npm test` — confirm RED (8 failures, 3 files — correct)
 
 ---
 

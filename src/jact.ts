@@ -66,6 +66,7 @@ interface CliValidateOptions {
 	lines?: string;
 	format?: string;
 	fix?: boolean;
+	verbose?: boolean;
 }
 
 // D-003: CliExtractOptions imported from ./types/contentExtractorTypes.js (canonical type)
@@ -218,13 +219,21 @@ export class JactCli {
 				if (options.format === "json") {
 					return this.formatAsJSON(filteredResult);
 				}
-				return this.formatForCLI(filteredResult, nestedCodeblockWarnings);
+				return this.formatForCLI(
+					filteredResult,
+					nestedCodeblockWarnings,
+					options.verbose ?? false,
+				);
 			}
 
 			if (options.format === "json") {
 				return this.formatAsJSON(result);
 			}
-			return this.formatForCLI(result, nestedCodeblockWarnings);
+			return this.formatForCLI(
+				result,
+				nestedCodeblockWarnings,
+				options.verbose ?? false,
+			);
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
@@ -312,7 +321,12 @@ export class JactCli {
 	private formatForCLI(
 		result: ValidationResult & { lineRange?: string },
 		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
+		verbose = false,
 	): string {
+		if (!verbose) {
+			return this.formatForCLIMinimal(result, nestedCodeblockWarnings);
+		}
+
 		const lines: string[] = [];
 		lines.push("Citation Validation Report");
 		lines.push("==========================");
@@ -417,6 +431,78 @@ export class JactCli {
 			);
 		} else {
 			lines.push("ALL CITATIONS VALID");
+		}
+
+		return lines.join("\n");
+	}
+
+	/**
+	 * Minimal (LLM-optimized) CLI formatter — default output.
+	 *
+	 * Emits only errors and warnings. Clean files produce a single "OK:" line.
+	 * Designed to minimize token consumption for LLM-driven repair workflows.
+	 */
+	private formatForCLIMinimal(
+		result: ValidationResult & { lineRange?: string },
+		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
+	): string {
+		const lines: string[] = [];
+
+		if (result.summary.errors > 0) {
+			lines.push(`ERRORS (${result.summary.errors})`);
+			const errorLinks = result.links.filter(
+				(link) => link.validation.status === "error",
+			);
+			for (const link of errorLinks) {
+				lines.push(`- Line ${link.line}: ${link.fullMatch}`);
+				if (link.validation.status === "error") {
+					lines.push(`  error: ${link.validation.error}`);
+					if (link.validation.suggestion) {
+						lines.push(`  suggestion: ${link.validation.suggestion}`);
+					}
+				}
+			}
+			lines.push("");
+		}
+
+		const totalWarnings =
+			result.summary.warnings + nestedCodeblockWarnings.length;
+
+		if (totalWarnings > 0) {
+			lines.push(`WARNINGS (${totalWarnings})`);
+			const warnLinks = result.links.filter(
+				(link) => link.validation.status === "warning",
+			);
+			for (const link of warnLinks) {
+				lines.push(`- Line ${link.line}: ${link.fullMatch}`);
+				if (
+					link.validation.status === "warning" &&
+					link.validation.suggestion
+				) {
+					lines.push(`  suggestion: ${link.validation.suggestion}`);
+				}
+			}
+			for (const w of nestedCodeblockWarnings) {
+				lines.push(`- Line ${w.line}: ${w.message}`);
+			}
+			lines.push("");
+		}
+
+		if (result.summary.errors > 0 || totalWarnings > 0) {
+			const parts: string[] = [];
+			if (result.summary.errors > 0) {
+				parts.push(
+					`${result.summary.errors} ${result.summary.errors === 1 ? "error" : "errors"}`,
+				);
+			}
+			if (totalWarnings > 0) {
+				parts.push(
+					`${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"}`,
+				);
+			}
+			lines.push(`FAILED: ${parts.join(", ")}`);
+		} else {
+			lines.push(`OK: ${result.summary.total} citations valid`);
 		}
 
 		return lines.join("\n");
