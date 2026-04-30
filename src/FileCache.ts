@@ -17,7 +17,7 @@ interface ResolveResultSuccess {
 
 interface ResolveResultFailure {
 	found: false;
-	reason: 'duplicate' | 'not_found' | 'duplicate_fuzzy';
+	reason: "duplicate" | "not_found" | "duplicate_fuzzy";
 	message: string;
 }
 
@@ -58,8 +58,8 @@ interface CacheStatsDetail {
  * // Returns { found: true, path: '/project/docs/design/architecture.md' }
  */
 export class FileCache {
-	private fs: typeof import('fs');
-	private path: typeof import('path');
+	private fs: typeof import("fs");
+	private path: typeof import("path");
 	private cache: Map<string, string>; // filename -> absolute path
 	private duplicates: Set<string>; // filenames that appear multiple times
 
@@ -69,7 +69,10 @@ export class FileCache {
 	 * @param fileSystem - Node.js fs module (or mock for testing)
 	 * @param pathModule - Node.js path module (or mock for testing)
 	 */
-	constructor(fileSystem: typeof import('fs'), pathModule: typeof import('path')) {
+	constructor(
+		fileSystem: typeof import("fs"),
+		pathModule: typeof import("path"),
+	) {
 		this.fs = fileSystem;
 		this.path = pathModule;
 		this.cache = new Map<string, string>();
@@ -86,13 +89,13 @@ export class FileCache {
 	 * @param {string} scopeFolder - Root folder to scan (can be symlink, will be resolved)
 	 * @returns {Object} Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
-	buildCache(scopeFolder: string): CacheStats {
+	buildCache(scopeFolder: string, verbose = false): CacheStats {
 		this.cache.clear();
 		this.duplicates.clear();
 
 		// Resolve symlinks to get the real path, but only scan the resolved path
 		const absoluteScopeFolder = this.path.resolve(scopeFolder);
-		let targetScanFolder;
+		let targetScanFolder: string;
 
 		try {
 			targetScanFolder = this.fs.realpathSync(absoluteScopeFolder);
@@ -105,7 +108,7 @@ export class FileCache {
 		this.scanDirectory(targetScanFolder);
 
 		// Log duplicates for debugging (should be much fewer now)
-		if (this.duplicates.size > 0) {
+		if (verbose && this.duplicates.size > 0) {
 			console.error(
 				`WARNING: Found duplicate filenames in scope: ${Array.from(this.duplicates).join(", ")}`,
 			);
@@ -138,7 +141,8 @@ export class FileCache {
 			}
 		} catch (error) {
 			// Skip directories we can't read (permissions, etc.)
-			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 			console.warn(
 				`Warning: Could not read directory ${dirPath}: ${errorMessage}`,
 			);
@@ -178,10 +182,15 @@ export class FileCache {
 					message: `Multiple files named "${filename}" found in scope. Use relative path for disambiguation.`,
 				};
 			}
-			return {
-				found: true,
-				path: this.cache.get(filename)!,
-			};
+			const resolvedPath = this.cache.get(filename);
+			if (resolvedPath === undefined) {
+				return {
+					found: false,
+					reason: "not_found",
+					message: `File not found: ${filename}`,
+				};
+			}
+			return { found: true, path: resolvedPath };
 		}
 
 		// Try without extension if not found
@@ -196,10 +205,15 @@ export class FileCache {
 					message: `Multiple files named "${withMdExt}" found in scope. Use relative path for disambiguation.`,
 				};
 			}
-			return {
-				found: true,
-				path: this.cache.get(withMdExt)!,
-			};
+			const resolvedPathExt = this.cache.get(withMdExt);
+			if (resolvedPathExt === undefined) {
+				return {
+					found: false,
+					reason: "not_found",
+					message: `File not found: ${withMdExt}`,
+				};
+			}
+			return { found: true, path: resolvedPathExt };
 		}
 
 		// Try fuzzy matching for common typos and issues
@@ -243,9 +257,17 @@ export class FileCache {
 						message: `Found potential match "${fixedFilename}" (corrected double .md extension), but multiple files with this name exist. Use relative path for disambiguation.`,
 					};
 				}
+				const fixedPath = this.cache.get(fixedFilename);
+				if (fixedPath === undefined) {
+					return {
+						found: false,
+						reason: "not_found",
+						message: `File not found: ${fixedFilename}`,
+					};
+				}
 				return {
 					found: true,
-					path: this.cache.get(fixedFilename)!,
+					path: fixedPath,
 					fuzzyMatch: true,
 					correctedFilename: fixedFilename,
 					message: `Auto-corrected double extension: "${filename}" → "${fixedFilename}"`,
@@ -274,9 +296,17 @@ export class FileCache {
 							message: `Found potential typo correction "${correctedFilename}", but multiple files with this name exist. Use relative path for disambiguation.`,
 						};
 					}
+					const correctedPath = this.cache.get(correctedFilename);
+					if (correctedPath === undefined) {
+						return {
+							found: false,
+							reason: "not_found",
+							message: `File not found: ${correctedFilename}`,
+						};
+					}
 					return {
 						found: true,
-						path: this.cache.get(correctedFilename)!,
+						path: correctedPath,
 						fuzzyMatch: true,
 						correctedFilename: correctedFilename,
 						message: `Auto-corrected typo: "${filename}" → "${correctedFilename}"`,
@@ -303,9 +333,17 @@ export class FileCache {
 			});
 
 			if (closeMatch) {
+				const closeMatchPath = this.cache.get(closeMatch);
+				if (closeMatchPath === undefined) {
+					return {
+						found: false,
+						reason: "not_found",
+						message: `File not found: ${closeMatch}`,
+					};
+				}
 				return {
 					found: true,
-					path: this.cache.get(closeMatch)!,
+					path: closeMatchPath,
 					fuzzyMatch: true,
 					correctedFilename: closeMatch,
 					message: `Found similar architecture file: "${filename}" → "${closeMatch}"`,

@@ -30,60 +30,58 @@
 
 ---
 
-## Phase 3: Test Outcomes
+## Phase 3: Test Outcomes ✅
 
-%% *Last Modified: 04/29/26 23:22:49* %%
+%% *Last Modified: 04/30/26 00:14:30* %%
 
 *Controlled environment: make tests GREEN*
 
 ### 3a. Core implementation
 
-%% *Last Modified: 04/29/26 23:22:49* %%
+%% *Last Modified: 04/30/26 00:14:30* %%
 
-- [ ] Add `verbose?: boolean` to `CliValidateOptions` (`src/jact.ts:64-69`)
-- [ ] Refactor `formatForCLI` (`src/jact.ts:312`) — branch on `verbose`; false = minimal; true = current byte-for-byte
-- [ ] Thread `verbose` through `validate()` (`src/jact.ts:180-227`) into both `formatForCLI` calls
+- [x] Add `verbose?: boolean` to `CliValidateOptions` (`src/jact.ts:64-69`)
+- [x] Refactor `formatForCLI` (`src/jact.ts:312`) — branch on `verbose`; false = minimal; true = current byte-for-byte
+- [x] Thread `verbose` through `validate()` (`src/jact.ts:180-227`) into both `formatForCLI` calls
 
 ### 3b. CLI + FileCache wiring
 
-%% *Last Modified: 04/29/26 23:22:49* %%
+%% *Last Modified: 04/30/26 00:14:30* %%
 
-- [ ] Add `--verbose` option to commander (`src/jact.ts:1075-1107`)
-- [ ] Update `addHelpText` block with new default-output docs and `--verbose` example
-- [ ] Add `verbose?: boolean` to `FileCache` constructor (`src/FileCache.ts:108-112`)
-- [ ] Wrap duplicate WARNING in `if (this.verbose)` 
-- [ ] Update `componentFactory.ts` `createFileCache` to accept + forward `verbose`
-- [ ] Pass `options.verbose` from `JactCli.validate()` into factory call
+- [x] Add `--verbose` option to commander (`src/jact.ts:1075-1107`)
+- [x] Update `addHelpText` block with new default-output docs and `--verbose` example
+- [x] Add `verbose` param to `FileCache.buildCache()` (`src/FileCache.ts`) — gates WARNING on verbose
+- [x] Pass `options.verbose` from `JactCli.validate()` into `buildCache()` call
 
 ### 3c. Build + test pass
 
-%% *Last Modified: 04/29/26 23:22:49* %%
+%% *Last Modified: 04/30/26 00:14:30* %%
 
-- [ ] `npm run build`
-- [ ] `npm test` — all GREEN
+- [x] `npm run build`
+- [x] `npm test` — 435/435 GREEN
 
 ---
 
-## Phase 4: Operational Outcomes
+## Phase 4: Operational Outcomes ✅
 
-%% *Last Modified: 04/29/26 23:22:49* %%
+%% *Last Modified: 04/30/26 00:14:30* %%
 
 *Real invocations against real files*
 
-- [ ] Clean file → `OK: N citations valid` (one line, no warnings) — asserts SC-1
-- [ ] `--verbose` → full banner + VALID CITATIONS tree + SUMMARY — asserts SC-3
-- [ ] Broken fixture → ERRORS block only, no VALID CITATIONS — asserts SC-2
-- [ ] `--format json` → same JSON shape — asserts SC-4
-- [ ] Exit codes: 0 (clean), 1 (errors), 2 (nonexistent file) — asserts SC-5
-- [ ] Token count: `jact validate <clean-file> --scope <scope> | wc -c` < 100 bytes — asserts SC-7
+- [x] Clean file → `OK: 69 citations valid` (23 bytes) — asserts SC-1
+- [x] `--verbose` → full banner + VALID CITATIONS tree + SUMMARY — asserts SC-3
+- [x] Broken fixture → ERRORS block only, no VALID CITATIONS — asserts SC-2
+- [x] `--format json` → same JSON shape — asserts SC-4
+- [x] Exit codes: 0 (clean), 1 (errors), 2 (nonexistent file) — asserts SC-5
+- [x] Token count: 23 bytes (target: <100) — asserts SC-7 ✅
 
 ---
 
-## Phase 5: Real-World Outcomes
+## Phase 5: Real-World Outcomes ✅
 
-%% *Last Modified: 04/29/26 23:22:49* %%
+%% *Last Modified: 04/30/26 00:14:30* %%
 
 *Documentation for production use*
 
-- [ ] Update `--help` example block (`src/jact.ts:1095-1106`) to document `--verbose` and new default behavior
-- [ ] `npm run build` final
+- [x] Update `--help` example block to document `--verbose` and new default behavior
+- [x] `npm run build` final
