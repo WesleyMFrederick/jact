@@ -368,7 +368,7 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 
 ### 7c. Naming & File Organization [i1]
 
-%% *Last Modified: 05/01/26 18:17:43* %%
+%% *Last Modified: 05/01/26 19:05:47* %%
 
 | New Symbol/File | Decision | Principle |
 |---|---|---|
@@ -376,9 +376,9 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 | `ScopeResolution` type | Tagged union: `{ scope: string; source: 'explicit'\|'cwd-git'\|'cwd-pkg'\|'target-git'\|'target-pkg'\|'none' }`. Co-located in `resolveScope.ts`. | **Behavior as Data**, **Co-located Helpers** |
 | `applyScope(cache, options, targetFile?)` | Private method on `JactCli`. Internal helper, not exported. | **Single Responsibility** |
 | `entries: Map<string, string[]>` | Replaces `cache + duplicates` dual-state. | **One Source of Truth** |
-| `ResolveResultFailure.candidates?: string[]` | Optional field on existing failure type when `reason: 'duplicate' \| 'duplicate_fuzzy'`. | **Illegal States Unrepresentable** |
-| `ResolveResultFailure.scope?: ScopeResolution` | Optional field carrying resolved scope+source for D7 error messages. | **Behavior as Data** |
-| `ResolveResultFailure.nearMisses?: string[]` | Optional field for D7 "Did you mean" suggestions on `reason: 'not_found'`. Top-3 Levenshtein ≤2. | **Self-Diagnosing Failures** |
+| `ResolveResultFailure.candidates?: string[]` | Optional field on existing failure type in `src/types/validationTypes.ts` when `reason: 'duplicate' \| 'duplicate_fuzzy'`. | **Illegal States Unrepresentable** |
+| `ResolveResultFailure.scope?: ScopeResolution` | Optional field in `src/types/validationTypes.ts` carrying resolved scope+source for D7 error messages. | **Behavior as Data** |
+| `ResolveResultFailure.nearMisses?: string[]` | Optional field in `src/types/validationTypes.ts` for D7 "Did you mean" suggestions on `reason: 'not_found'`. Top-3 Levenshtein ≤2. | **Self-Diagnosing Failures** |
 | `findNearMisses(name, entries, k=3, maxDist=2)` | Private helper in `FileCache`. Pure function over `Map.keys()`. | **Single Responsibility** |
 
 ### 7e. Validation Table [i2]
@@ -441,50 +441,31 @@ None.
 
 #### Minor Findings (Severity: Low)
 
-%% *Last Modified: 05/01/26 18:20:43* %%
+%% *Last Modified: 05/01/26 19:06:03* %%
 
-1. **Type file location unspecified** [Action-Based File Org / Data Contracts Separate]. `ResolveResultFailure` lives in `src/types/citationTypes.ts` or `validationTypes.ts` (per CLAUDE.md L67-69)? Not stated in §7c. Recommend: add explicit type file path to §7c naming row for `ResolveResultFailure.{candidates,scope,nearMisses}` before Phase 6 DIFFs.
-
-#### Recommendations (post-lock, integrate into Phase 6)
-
-%% *Last Modified: 05/01/26 18:20:43* %%
-
-1. Resolve type file location for D2/D7 fields (ResolveResultFailure additions) — pin to existing `src/types/validationTypes.ts` per source mapping convention.
-2. Phase 6 DIFFs should include unit test for D7 error message format (snapshot test on M1/M2/M3 strings).
-3. Phase 6 should add a Levenshtein unit test (D7 nearMisses with distance threshold ≤2).
+~~1. **Type file location unspecified** — `ResolveResultFailure` field location not stated in §7c.~~ **Resolved** — §7c naming table now pins all 3 fields (`candidates`, `scope`, `nearMisses`) to `src/types/validationTypes.ts`.
 
 #### Verdict
 
-%% *Last Modified: 05/01/26 18:20:43* %%
+%% *Last Modified: 05/01/26 19:06:03* %%
 
-- [X] **Ready to proceed** — all 9 categories compliant; 1 minor finding integrates into Phase 6 without re-opening §7 lock.
+- [X] **Ready to proceed** — all 9 categories compliant; all findings resolved inline.
 - [ ] Requires revision
 
-#### Prioritized Findings (MVP Lens)
+#### Resolved Findings
 
-%% *Last Modified: 05/01/26 18:20:43* %%
+%% *Last Modified: 05/01/26 19:06:03* %%
 
-##### Fix Now (Blocking MVP)
+| # | Item | Resolution |
+|---|---|---|
+| 1 | Pin `ResolveResultFailure` field type-file location | Resolved in §7c — 3 rows now specify `src/types/validationTypes.ts` |
+| 2 | D7 error message tests (M1/M2/M3 strings) | Resolved in §8g — 12 BDD assertions cover M1/M2/M3 formats |
+| 3 | `findNearMisses` Levenshtein unit test | Resolved in §8g — 6 BDD assertions cover distance threshold + ordering + edge cases |
+| 4 | All 4 §6.5 [i0] Critical Issues | Integrated into D1-D7 ([F-ID] derivations in §7b) |
+| 5 | All 3 §7d NBA items | Resolved before §7 lock |
+| 6 | Baseline anti-patterns (Scattered Checks, dual-state, leaky flag risk) | Actively eliminated by Delta |
 
-%% *Last Modified: 05/01/26 18:20:43* %%
-
-None.
-
-##### Fix Post-MVP / Phase 6 Integration
-
-%% *Last Modified: 05/01/26 18:20:43* %%
-
-1. Pin `ResolveResultFailure` field type-file location in §7c (5 min edit, no re-lock).
-2. Add D7 error message snapshot tests in Phase 6 DIFFs.
-3. Add nearMisses Levenshtein unit test in Phase 6 DIFFs.
-
-##### Already Mitigated
-
-%% *Last Modified: 05/01/26 18:20:43* %%
-
-- All 4 §6.5 [i0] Critical Issues integrated into D1-D7 ([F-ID] derivations in §7b).
-- All 3 §7d NBA items resolved before lock.
-- Baseline anti-patterns (Scattered Checks, dual-state, leaky flag risk) actively eliminated by Delta.
+**No deferred items. No post-MVP backlog.**
 
 ## 8. Phase 6 — BDD Test Assertions
 
