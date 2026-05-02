@@ -929,14 +929,52 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 #### REVIEW GATE 2 `delta-reviewer` (opus)
 
-%% *Last Modified: 05/01/26 19:31:55* %%
+%% *Last Modified: 05/01/26 21:21:14* %%
 
-- [ ] **3.R** REVIEW: Scope — `src/jact.ts` (extract methods + Commander defs), `src/formatExtractResult.ts`, 3 new test files. Review `git diff <Phase_2.C_end_hash>..HEAD`.
+- [x] **3.R** REVIEW: Scope — `src/jact.ts` (extract methods + Commander defs), `src/formatExtractResult.ts`, 3 new test files. Review `git diff <Phase_2.C_end_hash>..HEAD`.
   - Verify: D4 mirrors `validate` `--verbose` pattern at L181-256 (convention parity)
   - Verify: D4 markdown verbose footer format matches G5 decision (appends Outgoing Links Report + Stats sections)
   - Verify: D5 help text matches design §7a verbatim across all 3 extract subcommands (3-way consistency)
   - Verify: No coupling drift — Phase 3 changes do not touch D1/D2 contracts
   - **Verdict:** SHIP → proceed to Phase 4. NO-SHIP → escalation policy applies.
+
+##### Gate 2 Verdict — SHIP (recorded 05/01/26 by `delta-reviewer-g2` opus)
+
+%% *Last Modified: 05/01/26 21:21:14* %%
+
+**Diff range reviewed:** `9f5dd729a1041be02655871dee70acc3d607fab7..c0b3fb6ee87f2ae77a06296fab601fad2a191465` (Phase 2 end → Phase 3 end).
+
+**Verification checklist results:**
+
+| Item | Result | Evidence |
+|---|---|---|
+| D4 convention parity with `validate` --verbose | ✅ | `extract file/header/links` Commander defs (`jact.ts:1324, 1381, 1452`) all add `verbose: false` default; action handlers pass `options.verbose ? "verbose" : "minimal"` to `formatExtractResult` (`jact.ts:623, 1427, 1487`); mirrors `validate` pattern at L1214-1218 |
+| D4 markdown verbose footer format (G5) | ✅ | `formatExtractResult.ts:39` appends `\n\n---\n## Outgoing Links Report\n\n\`\`\`json...\`\`\`\n\n## Stats\n\n\`\`\`json...\`\`\`` — matches plan §6 spec character-for-character; integration test asserts both section headers present |
+| D5 help text verbatim across 3 subcommands | ✅ | Identical 268-char string at `jact.ts:1310-1311, 1376-1378, 1447-1449`: "Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root." Captured by 3-way consistency test in `cli-help.test.ts:55-65` |
+| No coupling drift to D1/D2 contracts | ✅ | `git diff --stat` shows `src/core/resolveScope.ts` NOT modified; `src/FileCache.ts` NOT modified; `CliExtractOptions` extended additively with optional `verbose?: boolean` (`contentExtractorTypes.ts:127`) — no breaking change |
+| M-1 cleanup (Gate 1) | ✅ | `test/unit/core/resolveScope.test.ts:100` renamed to "all-false fs returns 'none' even with targetFile" — title now matches assertion semantics |
+| M-2 cleanup (Gate 1) | ✅ | `applyScope` return type `ScopeResolution` → `void` (`jact.ts:148`); unused `import type { ScopeResolution }` removed (`jact.ts` import block) |
+| TDD discipline | ✅ | RED→GREEN flow recorded for all 3 deliverables (3.1-3.4 formatter, 3.5-3.9 CLI wiring, 3.10-3.13 help text); zero regressions across 500-test suite per 3.15 |
+| Tech-debt fix-now policy | ✅ | P3-2 — 11 existing tests + `jact:base-paths` npm script updated with `--verbose` where full payload was expected; no GH-issue deferral |
+
+**Findings (severity-classified):**
+
+- **Blocking:** None.
+- **Major:** None.
+- **Minor:** None.
+- **Nitpick N-1** — Extract `--verbose` adds short flag `-v, --verbose`; `validate` uses long-form `--verbose` only. Minor convention drift, but standard Commander idiom; reads as ergonomic improvement, not regression. Keep as-is.
+- **Nitpick N-2** — Plan §7a D5 spec wraps `.git` and `package.json` in markdown backticks; CLI string drops them (correctly — backticks would render as literal characters in `--help` output). Faithful interpretation, not a defect.
+- **Positive observation P-1** — Markdown verbose footer prefixes section block with `\n\n---\n` separator, providing clean visual delineation between content and metadata. Better than spec minimum.
+- **Positive observation P-2** — `extract-verbose.test.ts:135-143` adds an explicit "convention parity with validate" test asserting `--verbose` appears in `--help` output — proactive guard against future drift.
+- **Positive observation P-3** — `cli-help.test.ts:24-26` normalizes Commander's line-wrapped option descriptions via `replace(/\n\s{10,}/g, " ")`, robust to terminal-width variance.
+
+**Phase 3 deviations verified clean:**
+- P3-1 (existing json test renamed to "verbose" mode): Necessary behavior change; old assertion would fail under new minimal default. Correct adaptation.
+- P3-2 (11 tests + npm script updated with `--verbose`): Tech-debt-fix-now compliant; no scope creep — only tests/scripts that asserted full payload were touched.
+- P3-3 (D5 help text wired in same Commander step as D4): Acceptable consolidation; both deliverables touch identical lines, splitting would have been ceremony.
+- P3-4 ("Context" header in extract-verbose.test.ts): Pragmatic shell-escape avoidance; 10-assertion count maintained.
+
+**Disposition:** SHIP. Phase 4 (D6 docs) unblocked. Gate 1 cleanups (M-1, M-2) confirmed applied in this diff.
 
 ### Phase 4 — Documentation (D6) `delta-implementer` (sonnet)
 
