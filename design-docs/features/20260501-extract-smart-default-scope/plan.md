@@ -110,7 +110,7 @@ Added: `src/FileCache.ts` (Row 5 ambiguous-match logic). See §3 update.
 
 ### Source Map [h4]
 
-%% *Last Modified: 05/01/26 17:27:20* %%
+%% *Last Modified: 05/01/26 17:31:39* %%
 
 | # | Baseline [O] | Source ID | Source | Baseline Notes |
 |---|---|---|---|---|
@@ -130,15 +130,61 @@ Added: `src/FileCache.ts` (Row 5 ambiguous-match logic). See §3 update.
 | 4 | Agent carries global rule prescribing workaround | S4a | `~/.claude/CLAUDE.md` JACT SCOPE RULE | Codified workaround. Same source as S2a, different actor lens (rule maintenance, not invocation). |
 | 4 | "" | S4b | `jact/CLAUDE.md` | Project doc shows abs `--scope` in every example invocation — replicates rule downstream. |
 | 5 | User halted by actionable disambiguation on multi-match | S5a | `src/FileCache.ts:175-229` | `resolveFile()` returns generic msg ("Multiple files named X found in scope") on duplicate — no candidate paths listed. |
-| 5 | "" | S5b | `src/FileCache.ts:62,78-79` | `duplicates: Set<string>` stores filenames only, not paths. Cannot enumerate candidates without re-scan. |
+| 5 | "" | S5b | `src/FileCache.ts:64, 79` | `duplicates: Set<string>` (decl L64, init L79) stores filenames only, not paths. Cannot enumerate candidates without re-scan. |
 | 5 | "" | S5c | `src/FileCache.ts:153-160` | `addToCache()`: first path wins; subsequent duplicates discarded silently — original-vs-dup paths both unrecoverable from public API. |
 | 5 | "" | S5d | `src/jact.ts:766-779` | `extractFile` pathConversion uses single recommended path — no halt-on-ambiguity flow.
 
 ### Self-Checks [h2.5, h2.6]
 
-%% *Last Modified: 05/01/26 17:27:20* %%
+%% *Last Modified: 05/01/26 17:32:04* %%
 
 - Source IDs unique per row, format `S{row}{letter}` ✓
 - All 5 BI rows covered ✓
 - New artifact `src/FileCache.ts` added to §3 ✓
 - Source IDs trace forward into Phase 5/6 (Delta architecture, DIFFs) ✓
+
+### LSP Validation
+
+%% *Last Modified: 05/01/26 17:32:04* %%
+
+LSP `documentSymbol` run on `src/jact.ts` + `src/FileCache.ts` to verify symbol locations claimed in source map.
+
+**Commands used:**
+
+```
+LSP operation=documentSymbol filePath=src/jact.ts line=1 character=1
+LSP operation=documentSymbol filePath=src/FileCache.ts line=1 character=1
+```
+
+**Confirmed (LSP-reported line = source-map line):**
+
+| Source ID | Symbol | Claim | LSP Reports | Status |
+|---|---|---|---|---|
+| S1a, S3e | `extractLinks` (Method) | L555-606 | L555 | ✓ |
+| S1b | `extractHeader` (Method) | L645-701 | L645 | ✓ |
+| S1c, S5d | `extractFile` (Method) | L738-813 | L738 | ✓ |
+| S3c | `validate` (Method) | L181-256 | L181 | ✓ |
+| S3a | `extract file` action() | L1394-1437 | callback L1415 | ✓ (within range) |
+| S3b | `extract header` action() | L1334-1392 | callback L1360 | ✓ (within range) |
+| S5a | `resolveFile` (Method) | L175-229 | L175 | ✓ |
+| S5b | `cache`/`duplicates` props | L64, 79 | `cache` L63, `duplicates` L64; init L79 | ✓ (corrected from L62,78-79) |
+| S5c | `addToCache` (Method) | L153-160 | L153 | ✓ |
+
+**Not LSP-applicable (markdown / Commander option strings):**
+
+- S1d/e/f Commander `--scope` option lines (1281, 1339, 1398) — verified via Read in `[h2]`, not LSP-addressable
+- S2a, S4a `~/.claude/CLAUDE.md` — markdown
+- S4b `jact/CLAUDE.md` — markdown
+
+### Tech Debt Surfaced (during LSP validation)
+
+%% *Last Modified: 05/01/26 17:32:04* %%
+
+LSP diagnostics flagged spurious `await` on synchronous `FileCache.buildCache()` (returns `CacheStats`, not `Promise`). Pattern inconsistent with `validate` (L190 — no await, correct).
+
+| File:Line | Code | Issue | Resolution |
+|---|---|---|---|
+| `src/jact.ts:653` | `await this.fileCache.buildCache(options.scope)` (extractHeader) | TS80007: `'await' has no effect` | Drop `await` during Phase 6 DIFFs |
+| `src/jact.ts:745` | `await this.fileCache.buildCache(options.scope)` (extractFile) | TS80007: `'await' has no effect` | Drop `await` during Phase 6 DIFFs |
+
+Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds default-scope fallback.
