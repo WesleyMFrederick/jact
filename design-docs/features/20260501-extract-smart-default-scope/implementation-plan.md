@@ -832,9 +832,9 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 #### REVIEW GATE 1 `delta-reviewer` (opus)
 
-%% *Last Modified: 05/01/26 19:31:55* %%
+%% *Last Modified: 05/01/26 21:01:35* %%
 
-- [ ] **2.R** REVIEW: Scope — `src/types/fileCacheTypes.ts`, `src/core/resolveScope.ts`, `src/FileCache.ts`, `src/jact.ts` (applyScope + 3 method modifications), all 5 new test files. Review `git diff <Phase_0.C_end_hash>..HEAD`.
+- [x] **2.R** REVIEW: Scope — `src/types/fileCacheTypes.ts`, `src/core/resolveScope.ts`, `src/FileCache.ts`, `src/jact.ts` (applyScope + 3 method modifications), all 5 new test files. Review `git diff <Phase_0.C_end_hash>..HEAD`.
   - Verify: Plan §7a/§7b spec adherence (D1/D2/D3/D7 implemented as written; no architecture re-litigation)
 	  - Run `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/plan.md "D1 — `resolveScope` algorithm"`
 	  - Run `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/plan.md "D2 — `entries: Map<string, string[]>` refactor"`
