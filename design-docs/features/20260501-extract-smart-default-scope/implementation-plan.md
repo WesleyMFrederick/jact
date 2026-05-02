@@ -886,7 +886,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 3 — CLI Surface: --verbose + Help Text (D4 + D5) `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 21:15:42* %%
+%% *Last Modified: 05/01/26 21:17:24* %%
 
 - [x] **3.0** STATE-READ: `start_hash: b00f5f0d0f47438dc05f2e18339040d9a5e45000`. One doc-commit beyond Phase 2 end_hash — acceptable.
 
@@ -925,7 +925,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
   - DEVIATION P3-2: 11 existing tests + `jact:base-paths` npm script updated with `--verbose` where full payload was expected (TECH DEBT POLICY: fix-now).
   - DEVIATION P3-3: D5 help text wired in same Commander step as D4 `--verbose` (3.8) — no separate step needed.
   - DEVIATION P3-4: `extract-verbose.test.ts` uses "Context" header (avoids backtick shell-escape issues). 10 assertions maintained.
-- [ ] **3.C** COMMIT: Commit Phase 3 — "feat(scope): D4 minimal-default --verbose + D5 --scope help text". `git rev-parse HEAD` → `end_hash: <hash>`
+- [x] **3.C** COMMIT: Commit Phase 3 — "feat(scope): D4 minimal-default --verbose + D5 --scope help text". `end_hash: c0b3fb6ee87f2ae77a06296fab601fad2a191465`
 
 #### REVIEW GATE 2 `delta-reviewer` (opus)
 
