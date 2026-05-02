@@ -305,16 +305,14 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 
 #### D1 — `resolveScope` algorithm
 
-%% *Last Modified: 05/01/26 17:55:18* %%
+%% *Last Modified: 05/01/26 18:06:43* %%
 
 - **[F-ID]** A function whose output is a pure function of its inputs (cwd, targetFile, fs state) is deterministic — by definition. Required by **No Surprises** principle.
 - **[OBS]** [^S-jact-extractFile] `src/jact.ts:738-813` accepts `targetFile` as first arg — so target-file-walk-up fallback has the data it needs without new plumbing.
 - **[OBS]** [^S-validate-pattern] `src/jact.ts:181-256` `validate` shows established convention: `if (options.scope) buildCache(scope)`. New util replaces that conditional everywhere with a single resolved scope or fail-fast error.
-- **[H]** Marker priority `.git` > `package.json` covers 80% of jact use cases (markdown repos may lack package.json but always have .git).
-  - Strengthen (negate-first): find a real jact use case in `0_SoftwareDevelopment/` where `package.json` should win over an enclosing `.git`. If found, swap order.
-  - Utility: M — affects scope inferred for users with nested package.json under repo root.
-  - Cost: L — list `0_SoftwareDevelopment/` repos, check structures.
-  - DRI: Agent
+- **[F-ID]** Marker priority `.git` > `package.json` confirmed for jact use cases. Strengthened from [H] via 0_SoftwareDevelopment/ survey [^OBS-marker-survey].
+  - Survey result: 25+ repos with `.git`+`package.json` colocated at root (same level — order doesn't matter when colocated). Nested `package.json` cases (e.g., `claude-code-knowledgebase/agentic-workflows/package.json`, `repomix/browser/package.json`, `claude-code-web-ui/frontend/package.json`) are sub-packages within a parent `.git` repo — for markdown citation scope, parent repo wins. No counter-example found where `package.json` should override enclosing `.git`.
+^OBS-marker-survey
 - **[A]** When neither marker found and no `targetFile` provided, fail fast (`source: 'none'` → caller throws). Risk-if-wrong: minor friction for users running outside any repo who expected cwd-as-scope; mitigation via clear error msg suggesting `--scope .`.
 
 #### D2 — `entries: Map<string, string[]>` refactor
@@ -380,13 +378,15 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 
 ### 7d. NBA — Items to Resolve
 
-%% *Last Modified: 05/01/26 17:55:18* %%
+%% *Last Modified: 05/01/26 18:06:58* %%
 
 | ID | Item | Type | Status |
 |---|---|---|---|
-| H-D1-marker-order | `.git` > `package.json` priority covers jact use cases | H (negate-first) | Open — strengthen during Phase 6 implementation by surveying `0_SoftwareDevelopment/` repos |
-| A-D1-no-marker-fail | Fail fast when no marker + no targetFile vs fall back to cwd | A | Resolved → fail fast (per D1 rationale) |
+| ~~[H-D1-marker-order](#^H-D1-marker-order)~~ | ~~`.git` > `package.json` priority covers jact use cases~~ | ~~H (negate-first)~~ | **Resolved** — survey of `0_SoftwareDevelopment/` found no counter-example; [H]→[F-ID] [OBS-marker-survey](#^OBS-marker-survey) |
+| ~~[A-D1-no-marker-fail](#^A-D1-no-marker-fail)~~ | ~~Fail fast when no marker + no targetFile vs fall back to cwd~~ | ~~A~~ | **Resolved** — fail fast (per D1 rationale) |
 | H-D5-trace-flag | `--scope-trace` debug flag worth shipping in MVP | H | Open — defer to post-MVP unless Phase 6 shows confusion |
+^H-D1-marker-order
+^A-D1-no-marker-fail
 
 ### 7f. [i3] Eval Hold
 
