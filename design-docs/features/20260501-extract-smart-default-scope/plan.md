@@ -192,3 +192,93 @@ LSP diagnostics flagged spurious `await` on synchronous `FileCache.buildCache()`
 
 Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds default-scope fallback.
 
+## 6.5. Phase 5 — [i0] Architecture Eval (Baseline)
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+### Citation Context
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+`jact extract links` on plan: 0 wiki-links extracted (plan uses inline source refs `src/jact.ts:NNN`). Useful data — no external context dependencies.
+
+### Principle Compliance
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+| Category | Status | Details |
+|---|---|---|
+| Modular Design | ❌ Violates | S1a/b/c shows 3× duplicated `if (options.scope) buildCache(scope)` across `extractLinks/Header/File`. **Avoid Duplication** violation. Delta must centralize fallback logic, not propagate it. |
+| Data-First Design | ❌ Violates | S5b: `duplicates: Set<string>` makes "list candidates" unrepresentable (**Illegal States Unrepresentable** violation). Refactor representation first — likely `Map<string, string[]>` (filename → all paths). |
+| Action-Based File Org | ➖ Not mentioned | New util file (e.g., `resolveDefaultScope.ts`) likely needed for centralized inference. Not specified in plan. |
+| Format/Interface Design | ✅ Compliant | **Progressive Defaults** strongly applied: Row 1/2 baseline = no default; ideal = sensible default + override. Row 3 mirrors `validate`'s minimal/verbose split. |
+| MVP Principles | ⚠️ Partial | Rows 1-4 tightly scoped. Row 5 (interactive disambiguation) may exceed MVP — consider "fail with candidate list" before committing to interactive prompt. |
+| Deterministic Offloading | ❌ Violates | **No Surprises** at risk: default-scope inference algorithm undefined. What marks "project root" — `.git`, `package.json`, both, target file path walk-up? Without spec, behavior non-deterministic. |
+| Self-Contained Naming | ➖ Not mentioned | Naming for new symbols (e.g., `resolveDefaultScope`, `findProjectRoot`) deferred to Phase 5/6. Track. |
+| Safety-First Design | ⚠️ Partial | **Clear Contracts** gap: missing scope vs `--scope=.` vs absolute scope = three behaviors. Need explicit contract. **Fail Fast** ✓ for Row 5 ideal (halt-on-ambiguity). |
+| Anti-Patterns | ❌ Violates | **Scattered Checks**: 3× scattered `if (options.scope)` already (S1a/b/c); risk of further scatter as deltas add cwd-walk, target-walk, env-var branches per call site. Centralize. |
+
+### Critical Issues (Severity: High)
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+1. **Default-scope algorithm undefined** [Deterministic Offloading / No Surprises]. Plan §2 Why says "Natural root inferable from cwd or target file" but doesn't specify the inference order, project-root markers, or fallback behavior. Without spec, Row 1/2 ideal cannot be implemented deterministically.
+2. **`duplicates` data shape blocks Row 5 ideal** [Data-First / Illegal States Unrepresentable]. `Set<string>` cannot enumerate candidate paths. Refactor to `Map<string, string[]>` before logic changes.
+3. **Scope-fallback duplication** [Modular Design / Avoid Duplication]. 3× `if (options.scope) buildCache(scope)` will become 3× larger duplication if delta adds inference per call site. Extract to single util.
+4. **Three-way scope contract ambiguity** [Safety-First / Clear Contracts]. Define semantics for: missing `--scope`, `--scope .`, `--scope <abs>`. Without contract, users + agents cannot predict behavior.
+
+### Recommendations
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+1. **Add Phase 5 [i1] Delta row**: specify default-scope inference algorithm — proposed: walk up from cwd seeking `.git` or `package.json`; fall back to walk up from target file path; fail fast with clear error if neither found.
+2. **Add Phase 5 [i1] Delta row**: refactor `FileCache.duplicates` from `Set<string>` → `Map<string, string[]>`; update `addToCache()` to append all paths; expose via new method (e.g., `resolveFile()` returns candidate list on multi-match).
+3. **Add Phase 5 [i1] Delta row**: extract scope-fallback to single util (e.g., `src/core/resolveScope.ts`) consumed by all 3 extract methods; eliminates S1a/b/c duplication + S2b agent-burden in one move.
+4. **Add Phase 5 [i1] Delta row**: document `--scope` contract in CLI help text + `jact/CLAUDE.md`; specify behavior for missing/relative/absolute values.
+
+### Verdict
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+- [ ] Ready to proceed to `[i1: AGENT translates Deltas]`
+- [X] Requires revision — 4 algorithmic/data-shape questions need answers before delta architecture
+
+### Prioritized Findings (MVP Lens)
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+#### Fix Now (Blocking MVP)
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+1. **Default-scope algorithm spec** — without it, Row 1/2 cannot ship deterministically.
+2. **`duplicates` data shape refactor** — without it, Row 5 ideal is unrepresentable.
+3. **Scope-fallback centralization** — without it, delta multiplies existing duplication 3×.
+4. **Three-way scope contract** — without it, users hit silent surprises.
+
+#### Fix Post-MVP (Hardening)
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+1. Naming conventions for new util files — surfaces during Phase 6 DIFFs.
+2. Decide Row 5 disambiguation depth: minimal (fail with list) vs interactive prompt — MVP-first favors minimal.
+
+#### Already Mitigated
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+- Tech debt log captured (`await` removal `jact.ts:653, 745`) — handled in Phase 6 same-DIFF.
+- Tool-strip self-check passed at Phase 2 lock.
+- LSP validation confirms all symbol locations.
+
+### Type 1/Type 2 Classification of Recommendations
+
+%% *Last Modified: 05/01/26 17:42:42* %%
+
+| # | Rec | Type | Why |
+|---|---|---|---|
+| 1 | Default-scope algorithm | I | Defines public contract — affects every caller |
+| 2 | `duplicates` shape refactor | I | Public-API-visible (return type changes) |
+| 3 | Centralize scope-fallback | II | Internal refactor, behavior-equivalent |
+| 4 | Document `--scope` contract | II | Doc edit, no behavior change |
+
