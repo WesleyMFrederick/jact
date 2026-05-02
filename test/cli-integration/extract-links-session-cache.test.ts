@@ -36,7 +36,7 @@ describe("extract links --session (cache integration)", () => {
 	it("first call with --session produces JSON output (cache miss)", () => {
 		const sourcePath = join(testDir, "source.md");
 		const output = execSync(
-			`node "${CLI_PATH}" extract links "${sourcePath}" --scope "${testDir}" --session test-session-1`,
+			`node "${CLI_PATH}" extract links "${sourcePath}" --scope "${testDir}" --session test-session-1 --verbose`,
 			{ encoding: "utf8", cwd: testDir },
 		);
 
@@ -89,7 +89,7 @@ describe("extract links --session (cache integration)", () => {
 
 		// Second call — should extract (no cache was written for the failed attempt)
 		const output = execSync(
-			`node "${CLI_PATH}" extract links "${noLinksPath}" --scope "${testDir}" --session test-session-nolinks`,
+			`node "${CLI_PATH}" extract links "${noLinksPath}" --scope "${testDir}" --session test-session-nolinks --verbose`,
 			{ encoding: "utf8", cwd: testDir },
 		);
 		const result = JSON.parse(output);

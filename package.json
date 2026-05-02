@@ -19,7 +19,7 @@
 		"validate:ts-conversion": "node --loader ts-node/esm scripts/validate-typescript-conversion.ts",
 		"jact:validate": "node ./dist/jact.js validate",
 		"jact:ast": "node ./dist/jact.js ast",
-		"jact:base-paths": "sh -c 'node ./dist/jact.js extract links \"$1\" 2>/dev/null | jq -r \".outgoingLinksReport.processedLinks[] | select(.sourceLink.target.path.absolute) | .sourceLink.target.path.absolute\" | sort -u' --",
+		"jact:base-paths": "sh -c 'node ./dist/jact.js extract links \"$1\" --verbose 2>/dev/null | jq -r \".outgoingLinksReport.processedLinks[] | select(.sourceLink.target.path.absolute) | .sourceLink.target.path.absolute\" | sort -u' --",
 		"jact:extract": "node ./dist/jact.js extract links",
 		"jact:extract:content": "sh -c 'node ./dist/jact.js extract links \"$1\" | jq \".extractedContentBlocks\"' --",
 		"jact:extract:header": "sh -c 'node ./dist/jact.js extract header \"$1\" \"$2\"' --",

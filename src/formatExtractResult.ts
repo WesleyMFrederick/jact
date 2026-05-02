@@ -12,10 +12,16 @@ import type { OutgoingLinksExtractedContent } from "./types/contentExtractorType
 export function formatExtractResult(
 	result: OutgoingLinksExtractedContent,
 	format: "markdown" | "json",
+	mode: "minimal" | "verbose" = "minimal",
 ): string {
 	switch (format) {
-		case "json":
-			return JSON.stringify(result, null, 2);
+		case "json": {
+			const payload =
+				mode === "verbose"
+					? result
+					: { extractedContentBlocks: result.extractedContentBlocks };
+			return JSON.stringify(payload, null, 2);
+		}
 
 		case "markdown": {
 			const contentEntries = Object.entries(result.extractedContentBlocks)
@@ -28,7 +34,9 @@ export function formatExtractResult(
 				})
 				.filter((content): content is string => content !== undefined);
 
-			return contentEntries.join("\n---\n");
+			const content = contentEntries.join("\n---\n");
+			if (mode === "minimal") return content;
+			return `${content}\n\n---\n## Outgoing Links Report\n\n\`\`\`json\n${JSON.stringify(result.outgoingLinksReport, null, 2)}\n\`\`\`\n\n## Stats\n\n\`\`\`json\n${JSON.stringify(result.stats, null, 2)}\n\`\`\``;
 		}
 
 		default: {

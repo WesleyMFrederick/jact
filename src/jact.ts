@@ -35,6 +35,7 @@ import {
 	type NestedCodeblockWarning,
 } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import type { MarkdownParser } from "./core/MarkdownParser/index.js";
+import { resolveScope } from "./core/resolveScope.js";
 import type { FileCache } from "./FileCache.js";
 import {
 	createCitationValidator,
@@ -137,6 +138,28 @@ export class JactCli {
 		this.contentExtractor = createContentExtractor(
 			this.parsedFileCache, // Share cache with validator
 		);
+	}
+
+	/**
+	 * Centralized scope resolution + cache build.
+	 *
+	 * Resolves scope from explicit option / cwd / target file ancestors, then
+	 * builds the file cache against the resolved root. Throws when scope
+	 * cannot be inferred so callers don't silently fall back to no-scope mode.
+	 */
+	private applyScope(options: { scope?: string }, targetFile?: string): void {
+		const resolved = resolveScope({
+			...(options.scope !== undefined && { explicit: options.scope }),
+			cwd: process.cwd(),
+			...(targetFile !== undefined && { targetFile }),
+		});
+		if (resolved.source === "none") {
+			const triedParts = resolved.triedFallbacks ?? [];
+			throw new Error(
+				`cannot resolve scope. Tried: ${triedParts.join(", ")}. Pass --scope <dir>.`,
+			);
+		}
+		this.fileCache.buildCache(resolved.scope, false, resolved);
 	}
 
 	/**
@@ -557,10 +580,7 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<void> {
 		try {
-			// Decision: Build file cache if --scope provided
-			if (options.scope) {
-				this.fileCache.buildCache(options.scope);
-			}
+			this.applyScope(options, sourceFile);
 
 			// Phase 1: Link Discovery & Validation
 			// Pattern: Delegate to validator for link discovery and enrichment
@@ -587,9 +607,14 @@ export class JactCli {
 				{ fullFiles: options.fullFiles ?? false }, // Pass CLI flags to strategies
 			);
 
-			// Phase 3: Output
-			// Boundary: Output JSON to stdout
-			console.log(JSON.stringify(extractionResult, null, 2));
+			// Phase 3: Output — minimal payload by default; --verbose adds report + stats
+			console.log(
+				formatExtractResult(
+					extractionResult,
+					"json",
+					options.verbose ? "verbose" : "minimal",
+				),
+			);
 
 			// Decision: Exit code based on extraction success
 			if (extractionResult.stats.uniqueContent > 0) {
@@ -648,10 +673,7 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
-			// Decision: Build file cache if --scope provided
-			if (options.scope) {
-				await this.fileCache.buildCache(options.scope);
-			}
+			this.applyScope(options, targetFile);
 
 			// --- Phase 1: Synthetic Link Creation ---
 			// Pattern: Use factory to create unvalidated LinkObject from CLI parameters
@@ -740,10 +762,7 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
-			// Decision: Build file cache if --scope provided
-			if (options.scope) {
-				await this.fileCache.buildCache(options.scope);
-			}
+			this.applyScope(options, targetFile);
 
 			// --- Phase 1: Synthetic Link Creation ---
 			// Pattern: Use factory to create unvalidated LinkObject for full file
@@ -1273,12 +1292,18 @@ const extractCmd = program
 	.command("extract")
 	.description("Extract content from citations");
 
+// Shared option descriptions — kept in one place so wording stays consistent across subcommands
+const SCOPE_OPTION_DESCRIPTION =
+	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
+const VERBOSE_OPTION_DESCRIPTION =
+	"Include outgoingLinksReport + stats in output";
+
 extractCmd
 	.command("links <source-file>")
 	.description(
 		"Extract content from all links in source document with validation and deduplication",
 	)
-	.option("--scope <folder>", "Limit file resolution to folder")
+	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option("--format <type>", "Output format (reserved for future)", "json")
 	.option(
 		"--full-files",
@@ -1288,6 +1313,7 @@ extractCmd
 		"--session <id>",
 		"Session ID for cache deduplication (skips extraction on cache hit)",
 	)
+	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
 	.addHelpText(
 		"after",
 		`
@@ -1305,7 +1331,7 @@ Exit Codes:
 `,
 	)
 	.action(async (sourceFile: string, options: CliExtractOptions) => {
-		// D3: Cache check wraps extractLinks() at the CLI command level
+		// Session cache short-circuits extraction at the CLI boundary
 		if (options.session) {
 			if (checkExtractCache(options.session, sourceFile, CACHE_DIR)) {
 				process.exitCode = 0;
@@ -1319,7 +1345,7 @@ Exit Codes:
 		try {
 			await manager.extractLinks(sourceFile, options);
 
-			// D3: Write cache only after successful extraction (exitCode 0)
+			// Write cache only after successful extraction
 			if (options.session && process.exitCode !== 1) {
 				writeExtractCache(options.session, sourceFile, CACHE_DIR);
 			}
@@ -1336,7 +1362,8 @@ extractCmd
 	.description("Extract specific header section content from a target file")
 	.argument("<target-file>", "Markdown file to extract from")
 	.argument("<header-name>", "Exact header text to extract")
-	.option("--scope <folder>", "Limit file resolution scope")
+	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
 	.addOption(
 		new Option("--format <type>", "Output format")
 			.choices(["markdown", "json"])
@@ -1373,10 +1400,14 @@ Exit Codes:
 					options,
 				);
 
-				// D-001: Format output based on --format flag (default: markdown)
+				// Format output based on --format flag (default: markdown); minimal payload by default
 				if (result) {
 					console.log(
-						formatExtractResult(result, options.format ?? "markdown"),
+						formatExtractResult(
+							result,
+							options.format ?? "markdown",
+							options.verbose ? "verbose" : "minimal",
+						),
 					);
 					process.exitCode = 0;
 				}
@@ -1395,7 +1426,8 @@ extractCmd
 	.command("file")
 	.description("Extract entire markdown file content")
 	.argument("<target-file>", "Markdown file to extract")
-	.option("--scope <folder>", "Limit file resolution to specified directory")
+	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
 	.option("--format <type>", "Output format (json)", "json")
 	.addHelpText(
 		"after",
@@ -1420,10 +1452,15 @@ Exit Codes:
 			// Pattern: Delegate to JactCli orchestration method
 			const result = await manager.extractFile(targetFile, options);
 
-			// Decision: Output JSON to stdout if extraction succeeded
+			// Output JSON to stdout if extraction succeeded — minimal by default, --verbose adds report + stats
 			if (result) {
-				// Boundary: JSON output to stdout
-				console.log(JSON.stringify(result, null, 2));
+				console.log(
+					formatExtractResult(
+						result,
+						"json",
+						options.verbose ? "verbose" : "minimal",
+					),
+				);
 				process.exitCode = 0;
 			}
 			// Note: Error exit codes set by extractFile() method
