@@ -732,7 +732,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 0 — Baseline `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 20:16:12* %%
+%% *Last Modified: 05/01/26 20:17:12* %%
 
 - [x] **0.0** STATE-READ: `git rev-parse HEAD` → `baseline_hash: 2f7687504da56397915d04e672f4e1a598bc0ba3` (plan had placeholder `3872f7b`; actual HEAD is 2f7687504 — 3 commits added after plan was written).
 - [x] **0.1** BASELINE: Run LSP commands from Baseline Tracing Guide — DONE. Findings:
@@ -757,7 +757,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
   - DEVIATION D2: `test/unit/formatExtractResult.test.ts` already exists with 5 passing tests. Phase 3 must APPEND 2 new assertions (minimal/verbose) rather than create new file.
   - DEVIATION D3: `fix()` at L859 is a 5th `buildCache` call site (plan only mentioned 3 extract sites). D3 does NOT touch fix(). Confirmed as correct scoping.
   - DEVIATION D4: Plan baseline_hash placeholder `3872f7b` ≠ actual HEAD `2f7687504`. Updated in 0.0 above.
-- [x] **0.C** COMMIT: Plan-only changes (checkboxes + deviations). `end_hash: <to-be-filled-after-commit>`
+- [x] **0.C** COMMIT: Plan-only changes (checkboxes + deviations). `end_hash: c8b11daf544f708e81b63d8cea8421e51f9e6c52`
 
 ### Phase 1 — Foundation Types + Pure Util (D2 + D1) `delta-implementer` (sonnet)
 
