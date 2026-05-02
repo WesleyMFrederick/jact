@@ -1,8 +1,8 @@
+import { exec } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
-import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { describe, expect, it } from "vitest";
 
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
@@ -17,7 +17,7 @@ describe("CLI extract file subcommand - Basic Functionality", () => {
 
 		// When: Execute extract file command
 		const { stdout } = await execAsync(
-			`node "${CLI_PATH}" extract file "${testFile}"`,
+			`node "${CLI_PATH}" extract file "${testFile}" --verbose`,
 		);
 
 		// Then: Output contains complete file content
@@ -70,7 +70,7 @@ describe("CLI extract file subcommand - Scope Option", () => {
 
 		// When: Execute with scope option
 		const { stdout } = await execAsync(
-			`node "${CLI_PATH}" extract file "${fileName}" --scope "${scopedDir}"`,
+			`node "${CLI_PATH}" extract file "${fileName}" --scope "${scopedDir}" --verbose`,
 		);
 
 		// Then: File is found and content extracted
@@ -92,7 +92,7 @@ describe("CLI extract file subcommand - Exit Codes", () => {
 
 		// When: Execute extract file command
 		const { stdout, stderr } = await execAsync(
-			`node "${CLI_PATH}" extract file "${testFile}"`,
+			`node "${CLI_PATH}" extract file "${testFile}" --verbose`,
 		);
 
 		// Then: Command exits with code 0 (success - implicit in execAsync not throwing)

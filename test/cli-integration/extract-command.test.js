@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,10 +12,9 @@ describe("Extract Command - Infrastructure", () => {
 		// Given: jact CLI
 
 		// When: Request help for extract links command
-		const output = execSync(
-			"node dist/jact.js extract links --help",
-			{ encoding: "utf8" },
-		);
+		const output = execSync("node dist/jact.js extract links --help", {
+			encoding: "utf8",
+		});
 
 		// Then: Extract links command help displays
 		// Verification: Commander registered extract links command
@@ -32,10 +31,9 @@ describe("Extract Links Subcommand - Registration", () => {
 		// Given: jact CLI with extract command
 
 		// When: Request help for extract links
-		const output = execSync(
-			"node dist/jact.js extract links --help",
-			{ encoding: "utf8" },
-		);
+		const output = execSync("node dist/jact.js extract links --help", {
+			encoding: "utf8",
+		});
 
 		// Then: Subcommand help displays with arguments and options
 		expect(output).toContain("jact extract links");
@@ -53,7 +51,7 @@ describe("Extract Links - CLI Orchestration", () => {
 
 		// When: Execute extract links command
 		const output = execSync(
-			`node dist/jact.js extract links ${fixtureFile}`,
+			`node dist/jact.js extract links ${fixtureFile} --verbose`,
 			{ encoding: "utf8" },
 		);
 
@@ -100,7 +98,7 @@ describe("Extract Links - Full Files Flag", () => {
 
 		// When: Execute with --full-files flag
 		const output = execSync(
-			`node dist/jact.js extract links "${fixtureFile}" --full-files`,
+			`node dist/jact.js extract links "${fixtureFile}" --full-files --verbose`,
 			{ encoding: "utf8" },
 		);
 
@@ -121,7 +119,7 @@ describe("Extract Links - Full Files Flag", () => {
 		let output;
 		try {
 			output = execSync(
-				`node dist/jact.js extract links "${fixtureFile}"`,
+				`node dist/jact.js extract links "${fixtureFile}" --verbose`,
 				{ encoding: "utf8" },
 			);
 		} catch (error) {
@@ -172,10 +170,9 @@ describe("Extract Command - Help Documentation", () => {
 		// Given: jact CLI
 
 		// When: Request help for extract command
-		const output = execSync(
-			"node dist/jact.js extract --help",
-			{ encoding: "utf8" },
-		);
+		const output = execSync("node dist/jact.js extract --help", {
+			encoding: "utf8",
+		});
 
 		// Then: Help text includes description and subcommand list
 		expect(output).toContain("Extract content from citations");
@@ -190,10 +187,9 @@ describe("Extract Links - Help Documentation", () => {
 		// Given: jact CLI
 
 		// When: Request help for extract links
-		const output = execSync(
-			"node dist/jact.js extract links --help",
-			{ encoding: "utf8" },
-		);
+		const output = execSync("node dist/jact.js extract links --help", {
+			encoding: "utf8",
+		});
 
 		// Then: Help includes usage, options, examples, and exit codes
 		expect(output).toContain("Usage: jact extract links");

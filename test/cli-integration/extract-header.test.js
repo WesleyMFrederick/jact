@@ -20,7 +20,7 @@ describe("CLI - extract header command", () => {
 
 		// When: Run extract header command
 		const output = runCLI(
-			`node dist/jact.js extract header "${targetFile}" "${headerName}" --format json`,
+			`node dist/jact.js extract header "${targetFile}" "${headerName}" --format json --verbose`,
 			{ captureStderr: true },
 		);
 

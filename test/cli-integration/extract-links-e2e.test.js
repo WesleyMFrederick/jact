@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
 import { execSync } from "node:child_process";
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 
 describe("Extract Links - End-to-End Integration", () => {
 	it("should complete full extraction workflow with real fixtures", () => {
@@ -9,7 +9,7 @@ describe("Extract Links - End-to-End Integration", () => {
 
 		// When: Execute extract links with --full-files flag
 		const output = execSync(
-			`node dist/jact.js extract links "${sourceFile}" --full-files`,
+			`node dist/jact.js extract links "${sourceFile}" --full-files --verbose`,
 			{ encoding: "utf8" },
 		);
 

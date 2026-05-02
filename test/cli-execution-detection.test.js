@@ -72,9 +72,10 @@ describe("CLI Execution Detection via Symlink", () => {
 		const testFile = join(__dirname, "fixtures", "extract-test-source.md");
 
 		// Execute extract links command via symlink
-		const result = runCLI(`node ${symlinkPath} extract links "${testFile}"`, {
-			cwd: __dirname,
-		});
+		const result = runCLI(
+			`node ${symlinkPath} extract links "${testFile}" --verbose`,
+			{ cwd: __dirname },
+		);
 
 		// Should produce JSON output
 		const output = JSON.parse(result);

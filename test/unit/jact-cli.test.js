@@ -45,7 +45,7 @@ describe("JactCli - extractLinks() Phase 2", () => {
 			process.cwd(),
 			"test/fixtures/section-extraction/links.md",
 		);
-		const options = { fullFiles: true };
+		const options = { fullFiles: true, verbose: true };
 
 		// When: Call extractLinks with flags
 		await manager.extractLinks(sourceFile, options);

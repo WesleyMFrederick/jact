@@ -124,6 +124,7 @@ export interface CliExtractOptions {
 	format?: "markdown" | "json";
 	fullFiles?: boolean;
 	session?: string;
+	verbose?: boolean;
 }
 
 /**
