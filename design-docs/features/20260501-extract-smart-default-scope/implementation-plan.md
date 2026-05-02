@@ -732,25 +732,32 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 0 — Baseline `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 19:31:55* %%
+%% *Last Modified: 05/01/26 20:16:12* %%
 
-- [ ] **0.0** STATE-READ: `git rev-parse HEAD` → record as `baseline_hash: 3872f7b687811a18edde0ef27b0e0860cf2becb1` in this plan. This anchors the entire sequence.
-- [ ] **0.1** BASELINE: Run LSP commands from Baseline Tracing Guide (this plan §Baseline Tracing Guide):
-  - `findReferences` on `src/jact.ts:555` (extractLinks), `:645` (extractHeader), `:738` (extractFile)
-  - `findReferences` on `src/FileCache.ts:175` (resolveFile), `:92` (buildCache)
-  - `findReferences` on `src/FileCache.ts:24` (ResolveResult), `:3` (CacheStats) — confirm no external consumers pre-migration
-  - `documentSymbol` on `src/CitationValidator.ts`, `src/ParsedFileCache.ts`
-  - `documentSymbol` on `src/jact.ts` — locate `validate` at L181 as `--verbose` reference pattern
-- [ ] **0.2** BASELINE: Read key files in order (per plan §Baseline Tracing Guide):
-  - `src/jact.ts:181-256` (validate `--verbose` pattern)
-  - `src/jact.ts:555-606`, `:645-701`, `:738-813` (three target methods)
-  - `src/jact.ts:1276-1437` (Commander defs)
-  - `src/FileCache.ts:1-260` (full class + types + findFuzzyMatch)
-  - `src/formatExtractResult.ts:1-39`
-  - `design-docs/features/20260501-extract-smart-default-scope/plan.md` §7a–§7c, §8b–§8g
-- [ ] **0.3** BASELINE: Establish green baseline — `npm run build && npm test`. Note any pre-existing failures.
-- [ ] **0.S** STATE-WRITE: Update plan checkboxes at plan file path, note any baseline deviations (failing tests, lint errors)
-- [ ] **0.C** COMMIT: No code changes expected. If baseline deviations found, record in plan. `git rev-parse HEAD` → `end_hash: <hash>`
+- [x] **0.0** STATE-READ: `git rev-parse HEAD` → `baseline_hash: 2f7687504da56397915d04e672f4e1a598bc0ba3` (plan had placeholder `3872f7b`; actual HEAD is 2f7687504 — 3 commits added after plan was written).
+- [x] **0.1** BASELINE: Run LSP commands from Baseline Tracing Guide — DONE. Findings:
+  - `extractLinks` (L555): refs only in jact.ts (L555 def, L1320 Commander action). No external callers.
+  - `extractHeader` (L645): refs only in jact.ts (L645 def, L1370 Commander action).
+  - `extractFile` (L738): refs only in jact.ts (L738 def, L1421 Commander action).
+  - `resolveFile` (L175 FileCache): LSP returned only L175 (own decl); workspace symbol confirmed CitationValidator uses it at L440 + L767 via `FileCacheInterface`. Backward compat required.
+  - `buildCache` (L92): 5 call sites — jact.ts L190 (validate), L562 (extractLinks), L653 (extractHeader ⚠️ spurious await), L745 (extractFile ⚠️ spurious await), L859 (fix). D3 only replaces 3 extract sites; validate/fix stay unchanged.
+  - `ResolveResult` (L24): 0 external consumers (only FileCache.ts L175, L246). Migration safe.
+  - `CacheStats` (L3): 0 external consumers (only FileCache.ts L92). Migration safe.
+  - TS80007 diagnostics confirmed at L653 + L745.
+  - `CliExtractOptions` lives in `src/types/contentExtractorTypes.ts:122` (not jact.ts). No `verbose` field yet — Phase 3 (D4) adds it there.
+- [x] **0.2** BASELINE: Read key files — DONE. Key observations:
+  - `validate()` (L181–256): uses `if (options.scope) buildCache(...)` + passes `options.verbose` to formatForCLI. Pattern to mirror in D4.
+  - `extractLinks` (L555–606): outputs JSON directly in method at L592. `extractHeader`/`extractFile` return result; Commander action calls formatter.
+  - Commander defs (L1276–1437): no `--verbose` flag yet on any extract subcommand. `--scope` help text is minimal.
+  - `FileCache.ts` (L1–374): `cache: Map<string,string>` + `duplicates: Set<string>`. `findFuzzyMatch()` at L246 preserved in D2.
+  - `formatExtractResult.ts` (L1–39): single `mode` parameter doesn't exist yet; JSON case returns full result; markdown joins blocks with `\n---\n`.
+- [x] **0.3** BASELINE: `npm run build` clean. `npm test` — 78 test files, 435 tests, all green. Zero pre-existing failures.
+- [x] **0.S** STATE-WRITE: Deviations from plan:
+  - DEVIATION D1: `test/unit/` directory already exists (plan said "create new subdir"). No action needed.
+  - DEVIATION D2: `test/unit/formatExtractResult.test.ts` already exists with 5 passing tests. Phase 3 must APPEND 2 new assertions (minimal/verbose) rather than create new file.
+  - DEVIATION D3: `fix()` at L859 is a 5th `buildCache` call site (plan only mentioned 3 extract sites). D3 does NOT touch fix(). Confirmed as correct scoping.
+  - DEVIATION D4: Plan baseline_hash placeholder `3872f7b` ≠ actual HEAD `2f7687504`. Updated in 0.0 above.
+- [x] **0.C** COMMIT: Plan-only changes (checkboxes + deviations). `end_hash: <to-be-filled-after-commit>`
 
 ### Phase 1 — Foundation Types + Pure Util (D2 + D1) `delta-implementer` (sonnet)
 
