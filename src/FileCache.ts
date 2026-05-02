@@ -85,14 +85,14 @@ export class FileCache {
 
 		this.scanDirectory(targetScanFolder);
 
-		const duplicateCount = [...this.entries.values()].filter(
-			(v) => v.length > 1,
-		).length;
+		// Single pass: collect duplicate names and count together
+		const dupNames: string[] = [];
+		for (const [k, v] of this.entries) {
+			if (v.length > 1) dupNames.push(k);
+		}
+		const duplicateCount = dupNames.length;
 
 		if (verbose && duplicateCount > 0) {
-			const dupNames = [...this.entries.entries()]
-				.filter(([, v]) => v.length > 1)
-				.map(([k]) => k);
 			console.error(
 				`WARNING: Found duplicate filenames in scope: ${dupNames.join(", ")}`,
 			);
@@ -403,6 +403,7 @@ export function findNearMisses(
 
 	for (const key of entries.keys()) {
 		if (key === name) continue;
+		if (Math.abs(name.length - key.length) > maxDist) continue;
 		const d = levenshtein(name, key);
 		if (d <= maxDist) {
 			candidates.push({ key, dist: d });
@@ -418,19 +419,20 @@ export function findNearMisses(
 function levenshtein(a: string, b: string): number {
 	const m = a.length;
 	const n = b.length;
-	const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
-		Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
-	);
+	// Two rolling rows — O(n) allocation instead of O(m*n)
+	let prev = Array.from({ length: n + 1 }, (_, j) => j);
+	let curr = new Array<number>(n + 1);
 
 	for (let i = 1; i <= m; i++) {
+		curr[0] = i;
 		for (let j = 1; j <= n; j++) {
 			if (a[i - 1] === b[j - 1]) {
-				dp[i]![j] = dp[i - 1]![j - 1]!;
+				curr[j] = prev[j - 1]!;
 			} else {
-				dp[i]![j] =
-					1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
+				curr[j] = 1 + Math.min(prev[j]!, curr[j - 1]!, prev[j - 1]!);
 			}
 		}
+		[prev, curr] = [curr, prev];
 	}
-	return dp[m]![n]!;
+	return prev[n]!;
 }
