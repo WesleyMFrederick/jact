@@ -1,5 +1,6 @@
 import type { ScopeResolution } from "./core/resolveScope.js";
 import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
+import { levenshteinDistance } from "./utils/stringDistance.js";
 
 interface FileEntry {
 	filename: string;
@@ -25,7 +26,7 @@ interface CacheStatsDetail {
  *
  * Architecture decisions:
  * - Scans only the symlink-resolved directory to avoid duplicate entries
- * - entries Map stores ALL paths per filename (D2 refactor — eliminates dual-state bug)
+ * - entries Map stores ALL paths per filename so duplicates are tracked as a single source of truth
  * - Provides fuzzy matching as fallback (typo corrections, double extensions)
  * - Warns about duplicates to help users fix ambiguous references
  *
@@ -39,7 +40,7 @@ export class FileCache {
 	private fs: typeof import("fs");
 	private path: typeof import("path");
 	private entries: Map<string, string[]>; // filename -> all paths in scan order
-	private scope: ScopeResolution | undefined = undefined; // set by buildCache; used by resolveFile for D7 error messages
+	private scope: ScopeResolution | undefined = undefined; // set by buildCache; embedded in error messages from resolveFile
 
 	/**
 	 * Initialize cache with file system and path dependencies
@@ -64,6 +65,8 @@ export class FileCache {
 	 * filenames are detected (these will require relative path disambiguation).
 	 *
 	 * @param {string} scopeFolder - Root folder to scan (can be symlink, will be resolved)
+	 * @param {boolean} verbose - When true, log duplicate filename warnings to stderr
+	 * @param {ScopeResolution} scope - Optional resolution metadata used by resolveFile to enrich error messages
 	 * @returns {Object} Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
 	buildCache(
@@ -85,14 +88,9 @@ export class FileCache {
 
 		this.scanDirectory(targetScanFolder);
 
-		// Single pass: collect duplicate names and count together
-		const dupNames: string[] = [];
-		for (const [k, v] of this.entries) {
-			if (v.length > 1) dupNames.push(k);
-		}
-		const duplicateCount = dupNames.length;
+		const dupNames = this.duplicateNames();
 
-		if (verbose && duplicateCount > 0) {
+		if (verbose && dupNames.length > 0) {
 			console.error(
 				`WARNING: Found duplicate filenames in scope: ${dupNames.join(", ")}`,
 			);
@@ -100,10 +98,23 @@ export class FileCache {
 
 		return {
 			totalFiles: this.entries.size,
-			duplicates: duplicateCount,
+			duplicates: dupNames.length,
 			scopeFolder: absoluteScopeFolder,
 			realScopeFolder: targetScanFolder,
 		};
+	}
+
+	/**
+	 * Filenames that resolve to more than one path. Single source of truth for
+	 * duplicate detection — used by buildCache, getCacheStats, and any consumer
+	 * that needs the ambiguous-filename list.
+	 */
+	private duplicateNames(): string[] {
+		const dups: string[] = [];
+		for (const [name, paths] of this.entries) {
+			if (paths.length > 1) dups.push(name);
+		}
+		return dups;
 	}
 
 	private scanDirectory(dirPath: string): void {
@@ -147,7 +158,8 @@ export class FileCache {
 	 * 3. Fuzzy matching for typos and common issues
 	 *
 	 * Returns error if filename is ambiguous (multiple files with same name).
-	 * D2: failure results carry candidates[] listing every matching path.
+	 * Failure results carry candidates[] listing every matching path so callers
+	 * can present the disambiguation choice to users.
 	 *
 	 * @param {string} filename - Filename to resolve (with or without .md extension)
 	 * @returns {Object} Result object with { found, path?, reason?, message?, candidates?, fuzzyMatch?, correctedFilename? }
@@ -380,9 +392,7 @@ export class FileCache {
 
 	// Get cache statistics (total files, duplicates)
 	getCacheStats(): CacheStatsDetail {
-		const duplicates = [...this.entries.entries()]
-			.filter(([, v]) => v.length > 1)
-			.map(([k]) => k);
+		const duplicates = this.duplicateNames();
 		return {
 			totalFiles: this.entries.size,
 			duplicateCount: duplicates.length,
@@ -391,8 +401,15 @@ export class FileCache {
 	}
 }
 
-// Module-level export (per G3): unit-testable without class instantiation
-// Levenshtein top-k entries by ascending distance ≤ maxDist. Stable sort: ties preserve Map insertion order.
+/**
+ * Find top-k filename entries within Levenshtein distance ≤ maxDist of `name`.
+ *
+ * Stable sort: ties preserve Map insertion order. Length pre-filter skips
+ * candidates whose length differs by more than maxDist — eliminates the O(m*n)
+ * DP for the majority of entries at large scope sizes.
+ *
+ * Module-level export so it's unit-testable without class instantiation.
+ */
 export function findNearMisses(
 	name: string,
 	entries: Map<string, string[]>,
@@ -404,35 +421,13 @@ export function findNearMisses(
 	for (const key of entries.keys()) {
 		if (key === name) continue;
 		if (Math.abs(name.length - key.length) > maxDist) continue;
-		const d = levenshtein(name, key);
+		const d = levenshteinDistance(name, key);
 		if (d <= maxDist) {
 			candidates.push({ key, dist: d });
 		}
 	}
 
-	// Stable sort by ascending distance (Map insertion order preserved for ties)
 	candidates.sort((a, b) => a.dist - b.dist);
 
 	return candidates.slice(0, k).map((c) => c.key);
-}
-
-function levenshtein(a: string, b: string): number {
-	const m = a.length;
-	const n = b.length;
-	// Two rolling rows — O(n) allocation instead of O(m*n)
-	let prev = Array.from({ length: n + 1 }, (_, j) => j);
-	let curr = new Array<number>(n + 1);
-
-	for (let i = 1; i <= m; i++) {
-		curr[0] = i;
-		for (let j = 1; j <= n; j++) {
-			if (a[i - 1] === b[j - 1]) {
-				curr[j] = prev[j - 1]!;
-			} else {
-				curr[j] = 1 + Math.min(prev[j]!, curr[j - 1]!, prev[j - 1]!);
-			}
-		}
-		[prev, curr] = [curr, prev];
-	}
-	return prev[n]!;
 }

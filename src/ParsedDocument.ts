@@ -4,6 +4,7 @@ import type {
 	LinkObject,
 	ParserOutput,
 } from "./types/citationTypes.js";
+import { levenshteinDistance } from "./utils/stringDistance.js";
 
 /**
  * Facade providing stable query interface over MarkdownParser.Output.DataContract
@@ -386,36 +387,10 @@ class ParsedDocument {
 		if (str1 === str2) return 1.0;
 		if (str1.length === 0 || str2.length === 0) return 0.0;
 
-		// Convert to lowercase for case-insensitive comparison
+		// Case-insensitive comparison via shared distance helper
 		const a = str1.toLowerCase();
 		const b = str2.toLowerCase();
-
-		// Initialize matrix for dynamic programming
-		const matrix: number[][] = [];
-		for (let i = 0; i <= b.length; i++) {
-			matrix[i] = [i];
-		}
-		for (let j = 0; j <= a.length; j++) {
-			matrix[0]![j] = j;
-		}
-
-		// Fill matrix with Levenshtein distance calculation
-		for (let i = 1; i <= b.length; i++) {
-			for (let j = 1; j <= a.length; j++) {
-				if (b.charAt(i - 1) === a.charAt(j - 1)) {
-					matrix[i]![j] = matrix[i - 1]![j - 1]!;
-				} else {
-					matrix[i]![j] = Math.min(
-						matrix[i - 1]![j - 1]! + 1, // substitution
-						matrix[i]![j - 1]! + 1, // insertion
-						matrix[i - 1]![j]! + 1, // deletion
-					);
-				}
-			}
-		}
-
-		// Get final distance
-		const distance = matrix[b.length]![a.length]!;
+		const distance = levenshteinDistance(a, b);
 
 		// Normalize to 0-1 range (1 = identical, 0 = completely different)
 		const maxLength = Math.max(a.length, b.length);
