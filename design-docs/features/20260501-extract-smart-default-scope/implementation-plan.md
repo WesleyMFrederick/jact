@@ -8,7 +8,7 @@
 
 Source design: `design-docs/features/20260501-extract-smart-default-scope/plan.md` (LOCKED through Phase 6).
 
-Implements D1–D7 from §7a Delta Architecture:
+Implements D1–D7 from §[7. Phase 5 — Delta Architecture](plan.md#7.%20Phase%205%20—%20Delta%20Architecture)
 
 - **D1**: Add `resolveScope()` pure util — walk-up `.git`/`package.json` from cwd or target file
 - **D2**: Refactor `FileCache` `cache + duplicates` dual-state → single `entries: Map<string, string[]>`
@@ -702,19 +702,33 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 **Agents:** `delta-implementer` (coder, sonnet) · `delta-reviewer` (reviewer, opus) · `bi-row-verifier` (verifier, opus)
 **Plan file:** `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/implementation-plan.md`
 
-**Escalation Policy:**
+#### Agents
+
+%% *Last Modified: 05/01/26 18:36:07* %%
+
+| Role              | Source                 | Model  | Path                                                                              | Adaptation                                                             |
+| ----------------- | ---------------------- | ------ | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Delta Implementer | `coder` general agent  | sonnet |                                                                                   | Constrained to executing locked plan §7; no architecture re-litigation |
+| Delta Reviewer    | `forge:reviewer` agent | opus   | /Users/wesleyfrederick/.claude/plugins/cache/forge/forge/1.0.0/agents/reviewer.md | Direct reuse; review criteria = Plan §7a/§7b + arch principles         |
+| BI-Row Verifier   | `forge:verifier` agent | opus   | /Users/wesleyfrederick/.claude/plugins/cache/forge/forge/1.0.0/agents/verifier.md | Direct reuse; acceptance criteria = §7e Validation Table               |
+
+
+#### Escalation Policy
 - 1×: `delta-reviewer` finds issues → `delta-implementer` (sonnet) fixes → `delta-reviewer` re-reviews
 - 2×: `delta-reviewer` still finds issues → `delta-implementer` (opus model override) fixes → `delta-reviewer` re-reviews
 - 3×: `delta-reviewer` still finds issues → ESCALATE to human USER
 
-**Spawning Rules:**
+#### Spawning Rules
 - Just-in-time spawning — `delta-reviewer` spawns at review gates only; `bi-row-verifier` spawns when Phase 4 completes
 - Fresh `delta-implementer` per phase — never reuse across phase boundaries
 - Phases sized for 50-75% of agent context (~100-150K tokens). >15 tasks = split phase
 
-**Testing convention:** All tests use BDD-style assertions (`describe`/`it`/`expect`). Vitest + `npm test` (per G6 — project does not use bun for testing).
+#### Testing convention
+- All tests use BDD-style assertions (`describe`/`it`/`expect`). 
+- Vitest + `npm test` (per G6 — project does not use bun for testing).
 
-**Delta dependency order (per team-blueprint §Topology):** D2 → D1 → D3 → D7 → D4 → D5 → D6
+#### Delta dependency order
+- D2 → D1 → D3 → D7 → D4 → D5 → D6
 
 ### Phase 0 — Baseline `delta-implementer` (sonnet)
 
@@ -808,6 +822,10 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 - [ ] **2.R** REVIEW: Scope — `src/types/fileCacheTypes.ts`, `src/core/resolveScope.ts`, `src/FileCache.ts`, `src/jact.ts` (applyScope + 3 method modifications), all 5 new test files. Review `git diff <Phase_0.C_end_hash>..HEAD`.
   - Verify: Plan §7a/§7b spec adherence (D1/D2/D3/D7 implemented as written; no architecture re-litigation)
+	  - Run `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/plan.md "D1 — `resolveScope` algorithm"`
+	  - Run `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/plan.md "D2 — `entries: Map<string, string[]>` refactor"`
+	  - Run `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/plan.md "D3 — `applyScope` helper extraction"`
+	  - Run `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/plan.md "D7 — Smart error message stack"`
   - Verify: D2 backward compat — `CitationValidator`, `ParsedFileCache` consumers of `resolveFile()` success path unchanged
   - Verify: D1 purity — `resolveScope` performs no I/O beyond `fs.existsSync`; deterministic; `fs` injectable
   - Verify: D3 collapses 3 sites into 1; spurious `await` removed at L653 + L745 (CLAUDE.md TECH DEBT POLICY: in same PR)
