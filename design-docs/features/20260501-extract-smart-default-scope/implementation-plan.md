@@ -793,7 +793,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 2 — Core Build: applyScope + Smart Errors (D3 + D7) `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 20:56:49* %%
+%% *Last Modified: 05/01/26 20:57:37* %%
 
 - [x] **2.0** STATE-READ: `git rev-parse HEAD` → `start_hash: 83d799cc7a9641b771a7b5311579aa8d2dcd557d`. One commit past Phase 1.C end_hash `56c4501` (plan update commit `83d799c` — acceptable).
 
@@ -828,7 +828,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
   - DEVIATION P2-1: `buildCache` now accepts optional 3rd param `scope?: ScopeResolution` (stored as instance field) instead of `resolveFile(filename, scope?)` parameter approach. Cleaner: wires scope through FileCache without touching CitationValidator.
   - DEVIATION P2-2: `extract-default-scope.test.ts` has 9 assertions (plan said 8) — extra assertion for extract-links exit-code-1 handling.
   - DEVIATION P2-3: extract-links test accepts exit code 1 (no links found) as valid success — not a scope error. Test updated to distinguish exit 1 from exit 2.
-- [ ] **2.C** COMMIT: Commit Phase 2 — "feat(scope): D3 applyScope helper + D7 smart error stack (M1/M2/M3)". `git rev-parse HEAD` → `end_hash: <hash>`
+- [x] **2.C** COMMIT: "feat(scope): D3 applyScope helper + D7 smart error stack (M1/M2/M3)". `end_hash: 9f5dd729a1041be02655871dee70acc3d607fab7`
 
 #### REVIEW GATE 1 `delta-reviewer` (opus)
 
