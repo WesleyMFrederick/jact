@@ -1086,6 +1086,16 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 All other 4 outcomes ([O1]–[O4]) are fully verified and would ship clean independently. [O5] partially passes (M2 + M3 verified; M1 blocked).
 
+##### B-1 Fix — Applied 05/01/26 by `delta-implementer-fix` (sonnet)
+
+%% *Last Modified: 05/01/26 21:36:39* %%
+
+**Fix commit:** `dfbb38f`  
+**File changed:** `src/CitationValidator.ts:567` — replaced hardcoded `File "${filename}" not found in scope folder. ${debugInfo}` with `${cacheResult.message ?? ""}. ${debugInfo}` (mirrors duplicate-branch pattern at line 559).  
+**Test added:** `test/integration/extract-default-scope.test.ts` — new describe block "M1 near-miss suggestion — not_found branch" asserts `Did you mean: CLAUDE.md` in output for typo input `CLUADE.md`.  
+**Smoke result:** `jact extract file CLUADE.md` → stderr contains `Did you mean: CLAUDE.md?` ✓  
+**Full suite:** 501 tests, 85 files, all green ✓
+
 ---
 
 ## Review Gate Justification
