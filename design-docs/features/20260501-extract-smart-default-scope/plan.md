@@ -42,7 +42,7 @@
 
 ## 3. Artifacts
 
-%% *Last Modified: 05/01/26 17:13:37* %%
+%% *Last Modified: 05/01/26 17:26:04* %%
 
 | Artifact | Path | Role |
 |----------|------|------|
@@ -53,6 +53,7 @@
 | `extractLinks` | `src/jact.ts:555-606` | Target — same |
 | `validate` | `src/jact.ts:181-256` | Reference — minimal default + `--verbose` |
 | `formatExtractResult` | `src/formatExtractResult.ts` | Reference — current formatter (md/json) |
+| `FileCache` | `src/FileCache.ts` | Target — Row 5 ambiguous-match: `resolveFile()` 175-229, `duplicates` Set<string> 62/78-79, `addToCache` 153-160 silent overwrite |
 | User CLAUDE.md | `~/.claude/CLAUDE.md` (JACT TOOL RULES) | Evidence — workaround rule = unfixed friction |
 | Project CLAUDE.md | `jact/CLAUDE.md` | Reference — current invocation patterns |
 
@@ -80,7 +81,7 @@
 %% *Last Modified: 05/01/26 17:19:29* %%
 #LOCKED
 
-%% *Last Modified: 05/01/26 17:19:29* %%
+%% *Last Modified: 05/01/26 17:27:20* %%
 
 | # | Actor | Baseline [O] | Ideal [O] |
 |---|-------|--------------|-----------|
@@ -96,3 +97,48 @@
 - Like-for-like: every cell = [O]. ✓
 - Tool-strip: cells use "tool", "extract invocation", "search root", "structured payload" — abstract, no `--scope`/`jact`/flag names. ✓
 - Immutability: Baselines = observed reality (repro + CLAUDE.md rule). ✓
+
+## 6. Phase 4 — Source Mapping
+
+%% *Last Modified: 05/01/26 17:27:20* %%
+
+### Artifacts Update [h2.6]
+
+%% *Last Modified: 05/01/26 17:27:20* %%
+
+Added: `src/FileCache.ts` (Row 5 ambiguous-match logic). See §3 update.
+
+### Source Map [h4]
+
+%% *Last Modified: 05/01/26 17:27:20* %%
+
+| # | Baseline [O] | Source ID | Source | Baseline Notes |
+|---|---|---|---|---|
+| 1 | User declares search root every call | S1a | `src/jact.ts:561` | `extractLinks`: `if (options.scope) buildCache(scope)` — undefined → skip cache → cwd-relative resolve fails. |
+| 1 | "" | S1b | `src/jact.ts:652` | `extractHeader`: same no-fallback pattern. |
+| 1 | "" | S1c | `src/jact.ts:744` | `extractFile`: same. |
+| 1 | "" | S1d | `src/jact.ts:1281` | Commander `--scope <folder>` no default — `extract links`. |
+| 1 | "" | S1e | `src/jact.ts:1339` | Commander `--scope <folder>` no default — `extract header`. |
+| 1 | "" | S1f | `src/jact.ts:1398` | Commander `--scope <folder>` no default — `extract file`. |
+| 2 | Agent rebuilds abs search root every call | S2a | `~/.claude/CLAUDE.md` JACT SCOPE RULE | Global rule mandates abs `--scope` per call — workaround codified, every project + agent inherits cog tax. |
+| 2 | "" | S2b | `src/jact.ts:561,652,744` | Same no-fallback root cause as Row 1; agent compensates via S2a. |
+| 3 | User gets full structured payload every call | S3a | `src/jact.ts:1394-1437` | `extract file`: no `--verbose` opt; line 1426 `console.log(JSON.stringify(result, null, 2))` — always full dump. |
+| 3 | "" | S3b | `src/jact.ts:1334-1392` | `extract header`: `--format markdown\|json` (default md) but no minimal/verbose split — md still includes link reports + stats via formatter. |
+| 3 | "" | S3c | `src/jact.ts:181-256` (REF) | `validate`: minimal default + `--verbose` opt-in (`options.verbose`) — pattern to mirror. |
+| 3 | "" | S3d | `src/formatExtractResult.ts` | Md/json formatter — no minimal-vs-verbose layer. |
+| 3 | "" | S3e | `src/jact.ts:592` | `extractLinks`: `console.log(JSON.stringify(extractionResult, null, 2))` — always full. |
+| 4 | Agent carries global rule prescribing workaround | S4a | `~/.claude/CLAUDE.md` JACT SCOPE RULE | Codified workaround. Same source as S2a, different actor lens (rule maintenance, not invocation). |
+| 4 | "" | S4b | `jact/CLAUDE.md` | Project doc shows abs `--scope` in every example invocation — replicates rule downstream. |
+| 5 | User halted by actionable disambiguation on multi-match | S5a | `src/FileCache.ts:175-229` | `resolveFile()` returns generic msg ("Multiple files named X found in scope") on duplicate — no candidate paths listed. |
+| 5 | "" | S5b | `src/FileCache.ts:62,78-79` | `duplicates: Set<string>` stores filenames only, not paths. Cannot enumerate candidates without re-scan. |
+| 5 | "" | S5c | `src/FileCache.ts:153-160` | `addToCache()`: first path wins; subsequent duplicates discarded silently — original-vs-dup paths both unrecoverable from public API. |
+| 5 | "" | S5d | `src/jact.ts:766-779` | `extractFile` pathConversion uses single recommended path — no halt-on-ambiguity flow.
+
+### Self-Checks [h2.5, h2.6]
+
+%% *Last Modified: 05/01/26 17:27:20* %%
+
+- Source IDs unique per row, format `S{row}{letter}` ✓
+- All 5 BI rows covered ✓
+- New artifact `src/FileCache.ts` added to §3 ✓
+- Source IDs trace forward into Phase 5/6 (Delta architecture, DIFFs) ✓
