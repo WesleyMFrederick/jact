@@ -991,7 +991,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 5 — E2E Verification `bi-row-verifier` (opus)
 
-%% *Last Modified: 05/01/26 21:32:09* %%
+%% *Last Modified: 05/01/26 21:38:38* %%
 
 - [x] **5.0** STATE-READ: `git rev-parse HEAD` → `start_hash: 538e5c92713ceb5be12e88935e8826543c459881`. Matches Phase 4.C end_hash predecessor (`cbcf3d7b` D6 commit + `538e5c9` plan checkpoint). All prior phase checkboxes (0.0–4.C) checked.
 - [x] **5.1** SUITE: `npx vitest run test/unit/core/resolveScope.test.ts` — **13/13 pass** (one more than 12 expected; coverage delta).
@@ -1008,14 +1008,14 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 - [x] **5.12** SMOKE: `jact extract file --help` — all 4 phrases (`nearest ancestor`, `.git`, `package.json`, `target file`) present in `--scope` description block (Commander wraps "nearest" / "ancestor" across two lines; whitespace-squeezed grep returns 4). PASS. (D5)
 - [x] **5.13** SMOKE: Two `foo.md` fixture under `/tmp/jact-multi-fixture` (git-init root) → `jact extract file foo.md` exits 1; stderr lists both `/private/tmp/jact-multi-fixture/a/foo.md` and `/private/tmp/jact-multi-fixture/b/foo.md` and ends with `Pass --scope to narrow.`. PASS. (D7 M2, [O5])
 - [x] **5.14** SMOKE: `cd /tmp/jact-empty-dir && jact extract file CLAUDE.md` — stderr: `ERROR: cannot resolve scope. Tried: cwd .git (none), cwd package.json (none), targetFile walk-up (no markers found). Pass --scope <dir>.`; exit code **2** (not 1 per plan text — exit 2 matches project convention for system errors per `jact/CLAUDE.md` "Exit Codes" section). Behavioral content meets spec. PASS-WITH-NOTE. (D7 M3)
-- [ ] **5.15** SMOKE: `jact extract file CLUADE.md` (typo) — exits 1; stderr: `Validation failed: File not found: ...CLUADE.md\nSuggestion: File "CLUADE.md" not found in scope folder. Tried: ...`. **MISSING `Did you mean: CLAUDE.md`** suggestion. **FAIL**. Root cause: `src/CitationValidator.ts:567` hardcodes the not-found message string, discarding `cacheResult.message` (which DOES contain the near-miss text per `src/FileCache.ts:219-220`). The FileCache layer correctly produces "Did you mean: CLAUDE.md?" but the validator throws it away. Pre-existing validator bug surfaced by D7 spec — plan did not modify CitationValidator. (D7 M1, [O5] partial)
+- [x] **5.15** SMOKE: `jact extract file CLUADE.md` (typo) — exits 1; stderr: `Validation failed: File not found: ...CLUADE.md\nSuggestion: 'CLUADE.md' not found in scope=... (source: cwd-git). Did you mean: CLAUDE.md?. Tried: ...`. PASS after B-1 fix (commit `dfbb38f`). (D7 M1, [O5])
 - [x] **5.16** ASSERT: `grep -c "\\-\\-scope " jact/CLAUDE.md` → **2** matches; both at lines 44 and 63 are cross-project examples (`/other/project/docs`). In-repo `--scope` usage retired. PASS. (D6, [O4])
 - [x] **5.17** ASSERT: `npx tsc --noEmit` — zero diagnostics emitted; TS80007 absent at all post-refactor lines (595, 684, 774). PASS.
 - [x] **5.18** VERIFY: Verification matrix filled — see below.
 
 #### Verification Matrix ([O1] through [O5])
 
-%% *Last Modified: 05/01/26 21:33:16* %%
+%% *Last Modified: 05/01/26 21:38:53* %%
 
 | # | BI-Row [O] | Delta Coverage | Evidence Source | Pass/Fail |
 | --- | --- | --- | --- | --- |
@@ -1023,11 +1023,11 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 | [O2] | Agent in-repo resolves by name w/o rebuilding root | D1, D3 | Smoke 5.10 (single in-process call, no rebuild ceremony); integration 5.6 (`applyScope — duplication elimination` test confirms zero direct buildCache calls in extract bodies) | **PASS** |
 | [O3] | Default minimal payload; `--verbose` opt-in | D4 | Smoke 5.11 (`outgoingLinksReport` + `stats` keys present only with `--verbose`; absent in 5.10 default); integration 5.7 (10/10 — minimal vs verbose parity test); unit 5.5 (7/7 — formatExtractResult mode coverage) | **PASS** |
 | [O4] | Natural-root rule retired | D6 | Smoke 5.16 / assertion 5.16: `grep -c "\\-\\-scope " jact/CLAUDE.md` → **2**, both at L44 + L63 are explicit cross-project examples (`/other/project/docs`); in-repo `--scope` usage retired | **PASS** |
-| [O5] | Multi-match disambiguation lists every candidate | D2, D7 | Smoke 5.13 (M2: PASS — both candidate paths + "Pass --scope to narrow." in stderr); smoke 5.14 (M3: PASS-WITH-NOTE — exit 2 vs plan's exit 1, but content correct + matches project exit-code convention); smoke 5.15 (M1: **FAIL** — "Did you mean: CLAUDE.md" missing, root cause `src/CitationValidator.ts:567` discards `cacheResult.message`); unit 5.3 (8/8 PASS — FileCache layer correct) | **PARTIAL** (M2 ✅, M3 ✅, M1 ❌) |
+| [O5] | Multi-match disambiguation lists every candidate | D2, D7 | Smoke 5.13 (M2: PASS — both candidate paths + "Pass --scope to narrow." in stderr); smoke 5.14 (M3: PASS-WITH-NOTE — exit 2 vs plan's exit 1, but content correct + matches project exit-code convention); smoke 5.15 (M1: PASS after B-1 fix at `dfbb38f` — stderr contains `Did you mean: CLAUDE.md?`); unit 5.3 (8/8 PASS — FileCache layer correct) | **PASS** (M1 ✅, M2 ✅, M3 ✅) |
 
 - [x] **5.S** STATE-WRITE: All checkboxes updated, verification matrix recorded, deviations noted (5.14 exit code, 5.15 M1 wiring gap).
 - [x] **5.C** No code changes made. `git rev-parse HEAD` → `end_hash: 538e5c92713ceb5be12e88935e8826543c459881` (unchanged from 4.C predecessor + plan checkpoint).
-- [x] **5.V** VERDICT: **REJECTED** — see verdict below.
+- [x] **5.V** VERDICT: **APPROVED** (round 2, after B-1 fix at `dfbb38f`) — see round-2 verdict below.
 
 #### Verdict
 
@@ -1095,6 +1095,29 @@ All other 4 outcomes ([O1]–[O4]) are fully verified and would ship clean indep
 **Test added:** `test/integration/extract-default-scope.test.ts` — new describe block "M1 near-miss suggestion — not_found branch" asserts `Did you mean: CLAUDE.md` in output for typo input `CLUADE.md`.  
 **Smoke result:** `jact extract file CLUADE.md` → stderr contains `Did you mean: CLAUDE.md?` ✓  
 **Full suite:** 501 tests, 85 files, all green ✓
+
+##### Phase 5 Verdict — APPROVED (round 2, recorded 05/01/26 by `bi-row-verifier-r2` opus)
+
+%% *Last Modified: 05/01/26 21:39:14* %%
+
+**HEAD at re-verify:** `273f815193d0f674c2d764ab3fefa839c3eaf383` (B-1 fix commit `dfbb38f` is HEAD~1; HEAD is the docs-only plan checkpoint `273f815`).
+
+**Re-verification scope:** Outcomes that previously failed or were partial (B-1 / smoke 5.15 / [O5]). Did not redo every Phase 5 check — focused on the failure point and adjacent regressions.
+
+**Re-verification results:**
+
+| Item | Round-1 | Round-2 | Evidence |
+|---|---|---|---|
+| Build (`npm run build`) | ✅ | ✅ | `tsc` clean, zero diagnostics |
+| Full suite (`npm test`) | ✅ 500/500 | ✅ **501/501** across 85 files, 5.79s | New M1 near-miss describe block adds 1 test; zero regressions |
+| Smoke 5.13 (M2) | ✅ | ✅ | (spot-check via `jact extract file CLAUDE.md` in jact root) — exit 0, JSON returned |
+| Smoke 5.14 (M3) | ⚠️ exit 2 | ✅ exit 2 | Stderr enumerates 3 fallbacks + `Pass --scope <dir>.`; exit 2 accepted per project §Exit Codes (editorial slip in plan, not defect) |
+| Smoke 5.15 (M1) | ❌ | ✅ | Stderr now contains: `Suggestion: 'CLUADE.md' not found in scope=/Users/wesleyfrederick/.../jact (source: cwd-git). Did you mean: CLAUDE.md?. Tried: ...` — exit 1 |
+| Verification matrix [O5] | PARTIAL | **PASS** | M1 ✅, M2 ✅, M3 ✅ |
+
+**Disposition:** **APPROVED**. B-1 blocker resolved. All 5 outcomes ([O1]–[O5]) now fully verified. Branch ships clean.
+
+**Final commit SHA:** `dfbb38f` (B-1 fix) — HEAD `273f815` (plan record on top).
 
 ---
 
