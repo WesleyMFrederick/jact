@@ -761,31 +761,35 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 1 — Foundation Types + Pure Util (D2 + D1) `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 19:31:55* %%
+%% *Last Modified: 05/01/26 20:28:35* %%
 
-- [ ] **1.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches `end_hash` from Phase 0.C. Read plan, review Phase 0 checkboxes.
+- [x] **1.0** STATE-READ: `start_hash: 27bd6e0b9f3cc27c054c5f31548d61479a5d24d3`. One extra plan-file commit beyond Phase 0 end_hash — acceptable (plan 0.C end_hash update committed separately).
 
 **D2 — `FileCache.entries: Map<string, string[]>` refactor (foundation; data shape before logic):**
 
-- [ ] **1.1** IMPLEMENT: Create `src/types/fileCacheTypes.ts` per plan §File Changes ADDED — migrate `CacheStats`, `ResolveResultSuccess`, `ResolveResultFailure`, `ResolveResult` from `src/FileCache.ts` inline (G1). Add D7 optional fields (`candidates?`, `scope?`, `nearMisses?`) to `ResolveResultFailure` now (consumed in Phase 2).
-- [ ] **1.2** RED: Create `test/unit/FileCache.test.ts` per plan §File Changes (11 assertions: entries data shape, addToCache append, resolveFile single/duplicate, backward compat).
-- [ ] **1.3** VERIFY: `npx vitest run test/unit/FileCache.test.ts` — RED confirmed.
-- [ ] **1.4** GREEN: Modify `src/FileCache.ts` per plan §MODIFIED D2 portion: replace `cache + duplicates` dual state with `entries: Map<string, string[]>`. Update constructor, `buildCache()`, `addToCache()`, `resolveFile()`. Import types from new `fileCacheTypes.ts`. Preserve `findFuzzyMatch()`.
-- [ ] **1.5** VERIFY: `npx vitest run test/unit/FileCache.test.ts` — GREEN confirmed. `npm test` — no regressions in CitationValidator/ParsedFileCache (which consume FileCache via public API).
+- [x] **1.1** IMPLEMENT: Created `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/fileCacheTypes.ts` with all types + D7 optional fields. Also created stub `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/resolveScope.ts` (types + throwing fn) to satisfy TypeScript import resolution — deviation noted below.
+- [x] **1.2** RED: Created `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/FileCache.test.ts` (12 assertions — 1 extra for triple-duplicate case).
+- [x] **1.3** VERIFY: RED confirmed — 6 failing (candidates field missing on old type), 6 passing.
+- [x] **1.4** GREEN: Rewrote `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/FileCache.ts` — `entries: Map<string, string[]>`, `addToCache` appends, `resolveFile` returns `candidates[]`, `findFuzzyMatch` updated. Also added `findNearMisses` module-level export (G3, Phase 2 prereq). Fixed macOS symlink issue in test fixture.
+- [x] **1.5** VERIFY: 12/12 GREEN. `npm test` — 79 files, 447 tests, zero regressions.
 
 **D1 — `src/core/resolveScope.ts` new pure util (foundation; pure function, no consumers yet):**
 
-- [ ] **1.6** RED: Create `test/unit/core/resolveScope.test.ts` per plan §File Changes (12 assertions: explicit override, cwd walk-up, targetFile fallback, fail-fast none, purity).
-- [ ] **1.7** VERIFY: `npx vitest run test/unit/core/resolveScope.test.ts` — RED confirmed.
-- [ ] **1.8** GREEN: Create `src/core/resolveScope.ts` per plan §File Changes ADDED. Implement `resolveScope()` with algorithm: ① explicit → ② cwd .git → ③ cwd package.json → ④ targetFile .git → ⑤ targetFile package.json → ⑥ none. Inject `fs` for testability. Export `ScopeSource`, `ScopeResolution`, `ResolveScopeInput` types.
-- [ ] **1.9** VERIFY: `npx vitest run test/unit/core/resolveScope.test.ts` — GREEN confirmed.
+- [x] **1.6** RED: Created `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/resolveScope.test.ts` (13 assertions — 1 extra in targetFile fallback group).
+- [x] **1.7** VERIFY: RED confirmed — 13/13 failing with "resolveScope: not implemented".
+- [x] **1.8** GREEN: Implemented full `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/resolveScope.ts` — algorithm ①–⑥, `walkUpFor` private helper, `fs` injection, all exports.
+- [x] **1.9** VERIFY: 13/13 GREEN.
 
 **Phase 1 guardrails:**
 
-- [ ] **1.10** VERIFY: `npm run build` — TypeScript clean across new files + modified FileCache.
-- [ ] **1.11** VERIFY: `npm test` — full suite, no regressions.
-- [ ] **1.S** STATE-WRITE: Update plan checkboxes, note deviations
-- [ ] **1.C** COMMIT: Commit Phase 1 — "feat(scope): D2 entries Map refactor + D1 resolveScope util". `git rev-parse HEAD` → `end_hash: <hash>`
+- [x] **1.10** VERIFY: `npm run build` — TypeScript clean. Zero diagnostics.
+- [x] **1.11** VERIFY: `npm test` — 80 files, 460 tests, zero regressions.
+- [x] **1.S** STATE-WRITE: Deviations:
+  - DEVIATION P1-1: Stub `resolveScope.ts` created in step 1.1 (before TDD cycle) to allow TypeScript to resolve the import type in `fileCacheTypes.ts`. Full implementation added in 1.8 as planned. RED confirmed by throwing stub.
+  - DEVIATION P1-2: FileCache.test.ts has 12 assertions (plan said 11) — added triple-duplicate case for completeness.
+  - DEVIATION P1-3: resolveScope.test.ts has 13 assertions (plan said 12) — extra "none with targetFile present" mocked case.
+  - DEVIATION P1-4: `findNearMisses` module export added to `FileCache.ts` in step 1.4 (Phase 2 step 2.3 prereq) — early landing avoids a second FileCache.ts write cycle in Phase 2.
+- [x] **1.C** COMMIT: "feat(scope): D2 entries Map refactor + D1 resolveScope util". `end_hash: <to-be-filled>`
 
 ### Phase 2 — Core Build: applyScope + Smart Errors (D3 + D7) `delta-implementer` (sonnet)
 

@@ -1,27 +1,4 @@
-// Types defined inline: FileCache is leaf component with no consumers needing these types
-// If future components need these types, migrate to src/types/fileCacheTypes.ts
-interface CacheStats {
-	totalFiles: number;
-	duplicates: number;
-	scopeFolder: string;
-	realScopeFolder: string;
-}
-
-interface ResolveResultSuccess {
-	found: true;
-	path: string;
-	fuzzyMatch?: boolean;
-	correctedFilename?: string;
-	message?: string;
-}
-
-interface ResolveResultFailure {
-	found: false;
-	reason: "duplicate" | "not_found" | "duplicate_fuzzy";
-	message: string;
-}
-
-type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
+import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
 
 interface FileEntry {
 	filename: string;
@@ -47,7 +24,7 @@ interface CacheStatsDetail {
  *
  * Architecture decisions:
  * - Scans only the symlink-resolved directory to avoid duplicate entries
- * - Tracks duplicate filenames to prevent ambiguous resolutions
+ * - entries Map stores ALL paths per filename (D2 refactor — eliminates dual-state bug)
  * - Provides fuzzy matching as fallback (typo corrections, double extensions)
  * - Warns about duplicates to help users fix ambiguous references
  *
@@ -60,8 +37,7 @@ interface CacheStatsDetail {
 export class FileCache {
 	private fs: typeof import("fs");
 	private path: typeof import("path");
-	private cache: Map<string, string>; // filename -> absolute path
-	private duplicates: Set<string>; // filenames that appear multiple times
+	private entries: Map<string, string[]>; // filename -> all paths in scan order
 
 	/**
 	 * Initialize cache with file system and path dependencies
@@ -75,8 +51,7 @@ export class FileCache {
 	) {
 		this.fs = fileSystem;
 		this.path = pathModule;
-		this.cache = new Map<string, string>();
-		this.duplicates = new Set<string>();
+		this.entries = new Map<string, string[]>();
 	}
 
 	/**
@@ -90,39 +65,40 @@ export class FileCache {
 	 * @returns {Object} Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
 	buildCache(scopeFolder: string, verbose = false): CacheStats {
-		this.cache.clear();
-		this.duplicates.clear();
+		this.entries.clear();
 
-		// Resolve symlinks to get the real path, but only scan the resolved path
 		const absoluteScopeFolder = this.path.resolve(scopeFolder);
 		let targetScanFolder: string;
 
 		try {
 			targetScanFolder = this.fs.realpathSync(absoluteScopeFolder);
 		} catch (_error) {
-			// If realpath fails, use the original path
 			targetScanFolder = absoluteScopeFolder;
 		}
 
-		// Only scan the resolved target directory to avoid duplicates from symlink artifacts
 		this.scanDirectory(targetScanFolder);
 
-		// Log duplicates for debugging (should be much fewer now)
-		if (verbose && this.duplicates.size > 0) {
+		const duplicateCount = [...this.entries.values()].filter(
+			(v) => v.length > 1,
+		).length;
+
+		if (verbose && duplicateCount > 0) {
+			const dupNames = [...this.entries.entries()]
+				.filter(([, v]) => v.length > 1)
+				.map(([k]) => k);
 			console.error(
-				`WARNING: Found duplicate filenames in scope: ${Array.from(this.duplicates).join(", ")}`,
+				`WARNING: Found duplicate filenames in scope: ${dupNames.join(", ")}`,
 			);
 		}
 
 		return {
-			totalFiles: this.cache.size,
-			duplicates: this.duplicates.size,
+			totalFiles: this.entries.size,
+			duplicates: duplicateCount,
 			scopeFolder: absoluteScopeFolder,
 			realScopeFolder: targetScanFolder,
 		};
 	}
 
-	// Recursively scan directory for markdown files
 	private scanDirectory(dirPath: string): void {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
@@ -132,15 +108,12 @@ export class FileCache {
 				const stat = this.fs.statSync(fullPath);
 
 				if (stat.isDirectory()) {
-					// Recursively scan subdirectories
 					this.scanDirectory(fullPath);
 				} else if (entry.endsWith(".md")) {
-					// Cache markdown files
 					this.addToCache(entry, fullPath);
 				}
 			}
 		} catch (error) {
-			// Skip directories we can't read (permissions, etc.)
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
 			console.warn(
@@ -149,13 +122,12 @@ export class FileCache {
 		}
 	}
 
-	// Add file to cache or mark as duplicate if filename already exists
 	private addToCache(filename: string, fullPath: string): void {
-		if (this.cache.has(filename)) {
-			// Mark as duplicate
-			this.duplicates.add(filename);
+		const existing = this.entries.get(filename);
+		if (existing) {
+			existing.push(fullPath);
 		} else {
-			this.cache.set(filename, fullPath);
+			this.entries.set(filename, [fullPath]);
 		}
 	}
 
@@ -168,21 +140,24 @@ export class FileCache {
 	 * 3. Fuzzy matching for typos and common issues
 	 *
 	 * Returns error if filename is ambiguous (multiple files with same name).
+	 * D2: failure results carry candidates[] listing every matching path.
 	 *
 	 * @param {string} filename - Filename to resolve (with or without .md extension)
-	 * @returns {Object} Result object with { found, path?, reason?, message?, fuzzyMatch?, correctedFilename? }
+	 * @returns {Object} Result object with { found, path?, reason?, message?, candidates?, fuzzyMatch?, correctedFilename? }
 	 */
 	resolveFile(filename: string): ResolveResult {
-		// Check for exact filename match first
-		if (this.cache.has(filename)) {
-			if (this.duplicates.has(filename)) {
+		const arr = this.entries.get(filename);
+		if (arr !== undefined) {
+			if (arr.length > 1) {
 				return {
 					found: false,
 					reason: "duplicate",
+					candidates: arr,
 					message: `Multiple files named "${filename}" found in scope. Use relative path for disambiguation.`,
 				};
 			}
-			const resolvedPath = this.cache.get(filename);
+			// arr.length === 1 guaranteed (addToCache always pushes at least one)
+			const resolvedPath = arr[0];
 			if (resolvedPath === undefined) {
 				return {
 					found: false,
@@ -193,19 +168,21 @@ export class FileCache {
 			return { found: true, path: resolvedPath };
 		}
 
-		// Try without extension if not found
+		// Try without/with .md extension
 		const filenameWithoutExt = filename.replace(/\.md$/, "");
 		const withMdExt = `${filenameWithoutExt}.md`;
 
-		if (this.cache.has(withMdExt)) {
-			if (this.duplicates.has(withMdExt)) {
+		const arrExt = this.entries.get(withMdExt);
+		if (arrExt !== undefined) {
+			if (arrExt.length > 1) {
 				return {
 					found: false,
 					reason: "duplicate",
+					candidates: arrExt,
 					message: `Multiple files named "${withMdExt}" found in scope. Use relative path for disambiguation.`,
 				};
 			}
-			const resolvedPathExt = this.cache.get(withMdExt);
+			const resolvedPathExt = arrExt[0];
 			if (resolvedPathExt === undefined) {
 				return {
 					found: false,
@@ -241,23 +218,25 @@ export class FileCache {
 	 * has multiple matches.
 	 *
 	 * @param {string} filename - Original filename that failed exact match
-	 * @returns {Object|null} Fuzzy match result with { found, path, fuzzyMatch: true, correctedFilename, message } or null
+	 * @returns {Object|null} Fuzzy match result or null
 	 */
 	private findFuzzyMatch(filename: string): ResolveResult | null {
-		const allFiles = Array.from(this.cache.keys());
+		const allFiles = Array.from(this.entries.keys());
 
 		// Strategy 1: Fix double .md extension (e.g., "file.md.md" → "file.md")
 		if (filename.endsWith(".md.md")) {
 			const fixedFilename = filename.replace(/\.md\.md$/, ".md");
-			if (this.cache.has(fixedFilename)) {
-				if (this.duplicates.has(fixedFilename)) {
+			const fixedArr = this.entries.get(fixedFilename);
+			if (fixedArr !== undefined) {
+				if (fixedArr.length > 1) {
 					return {
 						found: false,
 						reason: "duplicate_fuzzy",
+						candidates: fixedArr,
 						message: `Found potential match "${fixedFilename}" (corrected double .md extension), but multiple files with this name exist. Use relative path for disambiguation.`,
 					};
 				}
-				const fixedPath = this.cache.get(fixedFilename);
+				const fixedPath = fixedArr[0];
 				if (fixedPath === undefined) {
 					return {
 						found: false,
@@ -288,15 +267,17 @@ export class FileCache {
 					typo.pattern,
 					typo.replacement,
 				);
-				if (this.cache.has(correctedFilename)) {
-					if (this.duplicates.has(correctedFilename)) {
+				const correctedArr = this.entries.get(correctedFilename);
+				if (correctedArr !== undefined) {
+					if (correctedArr.length > 1) {
 						return {
 							found: false,
 							reason: "duplicate_fuzzy",
+							candidates: correctedArr,
 							message: `Found potential typo correction "${correctedFilename}", but multiple files with this name exist. Use relative path for disambiguation.`,
 						};
 					}
-					const correctedPath = this.cache.get(correctedFilename);
+					const correctedPath = correctedArr[0];
 					if (correctedPath === undefined) {
 						return {
 							found: false,
@@ -317,13 +298,15 @@ export class FileCache {
 
 		// Strategy 3: Partial filename matching for architecture files
 		if (filename.includes("arch-") || filename.includes("architecture")) {
-			const archFiles = allFiles.filter(
-				(f) =>
+			const archFiles = allFiles.filter((f) => {
+				const fArr = this.entries.get(f);
+				return (
 					(f.includes("arch") || f.includes("architecture")) &&
-					!this.duplicates.has(f),
-			);
+					fArr !== undefined &&
+					fArr.length === 1
+				);
+			});
 
-			// Look for close matches based on key terms
 			const baseFilename = filename.replace(/^arch-/, "").replace(/\.md$/, "");
 			const closeMatch = archFiles.find((f) => {
 				const baseTarget = f.replace(/^arch.*?-/, "").replace(/\.md$/, "");
@@ -333,7 +316,15 @@ export class FileCache {
 			});
 
 			if (closeMatch) {
-				const closeMatchPath = this.cache.get(closeMatch);
+				const closeMatchArr = this.entries.get(closeMatch);
+				if (closeMatchArr === undefined || closeMatchArr.length === 0) {
+					return {
+						found: false,
+						reason: "not_found",
+						message: `File not found: ${closeMatch}`,
+					};
+				}
+				const closeMatchPath = closeMatchArr[0];
 				if (closeMatchPath === undefined) {
 					return {
 						found: false,
@@ -356,19 +347,69 @@ export class FileCache {
 
 	// Get all cached files with duplicate status
 	getAllFiles(): FileEntry[] {
-		return Array.from(this.cache.entries()).map(([filename, path]) => ({
-			filename,
-			path,
-			isDuplicate: this.duplicates.has(filename),
-		}));
+		const result: FileEntry[] = [];
+		for (const [filename, paths] of this.entries) {
+			const isDuplicate = paths.length > 1;
+			for (const p of paths) {
+				result.push({ filename, path: p, isDuplicate });
+			}
+		}
+		return result;
 	}
 
 	// Get cache statistics (total files, duplicates)
 	getCacheStats(): CacheStatsDetail {
+		const duplicates = [...this.entries.entries()]
+			.filter(([, v]) => v.length > 1)
+			.map(([k]) => k);
 		return {
-			totalFiles: this.cache.size,
-			duplicateCount: this.duplicates.size,
-			duplicates: Array.from(this.duplicates),
+			totalFiles: this.entries.size,
+			duplicateCount: duplicates.length,
+			duplicates,
 		};
 	}
+}
+
+// Module-level export (per G3): unit-testable without class instantiation
+// Levenshtein top-k entries by ascending distance ≤ maxDist. Stable sort: ties preserve Map insertion order.
+export function findNearMisses(
+	name: string,
+	entries: Map<string, string[]>,
+	k = 3,
+	maxDist = 2,
+): string[] {
+	const candidates: Array<{ key: string; dist: number }> = [];
+
+	for (const key of entries.keys()) {
+		if (key === name) continue;
+		const d = levenshtein(name, key);
+		if (d <= maxDist) {
+			candidates.push({ key, dist: d });
+		}
+	}
+
+	// Stable sort by ascending distance (Map insertion order preserved for ties)
+	candidates.sort((a, b) => a.dist - b.dist);
+
+	return candidates.slice(0, k).map((c) => c.key);
+}
+
+function levenshtein(a: string, b: string): number {
+	const m = a.length;
+	const n = b.length;
+	const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+		Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+	);
+
+	for (let i = 1; i <= m; i++) {
+		for (let j = 1; j <= n; j++) {
+			if (a[i - 1] === b[j - 1]) {
+				dp[i]![j] = dp[i - 1]![j - 1]!;
+			} else {
+				dp[i]![j] =
+					1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
+			}
+		}
+	}
+	return dp[m]![n]!;
 }
