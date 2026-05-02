@@ -622,7 +622,7 @@ export type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
 
 ## Verification
 
-%% *Last Modified: 05/01/26 19:13:19* %%
+%% *Last Modified: 05/01/26 22:04:20* %%
 
 ```bash
 # 1. RED → GREEN per file (TDD): run each new test, watch fail, implement, watch pass
@@ -667,7 +667,7 @@ jact extract file foo.md
 # D7 M3: no-scope error
 cd /tmp && mkdir empty-dir && cd empty-dir
 jact extract file CLAUDE.md
-# Expected: exit 1, stderr enumerates fallbacks tried + suggests --scope
+# Expected: exit 2 (system error — scope resolution failure per jact/CLAUDE.md §Exit Codes), stderr enumerates fallbacks tried + suggests --scope
 
 # D7 M1: not-found near-miss
 jact extract file CLUADE.md  # typo
