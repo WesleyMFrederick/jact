@@ -24,6 +24,9 @@ npm run test:watch    # Run tests in watch mode
 ```
 
 ### Citation Tool Commands
+
+%% *Last Modified: 05/01/26 21:23:24* %%
+
 ```bash
 # Validate citations (CLI output)
 npm run jact:validate path/to/file.md
@@ -34,11 +37,14 @@ npm run jact:validate path/to/file.md -- --format json
 # Validate with line filtering
 npm run jact:validate path/to/file.md -- --lines 150-160
 
-# Validate with folder scope (smart filename resolution)
-npm run jact:validate path/to/file.md -- --scope /path/to/project/docs
+# In-repo: scope auto-inferred from cwd (.git or package.json walk-up)
+npm run jact:validate path/to/file.md
+
+# Cross-project / explicit override only:
+npm run jact:validate path/to/file.md -- --scope /other/project/docs
 
 # Auto-fix broken citations
-npm run jact:validate path/to/file.md -- --fix --scope /path/to/docs
+npm run jact:validate path/to/file.md -- --fix
 
 # View AST and extracted data
 npm run jact:ast path/to/file.md
@@ -50,7 +56,11 @@ npm run jact:base-paths path/to/file.md
 npm run jact:extract path/to/file.md
 
 # Direct CLI usage (after npm link)
-jact validate path/to/file.md --lines 157 --scope /path/to/docs
+# In-repo: scope auto-inferred from cwd
+jact validate path/to/file.md --lines 157
+
+# Cross-project / explicit override only:
+jact validate path/to/file.md --lines 157 --scope /other/project/docs
 ```
 
 ## Architecture Overview

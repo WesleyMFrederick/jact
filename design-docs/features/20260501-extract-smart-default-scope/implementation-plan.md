@@ -978,13 +978,15 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 4 — Documentation (D6) `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 19:31:55* %%
+%% *Last Modified: 05/01/26 21:23:49* %%
 
-- [ ] **4.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches Phase 3.C end_hash.
-- [ ] **4.1** UPDATE: Edit `jact/CLAUDE.md` per plan §MODIFIED D6 — drop `--scope` from in-repo `npm run jact:validate`, `jact validate`, `jact extract`, `jact:base-paths`, `jact:extract` examples. Retain `--scope` in cross-project examples only. Add comment lines distinguishing in-repo vs cross-project usage.
-- [ ] **4.2** VERIFY: `grep -c "\\-\\-scope " jact/CLAUDE.md` — count drops; only cross-project examples retain `--scope`.
-- [ ] **4.3** VERIFY: `grep -c "JACT SCOPE RULE" ~/.claude/CLAUDE.md` — confirm 0 (already retired per design §7b D6, no edit needed; verify absence only).
-- [ ] **4.S** STATE-WRITE: Update plan checkboxes, note deviations
+- [x] **4.0** STATE-READ: `git rev-parse HEAD` → `start_hash: 5c51f75addeb9d11a35208a32b0d3cf21d989072`. HEAD is 2 doc-commits past Phase 3.C end_hash `c0b3fb6` — acceptable (plan update commits).
+- [x] **4.1** UPDATE: Edited `jact/CLAUDE.md` per plan §MODIFIED D6. Replaced in-repo `--scope` validate/fix/jact examples with in-repo comment + command (no flag) + cross-project block. `jact:base-paths` and `jact:extract` already had no `--scope` — no change needed.
+- [x] **4.2** VERIFY: `grep -c "\-\-scope " jact/CLAUDE.md` → `2`. Dropped from 3 (was: validate, fix, jact-validate). Remaining 2 are cross-project-only examples.
+- [x] **4.3** VERIFY: `grep -c "JACT SCOPE RULE" ~/.claude/CLAUDE.md` → `0`. Confirmed absent.
+- [x] **4.S** STATE-WRITE: Deviations:
+  - DEVIATION P4-1: `jact:base-paths` and `jact:extract` npm script examples already lacked `--scope` — no edit needed for those.
+  - DEVIATION P4-2: Auto-fix (`--fix`) example dropped `--scope` entirely (no cross-project variant added) to keep the section concise; the adjacent validate cross-project example illustrates the pattern.
 - [ ] **4.C** COMMIT: Commit Phase 4 — "docs(scope): D6 jact/CLAUDE.md examples drop --scope for in-repo". `git rev-parse HEAD` → `end_hash: <hash>`
 
 ### Phase 5 — E2E Verification `bi-row-verifier` (opus)
