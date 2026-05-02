@@ -133,7 +133,7 @@ LSP audit per CLAUDE.md TECH DEBT POLICY: fix in same PR.
 
 ```diff
 - if (options.scope) {
--   await this.fileCache.buildCache(options.scope);
+- await this.fileCache.buildCache(options.scope);
 - }
 + // Replaced by applyScope helper (D3) — see File Changes
 ```
@@ -144,7 +144,7 @@ LSP audit per CLAUDE.md TECH DEBT POLICY: fix in same PR.
 
 ```diff
 - if (options.scope) {
--   await this.fileCache.buildCache(options.scope);
+- await this.fileCache.buildCache(options.scope);
 - }
 + // Replaced by applyScope helper (D3) — see File Changes
 ```
@@ -374,66 +374,66 @@ export type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
 - interface ResolveResultFailure { ... }
 - type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
 + import type {
-+   CacheStats,
-+   ResolveResult,
-+   ResolveResultFailure,
++ CacheStats,
++ ResolveResult,
++ ResolveResultFailure,
 + } from "./types/fileCacheTypes.js";
 + import type { ScopeResolution } from "./core/resolveScope.js";
 
   export class FileCache {
--   private cache: Map<string, string>;     // filename -> absolute path
--   private duplicates: Set<string>;        // filenames appearing multiple times
-+   private entries: Map<string, string[]>; // filename -> all paths in scan order
+- private cache: Map<string, string>;     // filename -> absolute path
+- private duplicates: Set<string>;        // filenames appearing multiple times
++ private entries: Map<string, string[]>; // filename -> all paths in scan order
 
     constructor(...) {
--     this.cache = new Map<string, string>();
--     this.duplicates = new Set<string>();
-+     this.entries = new Map<string, string[]>();
+- this.cache = new Map<string, string>();
+- this.duplicates = new Set<string>();
++ this.entries = new Map<string, string[]>();
     }
 
     buildCache(scopeFolder: string, verbose = false): CacheStats {
--     this.cache.clear();
--     this.duplicates.clear();
-+     this.entries.clear();
+- this.cache.clear();
+- this.duplicates.clear();
++ this.entries.clear();
       // ... scanDirectory unchanged ...
 
--     return { totalFiles: this.cache.size, duplicates: this.duplicates.size, ... };
-+     // duplicates count derived: entries with array length > 1
-+     const duplicateCount = [...this.entries.values()].filter(v => v.length > 1).length;
-+     return { totalFiles: this.entries.size, duplicates: duplicateCount, ... };
+- return { totalFiles: this.cache.size, duplicates: this.duplicates.size, ... };
++ // duplicates count derived: entries with array length > 1
++ const duplicateCount = [...this.entries.values()].filter(v => v.length > 1).length;
++ return { totalFiles: this.entries.size, duplicates: duplicateCount, ... };
     }
 
     private addToCache(filename: string, fullPath: string): void {
--     if (this.cache.has(filename)) {
--       this.duplicates.add(filename);
--     } else {
--       this.cache.set(filename, fullPath);
--     }
-+     const existing = this.entries.get(filename);
-+     if (existing) existing.push(fullPath);
-+     else this.entries.set(filename, [fullPath]);
+- if (this.cache.has(filename)) {
+- this.duplicates.add(filename);
+- } else {
+- this.cache.set(filename, fullPath);
+- }
++ const existing = this.entries.get(filename);
++ if (existing) existing.push(fullPath);
++ else this.entries.set(filename, [fullPath]);
     }
 
     resolveFile(filename: string): ResolveResult {
-+     // D7 enrichment: failure results carry scope (set by caller via applyScope) + candidates / nearMisses
-+     // Implementation reads `this.entries` directly:
-+     //   - length === 1 → success
-+     //   - length > 1   → { found: false, reason: 'duplicate', candidates: [...], message: ... }
-+     //   - length === 0 → check .md alternation, then findFuzzyMatch, then findNearMisses for nearMisses field
-+     // The `scope` field on failure is populated by applyScope after this returns
++ // D7 enrichment: failure results carry scope (set by caller via applyScope) + candidates / nearMisses
++ // Implementation reads `this.entries` directly:
++ //   - length === 1 → success
++ //   - length > 1   → { found: false, reason: 'duplicate', candidates: [...], message: ... }
++ //   - length === 0 → check .md alternation, then findFuzzyMatch, then findNearMisses for nearMisses field
++ // The `scope` field on failure is populated by applyScope after this returns
       ...
     }
   }
 
 + // Module-level export (per G3): unit-testable from outside
 + export function findNearMisses(
-+   name: string,
-+   entries: Map<string, string[]>,
-+   k = 3,
-+   maxDist = 2,
++ name: string,
++ entries: Map<string, string[]>,
++ k = 3,
++ maxDist = 2,
 + ): string[] {
-+   // Levenshtein over Map.keys(); return top-k by ascending distance ≤ maxDist
-+   // Stable sort: ties preserve Map insertion order
++ // Levenshtein over Map.keys(); return top-k by ascending distance ≤ maxDist
++ // Stable sort: ties preserve Map insertion order
 + }
 ```
 
@@ -446,64 +446,64 @@ export type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
 + import type { ResolveResultFailure } from "./types/fileCacheTypes.js";
 
   class JactCli {
-+   /**
-+    * D3: Centralized scope resolution + cache build.
-+    * Replaces 3× scattered `if (options.scope) buildCache(scope)` blocks.
-+    * Throws M3 error if scope cannot be resolved (source: 'none').
-+    */
-+   private applyScope(
-+     options: { scope?: string },
-+     targetFile?: string,
-+   ): ScopeResolution {
-+     const resolved = resolveScope({
-+       explicit: options.scope,
-+       cwd: process.cwd(),
-+       targetFile,
-+     });
-+     if (resolved.source === "none") {
-+       // M3 error
-+       throw new Error(formatM3Error(resolved.triedFallbacks ?? []));
-+     }
-+     this.fileCache.buildCache(resolved.scope);
-+     return resolved;  // caller may use for D7 error enrichment
-+   }
++ /**
++ * D3: Centralized scope resolution + cache build.
++ * Replaces 3× scattered `if (options.scope) buildCache(scope)` blocks.
++ * Throws M3 error if scope cannot be resolved (source: 'none').
++ */
++ private applyScope(
++ options: { scope?: string },
++ targetFile?: string,
++ ): ScopeResolution {
++ const resolved = resolveScope({
++ explicit: options.scope,
++ cwd: process.cwd(),
++ targetFile,
++ });
++ if (resolved.source === "none") {
++ // M3 error
++ throw new Error(formatM3Error(resolved.triedFallbacks ?? []));
++ }
++ this.fileCache.buildCache(resolved.scope);
++ return resolved;  // caller may use for D7 error enrichment
++ }
 
     extractLinks(sourceFile: string, options: ExtractOptions) {
--     if (options.scope) {
--       this.fileCache.buildCache(options.scope);
--     }
-+     const scope = this.applyScope(options, sourceFile);
-+     // pass scope to error rendering when resolveFile fails
+- if (options.scope) {
+- this.fileCache.buildCache(options.scope);
+- }
++ const scope = this.applyScope(options, sourceFile);
++ // pass scope to error rendering when resolveFile fails
       ...
--     console.log(JSON.stringify(extractionResult, null, 2));
-+     // D4: minimal default
-+     const output = options.verbose
-+       ? extractionResult
-+       : { extractedContentBlocks: extractionResult.extractedContentBlocks };
-+     console.log(JSON.stringify(output, null, 2));
+- console.log(JSON.stringify(extractionResult, null, 2));
++ // D4: minimal default
++ const output = options.verbose
++ ? extractionResult
++ : { extractedContentBlocks: extractionResult.extractedContentBlocks };
++ console.log(JSON.stringify(output, null, 2));
     }
 
     extractHeader(...) {
--     if (options.scope) {
--       await this.fileCache.buildCache(options.scope);  // tech debt: spurious await
--     }
-+     const scope = this.applyScope(options, sourceFile);
+- if (options.scope) {
+- await this.fileCache.buildCache(options.scope);  // tech debt: spurious await
+- }
++ const scope = this.applyScope(options, sourceFile);
       ...
-+     // D4: pass `mode` to formatExtractResult
-+     console.log(formatExtractResult(result, options.format, options.verbose ? 'verbose' : 'minimal'));
++ // D4: pass `mode` to formatExtractResult
++ console.log(formatExtractResult(result, options.format, options.verbose ? 'verbose' : 'minimal'));
     }
 
     extractFile(targetFile: string, options: ExtractOptions) {
--     if (options.scope) {
--       await this.fileCache.buildCache(options.scope);  // tech debt: spurious await
--     }
-+     const scope = this.applyScope(options, targetFile);
+- if (options.scope) {
+- await this.fileCache.buildCache(options.scope);  // tech debt: spurious await
+- }
++ const scope = this.applyScope(options, targetFile);
       ...
-+     // D4: minimal JSON default
-+     const output = options.verbose
-+       ? result
-+       : { extractedContentBlocks: result.extractedContentBlocks };
-+     console.log(JSON.stringify(output, null, 2));
++ // D4: minimal JSON default
++ const output = options.verbose
++ ? result
++ : { extractedContentBlocks: result.extractedContentBlocks };
++ console.log(JSON.stringify(output, null, 2));
     }
   }
 
@@ -512,13 +512,13 @@ export type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
     .command("extract")
     .command("file <name>")
     .option("--format <fmt>", "...")
-+   .option("-v, --verbose", "Include outgoingLinksReport + stats in output", false)
++ .option("-v, --verbose", "Include outgoingLinksReport + stats in output", false)
     .option(
       "--scope <folder>",
--     "Folder to search for filename matches",
-+     "Folder to search for filename matches. Defaults to nearest ancestor "
-+     + "of cwd containing .git or package.json; falls back to target file's "
-+     + "ancestors. Required only when neither cwd nor target reveal a project root.",
+- "Folder to search for filename matches",
++ "Folder to search for filename matches. Defaults to nearest ancestor "
++ + "of cwd containing .git or package.json; falls back to target file's "
++ + "ancestors. Required only when neither cwd nor target reveal a project root.",
     )
     .action(...)
 
@@ -533,22 +533,22 @@ export type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
   export function formatExtractResult(
     result: OutgoingLinksExtractedContent,
     format: "markdown" | "json",
-+   mode: "minimal" | "verbose" = "minimal",
++ mode: "minimal" | "verbose" = "minimal",
   ): string {
     switch (format) {
       case "json":
--       return JSON.stringify(result, null, 2);
-+       return JSON.stringify(
-+         mode === "verbose" ? result : { extractedContentBlocks: result.extractedContentBlocks },
-+         null, 2,
-+       );
+- return JSON.stringify(result, null, 2);
++ return JSON.stringify(
++ mode === "verbose" ? result : { extractedContentBlocks: result.extractedContentBlocks },
++ null, 2,
++ );
 
       case "markdown": {
         // existing minimal markdown — content joined by ---
-+       const content = contentEntries.join("\n---\n");
-+       if (mode === "minimal") return content;
-+       // verbose markdown: append link reports + stats sections
-+       return `${content}\n\n---\n## Outgoing Links Report\n\n\`\`\`json\n${JSON.stringify(result.outgoingLinksReport, null, 2)}\n\`\`\`\n\n## Stats\n\n\`\`\`json\n${JSON.stringify(result.stats, null, 2)}\n\`\`\``;
++ const content = contentEntries.join("\n---\n");
++ if (mode === "minimal") return content;
++ // verbose markdown: append link reports + stats sections
++ return `${content}\n\n---\n## Outgoing Links Report\n\n\`\`\`json\n${JSON.stringify(result.outgoingLinksReport, null, 2)}\n\`\`\`\n\n## Stats\n\n\`\`\`json\n${JSON.stringify(result.stats, null, 2)}\n\`\`\``;
       }
     }
   }
@@ -683,7 +683,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Success Criteria
 
-%% *Last Modified: 05/01/26 19:13:19* %%
+%% *Last Modified: 05/01/26 19:31:55* %%
 
 1. ✅ All 67 BDD assertions pass (per design §8i)
 2. ✅ `npm test` exits 0 — zero existing-test regressions
@@ -692,3 +692,435 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 5. ✅ Manual smoke tests above all behave as expected
 6. ✅ `jact/CLAUDE.md` examples updated; in-repo invocations show no `--scope`
 7. ✅ User CLAUDE.md JACT SCOPE RULE confirmed absent (already retired per design §7b D6)
+
+---
+
+## Phased Task Sequence
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+**Agents:** `delta-implementer` (coder, sonnet) · `delta-reviewer` (reviewer, opus) · `bi-row-verifier` (verifier, opus)
+**Plan file:** `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/implementation-plan.md`
+
+**Escalation Policy:**
+- 1×: `delta-reviewer` finds issues → `delta-implementer` (sonnet) fixes → `delta-reviewer` re-reviews
+- 2×: `delta-reviewer` still finds issues → `delta-implementer` (opus model override) fixes → `delta-reviewer` re-reviews
+- 3×: `delta-reviewer` still finds issues → ESCALATE to human USER
+
+**Spawning Rules:**
+- Just-in-time spawning — `delta-reviewer` spawns at review gates only; `bi-row-verifier` spawns when Phase 4 completes
+- Fresh `delta-implementer` per phase — never reuse across phase boundaries
+- Phases sized for 50-75% of agent context (~100-150K tokens). >15 tasks = split phase
+
+**Testing convention:** All tests use BDD-style assertions (`describe`/`it`/`expect`). Vitest + `npm test` (per G6 — project does not use bun for testing).
+
+**Delta dependency order (per team-blueprint §Topology):** D2 → D1 → D3 → D7 → D4 → D5 → D6
+
+### Phase 0 — Baseline `delta-implementer` (sonnet)
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- [ ] **0.0** STATE-READ: `git rev-parse HEAD` → record as `baseline_hash: 3872f7b687811a18edde0ef27b0e0860cf2becb1` in this plan. This anchors the entire sequence.
+- [ ] **0.1** BASELINE: Run LSP commands from Baseline Tracing Guide (this plan §Baseline Tracing Guide):
+  - `findReferences` on `src/jact.ts:555` (extractLinks), `:645` (extractHeader), `:738` (extractFile)
+  - `findReferences` on `src/FileCache.ts:175` (resolveFile), `:92` (buildCache)
+  - `findReferences` on `src/FileCache.ts:24` (ResolveResult), `:3` (CacheStats) — confirm no external consumers pre-migration
+  - `documentSymbol` on `src/CitationValidator.ts`, `src/ParsedFileCache.ts`
+  - `documentSymbol` on `src/jact.ts` — locate `validate` at L181 as `--verbose` reference pattern
+- [ ] **0.2** BASELINE: Read key files in order (per plan §Baseline Tracing Guide):
+  - `src/jact.ts:181-256` (validate `--verbose` pattern)
+  - `src/jact.ts:555-606`, `:645-701`, `:738-813` (three target methods)
+  - `src/jact.ts:1276-1437` (Commander defs)
+  - `src/FileCache.ts:1-260` (full class + types + findFuzzyMatch)
+  - `src/formatExtractResult.ts:1-39`
+  - `design-docs/features/20260501-extract-smart-default-scope/plan.md` §7a–§7c, §8b–§8g
+- [ ] **0.3** BASELINE: Establish green baseline — `npm run build && npm test`. Note any pre-existing failures.
+- [ ] **0.S** STATE-WRITE: Update plan checkboxes at plan file path, note any baseline deviations (failing tests, lint errors)
+- [ ] **0.C** COMMIT: No code changes expected. If baseline deviations found, record in plan. `git rev-parse HEAD` → `end_hash: <hash>`
+
+### Phase 1 — Foundation Types + Pure Util (D2 + D1) `delta-implementer` (sonnet)
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- [ ] **1.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches `end_hash` from Phase 0.C. Read plan, review Phase 0 checkboxes.
+
+**D2 — `FileCache.entries: Map<string, string[]>` refactor (foundation; data shape before logic):**
+
+- [ ] **1.1** IMPLEMENT: Create `src/types/fileCacheTypes.ts` per plan §File Changes ADDED — migrate `CacheStats`, `ResolveResultSuccess`, `ResolveResultFailure`, `ResolveResult` from `src/FileCache.ts` inline (G1). Add D7 optional fields (`candidates?`, `scope?`, `nearMisses?`) to `ResolveResultFailure` now (consumed in Phase 2).
+- [ ] **1.2** RED: Create `test/unit/FileCache.test.ts` per plan §File Changes (11 assertions: entries data shape, addToCache append, resolveFile single/duplicate, backward compat).
+- [ ] **1.3** VERIFY: `npx vitest run test/unit/FileCache.test.ts` — RED confirmed.
+- [ ] **1.4** GREEN: Modify `src/FileCache.ts` per plan §MODIFIED D2 portion: replace `cache + duplicates` dual state with `entries: Map<string, string[]>`. Update constructor, `buildCache()`, `addToCache()`, `resolveFile()`. Import types from new `fileCacheTypes.ts`. Preserve `findFuzzyMatch()`.
+- [ ] **1.5** VERIFY: `npx vitest run test/unit/FileCache.test.ts` — GREEN confirmed. `npm test` — no regressions in CitationValidator/ParsedFileCache (which consume FileCache via public API).
+
+**D1 — `src/core/resolveScope.ts` new pure util (foundation; pure function, no consumers yet):**
+
+- [ ] **1.6** RED: Create `test/unit/core/resolveScope.test.ts` per plan §File Changes (12 assertions: explicit override, cwd walk-up, targetFile fallback, fail-fast none, purity).
+- [ ] **1.7** VERIFY: `npx vitest run test/unit/core/resolveScope.test.ts` — RED confirmed.
+- [ ] **1.8** GREEN: Create `src/core/resolveScope.ts` per plan §File Changes ADDED. Implement `resolveScope()` with algorithm: ① explicit → ② cwd .git → ③ cwd package.json → ④ targetFile .git → ⑤ targetFile package.json → ⑥ none. Inject `fs` for testability. Export `ScopeSource`, `ScopeResolution`, `ResolveScopeInput` types.
+- [ ] **1.9** VERIFY: `npx vitest run test/unit/core/resolveScope.test.ts` — GREEN confirmed.
+
+**Phase 1 guardrails:**
+
+- [ ] **1.10** VERIFY: `npm run build` — TypeScript clean across new files + modified FileCache.
+- [ ] **1.11** VERIFY: `npm test` — full suite, no regressions.
+- [ ] **1.S** STATE-WRITE: Update plan checkboxes, note deviations
+- [ ] **1.C** COMMIT: Commit Phase 1 — "feat(scope): D2 entries Map refactor + D1 resolveScope util". `git rev-parse HEAD` → `end_hash: <hash>`
+
+### Phase 2 — Core Build: applyScope + Smart Errors (D3 + D7) `delta-implementer` (sonnet)
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- [ ] **2.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches Phase 1.C end_hash.
+
+**D7 helper — `findNearMisses` module export (TDD first, consumed by D7 errors):**
+
+- [ ] **2.1** RED: Create `test/unit/findNearMisses.test.ts` per plan §File Changes (6 assertions: Levenshtein top-3 distance ≤2, stable sort).
+- [ ] **2.2** VERIFY: `npx vitest run test/unit/findNearMisses.test.ts` — RED confirmed.
+- [ ] **2.3** GREEN: Add module-level `export function findNearMisses(name, entries, k=3, maxDist=2)` to `src/FileCache.ts` per plan §MODIFIED. Stable sort: ties preserve Map insertion order.
+- [ ] **2.4** VERIFY: `npx vitest run test/unit/findNearMisses.test.ts` — GREEN confirmed.
+
+**D7 errors — M1/M2 in `resolveFile()` (TDD):**
+
+- [ ] **2.5** RED: Create `test/unit/FileCache.errors.test.ts` per plan §File Changes (8 assertions: M1 not-found w/ scope/source/nearMisses; M2 duplicate w/ candidates/Pass --scope hint).
+- [ ] **2.6** VERIFY: `npx vitest run test/unit/FileCache.errors.test.ts` — RED confirmed.
+- [ ] **2.7** GREEN: Enrich `resolveFile()` failure paths in `src/FileCache.ts`: populate `candidates` on duplicate (read directly from `entries.get(filename)`), populate `nearMisses` on not_found via `findNearMisses()`. Format M1/M2 messages per design §8g.
+- [ ] **2.8** VERIFY: `npx vitest run test/unit/FileCache.errors.test.ts` — GREEN confirmed.
+
+**D3 — `applyScope` helper + tech debt collapse (TDD):**
+
+- [ ] **2.9** RED: Create `test/integration/extract-default-scope.test.ts` per plan §File Changes (8 assertions: cwd-in-repo no flag, explicit wins, target walk-up, M3 fail, applyScope unification, no spurious await).
+- [ ] **2.10** VERIFY: `npx vitest run test/integration/extract-default-scope.test.ts` — RED confirmed.
+- [ ] **2.11** GREEN: Add private `applyScope(options, targetFile?)` to `JactCli` in `src/jact.ts` per plan §MODIFIED. Throws M3 error on `source: 'none'` (formatted per design §8g M3). Calls `this.fileCache.buildCache(resolved.scope)`. Returns `ScopeResolution` for caller error enrichment.
+- [ ] **2.12** GREEN: Replace 3× scattered `if (options.scope) { ... buildCache(...) }` blocks in `extractLinks` (L555), `extractHeader` (L645), `extractFile` (L738) with single `const scope = this.applyScope(options, sourceFile);` call. **Remove spurious `await`** at L653 + L745 (TS80007 tech debt).
+- [ ] **2.13** GREEN: Wire `scope` from `applyScope()` into error rendering paths so D7 M1/M2 errors carry `ResolveResultFailure.scope` field.
+- [ ] **2.14** VERIFY: `npx vitest run test/integration/extract-default-scope.test.ts` — GREEN confirmed.
+
+**Phase 2 guardrails:**
+
+- [ ] **2.15** VERIFY: `npm run build` — TypeScript clean. **Confirm zero TS80007 diagnostics in `src/jact.ts:645-813`**.
+- [ ] **2.16** VERIFY: `npm test` — full suite, no regressions.
+- [ ] **2.S** STATE-WRITE: Update plan checkboxes, note deviations
+- [ ] **2.C** COMMIT: Commit Phase 2 — "feat(scope): D3 applyScope helper + D7 smart error stack (M1/M2/M3)". `git rev-parse HEAD` → `end_hash: <hash>`
+
+#### REVIEW GATE 1 `delta-reviewer` (opus)
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- [ ] **2.R** REVIEW: Scope — `src/types/fileCacheTypes.ts`, `src/core/resolveScope.ts`, `src/FileCache.ts`, `src/jact.ts` (applyScope + 3 method modifications), all 5 new test files. Review `git diff <Phase_0.C_end_hash>..HEAD`.
+  - Verify: Plan §7a/§7b spec adherence (D1/D2/D3/D7 implemented as written; no architecture re-litigation)
+  - Verify: D2 backward compat — `CitationValidator`, `ParsedFileCache` consumers of `resolveFile()` success path unchanged
+  - Verify: D1 purity — `resolveScope` performs no I/O beyond `fs.existsSync`; deterministic; `fs` injectable
+  - Verify: D3 collapses 3 sites into 1; spurious `await` removed at L653 + L745 (CLAUDE.md TECH DEBT POLICY: in same PR)
+  - Verify: D7 M1/M2 messages match design §8g format exactly (scope=, source=, candidate enumeration, "Pass --scope" hint)
+  - Verify: G1 type migration — `ResolveResult*` lives in `fileCacheTypes.ts` (NOT `validationTypes.ts`)
+  - Verify: G3 `findNearMisses` is module-level export (not private method)
+  - **Verdict:** SHIP → proceed to Phase 3. NO-SHIP → escalation policy applies.
+
+### Phase 3 — CLI Surface: --verbose + Help Text (D4 + D5) `delta-implementer` (sonnet)
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- [ ] **3.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches Phase 2.C end_hash. Read plan, review Phase 2 checkboxes + Review Gate 1 findings.
+
+**D4 — formatter minimal/verbose mode (TDD):**
+
+- [ ] **3.1** RED: Create `test/unit/formatExtractResult.test.ts` per plan §File Changes (2 assertions: minimal returns extractedContentBlocks only; verbose returns full result).
+- [ ] **3.2** VERIFY: `npx vitest run test/unit/formatExtractResult.test.ts` — RED confirmed.
+- [ ] **3.3** GREEN: Modify `src/formatExtractResult.ts` per plan §MODIFIED — add `mode: "minimal" | "verbose" = "minimal"` parameter. JSON path: stringify `{ extractedContentBlocks }` when minimal. Markdown path: append `## Outgoing Links Report` + `## Stats` sections only when verbose (per G5).
+- [ ] **3.4** VERIFY: `npx vitest run test/unit/formatExtractResult.test.ts` — GREEN confirmed.
+
+**D4 — CLI --verbose wiring (TDD):**
+
+- [ ] **3.5** RED: Create `test/integration/extract-verbose.test.ts` per plan §File Changes (10 assertions: minimal default, verbose includes 3 keys, parity with validate).
+- [ ] **3.6** VERIFY: `npx vitest run test/integration/extract-verbose.test.ts` — RED confirmed.
+- [ ] **3.7** GREEN: Update `JactCli.extractFile/Header/Links` in `src/jact.ts` per plan §MODIFIED — pass `options.verbose ? 'verbose' : 'minimal'` to formatter; trim JSON output when not verbose.
+- [ ] **3.8** GREEN: Update Commander definitions (L1276-1437) for `extract file/header/links` — add `.option("-v, --verbose", "Include outgoingLinksReport + stats in output", false)` to all three subcommands.
+- [ ] **3.9** VERIFY: `npx vitest run test/integration/extract-verbose.test.ts` — GREEN confirmed.
+
+**D5 — Commander --scope help text (TDD):**
+
+- [ ] **3.10** RED: Create `test/cli-integration/cli-help.test.ts` per plan §File Changes (5 assertions: "nearest ancestor", ".git" + "package.json", target walk-up, "Required only when…", 3-way subcommand consistency).
+- [ ] **3.11** VERIFY: `npx vitest run test/cli-integration/cli-help.test.ts` — RED confirmed.
+- [ ] **3.12** GREEN: Update `--scope <folder>` option help string on all 3 `extract` subcommands per plan §MODIFIED — describe inference algorithm (nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors; required only when neither reveals a project root).
+- [ ] **3.13** VERIFY: `npx vitest run test/cli-integration/cli-help.test.ts` — GREEN confirmed.
+
+**Phase 3 guardrails:**
+
+- [ ] **3.14** VERIFY: `npm run build` — TypeScript clean.
+- [ ] **3.15** VERIFY: `npm test` — full suite, no regressions.
+- [ ] **3.S** STATE-WRITE: Update plan checkboxes, note deviations
+- [ ] **3.C** COMMIT: Commit Phase 3 — "feat(scope): D4 minimal-default --verbose + D5 --scope help text". `git rev-parse HEAD` → `end_hash: <hash>`
+
+#### REVIEW GATE 2 `delta-reviewer` (opus)
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- [ ] **3.R** REVIEW: Scope — `src/jact.ts` (extract methods + Commander defs), `src/formatExtractResult.ts`, 3 new test files. Review `git diff <Phase_2.C_end_hash>..HEAD`.
+  - Verify: D4 mirrors `validate` `--verbose` pattern at L181-256 (convention parity)
+  - Verify: D4 markdown verbose footer format matches G5 decision (appends Outgoing Links Report + Stats sections)
+  - Verify: D5 help text matches design §7a verbatim across all 3 extract subcommands (3-way consistency)
+  - Verify: No coupling drift — Phase 3 changes do not touch D1/D2 contracts
+  - **Verdict:** SHIP → proceed to Phase 4. NO-SHIP → escalation policy applies.
+
+### Phase 4 — Documentation (D6) `delta-implementer` (sonnet)
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- [ ] **4.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches Phase 3.C end_hash.
+- [ ] **4.1** UPDATE: Edit `jact/CLAUDE.md` per plan §MODIFIED D6 — drop `--scope` from in-repo `npm run jact:validate`, `jact validate`, `jact extract`, `jact:base-paths`, `jact:extract` examples. Retain `--scope` in cross-project examples only. Add comment lines distinguishing in-repo vs cross-project usage.
+- [ ] **4.2** VERIFY: `grep -c "\\-\\-scope " jact/CLAUDE.md` — count drops; only cross-project examples retain `--scope`.
+- [ ] **4.3** VERIFY: `grep -c "JACT SCOPE RULE" ~/.claude/CLAUDE.md` — confirm 0 (already retired per design §7b D6, no edit needed; verify absence only).
+- [ ] **4.S** STATE-WRITE: Update plan checkboxes, note deviations
+- [ ] **4.C** COMMIT: Commit Phase 4 — "docs(scope): D6 jact/CLAUDE.md examples drop --scope for in-repo". `git rev-parse HEAD` → `end_hash: <hash>`
+
+### Phase 5 — E2E Verification `bi-row-verifier` (opus)
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- [ ] **5.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches Phase 4.C end_hash. All prior phase checkboxes (0.0–4.C) checked.
+- [ ] **5.1** SUITE: `npx vitest run test/unit/core/resolveScope.test.ts` — expect 12/12 pass.
+- [ ] **5.2** SUITE: `npx vitest run test/unit/FileCache.test.ts` — expect 11/11 pass.
+- [ ] **5.3** SUITE: `npx vitest run test/unit/FileCache.errors.test.ts` — expect 8/8 pass.
+- [ ] **5.4** SUITE: `npx vitest run test/unit/findNearMisses.test.ts` — expect 6/6 pass.
+- [ ] **5.5** SUITE: `npx vitest run test/unit/formatExtractResult.test.ts` — expect 2/2 pass.
+- [ ] **5.6** SUITE: `npx vitest run test/integration/extract-default-scope.test.ts` — expect 8/8 pass.
+- [ ] **5.7** SUITE: `npx vitest run test/integration/extract-verbose.test.ts` — expect 10/10 pass.
+- [ ] **5.8** SUITE: `npx vitest run test/cli-integration/cli-help.test.ts` — expect 5/5 pass.
+- [ ] **5.9** SUITE: `npm run build && npm test` — full suite, expect 67 new assertions pass + zero existing-test regressions.
+- [ ] **5.10** SMOKE: `cd jact && jact extract file CLAUDE.md` — expect minimal JSON `{extractedContentBlocks: ...}` without `--scope`. (D1+D3, [O1]+[O2])
+- [ ] **5.11** SMOKE: `jact extract file CLAUDE.md --verbose` — expect output includes `outgoingLinksReport` + `stats` keys. (D4, [O3])
+- [ ] **5.12** SMOKE: `jact extract file --help | grep -E "(nearest ancestor|\\.git|package\\.json|target file)"` — expect 4 matched lines. (D5)
+- [ ] **5.13** SMOKE: Setup fixture w/ two `foo.md` files; `jact extract file foo.md` — expect exit 1, stderr lists every candidate path + "Pass --scope to narrow." (D7 M2, [O5])
+- [ ] **5.14** SMOKE: `cd /tmp && mkdir empty-dir && cd empty-dir && jact extract file CLAUDE.md` — expect exit 1, stderr enumerates fallbacks tried + suggests --scope. (D7 M3)
+- [ ] **5.15** SMOKE: `jact extract file CLUADE.md` (typo) — expect exit 1, stderr "Did you mean: CLAUDE.md, ..." (D7 M1)
+- [ ] **5.16** ASSERT: `grep -c "\\-\\-scope " jact/CLAUDE.md` — count reflects cross-project-only usage. (D6, [O4])
+- [ ] **5.17** ASSERT: TS80007 diagnostics absent at `src/jact.ts:653, 745`.
+- [ ] **5.18** VERIFY: Verification matrix filled — see below.
+
+#### Verification Matrix ([O1] through [O5])
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+| # | BI-Row [O] | Delta Coverage | Evidence Source | Pass/Fail |
+| --- | --- | --- | --- | --- |
+| [O1] | User in-repo resolves by name w/o `--scope` | D1, D3, D5 | Smoke 5.10, 5.12; integration 5.6 | _filled by verifier_ |
+| [O2] | Agent in-repo resolves by name w/o rebuilding root | D1, D3 | Smoke 5.10; integration 5.6 | _filled by verifier_ |
+| [O3] | Default minimal payload; `--verbose` opt-in | D4 | Smoke 5.11; integration 5.7; unit 5.5 | _filled by verifier_ |
+| [O4] | Natural-root rule retired | D6 | Smoke 5.16; assertion 5.16 | _filled by verifier_ |
+| [O5] | Multi-match disambiguation lists every candidate | D2, D7 | Smoke 5.13, 5.14, 5.15; unit 5.3 | _filled by verifier_ |
+
+- [ ] **5.S** STATE-WRITE: All checkboxes updated, verification matrix recorded, deviations noted.
+- [ ] **5.C** No code changes made. `git rev-parse HEAD` → `end_hash: <hash>` (unchanged from 4.C).
+- [ ] **5.V** VERDICT: **APPROVED / REJECTED** — see verdict below.
+
+#### Verdict
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+_To be filled by `bi-row-verifier`._
+
+---
+
+## Review Gate Justification
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+| Gate | Placement | Rework Cost if Skipped |
+|------|-----------|----------------------|
+| Gate 1 | After Phase 2 (Foundations + Core Build) | HIGH — D1 pure-fn contract, D2 data shape, D3 helper, D7 errors are the architectural backbone. Interface errors here cascade into Phase 3 wiring. Also covers G1 type migration, G3 module export, tech debt removal. ~5 source files, ~5 test files. |
+| Gate 2 | After Phase 3 (CLI Surface) | MEDIUM — User-facing behavior (flags, help text, formatter mode). Convention parity with `validate` is verifiable here before docs land. ~3 files. |
+| Rejected | After Phase 0 | No reviewable artifacts (research only) |
+| Rejected | After Phase 1 alone | Foundations are tightly coupled to Phase 2 consumers; reviewing in isolation forces re-review when D3/D7 land |
+| Rejected | After Phase 4 | Doc-only delta; smoke tests in Phase 5 (E2E) catch any drift between docs and shipped behavior |
+
+---
+
+## Orchestrator Instructions
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+### Team Spec
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+```
+TeamCreate:
+  name: "extract-smart-default-scope"
+  description: "jact extract smart-default-scope — D1-D7 implementation"
+```
+
+### Agents to Spawn
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+| Role | Agent Type | Model | Persistent? |
+|------|-----------|-------|------------|
+| Orchestrator | (you) | opus | — |
+| Coder | `delta-implementer` | sonnet | yes |
+| Reviewer | `delta-reviewer` | opus | spawn at gates only |
+| Verifier | `bi-row-verifier` | opus | spawn at Phase 5 only |
+
+### Plan File Checkbox Rule
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+**Every agent MUST update plan checkboxes after completing tasks.**
+
+Plan file: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/implementation-plan.md`
+
+Include this instruction in EVERY agent spawn prompt:
+> After completing each task step, update the plan file checkbox from `- [ ]` to `- [x]` for that step. For STATE-WRITE steps, also record any deviations as inline notes. For COMMIT steps, record the `end_hash` value next to the checkbox. Plan file path: `<plan file path above>`
+
+### Task Creation Map
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+Create tasks with `blockedBy` dependencies matching phase sequence:
+
+```
+Task #1: Phase 0 — Baseline
+  agent: delta-implementer
+  blockedBy: []
+  prompt: "Execute Phase 0 (baseline research) from the plan.
+    Run LSP commands, read key files, run npm test + build to establish green baseline.
+    Mark off each checkbox in plan file as you complete it. Record baseline_hash."
+
+Task #2: Phase 1 — Foundation Types + Pure Util (D2 + D1)
+  agent: delta-implementer
+  blockedBy: [1]
+  prompt: "Execute Phase 1 from the plan. TDD cycles:
+    D2: Create fileCacheTypes.ts (G1 migration with D7 optional fields). Then RED test/unit/FileCache.test.ts → GREEN refactor src/FileCache.ts to entries: Map<string, string[]>.
+    D1: RED test/unit/core/resolveScope.test.ts → GREEN create src/core/resolveScope.ts pure util.
+    Run full guardrails (npm run build && npm test). Commit.
+    Use BDD assertions (describe/it/expect). No test() blocks.
+    Mark off each checkbox in plan file. Record hashes."
+
+Task #3: Phase 2 — Core Build: applyScope + Smart Errors (D3 + D7)
+  agent: delta-implementer
+  blockedBy: [2]
+  prompt: "Execute Phase 2 from the plan. TDD cycles:
+    D7 helper: RED findNearMisses.test.ts → GREEN module-level export in FileCache.ts.
+    D7 errors: RED FileCache.errors.test.ts → GREEN enrich resolveFile() failure paths.
+    D3: RED extract-default-scope.test.ts → GREEN add applyScope() helper + collapse 3 sites + remove TS80007 spurious awaits at L653, L745.
+    Run npm run build (confirm zero TS80007). Run npm test. Commit.
+    Mark off each checkbox in plan file. Record hashes."
+
+Task #4: Review Gate 1
+  agent: delta-reviewer
+  blockedBy: [3]
+  prompt: "Execute Review Gate 1 (task 2.R) from the plan.
+    Scope: src/types/fileCacheTypes.ts, src/core/resolveScope.ts, src/FileCache.ts, src/jact.ts (extract methods), 5 new test files.
+    Run git diff from Phase 0 end_hash to HEAD.
+    Check: §7a/§7b spec adherence, D2 backward compat, D1 purity, D3 collapses 3 sites + tech debt fix, D7 message format match §8g, G1 type location, G3 findNearMisses module export.
+    Return SHIP or NO-SHIP with findings list.
+    Mark off checkbox 2.R in plan file."
+
+Task #5: Phase 3 — CLI Surface: --verbose + Help Text (D4 + D5)
+  agent: delta-implementer
+  blockedBy: [4]
+  prompt: "Execute Phase 3 from the plan. Read Review Gate 1 findings first — absorb any fixes.
+    D4 formatter: RED formatExtractResult.test.ts → GREEN add mode parameter (minimal/verbose).
+    D4 CLI: RED extract-verbose.test.ts → GREEN wire --verbose flag in 3 extract subcommands.
+    D5: RED cli-help.test.ts → GREEN update --scope help text on 3 subcommands.
+    Run npm run build && npm test. Commit.
+    Mark off each checkbox in plan file. Record hashes."
+
+Task #6: Review Gate 2
+  agent: delta-reviewer
+  blockedBy: [5]
+  prompt: "Execute Review Gate 2 (task 3.R) from the plan.
+    Scope: src/jact.ts, src/formatExtractResult.ts, 3 new test files.
+    Run git diff from Phase 2 end_hash to HEAD.
+    Check: D4 parity with validate --verbose pattern (L181-256), D4 markdown verbose footer (G5), D5 3-way subcommand consistency, no coupling drift to D1/D2 contracts.
+    Return SHIP or NO-SHIP with findings list.
+    Mark off checkbox 3.R in plan file."
+
+Task #7: Phase 4 — Documentation (D6)
+  agent: delta-implementer
+  blockedBy: [6]
+  prompt: "Execute Phase 4 from the plan.
+    Edit jact/CLAUDE.md: drop --scope from in-repo examples; retain in cross-project examples; add in-repo vs cross-project comment.
+    Verify ~/.claude/CLAUDE.md JACT SCOPE RULE absent (already retired).
+    Commit.
+    Mark off each checkbox in plan file. Record hashes."
+
+Task #8: Phase 5 — E2E Verification
+  agent: bi-row-verifier
+  blockedBy: [7]
+  prompt: "Execute Phase 5 from the plan.
+    Run all 8 test suites individually + full npm test.
+    Run 6 smoke tests (in-repo extract, --verbose, --help, M1/M2/M3 errors).
+    Run assertions (CLAUDE.md grep count, TS80007 absence).
+    Fill verification matrix against [O1] through [O5].
+    Return APPROVED or REJECTED with per-criterion evidence.
+    Mark off each checkbox in plan file."
+```
+
+### Message Routing
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+```
+Task #1 done → unblock #2
+Task #2 done → unblock #3
+Task #3 done → unblock #4 (review)
+Reviewer Task #4:
+  SHIP        → unblock #5
+  NO-SHIP     → escalation loop (see below)
+Task #5 done → unblock #6 (review)
+Reviewer Task #6:
+  SHIP        → unblock #7
+  NO-SHIP     → escalation loop
+Task #7 done → unblock #8 (verify)
+Verifier Task #8:
+  APPROVED    → shutdown sequence
+  REJECTED    → route failures to delta-implementer, re-run verify
+```
+
+### Escalation Loop Protocol
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+```
+Round 1 — NO-SHIP:
+  → SendMessage to delta-implementer (sonnet): "Fix these issues: {reviewer findings}"
+  → Implementer fixes, commits, messages back
+  → SendMessage to delta-reviewer: "Re-review. Changes since last review."
+
+Round 2 — Still NO-SHIP:
+  → Spawn NEW delta-implementer agent with model: opus (override)
+  → Prompt includes: full reviewer findings from rounds 1+2, specific failing checks
+  → Opus implementer fixes, commits, messages back
+  → SendMessage to delta-reviewer: "Re-review. Opus implementer applied fixes."
+
+Round 3 — Still NO-SHIP:
+  → STOP. Do NOT spawn another agent.
+  → Report to human USER:
+    - What was attempted (3 rounds)
+    - Reviewer findings that persist
+    - Files affected
+    - Recommendation
+```
+
+### Shutdown Sequence
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+```
+1. SendMessage type: shutdown_request → delta-implementer
+2. SendMessage type: shutdown_request → delta-reviewer (if still running)
+3. SendMessage type: shutdown_request → bi-row-verifier
+4. TeamDelete name: "extract-smart-default-scope"
+5. Report to user: final commit SHA, summary, verifier verdict
+```
+
+### Orchestrator Anti-Patterns
+
+%% *Last Modified: 05/01/26 19:31:55* %%
+
+- Do NOT read source files after spawning agents
+- Do NOT run git commands (diff, add, commit, status)
+- Do NOT arbitrate reviewer findings by reading code — route conflicts back to reviewer
+- Do NOT fix "trivial" issues directly — delegate everything
+- Do NOT skip task creation — every phase needs a tracked task
+- Do NOT spawn `delta-reviewer` or `bi-row-verifier` until their predecessor task is unblocked (just-in-time spawning)

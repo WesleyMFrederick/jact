@@ -91,10 +91,10 @@ Every role and quality gate below traces to one or more locked [O] outcomes:
 
 %% *Last Modified: 05/01/26 18:36:07* %%
 
-| Role | Source | Adaptation |
-|------|--------|------------|
+| Role              | Source                        | Adaptation                                                             |
+| ----------------- | ----------------------------- | ---------------------------------------------------------------------- |
 | Delta Implementer | `application-tech-lead` agent | Constrained to executing locked plan §7; no architecture re-litigation |
-| Delta Reviewer | `forge:reviewer` agent | Direct reuse; review criteria = Plan §7a/§7b + arch principles |
-| BI-Row Verifier | `forge:verifier` agent | Direct reuse; acceptance criteria = §7e Validation Table |
+| Delta Reviewer    | `forge:reviewer` agent        | Direct reuse; review criteria = Plan §7a/§7b + arch principles         |
+| BI-Row Verifier   | `forge:verifier` agent        | Direct reuse; acceptance criteria = §7e Validation Table               |
 
 No new agent definitions required.
