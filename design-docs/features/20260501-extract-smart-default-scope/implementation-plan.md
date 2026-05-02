@@ -761,7 +761,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 1 — Foundation Types + Pure Util (D2 + D1) `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 20:28:35* %%
+%% *Last Modified: 05/01/26 20:29:54* %%
 
 - [x] **1.0** STATE-READ: `start_hash: 27bd6e0b9f3cc27c054c5f31548d61479a5d24d3`. One extra plan-file commit beyond Phase 0 end_hash — acceptable (plan 0.C end_hash update committed separately).
 
@@ -789,7 +789,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
   - DEVIATION P1-2: FileCache.test.ts has 12 assertions (plan said 11) — added triple-duplicate case for completeness.
   - DEVIATION P1-3: resolveScope.test.ts has 13 assertions (plan said 12) — extra "none with targetFile present" mocked case.
   - DEVIATION P1-4: `findNearMisses` module export added to `FileCache.ts` in step 1.4 (Phase 2 step 2.3 prereq) — early landing avoids a second FileCache.ts write cycle in Phase 2.
-- [x] **1.C** COMMIT: "feat(scope): D2 entries Map refactor + D1 resolveScope util". `end_hash: <to-be-filled>`
+- [x] **1.C** COMMIT: "feat(scope): D2 entries Map refactor + D1 resolveScope util". `end_hash: 56c4501aae59f1325941e626c84ff764bd6d1330`
 
 ### Phase 2 — Core Build: applyScope + Smart Errors (D3 + D7) `delta-implementer` (sonnet)
 
