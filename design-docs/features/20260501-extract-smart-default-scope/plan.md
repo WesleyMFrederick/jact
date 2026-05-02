@@ -407,9 +407,82 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 ^A-D1-no-marker-fail
 ^H-D5-trace-flag
 
-### 7f. [i3] Eval Hold
+### 7f. Phase 5 [i3] — Architecture Eval (Delta)
 
-%% *Last Modified: 05/01/26 17:55:18* %%
+%% *Last Modified: 05/01/26 18:20:43* %%
 
-Phase 5 [i3] eval (Delta arch against principles) pending — to dispatch post-lock.
+#### Citation Context
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+`jact extract links` on plan: 0 wiki-links extracted (plan uses inline source refs `src/jact.ts:NNN`). No external context dependencies.
+
+#### Principle Compliance (D1-D7)
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+| Category | Status | Details |
+|---|---|---|
+| Modular Design | ✅ Compliant | D1 single-responsibility pure fn; D2 **One Source of Truth** (entries replaces dual-state); D3 **Avoid Duplication** (3× scattered → 1 helper); D7 enrichment at single throw site (`FileCache.resolveFile()` L175-229). |
+| Data-First Design | ✅ Compliant | D1 `ScopeResolution` tagged union → **Behavior as Data**; D2 `Map<string,string[]>` → **Illegal States Unrepresentable** (Row 5 representable); D7 `ResolveResultFailure.{scope,nearMisses,candidates}` → **Refactor Representation First** applied before logic changes. |
+| Action-Based File Org | ✅ Compliant | D1 `src/core/resolveScope.ts` → **Transformation Naming** + **Primary Export Pattern**; D7 `findNearMisses` → **Co-located Helpers** in FileCache; ScopeResolution type co-located in resolveScope.ts. |
+| Format/Interface Design | ✅ Compliant | **Progressive Defaults** strongly applied: D5 sensible scope default + override; D4 minimal-output default + `--verbose`; D7 **Simplicity First** — no new flag, diagnostics on failure path only. |
+| MVP Principles | ✅ Compliant | D7 replaces D5 `--scope-trace` proposal → **Simplicity First** + **Implement When Needed**; Row 5 scoped to "fail with candidate list" not interactive prompt → **MVP-First**; D7 reuses D1+D2 outputs → **Foundation Reuse**. |
+| Deterministic Offloading | ✅ Compliant | D1 pure function over `(cwd, targetFile, fs)` → **No Surprises**; D7 source enum (`cwd-git\|cwd-pkg\|...`) → deterministic mapping; D5 algorithm documented in help text → **Tool-First Design**. |
+| Self-Contained Naming | ✅ Compliant | `resolveScope`, `applyScope`, `findNearMisses` → **Descriptive Labels**; `source: 'cwd-git'\|'cwd-pkg'\|'target-git'\|'target-pkg'\|'none'` → **Immediate Understanding**; `nearMisses`, `candidates`, `scope` failure fields → **Confusion Prevention**; D4 `--verbose` mirrors validate → **Follow Conventions**. |
+| Safety-First Design | ✅ Compliant | D1 **Fail Fast** on `source: 'none'`; D2 **Clear Contracts** (public API explicit); D7 actionable error messages; D3 `applyScope` fails at boundary. Backup/Dry-Run/Atomic N/A — read-only CLI, no user-data mutation. |
+| Anti-Patterns | ✅ Compliant — actively eliminates baseline | **Scattered Checks** ELIMINATED (D3: 3× → 1); **Branch Explosion** avoided (D1 linear walk-up + enum); **Over-Engineered Structures** avoided (D2 single Map, D7 zero-data-cost); **Leaky Flags** avoided (`--scope-trace` removed); **Hidden Global State** absent (ScopeResolution passed explicitly). |
+
+#### Critical Issues (Severity: High)
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+None.
+
+#### Minor Findings (Severity: Low)
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+1. **Type file location unspecified** [Action-Based File Org / Data Contracts Separate]. `ResolveResultFailure` lives in `src/types/citationTypes.ts` or `validationTypes.ts` (per CLAUDE.md L67-69)? Not stated in §7c. Recommend: add explicit type file path to §7c naming row for `ResolveResultFailure.{candidates,scope,nearMisses}` before Phase 6 DIFFs.
+
+#### Recommendations (post-lock, integrate into Phase 6)
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+1. Resolve type file location for D2/D7 fields (ResolveResultFailure additions) — pin to existing `src/types/validationTypes.ts` per source mapping convention.
+2. Phase 6 DIFFs should include unit test for D7 error message format (snapshot test on M1/M2/M3 strings).
+3. Phase 6 should add a Levenshtein unit test (D7 nearMisses with distance threshold ≤2).
+
+#### Verdict
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+- [X] **Ready to proceed** — all 9 categories compliant; 1 minor finding integrates into Phase 6 without re-opening §7 lock.
+- [ ] Requires revision
+
+#### Prioritized Findings (MVP Lens)
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+##### Fix Now (Blocking MVP)
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+None.
+
+##### Fix Post-MVP / Phase 6 Integration
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+1. Pin `ResolveResultFailure` field type-file location in §7c (5 min edit, no re-lock).
+2. Add D7 error message snapshot tests in Phase 6 DIFFs.
+3. Add nearMisses Levenshtein unit test in Phase 6 DIFFs.
+
+##### Already Mitigated
+
+%% *Last Modified: 05/01/26 18:20:43* %%
+
+- All 4 §6.5 [i0] Critical Issues integrated into D1-D7 ([F-ID] derivations in §7b).
+- All 3 §7d NBA items resolved before lock.
+- Baseline anti-patterns (Scattered Checks, dual-state, leaky flag risk) actively eliminated by Delta.
 
