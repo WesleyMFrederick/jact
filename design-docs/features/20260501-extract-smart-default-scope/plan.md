@@ -288,7 +288,7 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 
 ### 7a. Delta Architecture Table [i1]
 
-%% *Last Modified: 05/01/26 17:55:18* %%
+%% *Last Modified: 05/01/26 18:16:56* %%
 
 | # | BI | File | Section | Before | After | Notes | CEO Translation |
 |---|---|---|---|---|---|---|---|
@@ -296,8 +296,9 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 | D2 | 5 | `src/FileCache.ts` | L60-160 | `cache: Map<string, string>` (filename → first path) + `duplicates: Set<string>` (dup filenames only). `addToCache()` keeps first, marks dup; loses subsequent paths. `resolveFile()` returns generic dup msg, no candidates. | Single field: `entries: Map<string, string[]>` (filename → all paths in scan order). `addToCache()` appends. `resolveFile()` returns `{found: false, reason: 'duplicate', candidates: string[], message}` listing every candidate path. | Eliminates dual-state bug (S5c). Public API change: `ResolveResultFailure` adds `candidates?: string[]` for `reason: 'duplicate' \| 'duplicate_fuzzy'`. | When two files share a name, the tool now lists every match instead of swallowing all but the first. |
 | D3 | 1, 2 | `src/jact.ts` | L555-606, L645-701, L738-813 | 3× duplicated `if (options.scope) { (await\|sync) buildCache(scope) }` — no fallback when scope absent. | Replace with single helper call `applyScope(this.fileCache, options, targetFile)` in each method. Helper: `private applyScope(cache, options, targetFile?): void` calls `resolveScope` → `cache.buildCache(resolved)` → throws clear error if `source === 'none'`. Also drops spurious `await` (tech debt at L653, L745). | Three call sites collapse to one helper. Eliminates S1a/b/c scattered checks. | Three nearly-identical scope blocks become one shared step — fewer places to break, easier to fix. |
 | D4 | 3 | `src/jact.ts` (Commander defs L1334-1437) + `src/formatExtractResult.ts` | extract file/header always full JSON. extract links default verbose. | Add `--verbose` option to `extract file`, `extract header`, `extract links` (mirror `validate`'s pattern at L181). Default = minimal: only `extractedContentBlocks` content array. `--verbose` = current full payload (`extractedContentBlocks` + `outgoingLinksReport` + `stats`). `formatExtractResult` gains `minimal` mode that strips `outgoingLinksReport` + `stats`. | Mirrors `validate` ergonomics. Commander option default: `verbose: false`. | Default output now contains only the content you asked for. Add `--verbose` when you also want link reports and stats. |
-| D5 | 1, 2 | `src/jact.ts` Commander defs (L1281, L1339, L1398) + help text | `--scope <folder>` with no default; help text silent on inference. | `--scope <folder>` remains optional. Help text updated: "Folder to search for filename matches. Defaults to nearest ancestor of cwd containing `.git` or `package.json`; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root." Add `--scope-trace` (boolean, hidden) for debugging which source resolved. | Documents D1 algorithm at the CLI surface so users discover behavior without reading source. | Help text now explains how the tool figures out the folder — no need to memorize a workaround. |
+| D5 | 1, 2 | `src/jact.ts` Commander defs (L1281, L1339, L1398) + help text | `--scope <folder>` with no default; help text silent on inference. | `--scope <folder>` remains optional. Help text updated: "Folder to search for filename matches. Defaults to nearest ancestor of cwd containing `.git` or `package.json`; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root." | Documents D1 algorithm at the CLI surface so users discover behavior without reading source. NO new flag — diagnostics moved to D7 error messages. | Help text now explains how the tool figures out the folder — no need to memorize a workaround. |
 | D6 | 4 | `jact/CLAUDE.md` Citation Tool Commands; `~/.claude/CLAUDE.md` JACT TOOL RULES | Project doc shows abs `--scope` in every example; user CLAUDE.md historically had JACT SCOPE RULE workaround. | Update `jact/CLAUDE.md` examples to omit `--scope` for in-repo calls; show `--scope` only in cross-project example. Note: user CLAUDE.md JACT SCOPE RULE already retired (only JACT CLI PATH RULE remains). | Documentation reflects new defaults. Workaround rule formally retires. | Tool docs now show the simple invocation; the workaround rule is gone. |
+| D7 | 1, 2, 5 | `src/FileCache.ts:175-229` (`resolveFile`); new helper in `src/core/resolveScope.ts`; consumed by `applyScope` (D3) | Errors are generic: "File not found" / "Multiple files named X found in scope" — no scope path, no source, no near-misses. | Smart error stack — 3 modes: **(M1) Not-found**: `Error: '<name>' not found in scope=<path> (source: <src>). Did you mean: <near1>, <near2>, <near3>?` (Levenshtein top-3 over `entries: Map<string,string[]>` keys, distance ≤2). **(M2) Duplicate**: `Error: '<name>' matched <N> files in scope=<path> (source: <src>):\n  <path1>\n  <path2>\n  ...\nPass --scope to narrow.` **(M3) No-scope**: `Error: cannot resolve scope. Tried: cwd .git (none), cwd package.json (none), targetFile walk-up (no targetFile). Pass --scope <dir>.` | Replaces D5 `--scope-trace` proposal — diagnostics ride on the failure path, never on success. Reuses `ScopeResolution` (D1) + `entries` Map (D2). Levenshtein is ~30 LOC, no dep. | Errors now self-explain: which folder was searched, why, and which similar names exist nearby. No new flags to remember. |
 
 ### 7b. Design Decisions Rationale [i1]
 
@@ -337,13 +338,23 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 - **[OBS]** [^S-validate-verbose] `validate` at L181 establishes minimal-default + `--verbose` ergonomics. **Follow Conventions**: extract should mirror.
 - **[F-ID]** Token economy: minimal output (content only) ≪ full output (content + reports + stats). Default → smaller surface for 80% case (**Progressive Defaults**).
 
-#### D5 — `--scope` help text + `--scope-trace`
+#### D5 — `--scope` help text (no new flag)
 
-%% *Last Modified: 05/01/26 17:55:18* %%
+%% *Last Modified: 05/01/26 18:17:28* %%
 
 - **[OBS]** [^S-Commander-help] `src/jact.ts:1281` (and analogues) Commander option has no `addHelpText` for `--scope`. Documenting the algorithm at the CLI surface satisfies **Clear Contracts** without forcing source-reading.
-- **[H]** `--scope-trace` (debug flag) helps users diagnose unexpected scope inference.
-  - Strengthen: skip first round; add only if Phase 6 user testing shows scope-inference confusion. Defer hidden flag if unproven.
+- **[F-ID]** Diagnostic flag (`--scope-trace`) is unnecessary — D7 surfaces scope+source on the failure path where users actually need it. **Reduce flags / Better defaults** principle: every new flag is cognitive load on every call; diagnostics should ride on errors, not on successful runs.
+
+#### D7 — Smart error message stack
+
+%% *Last Modified: 05/01/26 18:17:28* %%
+
+- **[O]** USER outcomes for this Delta: (a) reduce CLI flag complexity, (b) better defaults, (c) surface info on errors, (d) self-diagnosing failures.
+- **[F-ID]** D1 produces `ScopeResolution { scope, source }`; D2 produces `entries: Map<string,string[]>`. Both are already in scope at the throw site (`FileCache.resolveFile()`). Therefore embedding scope+source+near-misses in error messages is zero-data-cost — only formatting work.
+- **[OBS]** [^S-FileCache-resolveFile] `src/FileCache.ts:175-229` is the single throw site for not-found and duplicate failures — one location to enrich, no scatter.
+- **[F-ID]** Levenshtein distance ≤2 over `Map.keys()` is O(n·m) where n = filenames in cache, m = avg name length. For typical jact scope (≤1k markdown files), n≈300, m≈20 → 6k ops per failure. Acceptable on the failure path.
+- **[A]** Top-3 near-misses with distance ≤2 captures common typos (single insert/delete/swap). Risk-if-wrong: distance threshold too tight misses real near-matches; mitigation: tune in Phase 6 if any reported.
+- **[F-ID]** No new public API surface, no new flag, no stdout pollution on success → satisfies **No Surprises** + **Reduce Flag Surface** principles. Replaces D5 `--scope-trace` proposal.
 
 #### D6 — CLAUDE.md update
 
@@ -354,7 +365,7 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 
 ### 7c. Naming & File Organization [i1]
 
-%% *Last Modified: 05/01/26 17:55:18* %%
+%% *Last Modified: 05/01/26 18:17:43* %%
 
 | New Symbol/File | Decision | Principle |
 |---|---|---|
@@ -363,10 +374,13 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 | `applyScope(cache, options, targetFile?)` | Private method on `JactCli`. Internal helper, not exported. | **Single Responsibility** |
 | `entries: Map<string, string[]>` | Replaces `cache + duplicates` dual-state. | **One Source of Truth** |
 | `ResolveResultFailure.candidates?: string[]` | Optional field on existing failure type when `reason: 'duplicate' \| 'duplicate_fuzzy'`. | **Illegal States Unrepresentable** |
+| `ResolveResultFailure.scope?: ScopeResolution` | Optional field carrying resolved scope+source for D7 error messages. | **Behavior as Data** |
+| `ResolveResultFailure.nearMisses?: string[]` | Optional field for D7 "Did you mean" suggestions on `reason: 'not_found'`. Top-3 Levenshtein ≤2. | **Self-Diagnosing Failures** |
+| `findNearMisses(name, entries, k=3, maxDist=2)` | Private helper in `FileCache`. Pure function over `Map.keys()`. | **Single Responsibility** |
 
 ### 7e. Validation Table [i2]
 
-%% *Last Modified: 05/01/26 17:55:18* %%
+%% *Last Modified: 05/01/26 18:17:49* %%
 
 | BI Row | Ideal [O] | Delta(s) | Verification |
 |---|---|---|---|
@@ -374,19 +388,21 @@ Both lines fall inside Delta scope (S1b, S1c) — fix in same DIFF that adds def
 | 2 | Agent resolves by name w/o rebuilding root | D1, D3, D6 | Open new agent session; agent invokes `jact extract file <name>` without abs `--scope`; succeeds without consulting CLAUDE.md rule. |
 | 3 | User gets only content asked for by default | D4 | `jact extract file foo.md` outputs minimal content array; `--verbose` adds reports + stats. Token diff observable. |
 | 4 | Natural-root rule retires | D6 | `jact/CLAUDE.md` examples updated; user `~/.claude/CLAUDE.md` JACT SCOPE RULE absent (already retired). |
-| 5 | User receives actionable disambiguation prompt naming every candidate | D2 | Place duplicate-named files in scope; run `jact extract file <name>`; error lists every candidate path; exit 1. |
+| 5 | User receives actionable disambiguation prompt naming every candidate | D2, D7 | Place duplicate-named files in scope; run `jact extract file <name>`; error lists every candidate path with scope+source header; exit 1. |
+| 1+5 | Failures self-diagnose without new flag | D7 | (M1) Misspell filename → error contains scope=, source=, "Did you mean: …". (M2) Duplicate name → error lists all candidate paths. (M3) Run from random dir without `--scope` → error names every fallback tried + suggests `--scope`. |
 
 ### 7d. NBA — Items to Resolve
 
-%% *Last Modified: 05/01/26 18:06:58* %%
+%% *Last Modified: 05/01/26 18:17:58* %%
 
 | ID | Item | Type | Status |
 |---|---|---|---|
 | ~~[H-D1-marker-order](#^H-D1-marker-order)~~ | ~~`.git` > `package.json` priority covers jact use cases~~ | ~~H (negate-first)~~ | **Resolved** — survey of `0_SoftwareDevelopment/` found no counter-example; [H]→[F-ID] [OBS-marker-survey](#^OBS-marker-survey) |
 | ~~[A-D1-no-marker-fail](#^A-D1-no-marker-fail)~~ | ~~Fail fast when no marker + no targetFile vs fall back to cwd~~ | ~~A~~ | **Resolved** — fail fast (per D1 rationale) |
-| H-D5-trace-flag | `--scope-trace` debug flag worth shipping in MVP | H | Open — defer to post-MVP unless Phase 6 shows confusion |
+| ~~[H-D5-trace-flag](#^H-D5-trace-flag)~~ | ~~`--scope-trace` debug flag worth shipping in MVP~~ | ~~H~~ | **Resolved** — superseded by D7 smart error stack; diagnostics ride failure path, no new flag needed |
 ^H-D1-marker-order
 ^A-D1-no-marker-fail
+^H-D5-trace-flag
 
 ### 7f. [i3] Eval Hold
 
