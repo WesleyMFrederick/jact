@@ -44,7 +44,7 @@ describe("extract header --format flag", () => {
 
 	it("--format json returns valid JSON with OutgoingLinksExtractedContent structure", () => {
 		const output = execSync(
-			`node "${CLI_PATH}" extract header "${join(testDir, "source.md")}" "Overview" --scope "${testDir}" --format json`,
+			`node "${CLI_PATH}" extract header "${join(testDir, "source.md")}" "Overview" --scope "${testDir}" --format json --verbose`,
 			{ encoding: "utf8" },
 		);
 

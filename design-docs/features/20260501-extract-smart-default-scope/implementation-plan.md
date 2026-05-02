@@ -886,37 +886,45 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 3 — CLI Surface: --verbose + Help Text (D4 + D5) `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 19:31:55* %%
+%% *Last Modified: 05/01/26 21:15:42* %%
 
-- [ ] **3.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches Phase 2.C end_hash. Read plan, review Phase 2 checkboxes + Review Gate 1 findings.
+- [x] **3.0** STATE-READ: `start_hash: b00f5f0d0f47438dc05f2e18339040d9a5e45000`. One doc-commit beyond Phase 2 end_hash — acceptable.
 
 **D4 — formatter minimal/verbose mode (TDD):**
 
-- [ ] **3.1** RED: Create `test/unit/formatExtractResult.test.ts` per plan §File Changes (2 assertions: minimal returns extractedContentBlocks only; verbose returns full result).
-- [ ] **3.2** VERIFY: `npx vitest run test/unit/formatExtractResult.test.ts` — RED confirmed.
-- [ ] **3.3** GREEN: Modify `src/formatExtractResult.ts` per plan §MODIFIED — add `mode: "minimal" | "verbose" = "minimal"` parameter. JSON path: stringify `{ extractedContentBlocks }` when minimal. Markdown path: append `## Outgoing Links Report` + `## Stats` sections only when verbose (per G5).
-- [ ] **3.4** VERIFY: `npx vitest run test/unit/formatExtractResult.test.ts` — GREEN confirmed.
+- [x] **3.1** RED: APPENDED 2 assertions to existing `test/unit/formatExtractResult.test.ts` (deviation P0-2). Also updated existing json test to use `"verbose"` mode — old test expected full payload, now verbose-only. Total: 7 tests.
+- [x] **3.2** VERIFY: RED confirmed — 1 failing, 6 passing.
+- [x] **3.3** GREEN: Modified `src/formatExtractResult.ts` — `mode: "minimal" | "verbose" = "minimal"`. JSON: `{ extractedContentBlocks }` when minimal. Markdown: appends `## Outgoing Links Report` + `## Stats` when verbose.
+- [x] **3.4** VERIFY: 7/7 GREEN confirmed.
 
 **D4 — CLI --verbose wiring (TDD):**
 
-- [ ] **3.5** RED: Create `test/integration/extract-verbose.test.ts` per plan §File Changes (10 assertions: minimal default, verbose includes 3 keys, parity with validate).
-- [ ] **3.6** VERIFY: `npx vitest run test/integration/extract-verbose.test.ts` — RED confirmed.
-- [ ] **3.7** GREEN: Update `JactCli.extractFile/Header/Links` in `src/jact.ts` per plan §MODIFIED — pass `options.verbose ? 'verbose' : 'minimal'` to formatter; trim JSON output when not verbose.
-- [ ] **3.8** GREEN: Update Commander definitions (L1276-1437) for `extract file/header/links` — add `.option("-v, --verbose", "Include outgoingLinksReport + stats in output", false)` to all three subcommands.
-- [ ] **3.9** VERIFY: `npx vitest run test/integration/extract-verbose.test.ts` — GREEN confirmed.
+- [x] **3.5** RED: Created `test/integration/extract-verbose.test.ts` — 10 assertions. Fixed extract-links helper to catch exit-code 1.
+- [x] **3.6** VERIFY: 10/10 RED confirmed.
+- [x] **3.7** GREEN: Added `verbose?: boolean` to `CliExtractOptions` (deviation P0-4: lives in `contentExtractorTypes.ts`). Updated `extractLinks` to use `formatExtractResult`. Updated Commander actions for `extractHeader` + `extractFile` to pass verbose mode.
+- [x] **3.8** GREEN: Added `-v, --verbose` option to all 3 extract Commander defs. Updated `--scope` help text on all 3 (D4 + D5 in same step).
+- [x] **3.9** VERIFY: 10/10 GREEN confirmed.
 
 **D5 — Commander --scope help text (TDD):**
 
-- [ ] **3.10** RED: Create `test/cli-integration/cli-help.test.ts` per plan §File Changes (5 assertions: "nearest ancestor", ".git" + "package.json", target walk-up, "Required only when…", 3-way subcommand consistency).
-- [ ] **3.11** VERIFY: `npx vitest run test/cli-integration/cli-help.test.ts` — RED confirmed.
-- [ ] **3.12** GREEN: Update `--scope <folder>` option help string on all 3 `extract` subcommands per plan §MODIFIED — describe inference algorithm (nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors; required only when neither reveals a project root).
-- [ ] **3.13** VERIFY: `npx vitest run test/cli-integration/cli-help.test.ts` — GREEN confirmed.
+- [x] **3.10** RED: Created `test/cli-integration/cli-help.test.ts` — 5 assertions. Normalized line-wrapped help output. No dummy args needed (Commander processes `--help` before arg validation).
+- [x] **3.11** VERIFY: 5/5 RED confirmed (text not in dist yet).
+- [x] **3.12** GREEN: Help text already added in 3.8. Build required.
+- [x] **3.13** VERIFY: 5/5 GREEN confirmed.
+
+**M-1 + M-2 cleanup (Review Gate 1 findings):**
+- [x] M-1: Renamed `resolveScope.test.ts:101` test title → "all-false fs returns 'none' even with targetFile".
+- [x] M-2: `applyScope` return type `ScopeResolution` → `void`. Removed unused `ScopeResolution` import from `jact.ts`.
 
 **Phase 3 guardrails:**
 
-- [ ] **3.14** VERIFY: `npm run build` — TypeScript clean.
-- [ ] **3.15** VERIFY: `npm test` — full suite, no regressions.
-- [ ] **3.S** STATE-WRITE: Update plan checkboxes, note deviations
+- [x] **3.14** VERIFY: `npm run build` — TypeScript clean. Zero diagnostics.
+- [x] **3.15** VERIFY: `npm test` — 85 files, 500 tests, zero regressions.
+- [x] **3.S** STATE-WRITE: Deviations:
+  - DEVIATION P3-1: Existing json test in `formatExtractResult.test.ts` renamed to use `"verbose"` mode (old assertion expected full payload, now verbose-only behavior).
+  - DEVIATION P3-2: 11 existing tests + `jact:base-paths` npm script updated with `--verbose` where full payload was expected (TECH DEBT POLICY: fix-now).
+  - DEVIATION P3-3: D5 help text wired in same Commander step as D4 `--verbose` (3.8) — no separate step needed.
+  - DEVIATION P3-4: `extract-verbose.test.ts` uses "Context" header (avoids backtick shell-escape issues). 10 assertions maintained.
 - [ ] **3.C** COMMIT: Commit Phase 3 — "feat(scope): D4 minimal-default --verbose + D5 --scope help text". `git rev-parse HEAD` → `end_hash: <hash>`
 
 #### REVIEW GATE 2 `delta-reviewer` (opus)

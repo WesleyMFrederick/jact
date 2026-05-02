@@ -45,8 +45,8 @@ describe("formatExtractResult", () => {
 		39,
 	);
 
-	it("format 'json' returns valid JSON matching JSON.stringify(result, null, 2)", () => {
-		const output = formatExtractResult(singleBlock, "json");
+	it("format 'json' verbose returns valid JSON matching JSON.stringify(result, null, 2)", () => {
+		const output = formatExtractResult(singleBlock, "json", "verbose");
 		expect(output).toBe(JSON.stringify(singleBlock, null, 2));
 	});
 
@@ -73,5 +73,35 @@ describe("formatExtractResult", () => {
 	it("single block produces output with no separator", () => {
 		const output = formatExtractResult(singleBlock, "markdown");
 		expect(output).not.toContain("---");
+	});
+});
+
+describe("formatExtractResult — minimal mode", () => {
+	const fullResult: OutgoingLinksExtractedContent = {
+		extractedContentBlocks: {
+			_totalContentCharacterLength: 26,
+			"block-1": { content: "# Hello\nContent.", contentLength: 16 },
+		},
+		outgoingLinksReport: { processedLinks: [] },
+		stats: {
+			totalLinks: 1,
+			uniqueContent: 1,
+			duplicateContentDetected: 0,
+			tokensSaved: 0,
+			compressionRatio: 1,
+		},
+	};
+
+	it("given mode 'minimal' json → returns object with only extractedContentBlocks", () => {
+		const output = formatExtractResult(fullResult, "json", "minimal");
+		const parsed = JSON.parse(output) as Record<string, unknown>;
+		expect(Object.keys(parsed)).toEqual(["extractedContentBlocks"]);
+		expect(parsed["outgoingLinksReport"]).toBeUndefined();
+		expect(parsed["stats"]).toBeUndefined();
+	});
+
+	it("given mode 'verbose' json → returns full result unchanged", () => {
+		const output = formatExtractResult(fullResult, "json", "verbose");
+		expect(JSON.parse(output)).toEqual(fullResult);
 	});
 });
