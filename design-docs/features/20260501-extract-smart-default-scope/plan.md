@@ -6,6 +6,12 @@
 
 %% *Last Modified: 05/01/26 17:13:37* %%
 
+> [!objective] CRITICAL WORKFLOW
+> 1. Run !`/continous-learning` skill
+> 2. Use !`/caveman` to save on tokens while writing plan
+> 3. ON STARTUP, ALWAYS Ingest this document, run skills, return status in chat window, BECAUSE USER needs to know what we worked on last and what needs to happen next
+
+
 **Routing:**
 - Phase output → this file
 - Chat → gates + status only
@@ -71,9 +77,10 @@
 
 ## 5. Phase 2 — BI
 
-%% *Last Modified: 05/01/26 17:13:37* %%
+%% *Last Modified: 05/01/26 17:19:29* %%
+#LOCKED
 
-<!-- AWAITING USER LOCK at HARD GATE [e2] -->
+%% *Last Modified: 05/01/26 17:19:29* %%
 
 | # | Actor | Baseline [O] | Ideal [O] |
 |---|-------|--------------|-----------|
@@ -81,6 +88,7 @@
 | 2 | Agent invoking tool for user | Agent rebuilds abs search root every call — re-runs discovery or reads global memory rule prescribing it. | Agent from inside known project resolves by name w/o rebuilding root; explicit declaration only for cross-project. |
 | 3 | User receiving extract output | User gets full structured payload (content + link reports + stats) every call regardless of need. | User gets only content asked for by default; opts into payload when needed. |
 | 4 | Agent maintaining tool rules | Agent carries persistent global rule prescribing workaround for missing default, applied in every project. | Agent reaches for rules only on genuine cross-project ambiguity; natural-root rule retires. |
+| 5 | User resolving ambiguous name match | User experiences silent wrong-file resolution or opaque failure when a name matches multiple candidates within the inferred root. | User receives an actionable disambiguation prompt naming every candidate when a name matches multiple files within the inferred root, and the tool halts until the user picks one or narrows the call. |
 
 ---
 
