@@ -564,7 +564,7 @@ export class CitationValidator {
 						citation,
 						"error",
 						`File not found: ${citation.target.path.raw}`,
-						`File "${filename}" not found in scope folder. ${debugInfo}`,
+						`${cacheResult.message ?? ""}. ${debugInfo}`,
 					);
 				}
 			}

@@ -141,6 +141,23 @@ describe("applyScope — duplication elimination", () => {
 	});
 });
 
+describe("M1 near-miss suggestion — not_found branch", () => {
+	it("given a typo filename close to CLAUDE.md, when extract file runs, then output contains 'Did you mean: CLAUDE.md'", async () => {
+		const typoPath = join(JACT_ROOT, "CLUADE.md"); // deliberate typo
+		try {
+			await execAsync(`node "${CLI_PATH}" extract file "${typoPath}"`, {
+				cwd: JACT_ROOT,
+			});
+			expect.fail("Command should have failed for non-existent file");
+		} catch (error: unknown) {
+			const err = error as { code: number; stderr: string; stdout: string };
+			expect(err.code).toBeGreaterThan(0);
+			const output = err.stderr + err.stdout;
+			expect(output).toContain("Did you mean: CLAUDE.md");
+		}
+	});
+});
+
 describe("applyScope — sync semantics (tech debt fix)", () => {
 	it("given extract header / extract file methods, when source is inspected, then no spurious 'await' on buildCache (TS80007 cleared)", () => {
 		const src = fs.readFileSync(JACT_SRC, "utf8");
