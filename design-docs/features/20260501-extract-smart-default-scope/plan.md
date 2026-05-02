@@ -486,3 +486,116 @@ None.
 - All 3 §7d NBA items resolved before lock.
 - Baseline anti-patterns (Scattered Checks, dual-state, leaky flag risk) actively eliminated by Delta.
 
+## 7.5. Phase 5 — [i4] BDD Test Assertions
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+### 7g. BDD Coverage Matrix [i4]
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+Per-Delta Given/When/Then assertions mapped to BI Row + Actor. Each row = one atomic test. Coverage column maps additions/modifications back to Ideal [O].
+
+#### D1 — `resolveScope` util (NEW)
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+| ID | BI / Actor | Given | When | Then | Covers |
+|---|---|---|---|---|---|
+| T1.1 | 1 / User invoking tool | cwd inside repo containing `.git/`, no explicit scope | `resolveScope({cwd, targetFile: undefined})` called | returns `{scope: <git-root>, source: 'cwd-git'}` | Ideal: resolves by name w/o declaring root |
+| T1.2 | 1 / User | cwd has `package.json` but no `.git` | `resolveScope({cwd})` | returns `{scope: <pkg-root>, source: 'cwd-pkg'}` | Marker fallback chain |
+| T1.3 | 1 / User | cwd outside any repo, `targetFile` path inside repo | `resolveScope({cwd, targetFile})` | returns `{scope: <git-root>, source: 'target-git'}` | Target-walk-up fallback |
+| T1.4 | 1 / User | explicit scope `'/abs/dir'` passed | `resolveScope({explicit, cwd})` | returns `{scope: '/abs/dir', source: 'explicit'}` | Override path |
+| T1.5 | 1 / User | cwd outside repo, no targetFile | `resolveScope({cwd})` | returns `{source: 'none'}` (caller will throw) | Fail-fast contract |
+| T1.6 | 1 / User | `.git` AND `package.json` colocated at same level | `resolveScope({cwd})` | returns `source: 'cwd-git'` (priority) | [F-ID] marker priority lock |
+| T1.7 | 2 / Agent | nested `package.json` inside `.git` repo | `resolveScope({cwd: <nested-pkg>})` | returns `source: 'cwd-git'` (parent repo wins) | [OBS-marker-survey] result |
+
+#### D2 — `FileCache.entries` refactor
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+| ID | BI / Actor | Given | When | Then | Covers |
+|---|---|---|---|---|---|
+| T2.1 | 5 / User resolving ambiguous match | scope dir has `foo.md` at `a/foo.md` and `b/foo.md` | `buildCache(scope)` called | `entries.get('foo.md')` returns `['a/foo.md', 'b/foo.md']` (length 2) | Refactor representation first |
+| T2.2 | 5 / User | duplicate `foo.md` in cache | `resolveFile('foo.md')` | returns `{found: false, reason: 'duplicate', candidates: ['a/foo.md','b/foo.md'], scope, message}` | Ideal: actionable disambiguation w/ every candidate |
+| T2.3 | 5 / User | unique `bar.md` in cache | `resolveFile('bar.md')` | returns `{found: true, path: '<resolved>'}` | No regression on happy path |
+| T2.4 | 5 / Agent | three+ duplicates of same name | `resolveFile(name)` | `candidates.length === 3` (no path silently dropped) | Eliminates S5c silent-overwrite bug |
+
+#### D3 — `applyScope` helper extraction
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+| ID | BI / Actor | Given | When | Then | Covers |
+|---|---|---|---|---|---|
+| T3.1 | 1 / User | `extractFile('foo.md', {})` from inside repo, no `options.scope` | method invoked | `fileCache` built w/ resolved scope (no "File not found"); content returned | Ideal: resolves w/o declaring root |
+| T3.2 | 1 / User | same call but cwd outside any repo, no targetFile resolves | method invoked | throws clear error containing M3 message (D7) | Fail-fast at boundary |
+| T3.3 | 2 / Agent | `extractHeader` + `extractLinks` + `extractFile` codebase scan | grep `if \(options\.scope\) buildCache` | 0 matches (replaced by `applyScope`) | Avoid Duplication — 3× → 1 |
+| T3.4 | 2 / Agent | grep `await this.fileCache.buildCache` | scan `src/jact.ts` | 0 matches (tech debt L653, L745 cleared) | TS80007 spurious-await fix |
+
+#### D4 — Minimal-by-default extract output
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+| ID | BI / Actor | Given | When | Then | Covers |
+|---|---|---|---|---|---|
+| T4.1 | 3 / User receiving extract output | `jact extract file foo.md` (no `--verbose`) | command runs | stdout JSON has `extractedContentBlocks` ONLY; no `outgoingLinksReport`, no `stats` | Ideal: only content asked for |
+| T4.2 | 3 / User | `jact extract file foo.md --verbose` | command runs | stdout JSON has all three: `extractedContentBlocks` + `outgoingLinksReport` + `stats` | Opt-in to payload |
+| T4.3 | 3 / User | `jact extract header foo.md#h1` (no `--verbose`) | command runs | minimal mode (mirrors validate L181 pattern) | Ergonomics parity w/ validate |
+| T4.4 | 3 / User | `jact extract links foo.md` (no `--verbose`) | command runs | minimal mode replaces current always-full dump (S3e) | Ergonomics parity |
+| T4.5 | 3 / User | token-count diff `minimal` vs `--verbose` on same file | measure | minimal < verbose (observable token reduction) | Token economy [F-ID] |
+
+#### D5 — `--scope` help text (no new flag)
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+| ID | BI / Actor | Given | When | Then | Covers |
+|---|---|---|---|---|---|
+| T5.1 | 1 / User | `jact extract file --help` | command runs | help text contains: "Defaults to nearest ancestor of cwd containing `.git` or `package.json`" | Tool-First Design |
+| T5.2 | 2 / Agent | grep new `--scope-trace` flag in src | scan codebase | 0 matches (D7 supersedes — no leaky flag) | Reduce flag surface |
+
+#### D6 — CLAUDE.md doc update
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+| ID | BI / Actor | Given | When | Then | Covers |
+|---|---|---|---|---|---|
+| T6.1 | 4 / Agent maintaining tool rules | `jact/CLAUDE.md` Citation Tool Commands section | inspect examples | in-repo examples omit `--scope`; ONE cross-project example retains `--scope` | Workaround replicates downstream — fixed |
+| T6.2 | 4 / Agent | `~/.claude/CLAUDE.md` JACT TOOL RULES | grep `JACT SCOPE RULE` | 0 matches (already retired); only `JACT CLI PATH RULE` remains | Natural-root rule retires |
+
+#### D7 — Smart error message stack
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+| ID | BI / Actor | Given | When | Then | Covers |
+|---|---|---|---|---|---|
+| T7.1 (M1) | 1 / User | misspelled name `'fooo.md'` in scope w/ `foo.md` present | `extractFile` invoked | stderr matches `/'fooo\.md' not found in scope=.+ \(source: cwd-git\)\. Did you mean: foo\.md/` (top-3, distance ≤2) | Self-diagnosing failures |
+| T7.2 (M2) | 5 / User | `foo.md` duplicate in `a/` and `b/` | `extractFile('foo.md')` | stderr lists EVERY candidate path on separate lines + `scope=`, `source=`, `Pass --scope to narrow.` | Ideal: actionable disambiguation |
+| T7.3 (M3) | 1 / User | cwd outside any repo, no `--scope`, no targetFile-derivable scope | `extractFile` invoked | stderr matches: `cannot resolve scope. Tried: cwd .git \(none\), cwd package.json \(none\), targetFile walk-up \(no targetFile\)\. Pass --scope <dir>\.` | M3 contract |
+| T7.4 | 1 / User | `findNearMisses('readme', entries={readme.md, README.md, readem.md, other.md})` | helper called | returns `['readme.md', 'README.md', 'readem.md']` (top-3, distance ≤2, `other.md` excluded) | Levenshtein algorithm correctness |
+| T7.5 | 5 / Agent | error JSON structure check | stderr parsed | `ResolveResultFailure` carries `{scope, candidates?, nearMisses?, reason}` per §7c | Behavior as Data |
+
+### 7h. Coverage Matrix — Ideal × Delta × BDD [i4]
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+Cross-check: every Ideal [O] reachable via ≥1 BDD test through ≥1 Delta. No orphan Deltas. No uncovered Ideals.
+
+| BI Row | Actor | Ideal [O] | Delta(s) | BDD Tests | Coverage |
+|---|---|---|---|---|---|
+| 1 | User invoking tool | Resolves by name w/o declaring root; declares only to override | D1, D3, D5, D7 | T1.1-1.6, T3.1-3.2, T5.1, T7.1, T7.3 | ✓ Full |
+| 2 | Agent invoking tool | Resolves w/o rebuilding root; explicit only cross-project | D1, D3, D6, D5 | T1.7, T3.3-3.4, T5.2, T6.2 | ✓ Full |
+| 3 | User receiving output | Only content by default; opt-in payload | D4 | T4.1-4.5 | ✓ Full |
+| 4 | Agent maintaining rules | Natural-root rule retires; rules only on real ambiguity | D6 | T6.1-6.2 | ✓ Full |
+| 5 | User resolving ambiguous match | Receives prompt naming every candidate; tool halts | D2, D7 | T2.1-2.4, T7.2, T7.5 | ✓ Full |
+
+### 7i. Self-Checks [i4]
+
+%% *Last Modified: 05/01/26 18:50:11* %%
+
+- Every Delta D1-D7 has ≥1 BDD test ✓
+- Every BI Row 1-5 covered by ≥1 BDD test ✓
+- Every test Given/When/Then maps to specific Actor (not generic row) ✓ (per learning: actor-based, not numbered)
+- Tech-debt fixes (await removal) verifiable via T3.4 ✓
+- Negative cases included (T1.5, T3.2, T7.3) — fail-fast contract verifiable ✓
+- Tests reference modifications (file/line scope) AND additions (NEW symbols/files) per Delta ✓
+
