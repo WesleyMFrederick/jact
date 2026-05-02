@@ -486,116 +486,277 @@ None.
 - All 3 §7d NBA items resolved before lock.
 - Baseline anti-patterns (Scattered Checks, dual-state, leaky flag risk) actively eliminated by Delta.
 
-## 7.5. Phase 5 — [i4] BDD Test Assertions
+## 8. Phase 6 — BDD Test Assertions
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+%% *Last Modified: 05/01/26 18:59:12* %%
 
-### 7g. BDD Coverage Matrix [i4]
+### 8a. Test Coverage Matrix [Delta × BI Row × Change Type]
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+%% *Last Modified: 05/01/26 18:59:12* %%
 
-Per-Delta Given/When/Then assertions mapped to BI Row + Actor. Each row = one atomic test. Coverage column maps additions/modifications back to Ideal [O].
+| Delta | Change Type | BI Row(s) | Test File | New / Modified |
+|---|---|---|---|---|
+| D1 | ADD `src/core/resolveScope.ts` | 1, 2, 4 | `test/unit/core/resolveScope.test.ts` (NEW) | NEW |
+| D2 | MODIFY `src/FileCache.ts` (entries Map, candidates) | 5 | `test/unit/FileCache.test.ts` | MODIFIED |
+| D3 | MODIFY `src/jact.ts` (applyScope helper) | 1, 2 | `test/integration/extract-default-scope.test.ts` (NEW) | NEW |
+| D4 | MODIFY `src/jact.ts` + `formatExtractResult.ts` (--verbose) | 3 | `test/unit/formatExtractResult.test.ts`, `test/integration/extract-verbose.test.ts` (NEW) | NEW + MODIFIED |
+| D5 | MODIFY Commander help text | 1, 2 | `test/integration/cli-help.test.ts` (NEW) | NEW |
+| D6 | MODIFY `jact/CLAUDE.md` examples | 4 | (manual review — no test) | DOC |
+| D7 | ADD smart error stack (M1/M2/M3) | 1, 2, 5 | `test/unit/FileCache.errors.test.ts` (NEW), `test/unit/findNearMisses.test.ts` (NEW) | NEW |
 
-#### D1 — `resolveScope` util (NEW)
+### 8b. BDD Assertions — D1 `resolveScope` (Additions)
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+%% *Last Modified: 05/01/26 18:59:12* %%
 
-| ID | BI / Actor | Given | When | Then | Covers |
-|---|---|---|---|---|---|
-| T1.1 | 1 / User invoking tool | cwd inside repo containing `.git/`, no explicit scope | `resolveScope({cwd, targetFile: undefined})` called | returns `{scope: <git-root>, source: 'cwd-git'}` | Ideal: resolves by name w/o declaring root |
-| T1.2 | 1 / User | cwd has `package.json` but no `.git` | `resolveScope({cwd})` | returns `{scope: <pkg-root>, source: 'cwd-pkg'}` | Marker fallback chain |
-| T1.3 | 1 / User | cwd outside any repo, `targetFile` path inside repo | `resolveScope({cwd, targetFile})` | returns `{scope: <git-root>, source: 'target-git'}` | Target-walk-up fallback |
-| T1.4 | 1 / User | explicit scope `'/abs/dir'` passed | `resolveScope({explicit, cwd})` | returns `{scope: '/abs/dir', source: 'explicit'}` | Override path |
-| T1.5 | 1 / User | cwd outside repo, no targetFile | `resolveScope({cwd})` | returns `{source: 'none'}` (caller will throw) | Fail-fast contract |
-| T1.6 | 1 / User | `.git` AND `package.json` colocated at same level | `resolveScope({cwd})` | returns `source: 'cwd-git'` (priority) | [F-ID] marker priority lock |
-| T1.7 | 2 / Agent | nested `package.json` inside `.git` repo | `resolveScope({cwd: <nested-pkg>})` | returns `source: 'cwd-git'` (parent repo wins) | [OBS-marker-survey] result |
+**Feature:** Default-scope inference algorithm. **BI Coverage:** Rows 1, 2, 4.
 
-#### D2 — `FileCache.entries` refactor
+```typescript
+describe("resolveScope — explicit override", () => {
+  it("given an explicit scope, when called, then returns source: 'explicit' with that scope unchanged", () => {});
+  it("given an explicit scope and a cwd inside a git repo, when called, then explicit wins (no walk-up)", () => {});
+});
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+describe("resolveScope — cwd marker walk-up", () => {
+  it("given cwd inside a directory containing .git/, when called, then returns source: 'cwd-git' with that directory", () => {});
+  it("given cwd nested 3 levels below .git/, when called, then walks up and returns source: 'cwd-git'", () => {});
+  it("given cwd in directory with package.json but no .git, when called, then returns source: 'cwd-pkg'", () => {});
+  it("given cwd in directory with both .git and package.json colocated, when called, then returns source: 'cwd-git' (.git priority)", () => {});
+  it("given cwd in nested package.json sub-package within parent .git repo, when called, then returns parent's source: 'cwd-git' (parent wins)", () => {});
+});
 
-| ID | BI / Actor | Given | When | Then | Covers |
-|---|---|---|---|---|---|
-| T2.1 | 5 / User resolving ambiguous match | scope dir has `foo.md` at `a/foo.md` and `b/foo.md` | `buildCache(scope)` called | `entries.get('foo.md')` returns `['a/foo.md', 'b/foo.md']` (length 2) | Refactor representation first |
-| T2.2 | 5 / User | duplicate `foo.md` in cache | `resolveFile('foo.md')` | returns `{found: false, reason: 'duplicate', candidates: ['a/foo.md','b/foo.md'], scope, message}` | Ideal: actionable disambiguation w/ every candidate |
-| T2.3 | 5 / User | unique `bar.md` in cache | `resolveFile('bar.md')` | returns `{found: true, path: '<resolved>'}` | No regression on happy path |
-| T2.4 | 5 / Agent | three+ duplicates of same name | `resolveFile(name)` | `candidates.length === 3` (no path silently dropped) | Eliminates S5c silent-overwrite bug |
+describe("resolveScope — targetFile fallback", () => {
+  it("given cwd has no markers but targetFile is inside a .git repo, when called, then returns source: 'target-git'", () => {});
+  it("given cwd has no markers and targetFile dir has package.json, when called, then returns source: 'target-pkg'", () => {});
+  it("given both cwd and targetFile in marker dirs, when called, then cwd wins (cwd checked first)", () => {});
+});
 
-#### D3 — `applyScope` helper extraction
+describe("resolveScope — fail-fast none", () => {
+  it("given no explicit, no cwd markers, no targetFile, when called, then returns source: 'none'", () => {});
+  it("given source: 'none' result, when caller acts, then caller throws actionable error (D7 M3)", () => {});
+});
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+describe("resolveScope — purity", () => {
+  it("given identical inputs called twice, when invoked, then returns identical output (deterministic)", () => {});
+  it("given fs.existsSync mocked, when called, then performs no I/O beyond existsSync (no readFile, no exec)", () => {});
+});
+```
 
-| ID | BI / Actor | Given | When | Then | Covers |
-|---|---|---|---|---|---|
-| T3.1 | 1 / User | `extractFile('foo.md', {})` from inside repo, no `options.scope` | method invoked | `fileCache` built w/ resolved scope (no "File not found"); content returned | Ideal: resolves w/o declaring root |
-| T3.2 | 1 / User | same call but cwd outside any repo, no targetFile resolves | method invoked | throws clear error containing M3 message (D7) | Fail-fast at boundary |
-| T3.3 | 2 / Agent | `extractHeader` + `extractLinks` + `extractFile` codebase scan | grep `if \(options\.scope\) buildCache` | 0 matches (replaced by `applyScope`) | Avoid Duplication — 3× → 1 |
-| T3.4 | 2 / Agent | grep `await this.fileCache.buildCache` | scan `src/jact.ts` | 0 matches (tech debt L653, L745 cleared) | TS80007 spurious-await fix |
+**Delta coverage:** 12 assertions × 5 source enum values + edge cases. Covers all branches in D1 algorithm ①→⑤.
 
-#### D4 — Minimal-by-default extract output
+### 8c. BDD Assertions — D2 `FileCache` (Modifications)
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+%% *Last Modified: 05/01/26 18:59:12* %%
 
-| ID | BI / Actor | Given | When | Then | Covers |
-|---|---|---|---|---|---|
-| T4.1 | 3 / User receiving extract output | `jact extract file foo.md` (no `--verbose`) | command runs | stdout JSON has `extractedContentBlocks` ONLY; no `outgoingLinksReport`, no `stats` | Ideal: only content asked for |
-| T4.2 | 3 / User | `jact extract file foo.md --verbose` | command runs | stdout JSON has all three: `extractedContentBlocks` + `outgoingLinksReport` + `stats` | Opt-in to payload |
-| T4.3 | 3 / User | `jact extract header foo.md#h1` (no `--verbose`) | command runs | minimal mode (mirrors validate L181 pattern) | Ergonomics parity w/ validate |
-| T4.4 | 3 / User | `jact extract links foo.md` (no `--verbose`) | command runs | minimal mode replaces current always-full dump (S3e) | Ergonomics parity |
-| T4.5 | 3 / User | token-count diff `minimal` vs `--verbose` on same file | measure | minimal < verbose (observable token reduction) | Token economy [F-ID] |
+**Feature:** `entries: Map<string, string[]>` replaces dual-state. **BI Coverage:** Row 5.
 
-#### D5 — `--scope` help text (no new flag)
+**Delta coverage gap (existing tests):** Existing tests only assert `cache.has` / `duplicates.has` semantics. Missing: candidate enumeration on multi-match, append-on-add behavior.
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+```typescript
+describe("FileCache — entries data shape", () => {
+  it("given a single file added, when entries queried, then key maps to array with one path", () => {});
+  it("given two files with same name added, when entries queried, then key maps to array with both paths in scan order", () => {});
+  it("given five files with same name added, when entries queried, then key maps to array with all five paths", () => {});
+});
 
-| ID | BI / Actor | Given | When | Then | Covers |
-|---|---|---|---|---|---|
-| T5.1 | 1 / User | `jact extract file --help` | command runs | help text contains: "Defaults to nearest ancestor of cwd containing `.git` or `package.json`" | Tool-First Design |
-| T5.2 | 2 / Agent | grep new `--scope-trace` flag in src | scan codebase | 0 matches (D7 supersedes — no leaky flag) | Reduce flag surface |
+describe("FileCache — addToCache append semantics", () => {
+  it("given empty cache, when addToCache called once, then entries.get(name).length === 1", () => {});
+  it("given cache with one path for name, when addToCache called with second path, then entries.get(name).length === 2 (appended, not overwritten)", () => {});
+  it("given duplicate filename added, when addToCache called, then both paths recoverable via entries.get(name)", () => {});
+});
 
-#### D6 — CLAUDE.md doc update
+describe("FileCache — resolveFile single match", () => {
+  it("given entries has exactly one path for name, when resolveFile called, then returns {found: true, path}", () => {});
+});
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+describe("FileCache — resolveFile duplicate match", () => {
+  it("given entries has two paths for name, when resolveFile called, then returns {found: false, reason: 'duplicate', candidates: [path1, path2]}", () => {});
+  it("given entries has duplicate match, when resolveFile result inspected, then candidates array preserves scan order", () => {});
+  it("given entries has duplicate match, when resolveFile result inspected, then message lists every candidate path on separate lines", () => {});
+});
 
-| ID | BI / Actor | Given | When | Then | Covers |
-|---|---|---|---|---|---|
-| T6.1 | 4 / Agent maintaining tool rules | `jact/CLAUDE.md` Citation Tool Commands section | inspect examples | in-repo examples omit `--scope`; ONE cross-project example retains `--scope` | Workaround replicates downstream — fixed |
-| T6.2 | 4 / Agent | `~/.claude/CLAUDE.md` JACT TOOL RULES | grep `JACT SCOPE RULE` | 0 matches (already retired); only `JACT CLI PATH RULE` remains | Natural-root rule retires |
+describe("FileCache — backward compatibility", () => {
+  it("given existing callers used cache.has(name), when migrated to entries.has(name), then returns same boolean", () => {});
+  it("given existing callers checked duplicates.has(name), when migrated to (entries.get(name)?.length ?? 0) > 1, then returns same boolean", () => {});
+});
+```
 
-#### D7 — Smart error message stack
+**Delta coverage:** 11 assertions covering: single/multi-add, scan-order preservation, public API change shape.
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+### 8d. BDD Assertions — D3 `applyScope` Helper (Modifications)
 
-| ID | BI / Actor | Given | When | Then | Covers |
-|---|---|---|---|---|---|
-| T7.1 (M1) | 1 / User | misspelled name `'fooo.md'` in scope w/ `foo.md` present | `extractFile` invoked | stderr matches `/'fooo\.md' not found in scope=.+ \(source: cwd-git\)\. Did you mean: foo\.md/` (top-3, distance ≤2) | Self-diagnosing failures |
-| T7.2 (M2) | 5 / User | `foo.md` duplicate in `a/` and `b/` | `extractFile('foo.md')` | stderr lists EVERY candidate path on separate lines + `scope=`, `source=`, `Pass --scope to narrow.` | Ideal: actionable disambiguation |
-| T7.3 (M3) | 1 / User | cwd outside any repo, no `--scope`, no targetFile-derivable scope | `extractFile` invoked | stderr matches: `cannot resolve scope. Tried: cwd .git \(none\), cwd package.json \(none\), targetFile walk-up \(no targetFile\)\. Pass --scope <dir>\.` | M3 contract |
-| T7.4 | 1 / User | `findNearMisses('readme', entries={readme.md, README.md, readem.md, other.md})` | helper called | returns `['readme.md', 'README.md', 'readem.md']` (top-3, distance ≤2, `other.md` excluded) | Levenshtein algorithm correctness |
-| T7.5 | 5 / Agent | error JSON structure check | stderr parsed | `ResolveResultFailure` carries `{scope, candidates?, nearMisses?, reason}` per §7c | Behavior as Data |
+%% *Last Modified: 05/01/26 18:59:12* %%
 
-### 7h. Coverage Matrix — Ideal × Delta × BDD [i4]
+**Feature:** Centralized scope-fallback in `extractLinks/Header/File`. **BI Coverage:** Rows 1, 2.
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+```typescript
+describe("extract file — default scope inference", () => {
+  it("given cwd inside jact repo and no --scope flag, when extract file <name> runs, then succeeds without error", () => {});
+  it("given cwd inside jact repo and --scope passed, when extract file runs, then explicit scope wins (matches D1 source: 'explicit')", () => {});
+  it("given cwd outside any project + no --scope + targetFile inside a repo, when extract file runs, then succeeds via target-walk-up", () => {});
+  it("given cwd outside any project + no --scope + no targetFile in a repo, when extract file runs, then exits non-zero with M3 error message", () => {});
+});
 
-Cross-check: every Ideal [O] reachable via ≥1 BDD test through ≥1 Delta. No orphan Deltas. No uncovered Ideals.
+describe("extract header — default scope inference", () => {
+  it("given cwd inside jact repo and no --scope, when extract header runs, then succeeds (mirrors extract file behavior)", () => {});
+});
 
-| BI Row | Actor | Ideal [O] | Delta(s) | BDD Tests | Coverage |
-|---|---|---|---|---|---|
-| 1 | User invoking tool | Resolves by name w/o declaring root; declares only to override | D1, D3, D5, D7 | T1.1-1.6, T3.1-3.2, T5.1, T7.1, T7.3 | ✓ Full |
-| 2 | Agent invoking tool | Resolves w/o rebuilding root; explicit only cross-project | D1, D3, D6, D5 | T1.7, T3.3-3.4, T5.2, T6.2 | ✓ Full |
-| 3 | User receiving output | Only content by default; opt-in payload | D4 | T4.1-4.5 | ✓ Full |
-| 4 | Agent maintaining rules | Natural-root rule retires; rules only on real ambiguity | D6 | T6.1-6.2 | ✓ Full |
-| 5 | User resolving ambiguous match | Receives prompt naming every candidate; tool halts | D2, D7 | T2.1-2.4, T7.2, T7.5 | ✓ Full |
+describe("extract links — default scope inference", () => {
+  it("given cwd inside jact repo and no --scope, when extract links runs, then succeeds (mirrors extract file behavior)", () => {});
+});
 
-### 7i. Self-Checks [i4]
+describe("applyScope — duplication elimination", () => {
+  it("given the three extract methods, when source is inspected, then each invokes applyScope once and contains zero direct buildCache calls", () => {});
+  it("given applyScope receives source: 'none' from resolveScope, when called, then throws with M3 error before reaching FileCache", () => {});
+});
 
-%% *Last Modified: 05/01/26 18:50:11* %%
+describe("applyScope — sync semantics (tech debt fix)", () => {
+  it("given extract header / extract file methods, when source is inspected, then no spurious 'await' on buildCache (TS80007 cleared)", () => {});
+});
+```
 
-- Every Delta D1-D7 has ≥1 BDD test ✓
-- Every BI Row 1-5 covered by ≥1 BDD test ✓
-- Every test Given/When/Then maps to specific Actor (not generic row) ✓ (per learning: actor-based, not numbered)
-- Tech-debt fixes (await removal) verifiable via T3.4 ✓
-- Negative cases included (T1.5, T3.2, T7.3) — fail-fast contract verifiable ✓
-- Tests reference modifications (file/line scope) AND additions (NEW symbols/files) per Delta ✓
+**Delta coverage:** 8 assertions covering: 3× call sites unified, target-walk-up fallback, fail-fast on none, await-removal tech debt.
+
+### 8e. BDD Assertions — D4 Minimal-by-Default Output (Modifications)
+
+%% *Last Modified: 05/01/26 18:59:12* %%
+
+**Feature:** `--verbose` flag mirrors `validate` ergonomics. **BI Coverage:** Row 3.
+
+```typescript
+describe("extract file — output mode default", () => {
+  it("given no --verbose flag, when extract file runs, then JSON output contains only extractedContentBlocks", () => {});
+  it("given no --verbose flag, when extract file runs, then JSON output omits outgoingLinksReport", () => {});
+  it("given no --verbose flag, when extract file runs, then JSON output omits stats", () => {});
+});
+
+describe("extract file — --verbose mode", () => {
+  it("given --verbose flag, when extract file runs, then JSON output contains extractedContentBlocks + outgoingLinksReport + stats", () => {});
+  it("given --verbose flag, when output compared to no-flag output, then verbose payload is strict superset", () => {});
+});
+
+describe("extract header — output mode default", () => {
+  it("given no --verbose flag and default markdown format, when extract header runs, then output omits link reports + stats sections", () => {});
+  it("given --verbose flag, when extract header runs in markdown, then output includes link reports + stats", () => {});
+});
+
+describe("extract links — output mode default", () => {
+  it("given no --verbose flag, when extract links runs, then output is minimal (content-only)", () => {});
+  it("given --verbose flag, when extract links runs, then output is current full payload", () => {});
+});
+
+describe("formatExtractResult — minimal mode", () => {
+  it("given mode: 'minimal', when called with full result, then returns object with only extractedContentBlocks key", () => {});
+  it("given mode: 'verbose', when called with full result, then returns full result unchanged", () => {});
+});
+
+describe("extract — convention parity with validate", () => {
+  it("given extract --verbose and validate --verbose, when invoked, then both flags accept same shape (no value, boolean toggle)", () => {});
+});
+```
+
+**Delta coverage:** 12 assertions covering: 3 commands × 2 modes + formatter unit + convention parity.
+
+### 8f. BDD Assertions — D5 Help Text (Modifications)
+
+%% *Last Modified: 05/01/26 18:59:12* %%
+
+**Feature:** `--scope` help text documents inference algorithm. **BI Coverage:** Rows 1, 2.
+
+```typescript
+describe("CLI help — extract file --help", () => {
+  it("given user runs jact extract file --help, when output captured, then contains 'Defaults to nearest ancestor' phrase", () => {});
+  it("given help output, when inspected, then mentions both '.git' and 'package.json' marker names", () => {});
+  it("given help output, when inspected, then mentions target file walk-up fallback", () => {});
+  it("given help output, when inspected, then states 'Required only when neither cwd nor target reveal a project root'", () => {});
+});
+
+describe("CLI help — extract header / extract links", () => {
+  it("given each extract subcommand --help, when output captured, then --scope help text matches extract file (consistent across all 3)", () => {});
+});
+```
+
+**Delta coverage:** 5 assertions covering algorithm documentation + 3-way consistency.
+
+### 8g. BDD Assertions — D7 Smart Error Stack (Additions)
+
+%% *Last Modified: 05/01/26 18:59:12* %%
+
+**Feature:** M1 not-found, M2 duplicate, M3 no-scope error formats. **BI Coverage:** Rows 1, 2, 5.
+
+```typescript
+describe("M1 — not-found error format", () => {
+  it("given filename not in entries, when resolveFile fails, then error message contains 'not found in scope=<path>'", () => {});
+  it("given not-found failure, when error inspected, then message contains 'source: <enum-value>' (one of: explicit|cwd-git|cwd-pkg|target-git|target-pkg)", () => {});
+  it("given not-found + similar names exist, when error inspected, then 'Did you mean:' line lists top-3 nearMisses", () => {});
+  it("given not-found + zero names within distance ≤2, when error inspected, then 'Did you mean:' line is omitted (or empty)", () => {});
+});
+
+describe("M2 — duplicate error format", () => {
+  it("given filename matches 2 paths in scope, when resolveFile fails, then error states 'matched 2 files in scope=<path>'", () => {});
+  it("given duplicate failure, when error inspected, then every candidate path printed on its own indented line", () => {});
+  it("given duplicate failure, when error inspected, then trailing line reads 'Pass --scope to narrow.'", () => {});
+  it("given duplicate failure, when error inspected, then message contains source: <enum-value>", () => {});
+});
+
+describe("M3 — no-scope error format", () => {
+  it("given resolveScope returns source: 'none', when caller throws, then error message starts 'cannot resolve scope'", () => {});
+  it("given M3 error, when inspected, then message enumerates each fallback tried (cwd .git, cwd package.json, targetFile walk-up)", () => {});
+  it("given M3 error, when inspected, then ends with actionable suggestion 'Pass --scope <dir>'", () => {});
+  it("given M3 error and no targetFile provided, when inspected, then notes 'no targetFile' explicitly", () => {});
+});
+
+describe("findNearMisses — Levenshtein top-3 distance ≤2", () => {
+  it("given filename 'foo.md' and entries containing 'fooo.md', when findNearMisses called, then returns ['fooo.md'] (distance 1)", () => {});
+  it("given filename 'foo.md' and entries containing 'bar.md', when findNearMisses called, then returns [] (distance > 2)", () => {});
+  it("given 5 candidates within distance ≤2, when findNearMisses called, then returns exactly 3 sorted by ascending distance", () => {});
+  it("given empty entries map, when findNearMisses called, then returns []", () => {});
+  it("given filename matching no entry exactly, when findNearMisses called, then result excludes exact match (none exist)", () => {});
+  it("given identical-distance candidates, when findNearMisses called, then ordering is stable (insertion order from Map.keys())", () => {});
+});
+
+describe("D7 — diagnostics never on success path", () => {
+  it("given successful resolveFile, when stdout captured, then no scope=, source=, nearMisses output (zero diagnostic noise)", () => {});
+  it("given successful extract, when stderr captured, then empty (diagnostics gated to failure path)", () => {});
+});
+```
+
+**Delta coverage:** 19 assertions covering 3 error modes + Levenshtein helper + success-path silence invariant.
+
+### 8h. Delta-to-Ideal-Outcome Coverage Map
+
+%% *Last Modified: 05/01/26 18:59:12* %%
+
+| BI Row | Ideal [O] | Verifying Assertions | Test Sections |
+|---|---|---|---|
+| 1 | User resolves by name w/o declaring root | `extract file given cwd inside jact repo and no --scope...` ; `resolveScope cwd-git/cwd-pkg branches` ; `D5 help text discoverability` | §8b cwd walk-up, §8d call-site default, §8f help |
+| 2 | Agent resolves by name w/o rebuilding root | Same set as Row 1 + `D6 doc examples updated` (manual) | §8b, §8d, §8f |
+| 3 | User gets only content asked for by default | `extract file no --verbose...minimal` ; `--verbose superset` ; `formatExtractResult minimal mode` | §8e all |
+| 4 | Natural-root rule retires | `D6 jact/CLAUDE.md examples updated` (manual review) ; `resolveScope source enum complete` | §8b purity + manual D6 |
+| 5 | Actionable disambiguation on multi-match | `entries Map<string, string[]>` ; `M2 duplicate error lists every candidate` ; `candidates preserves scan order` | §8c, §8g M2 |
+| 1+5 cross | Failures self-diagnose without new flag | M1/M2/M3 full set + `D7 success-path silence invariant` | §8g all |
+
+### 8i. Delta Coverage Verification
+
+%% *Last Modified: 05/01/26 18:59:12* %%
+
+- **D1 (ADD):** 12 assertions — branches ①-⑤ + purity ✓
+- **D2 (MODIFY):** 11 assertions — data shape + append + API change ✓
+- **D3 (MODIFY):** 8 assertions — 3 call sites + tech debt + fail-fast ✓
+- **D4 (MODIFY+ADD):** 12 assertions — 3 commands × 2 modes + formatter ✓
+- **D5 (MODIFY):** 5 assertions — algorithm doc + 3-way consistency ✓
+- **D6 (DOC):** Manual review — no automated test ✓
+- **D7 (ADD):** 19 assertions — M1/M2/M3 + Levenshtein + silence invariant ✓
+
+**Total: 67 BDD assertions across 7 deltas. All 5 BI ideal outcomes covered. All additions and modifications mapped.**
+
+### 8j. Self-Checks [§8]
+
+%% *Last Modified: 05/01/26 18:59:12* %%
+
+- Every Delta has at least one BDD assertion (or explicit DOC marker for D6) ✓
+- Every BI Row 1-5 ideal has ≥2 verifying assertions in §8h ✓
+- Assertions describe observable behavior (CLI output, return values, error messages) — not implementation internals ✓
+- Each assertion follows Given/When/Then BDD form ✓
+- Edge cases included: empty entries, zero near-misses, identical-distance ordering, success-path silence ✓
+- Anti-patterns avoided: no snapshot-only tests, no assertion-free `toBeDefined()`, no Cartesian explosion (each dimension touched once) ✓
 
