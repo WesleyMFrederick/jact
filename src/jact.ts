@@ -152,15 +152,7 @@ export class JactCli {
 			...(targetFile !== undefined && { targetFile }),
 		});
 		if (resolved.source === "none") {
-			const triedParts: string[] = [
-				"cwd .git (none)",
-				"cwd package.json (none)",
-			];
-			triedParts.push(
-				targetFile !== undefined
-					? "targetFile walk-up (no markers found)"
-					: "targetFile walk-up (no targetFile)",
-			);
+			const triedParts = resolved.triedFallbacks ?? [];
 			throw new Error(
 				`cannot resolve scope. Tried: ${triedParts.join(", ")}. Pass --scope <dir>.`,
 			);

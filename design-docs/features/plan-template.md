@@ -11,7 +11,10 @@ Whiteboard: `openspec/changes/{{change-id}}/workflows/{{workflow-name}}/whiteboa
 ## Baseline Tracing Guide (for dev agent)
 
 ### Folder map
-```
+
+%% *Last Modified: 05/01/26 22:18:59* %%
+
+```text
 src/
   {{domain}}/
     {{file}}.ts     ← REMOVING / REUSE / UNTOUCHED — one-line reason
@@ -20,7 +23,9 @@ data-{{output-dir}}/  ← output target
 
 ### LSP commands to run before coding
 
-```
+%% *Last Modified: 05/01/26 22:18:59* %%
+
+```text
 # Confirm callers of every function being created/deleted/moved
 LSP findReferences: {{file}}:{{line}} ({{functionName}})
 

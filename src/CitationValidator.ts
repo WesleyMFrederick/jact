@@ -556,7 +556,7 @@ export class CitationValidator {
 						citation,
 						"error",
 						`File not found: ${citation.target.path.raw}`,
-						`${cacheResult.message ?? ""}. ${debugInfo}`,
+						`${cacheResult.message ?? ""} ${debugInfo}`,
 					);
 				}
 				if (cacheResult.reason === "not_found") {
@@ -564,7 +564,7 @@ export class CitationValidator {
 						citation,
 						"error",
 						`File not found: ${citation.target.path.raw}`,
-						`${cacheResult.message ?? ""}. ${debugInfo}`,
+						`${cacheResult.message ?? ""} ${debugInfo}`,
 					);
 				}
 			}

@@ -622,7 +622,7 @@ export type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
 
 ## Verification
 
-%% *Last Modified: 05/01/26 22:04:20* %%
+%% *Last Modified: 05/01/26 22:19:05* %%
 
 ```bash
 # 1. RED → GREEN per file (TDD): run each new test, watch fail, implement, watch pass
@@ -645,7 +645,7 @@ npm test
 #    Run via IDE / language-server; expected output: 0 diagnostics in src/jact.ts L645-813
 
 # 5. Manual smoke tests — verify each delta from a real cwd
-cd /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact
+cd "$(git rev-parse --show-toplevel)"
 
 # D1+D3: in-repo extract w/o --scope
 jact extract file CLAUDE.md
@@ -697,20 +697,20 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ## Phased Task Sequence
 
-%% *Last Modified: 05/01/26 19:31:55* %%
+%% *Last Modified: 05/01/26 22:19:11* %%
 
 **Agents:** `delta-implementer` (coder, sonnet) · `delta-reviewer` (reviewer, opus) · `bi-row-verifier` (verifier, opus)
-**Plan file:** `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/20260501-extract-smart-default-scope/implementation-plan.md`
+**Plan file:** `<repo-root>/design-docs/features/20260501-extract-smart-default-scope/implementation-plan.md`
 
 #### Agents
 
-%% *Last Modified: 05/01/26 18:36:07* %%
+%% *Last Modified: 05/01/26 22:19:19* %%
 
 | Role              | Source                 | Model  | Path                                                                              | Adaptation                                                             |
 | ----------------- | ---------------------- | ------ | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | Delta Implementer | `coder` general agent  | sonnet |                                                                                   | Constrained to executing locked plan §7; no architecture re-litigation |
-| Delta Reviewer    | `forge:reviewer` agent | opus   | /Users/wesleyfrederick/.claude/plugins/cache/forge/forge/1.0.0/agents/reviewer.md | Direct reuse; review criteria = Plan §7a/§7b + arch principles         |
-| BI-Row Verifier   | `forge:verifier` agent | opus   | /Users/wesleyfrederick/.claude/plugins/cache/forge/forge/1.0.0/agents/verifier.md | Direct reuse; acceptance criteria = §7e Validation Table               |
+| Delta Reviewer    | `forge:reviewer` agent | opus   | `<claude-plugins>/cache/forge/forge/1.0.0/agents/reviewer.md`                     | Direct reuse; review criteria = Plan §7a/§7b + arch principles         |
+| BI-Row Verifier   | `forge:verifier` agent | opus   | `<claude-plugins>/cache/forge/forge/1.0.0/agents/verifier.md`                     | Direct reuse; acceptance criteria = §7e Validation Table               |
 
 
 #### Escalation Policy

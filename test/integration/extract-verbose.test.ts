@@ -17,10 +17,9 @@ const __dirname = dirname(__filename);
 const CLI_PATH = join(__dirname, "../../dist/jact.js");
 const JACT_ROOT = join(__dirname, "../..");
 const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");
-const PLAN_MD = join(
-	JACT_ROOT,
-	"design-docs/features/20260501-extract-smart-default-scope/implementation-plan.md",
-);
+// Stable fixture (not a transient feature doc) — file under test/fixtures/ is
+// guaranteed to persist beyond any single feature's lifecycle.
+const PLAN_MD = join(JACT_ROOT, "test/fixtures/extract-verbose-fixture.md");
 
 describe("extract file — output mode default", () => {
 	it("given no --verbose flag, when extract file runs, then output has only extractedContentBlocks key", async () => {

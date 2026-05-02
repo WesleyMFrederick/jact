@@ -98,14 +98,9 @@ describe("resolveScope — cwd marker walk-up", () => {
 
 describe("resolveScope — targetFile fallback", () => {
 	it("all-false fs returns 'none' even with targetFile", () => {
-		// Mock fs so cwd walk-up finds nothing; real fs for targetFile
-		const neverFinds = {
-			existsSync: (p: string) =>
-				p.startsWith(gitRoot) || p === path.join(gitRoot, ".git"),
-		} as unknown as typeof import("fs");
-
 		// Use a fresh empty cwd (no .git / package.json hierarchy)
 		const isolatedCwd = mkdtemp();
+		// Mock fs always returns false: applies to cwd walk-up AND targetFile walk-up
 		const mockNoMarkers = {
 			existsSync: () => false,
 		} as unknown as typeof import("fs");
@@ -113,11 +108,8 @@ describe("resolveScope — targetFile fallback", () => {
 		const result = resolveScope({
 			cwd: isolatedCwd,
 			targetFile: path.join(gitRoot, "README.md"),
-			fs: mockNoMarkers, // cwd walk-up finds nothing
+			fs: mockNoMarkers,
 		});
-		// With mocked fs always false, falls through to targetFile walk-up which uses real fs
-		// Actually: mock affects entire function — need different approach
-		void neverFinds; // unused, see alternate approach below
 		expect(result.source).toBe("none"); // mock always returns false for everything
 	});
 
