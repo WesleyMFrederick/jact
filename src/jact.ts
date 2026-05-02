@@ -35,6 +35,8 @@ import {
 	type NestedCodeblockWarning,
 } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import type { MarkdownParser } from "./core/MarkdownParser/index.js";
+import type { ScopeResolution } from "./core/resolveScope.js";
+import { resolveScope } from "./core/resolveScope.js";
 import type { FileCache } from "./FileCache.js";
 import {
 	createCitationValidator,
@@ -137,6 +139,38 @@ export class JactCli {
 		this.contentExtractor = createContentExtractor(
 			this.parsedFileCache, // Share cache with validator
 		);
+	}
+
+	/**
+	 * D3: Centralized scope resolution + cache build.
+	 * Replaces 3× scattered `if (options.scope) buildCache(scope)` blocks.
+	 * Throws M3 error if scope cannot be resolved (source: 'none').
+	 */
+	private applyScope(
+		options: { scope?: string },
+		targetFile?: string,
+	): ScopeResolution {
+		const resolved = resolveScope({
+			...(options.scope !== undefined && { explicit: options.scope }),
+			cwd: process.cwd(),
+			...(targetFile !== undefined && { targetFile }),
+		});
+		if (resolved.source === "none") {
+			const triedParts: string[] = [
+				"cwd .git (none)",
+				"cwd package.json (none)",
+			];
+			triedParts.push(
+				targetFile !== undefined
+					? "targetFile walk-up (no markers found)"
+					: "targetFile walk-up (no targetFile)",
+			);
+			throw new Error(
+				`cannot resolve scope. Tried: ${triedParts.join(", ")}. Pass --scope <dir>.`,
+			);
+		}
+		this.fileCache.buildCache(resolved.scope, false, resolved);
+		return resolved;
 	}
 
 	/**
@@ -557,10 +591,8 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<void> {
 		try {
-			// Decision: Build file cache if --scope provided
-			if (options.scope) {
-				this.fileCache.buildCache(options.scope);
-			}
+			// D3: auto-infer scope from cwd/.git/package.json; throws M3 if unresolvable
+			this.applyScope(options, sourceFile);
 
 			// Phase 1: Link Discovery & Validation
 			// Pattern: Delegate to validator for link discovery and enrichment
@@ -648,10 +680,8 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
-			// Decision: Build file cache if --scope provided
-			if (options.scope) {
-				await this.fileCache.buildCache(options.scope);
-			}
+			// D3: auto-infer scope from cwd/.git/package.json; throws M3 if unresolvable
+			this.applyScope(options, targetFile);
 
 			// --- Phase 1: Synthetic Link Creation ---
 			// Pattern: Use factory to create unvalidated LinkObject from CLI parameters
@@ -740,10 +770,8 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
-			// Decision: Build file cache if --scope provided
-			if (options.scope) {
-				await this.fileCache.buildCache(options.scope);
-			}
+			// D3: auto-infer scope from cwd/.git/package.json; throws M3 if unresolvable
+			this.applyScope(options, targetFile);
 
 			// --- Phase 1: Synthetic Link Creation ---
 			// Pattern: Use factory to create unvalidated LinkObject for full file

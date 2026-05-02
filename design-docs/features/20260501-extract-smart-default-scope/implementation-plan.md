@@ -793,38 +793,41 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ### Phase 2 — Core Build: applyScope + Smart Errors (D3 + D7) `delta-implementer` (sonnet)
 
-%% *Last Modified: 05/01/26 19:31:55* %%
+%% *Last Modified: 05/01/26 20:56:49* %%
 
-- [ ] **2.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches Phase 1.C end_hash.
+- [x] **2.0** STATE-READ: `git rev-parse HEAD` → `start_hash: 83d799cc7a9641b771a7b5311579aa8d2dcd557d`. One commit past Phase 1.C end_hash `56c4501` (plan update commit `83d799c` — acceptable).
 
 **D7 helper — `findNearMisses` module export (TDD first, consumed by D7 errors):**
 
-- [ ] **2.1** RED: Create `test/unit/findNearMisses.test.ts` per plan §File Changes (6 assertions: Levenshtein top-3 distance ≤2, stable sort).
-- [ ] **2.2** VERIFY: `npx vitest run test/unit/findNearMisses.test.ts` — RED confirmed.
-- [ ] **2.3** GREEN: Add module-level `export function findNearMisses(name, entries, k=3, maxDist=2)` to `src/FileCache.ts` per plan §MODIFIED. Stable sort: ties preserve Map insertion order.
-- [ ] **2.4** VERIFY: `npx vitest run test/unit/findNearMisses.test.ts` — GREEN confirmed.
+- [x] **2.1** RED: Created `test/unit/findNearMisses.test.ts` — 6 BDD assertions per §8g.
+- [x] **2.2** VERIFY: DEVIATION — tests went GREEN immediately (not RED). `findNearMisses` already implemented in Phase 1 (P1-4 deviation). Expected RED, got 6/6 GREEN.
+- [x] **2.3** GREEN: NO-OP — `findNearMisses` module export already exists in `src/FileCache.ts` from Phase 1. Verified presence.
+- [x] **2.4** VERIFY: 6/6 GREEN confirmed.
 
 **D7 errors — M1/M2 in `resolveFile()` (TDD):**
 
-- [ ] **2.5** RED: Create `test/unit/FileCache.errors.test.ts` per plan §File Changes (8 assertions: M1 not-found w/ scope/source/nearMisses; M2 duplicate w/ candidates/Pass --scope hint).
-- [ ] **2.6** VERIFY: `npx vitest run test/unit/FileCache.errors.test.ts` — RED confirmed.
-- [ ] **2.7** GREEN: Enrich `resolveFile()` failure paths in `src/FileCache.ts`: populate `candidates` on duplicate (read directly from `entries.get(filename)`), populate `nearMisses` on not_found via `findNearMisses()`. Format M1/M2 messages per design §8g.
-- [ ] **2.8** VERIFY: `npx vitest run test/unit/FileCache.errors.test.ts` — GREEN confirmed.
+- [x] **2.5** RED: Created `test/unit/FileCache.errors.test.ts` — 8 BDD assertions (M1 ×4, M2 ×4). RED confirmed: 7/8 failing (scope param not yet on buildCache; message format wrong).
+- [x] **2.6** VERIFY: RED confirmed — 7 failing, 1 passing.
+- [x] **2.7** GREEN: Added `private scope: ScopeResolution | undefined` field + optional `scope?` param to `buildCache`. Extracted `buildDuplicateFailure` + `buildNotFoundFailure` private helpers. M1 message: `'<name>' not found in scope=<path> (source: <src>)[. Did you mean: ...]`. M2 message: `'<name>' matched N files in scope=<path> (source: <src>):\n  <paths>\nPass --scope to narrow.` `nearMisses` populated via `findNearMisses()`.
+- [x] **2.8** VERIFY: 8/8 GREEN confirmed.
 
 **D3 — `applyScope` helper + tech debt collapse (TDD):**
 
-- [ ] **2.9** RED: Create `test/integration/extract-default-scope.test.ts` per plan §File Changes (8 assertions: cwd-in-repo no flag, explicit wins, target walk-up, M3 fail, applyScope unification, no spurious await).
-- [ ] **2.10** VERIFY: `npx vitest run test/integration/extract-default-scope.test.ts` — RED confirmed.
-- [ ] **2.11** GREEN: Add private `applyScope(options, targetFile?)` to `JactCli` in `src/jact.ts` per plan §MODIFIED. Throws M3 error on `source: 'none'` (formatted per design §8g M3). Calls `this.fileCache.buildCache(resolved.scope)`. Returns `ScopeResolution` for caller error enrichment.
-- [ ] **2.12** GREEN: Replace 3× scattered `if (options.scope) { ... buildCache(...) }` blocks in `extractLinks` (L555), `extractHeader` (L645), `extractFile` (L738) with single `const scope = this.applyScope(options, sourceFile);` call. **Remove spurious `await`** at L653 + L745 (TS80007 tech debt).
-- [ ] **2.13** GREEN: Wire `scope` from `applyScope()` into error rendering paths so D7 M1/M2 errors carry `ResolveResultFailure.scope` field.
-- [ ] **2.14** VERIFY: `npx vitest run test/integration/extract-default-scope.test.ts` — GREEN confirmed.
+- [x] **2.9** RED: Created `test/integration/extract-default-scope.test.ts` — 9 assertions (plan said 8; +1 for extract-links variant). RED: 5 failing (M3, source inspection ×3, extract-links exit-code).
+- [x] **2.10** VERIFY: RED confirmed — 5 failing, 4 passing.
+- [x] **2.11** GREEN: Added `private applyScope(options, targetFile?)` to `JactCli`. Resolves scope via `resolveScope()`, throws M3 error on `source: 'none'`, calls `this.fileCache.buildCache(resolved.scope, false, resolved)`, returns `ScopeResolution`.
+- [x] **2.12** GREEN: Replaced all 3 `if (options.scope) { ... buildCache(...) }` blocks with `this.applyScope(options, sourceFile/targetFile)`. Removed spurious `await` at extractHeader (L655) + extractFile (L747) — TS80007 cleared.
+- [x] **2.13** GREEN: Scope wired via `buildCache(scope, false, resolved)` — `FileCache.scope` field set, consumed by `resolveFile()` failure paths automatically. No extra wiring needed.
+- [x] **2.14** VERIFY: 9/9 GREEN confirmed (after fixing extract-links test to accept exit-code 1).
 
 **Phase 2 guardrails:**
 
-- [ ] **2.15** VERIFY: `npm run build` — TypeScript clean. **Confirm zero TS80007 diagnostics in `src/jact.ts:645-813`**.
-- [ ] **2.16** VERIFY: `npm test` — full suite, no regressions.
-- [ ] **2.S** STATE-WRITE: Update plan checkboxes, note deviations
+- [x] **2.15** VERIFY: `npm run build` — TypeScript clean. Zero TS80007 diagnostics confirmed (no `await this.fileCache.buildCache` remains).
+- [x] **2.16** VERIFY: `npm test` — 83 files, 483 tests, zero regressions. (+23 new tests over Phase 1 baseline of 460).
+- [x] **2.S** STATE-WRITE: Deviations:
+  - DEVIATION P2-1: `buildCache` now accepts optional 3rd param `scope?: ScopeResolution` (stored as instance field) instead of `resolveFile(filename, scope?)` parameter approach. Cleaner: wires scope through FileCache without touching CitationValidator.
+  - DEVIATION P2-2: `extract-default-scope.test.ts` has 9 assertions (plan said 8) — extra assertion for extract-links exit-code-1 handling.
+  - DEVIATION P2-3: extract-links test accepts exit code 1 (no links found) as valid success — not a scope error. Test updated to distinguish exit 1 from exit 2.
 - [ ] **2.C** COMMIT: Commit Phase 2 — "feat(scope): D3 applyScope helper + D7 smart error stack (M1/M2/M3)". `git rev-parse HEAD` → `end_hash: <hash>`
 
 #### REVIEW GATE 1 `delta-reviewer` (opus)

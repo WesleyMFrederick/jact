@@ -1,3 +1,4 @@
+import type { ScopeResolution } from "./core/resolveScope.js";
 import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
 
 interface FileEntry {
@@ -38,6 +39,7 @@ export class FileCache {
 	private fs: typeof import("fs");
 	private path: typeof import("path");
 	private entries: Map<string, string[]>; // filename -> all paths in scan order
+	private scope: ScopeResolution | undefined = undefined; // set by buildCache; used by resolveFile for D7 error messages
 
 	/**
 	 * Initialize cache with file system and path dependencies
@@ -64,8 +66,13 @@ export class FileCache {
 	 * @param {string} scopeFolder - Root folder to scan (can be symlink, will be resolved)
 	 * @returns {Object} Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
-	buildCache(scopeFolder: string, verbose = false): CacheStats {
+	buildCache(
+		scopeFolder: string,
+		verbose = false,
+		scope?: ScopeResolution,
+	): CacheStats {
 		this.entries.clear();
+		this.scope = scope;
 
 		const absoluteScopeFolder = this.path.resolve(scopeFolder);
 		let targetScanFolder: string;
@@ -149,21 +156,12 @@ export class FileCache {
 		const arr = this.entries.get(filename);
 		if (arr !== undefined) {
 			if (arr.length > 1) {
-				return {
-					found: false,
-					reason: "duplicate",
-					candidates: arr,
-					message: `Multiple files named "${filename}" found in scope. Use relative path for disambiguation.`,
-				};
+				return this.buildDuplicateFailure(filename, arr);
 			}
 			// arr.length === 1 guaranteed (addToCache always pushes at least one)
 			const resolvedPath = arr[0];
 			if (resolvedPath === undefined) {
-				return {
-					found: false,
-					reason: "not_found",
-					message: `File not found: ${filename}`,
-				};
+				return this.buildNotFoundFailure(filename);
 			}
 			return { found: true, path: resolvedPath };
 		}
@@ -175,20 +173,11 @@ export class FileCache {
 		const arrExt = this.entries.get(withMdExt);
 		if (arrExt !== undefined) {
 			if (arrExt.length > 1) {
-				return {
-					found: false,
-					reason: "duplicate",
-					candidates: arrExt,
-					message: `Multiple files named "${withMdExt}" found in scope. Use relative path for disambiguation.`,
-				};
+				return this.buildDuplicateFailure(withMdExt, arrExt);
 			}
 			const resolvedPathExt = arrExt[0];
 			if (resolvedPathExt === undefined) {
-				return {
-					found: false,
-					reason: "not_found",
-					message: `File not found: ${withMdExt}`,
-				};
+				return this.buildNotFoundFailure(withMdExt);
 			}
 			return { found: true, path: resolvedPathExt };
 		}
@@ -199,10 +188,42 @@ export class FileCache {
 			return fuzzyMatch;
 		}
 
+		return this.buildNotFoundFailure(filename);
+	}
+
+	private buildDuplicateFailure(
+		filename: string,
+		paths: string[],
+	): import("./types/fileCacheTypes.js").ResolveResultFailure {
+		const scopeStr = this.scope
+			? ` in scope=${this.scope.scope} (source: ${this.scope.source})`
+			: "";
+		const candidateLines = paths.map((p) => `  ${p}`).join("\n");
+		const message = `'${filename}' matched ${paths.length} files${scopeStr}:\n${candidateLines}\nPass --scope to narrow.`;
+		return {
+			found: false,
+			reason: "duplicate",
+			candidates: paths,
+			...(this.scope !== undefined && { scope: this.scope }),
+			message,
+		};
+	}
+
+	private buildNotFoundFailure(
+		filename: string,
+	): import("./types/fileCacheTypes.js").ResolveResultFailure {
+		const nearMisses = findNearMisses(filename, this.entries);
+		const scopeStr = this.scope
+			? `'${filename}' not found in scope=${this.scope.scope} (source: ${this.scope.source}).`
+			: `File "${filename}" not found in scope folder.`;
+		const didYouMean =
+			nearMisses.length > 0 ? ` Did you mean: ${nearMisses.join(", ")}?` : "";
 		return {
 			found: false,
 			reason: "not_found",
-			message: `File "${filename}" not found in scope folder.`,
+			...(nearMisses.length > 0 && { nearMisses }),
+			...(this.scope !== undefined && { scope: this.scope }),
+			message: `${scopeStr}${didYouMean}`,
 		};
 	}
 
