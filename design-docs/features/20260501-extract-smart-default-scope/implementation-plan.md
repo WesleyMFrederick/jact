@@ -1035,7 +1035,7 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
 
 ##### Phase 5 Verdict — REJECTED (recorded 05/01/26 by `bi-row-verifier` opus)
 
-%% *Last Modified: 05/01/26 21:33:16* %%
+%% *Last Modified: 05/01/26 22:06:09* %%
 
 **Diff range verified:** `c0b3fb6ee87f2ae77a06296fab601fad2a191465..538e5c92713ceb5be12e88935e8826543c459881` (Phase 3 end → Phase 4 commits + plan checkpoint). No Phase 5 code changes.
 
@@ -1074,8 +1074,8 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
   - **P-4** — `tsc --noEmit` clean across the repo, not just at the 3 expected lines. The Phase 2 tech-debt fix (TS80007 cleanup) appears robust to subsequent line-number drift.
 
 **Deviations from plan:**
-- **DEV-1** (5.14): Exit 2 instead of plan's exit 1 — accepted (matches project convention).
-- **DEV-2** (5.15): D7 M1 wiring incomplete — see B-1 above.
+- **DEV-1** (5.14): Exit 2 instead of plan's exit 1 — **RESOLVED 05/01/26**: plan text at L670 updated to "exit 2" with `jact/CLAUDE.md §Exit Codes` citation. Code was correct; doc drift closed.
+- **DEV-2** (5.15): D7 M1 wiring incomplete — **RESOLVED at commit `dfbb38f`** (see B-1 Fix block below). `CitationValidator.ts:567` now forwards `cacheResult.message`; integration test added; round-2 verifier APPROVED.
 - **DEV-3** (test-count overshoots): all individual suites have more tests than plan minimums (no failures, just denser coverage). Recorded as positive.
 
 **Disposition:** **REJECTED**. Single blocker (B-1) must be resolved before this branch ships. After fix:
