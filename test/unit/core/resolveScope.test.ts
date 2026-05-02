@@ -97,7 +97,7 @@ describe("resolveScope — cwd marker walk-up", () => {
 });
 
 describe("resolveScope — targetFile fallback", () => {
-	it("no cwd markers: resolves from targetFile dir .git", () => {
+	it("all-false fs returns 'none' even with targetFile", () => {
 		// Mock fs so cwd walk-up finds nothing; real fs for targetFile
 		const neverFinds = {
 			existsSync: (p: string) =>

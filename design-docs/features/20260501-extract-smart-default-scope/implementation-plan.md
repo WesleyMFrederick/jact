@@ -848,6 +848,42 @@ grep -c "\\-\\-scope " jact/CLAUDE.md
   - Verify: G3 `findNearMisses` is module-level export (not private method)
   - **Verdict:** SHIP → proceed to Phase 3. NO-SHIP → escalation policy applies.
 
+##### Gate 1 Verdict — SHIP (recorded 05/02/26 by `delta-reviewer` opus)
+
+%% *Last Modified: 05/01/26 21:04:14* %%
+
+**Diff range reviewed:** `c8b11daf544f708e81b63d8cea8421e51f9e6c52..9f5dd729a1041be02655871dee70acc3d607fab7` (Phase 0 → Phase 2 end).
+
+**Verification checklist results:**
+
+| Item | Result | Evidence |
+|---|---|---|
+| §7a/§7b spec adherence | ✅ | D1 algorithm ①→⑥, D2 entries Map, D3 helper, D7 M1/M2/M3 — all as written |
+| D2 backward compat | ✅ | `CitationValidator.FileCacheInterface` (L32-45) structural shape preserved; `ParsedFileCache` untouched; success path returns `{found: true, path}` |
+| D1 purity | ✅ | Only `fs.existsSync` (`resolveScope.ts:76`); `fs` injectable (L31); deterministic (test L165-184) |
+| D3 collapses 3→1 | ✅ | `jact.ts:595, 684, 774` all call `this.applyScope`; `await` removed (test enforces no `await this.fileCache.buildCache`) |
+| D7 message formats | ✅ | M1 (`FileCache.ts:217-227`), M2 (`FileCache.ts:198-209`), M3 (`jact.ts:163-171`) match §8g spec |
+| G1 type location | ✅ | `ResolveResult*` lives in `src/types/fileCacheTypes.ts` (header comment confirms migration intent) |
+| G3 findNearMisses export | ✅ | Module-level export at `FileCache.ts:396-416` |
+
+**Findings (severity-classified):**
+
+- **Blocking:** None.
+- **Major:** None.
+- **Minor M-1** — `test/unit/core/resolveScope.test.ts:100-122` is dead/misleading. Title says "no cwd markers: resolves from targetFile dir .git" but `mockNoMarkers` returns false for everything, so it asserts `source === 'none'` not `'target-git'`. Author noted issue inline. Next test (L124-139) covers the actual case. Fix: delete L100-122 OR rename to "all-false fs returns 'none' even with targetFile". → **Routed to Phase 3 cleanup**
+- **Minor M-2** — `applyScope` in `jact.ts` returns `ScopeResolution` but all 3 call sites ignore it. Fix: change return type to `void` for honesty. → **Routed to Phase 3 cleanup**
+- **Nitpick N-1** — `applyScope` M3 string says `"targetFile walk-up (no markers found)"` rather than spec's `"targetFile walk-up (no targetFile)"`. Implementation more informative than spec — keep as-is.
+- **Nitpick N-2** — `validate`/`fix` retain old `if (options.scope) buildCache(...)`. Confirmed in scope: plan §7a row D3 cites only the 3 extract methods. Not a finding; surfacing for transparency.
+
+**Phase 1+2 deviations verified clean:**
+- P1-1 (stub resolveScope.ts): Resolved — full implementation in 1.8.
+- P1-3 (test counts 12/13 vs 11/12): Net positive coverage, no spec gaps.
+- P2-1 (scope as FileCache instance field): Cleaner than threading through `resolveFile()`. CitationValidator unchanged (consumes structural interface). M1/M2 messages carry scope correctly via `this.scope` field (`FileCache.ts:75`).
+- P2-2 (9 vs 8 assertions): Extra assertion for extract-links exit-code-1 handling.
+- P2-3 (findNearMisses landed in Phase 1 P1-2): Module export confirmed at `FileCache.ts:396-416`. Stable sort, distance ≤2, top-k, excludes exact match.
+
+**Disposition:** SHIP. M-1 + M-2 routed to Phase 3 cleanup (non-blocking).
+
 ### Phase 3 — CLI Surface: --verbose + Help Text (D4 + D5) `delta-implementer` (sonnet)
 
 %% *Last Modified: 05/01/26 19:31:55* %%
