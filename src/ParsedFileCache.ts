@@ -1,7 +1,7 @@
 import { normalize, resolve } from "node:path";
+import type { MarkdownParser } from "./core/MarkdownParser/index.js";
 import ParsedDocument from "./ParsedDocument.js";
 import type { ParserOutput } from "./types/citationTypes.js";
-import type { MarkdownParser } from "./core/MarkdownParser/index.js";
 
 /**
  * Promise-based cache for parsed markdown files
@@ -34,6 +34,11 @@ export class ParsedFileCache {
 	constructor(markdownParser: MarkdownParser) {
 		this.parser = markdownParser;
 		this.cache = new Map<string, Promise<ParsedDocument>>();
+	}
+
+	/** Delegate FileCache update to the embedded parser. Allows factories to share the scope-seeded cache. */
+	syncParserFileCache(fc: import("./FileCache.js").FileCache): void {
+		this.parser.setFileCache(fc);
 	}
 
 	/**

@@ -1,3 +1,5 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
+
 # Task 4 Re-Review Results: Token-First Extraction (#28)
 
 **Reviewer Model:** Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)

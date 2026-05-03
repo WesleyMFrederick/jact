@@ -145,7 +145,9 @@ describe("Enhanced Citation Pattern Tests", () => {
 			c.fullMatch.includes("../fixtures"),
 		);
 		if (dirReference) {
-			expect(dirReference.validation.status).toBe("error");
+			// D1 grammar change: extractWikilinks replaced extractWikiCrossDocLinks/extractWikiInternalLinks;
+			// directory path warnings come from CitationValidator.isFile() check, not the grammar itself.
+			expect(dirReference.validation.status).toBe("warning");
 		}
 		// If directory reference not detected, that's acceptable - just verify other validations work
 	});

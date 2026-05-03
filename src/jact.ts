@@ -22,7 +22,7 @@
  * @module jact
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { Command, Option } from "commander";
 import type { CitationValidator } from "./CitationValidator.js";
 import {
@@ -165,9 +165,43 @@ export class JactCli {
 	/**
 	 * Parse a markdown file and return its full AST with extracted metadata.
 	 * Used by the `ast` CLI command to expose parser internals for debugging.
+	 *
+	 * Applies smart-default-scope resolution (cwd-git → cwd-pkg → target-git
+	 * → target-pkg → none) so the same `--scope` ergonomics from the extract
+	 * subcommands work here. Bare filenames that don't exist as a literal
+	 * path are resolved via FileCache; M1 (not-found + Did-you-mean), M2
+	 * (ambiguous), and M3 (no scope) failures surface through the same
+	 * `cacheResult.message` text the extract commands emit.
+	 *
+	 * @param filePath - Path to markdown file (absolute, relative, or bare filename)
+	 * @param options - Resolution options
+	 * @param options.scope - Explicit scope override (skips inference)
+	 * @returns Parsed file AST + metadata
+	 * @throws Error with optional `.suggestion` property when file cannot be resolved
 	 */
-	async getAst(filePath: string): Promise<ParserOutput> {
-		return this.parser.parseFile(filePath);
+	async getAst(
+		filePath: string,
+		options: { scope?: string } = {},
+	): Promise<ParserOutput> {
+		this.applyScope(options, filePath);
+
+		const { resolve, basename } = await import("node:path");
+		const absolute = resolve(filePath);
+
+		if (existsSync(absolute)) {
+			return this.parser.parseFile(absolute);
+		}
+
+		const cacheResult = this.fileCache.resolveFile(basename(filePath));
+		if (cacheResult.found) {
+			return this.parser.parseFile(cacheResult.path);
+		}
+
+		// M1/M2: cacheResult.message already contains "matched N files… Pass --scope to narrow."
+		// or "not found in scope=… Did you mean: X?" text built by FileCache.
+		const err = new Error(`File not found: ${absolute}`);
+		(err as Error & { suggestion?: string }).suggestion = cacheResult.message;
+		throw err;
 	}
 
 	/**
@@ -1262,10 +1296,17 @@ Exit Codes:
 		}
 	});
 
+// Shared option descriptions — kept in one place so wording stays consistent across subcommands
+const SCOPE_OPTION_DESCRIPTION =
+	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
+const VERBOSE_OPTION_DESCRIPTION =
+	"Include outgoingLinksReport + stats in output";
+
 program
 	.command("ast")
 	.description("Display markdown AST and citation metadata for debugging")
 	.argument("<file>", "path to markdown file to analyze")
+	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.addHelpText(
 		"after",
 		`
@@ -1273,6 +1314,8 @@ Examples:
     $ jact ast docs/design.md
     $ jact ast file.md | jq '.links'
     $ jact ast file.md | jq '.anchors | length'
+    $ jact ast plan.md                        # smart default scope (cwd-git/pkg)
+    $ jact ast plan.md --scope ./other-repo   # explicit override
 
 Output includes:
   - tokens: Markdown AST from marked.js parser
@@ -1281,22 +1324,25 @@ Output includes:
   - anchors: Available anchor points (headers and blocks)
 `,
 	)
-	.action(async (file: string) => {
+	.action(async (file: string, options: { scope?: string }) => {
 		const manager = new JactCli();
-		const ast = await manager.getAst(file);
-		console.log(JSON.stringify(ast, null, 2));
+		try {
+			const ast = await manager.getAst(file, options);
+			console.log(JSON.stringify(ast, null, 2));
+		} catch (error) {
+			const e = error as Error & { suggestion?: string };
+			console.error("ERROR:", e.message);
+			if (e.suggestion) {
+				console.error("Suggestion:", e.suggestion);
+			}
+			process.exitCode = 2;
+		}
 	});
 
 // Pattern: Extract command with links subcommand
 const extractCmd = program
 	.command("extract")
 	.description("Extract content from citations");
-
-// Shared option descriptions — kept in one place so wording stays consistent across subcommands
-const SCOPE_OPTION_DESCRIPTION =
-	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
-const VERBOSE_OPTION_DESCRIPTION =
-	"Include outgoingLinksReport + stats in output";
 
 extractCmd
 	.command("links <source-file>")

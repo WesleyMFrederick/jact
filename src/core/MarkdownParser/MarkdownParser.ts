@@ -1,6 +1,7 @@
 import type { readFileSync } from "node:fs";
 import type { Token } from "marked";
 import { marked } from "marked";
+import type { FileCache } from "../../FileCache.js";
 import type {
 	AnchorObject,
 	HeadingObject,
@@ -52,14 +53,22 @@ interface FileSystemInterface {
  */
 export class MarkdownParser {
 	private fs: FileSystemInterface;
+	private fileCache: FileCache;
 
 	/**
-	 * Initialize parser with file system dependency
+	 * Initialize parser with file system and file cache dependencies
 	 *
 	 * @param fileSystem - Node.js fs module (or mock for testing)
+	 * @param fileCache - FileCache instance for wiki page name resolution
 	 */
-	constructor(fileSystem: FileSystemInterface) {
+	constructor(fileSystem: FileSystemInterface, fileCache: FileCache) {
 		this.fs = fileSystem;
+		this.fileCache = fileCache;
+	}
+
+	/** Replace the FileCache reference used for wiki resolution. Called by factories to share the scope-seeded cache. */
+	setFileCache(fc: FileCache): void {
+		this.fileCache = fc;
 	}
 
 	/**
@@ -100,7 +109,7 @@ export class MarkdownParser {
 	 * @returns Array of link objects with { linkType, scope, anchorType, source, target, text, fullMatch, line, column }
 	 */
 	extractLinks(content: string, sourcePath: string): LinkObject[] {
-		return extractLinks(content, sourcePath);
+		return extractLinks(content, sourcePath, this.fileCache);
 	}
 
 	/**
@@ -150,6 +159,6 @@ export class MarkdownParser {
 		column: number;
 		extractionMarker: { fullMatch: string; innerText: string } | null;
 	}): LinkObject {
-		return createLinkObject(params);
+		return createLinkObject({ ...params, fileCache: this.fileCache });
 	}
 }

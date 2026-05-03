@@ -1,3 +1,5 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
+
 # Plan: `jact extract` smart default scope — Implementation
 
 %% *Last Modified: 05/01/26 19:13:19* %%

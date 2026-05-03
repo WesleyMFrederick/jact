@@ -1,3 +1,5 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
+
 ---
 goal: "Execute Phase 6 implementation of Deltas D1-D7 in jact extract smart-default-scope plan"
 domain: software

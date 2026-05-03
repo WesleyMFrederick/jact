@@ -1,8 +1,12 @@
 import type { Token, Tokens } from "marked";
 import { marked } from "marked";
+import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
 import { detectExtractionMarker } from "./detectExtractionMarker.js";
+import { extractWikilinks } from "./extractWikilinks.js";
+import { getFencedCodeBlockLineSet } from "./isInsideCodeBlock.js";
+import { isInsideInlineCode } from "./isInsideInlineCode.js";
 
 /**
  * Type guard for tokens with nested token arrays
@@ -65,62 +69,6 @@ function isDuplicateLink(
 }
 
 /**
- * Check if a position in a line is inside inline code (backticks).
- * Handles escaped backticks but not complex nesting scenarios.
- */
-function isInsideInlineCode(line: string, position: number): boolean {
-	let inCode = false;
-	let i = 0;
-
-	while (i < line.length && i < position) {
-		const char = line[i];
-		const prevChar = i > 0 ? line[i - 1] : "";
-
-		// Check for unescaped backtick
-		if (char === "`" && prevChar !== "\\") {
-			inCode = !inCode;
-		}
-		i++;
-	}
-
-	return inCode;
-}
-
-/**
- * Build a set of line numbers that are inside code blocks.
- * Uses a state machine to track fenced code block boundaries.
- * Lines inside code blocks should be excluded from regex-based link extraction.
- */
-function getCodeBlockLines(lines: string[]): Set<number> {
-	const codeLines = new Set<number>();
-	let inCodeBlock = false;
-
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		if (line === undefined) continue;
-
-		// Check for fence markers (``` or ~~~)
-		const trimmed = line.trim();
-		if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
-			if (inCodeBlock) {
-				// Closing fence - add this line too
-				codeLines.add(i + 1); // 1-based line number
-				inCodeBlock = false;
-			} else {
-				// Opening fence
-				codeLines.add(i + 1); // 1-based line number
-				inCodeBlock = true;
-			}
-		} else if (inCodeBlock) {
-			// We're inside a code block
-			codeLines.add(i + 1); // 1-based line number
-		}
-	}
-
-	return codeLines;
-}
-
-/**
  * Walk marked.js tokens recursively to extract standard markdown links.
  * Handles: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
  */
@@ -129,6 +77,7 @@ function extractLinksFromTokens(
 	lines: string[],
 	sourceAbsolutePath: string,
 	links: LinkObject[],
+	fileCache: FileCache,
 ): void {
 	const walkTokens = (tokenList: Token[]): void => {
 		for (const token of tokenList) {
@@ -205,6 +154,7 @@ function extractLinksFromTokens(
 									column + raw.length,
 								)
 							: null,
+					fileCache,
 				});
 				links.push(linkObject);
 			}
@@ -237,6 +187,7 @@ function extractMarkdownLinksRegex(
 	index: number,
 	sourceAbsolutePath: string,
 	links: LinkObject[],
+	fileCache: FileCache,
 ): void {
 	// Pattern for markdown links: [text](path#anchor)
 	// Permissive anchor pattern allows spaces, colons, parens (supports 2 levels of nesting)
@@ -275,6 +226,7 @@ function extractMarkdownLinksRegex(
 					line,
 					match.index + fullMatch.length,
 				),
+				fileCache,
 			});
 			links.push(linkObject);
 		}
@@ -316,6 +268,7 @@ function extractMarkdownLinksRegex(
 					line,
 					match.index + fullMatch.length,
 				),
+				fileCache,
 			});
 			links.push(linkObject);
 		}
@@ -362,6 +315,7 @@ function extractMarkdownLinksRegex(
 							line,
 							match.index + fullMatch.length,
 						),
+						fileCache,
 					});
 					links.push(linkObject);
 				}
@@ -380,6 +334,7 @@ function extractCiteLinks(
 	index: number,
 	sourceAbsolutePath: string,
 	links: LinkObject[],
+	fileCache: FileCache,
 ): void {
 	const citePattern = /\[cite:\s*([^\]]+)\]/g;
 	let match = citePattern.exec(line);
@@ -407,94 +362,10 @@ function extractCiteLinks(
 				line,
 				match.index + match[0].length,
 			),
+			fileCache,
 		});
 		links.push(linkObject);
 		match = citePattern.exec(line);
-	}
-}
-
-/**
- * Extract wiki-style cross-document links: [[file.md#anchor|text]]
- * NOT in CommonMark — Obsidian specific
- */
-function extractWikiCrossDocLinks(
-	line: string,
-	index: number,
-	sourceAbsolutePath: string,
-	links: LinkObject[],
-): void {
-	const wikiCrossDocRegex = /\[\[([^#\]]+\.md)(#([^|]+?))?\|([^\]]+)\]\]/g;
-	let match = wikiCrossDocRegex.exec(line);
-	while (match !== null) {
-		// Skip if inside inline code (backticks)
-		if (isInsideInlineCode(line, match.index)) {
-			match = wikiCrossDocRegex.exec(line);
-			continue;
-		}
-
-		const rawPath = match[1] ?? "";
-		const anchor = match[3] ?? null;
-		const text = match[4] ?? "";
-
-		const linkObject = createLinkObject({
-			linkType: "wiki",
-			scope: "cross-document",
-			anchor,
-			rawPath,
-			sourceAbsolutePath,
-			text,
-			fullMatch: match[0],
-			line: index + 1,
-			column: match.index,
-			extractionMarker: detectExtractionMarker(
-				line,
-				match.index + match[0].length,
-			),
-		});
-		links.push(linkObject);
-		match = wikiCrossDocRegex.exec(line);
-	}
-}
-
-/**
- * Extract wiki-style internal links: [[#anchor|text]]
- * NOT in CommonMark — Obsidian specific
- */
-function extractWikiInternalLinks(
-	line: string,
-	index: number,
-	sourceAbsolutePath: string,
-	links: LinkObject[],
-): void {
-	const wikiRegex = /\[\[#([^|]+)\|([^\]]+)\]\]/g;
-	let match = wikiRegex.exec(line);
-	while (match !== null) {
-		// Skip if inside inline code (backticks)
-		if (isInsideInlineCode(line, match.index)) {
-			match = wikiRegex.exec(line);
-			continue;
-		}
-
-		const anchor = match[1] ?? "";
-		const text = match[2] ?? "";
-
-		const linkObject = createLinkObject({
-			linkType: "wiki",
-			scope: "internal",
-			anchor,
-			rawPath: null,
-			sourceAbsolutePath,
-			text,
-			fullMatch: match[0],
-			line: index + 1,
-			column: match.index,
-			extractionMarker: detectExtractionMarker(
-				line,
-				match.index + match[0].length,
-			),
-		});
-		links.push(linkObject);
-		match = wikiRegex.exec(line);
 	}
 }
 
@@ -507,6 +378,7 @@ function extractCaretLinks(
 	index: number,
 	sourceAbsolutePath: string,
 	links: LinkObject[],
+	fileCache: FileCache,
 ): void {
 	const caretRegex = /\^([A-Za-z0-9-]+)/g;
 	let match = caretRegex.exec(line);
@@ -538,6 +410,7 @@ function extractCaretLinks(
 					line,
 					match.index + match[0].length,
 				),
+				fileCache,
 			});
 			links.push(linkObject);
 		}
@@ -564,6 +437,7 @@ function extractCaretLinks(
 export function extractLinks(
 	content: string,
 	sourcePath: string,
+	fileCache: FileCache,
 ): LinkObject[] {
 	const links: LinkObject[] = [];
 	const lines = content.split("\n");
@@ -571,34 +445,37 @@ export function extractLinks(
 
 	// Phase 1: Token-based extraction for standard markdown links
 	const tokens = marked.lexer(content);
-	extractLinksFromTokens(tokens, lines, sourceAbsolutePath, links);
+	extractLinksFromTokens(tokens, lines, sourceAbsolutePath, links, fileCache);
 
-	// Build set of line numbers inside code blocks to skip in regex extraction
-	const codeBlockLines = getCodeBlockLines(lines);
+	// 0-based line indices inside fenced code blocks. Single source of truth
+	// shared with extractWikilinks (CommonMark §4.5 fence-type tracked).
+	const codeBlockLines = getFencedCodeBlockLineSet(content);
+
+	// Wiki-style links (all forms): [[...]] — NOT in CommonMark
+	links.push(...extractWikilinks(content, sourceAbsolutePath, fileCache));
 
 	// Phase 2: Regex extraction for patterns not in CommonMark or not caught by token parser
 	lines.forEach((line, index) => {
-		// Skip lines inside code blocks - they contain code examples, not real links
-		const lineNumber = index + 1;
-		if (codeBlockLines.has(lineNumber)) {
+		// Skip lines inside fenced code blocks - they contain code examples, not real links
+		if (codeBlockLines.has(index)) {
 			return;
 		}
 
 		// Regex fallback for markdown links with non-URL-encoded anchors
 		// (CommonMark only recognizes URL-encoded anchors, but Obsidian allows raw spaces/colons)
-		extractMarkdownLinksRegex(line, index, sourceAbsolutePath, links);
+		extractMarkdownLinksRegex(
+			line,
+			index,
+			sourceAbsolutePath,
+			links,
+			fileCache,
+		);
 
 		// Citation format: [cite: path] — NOT in CommonMark
-		extractCiteLinks(line, index, sourceAbsolutePath, links);
-
-		// Wiki-style cross-document links: [[file.md#anchor|text]] — NOT in CommonMark
-		extractWikiCrossDocLinks(line, index, sourceAbsolutePath, links);
-
-		// Wiki-style internal links: [[#anchor|text]] — NOT in CommonMark
-		extractWikiInternalLinks(line, index, sourceAbsolutePath, links);
+		extractCiteLinks(line, index, sourceAbsolutePath, links, fileCache);
 
 		// Caret syntax references: ^anchor-id — NOT in CommonMark
-		extractCaretLinks(line, index, sourceAbsolutePath, links);
+		extractCaretLinks(line, index, sourceAbsolutePath, links, fileCache);
 	});
 
 	return links;
