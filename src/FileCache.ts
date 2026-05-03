@@ -64,10 +64,10 @@ export class FileCache {
 	 * Scans all subdirectories for .md files and indexes by filename. Warns if duplicate
 	 * filenames are detected (these will require relative path disambiguation).
 	 *
-	 * @param {string} scopeFolder - Root folder to scan (can be symlink, will be resolved)
-	 * @param {boolean} verbose - When true, log duplicate filename warnings to stderr
-	 * @param {ScopeResolution} scope - Optional resolution metadata used by resolveFile to enrich error messages
-	 * @returns {Object} Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
+	 * @param scopeFolder - Root folder to scan (can be symlink, will be resolved)
+	 * @param verbose - When true, log duplicate filename warnings to stderr
+	 * @param scope - Optional resolution metadata used by resolveFile to enrich error messages
+	 * @returns Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
 	buildCache(
 		scopeFolder: string,
@@ -161,8 +161,8 @@ export class FileCache {
 	 * Failure results carry candidates[] listing every matching path so callers
 	 * can present the disambiguation choice to users.
 	 *
-	 * @param {string} filename - Filename to resolve (with or without .md extension)
-	 * @returns {Object} Result object with { found, path?, reason?, message?, candidates?, fuzzyMatch?, correctedFilename? }
+	 * @param filename - Filename to resolve (with or without .md extension)
+	 * @returns Result object with { found, path?, reason?, message?, candidates?, fuzzyMatch?, correctedFilename? }
 	 */
 	resolveFile(filename: string): ResolveResult {
 		const arr = this.entries.get(filename);
@@ -250,8 +250,8 @@ export class FileCache {
 	 * Returns null if no fuzzy match found. Returns duplicate error if corrected filename
 	 * has multiple matches.
 	 *
-	 * @param {string} filename - Original filename that failed exact match
-	 * @returns {Object|null} Fuzzy match result or null
+	 * @param filename - Original filename that failed exact match
+	 * @returns Fuzzy match result or null
 	 */
 	private findFuzzyMatch(filename: string): ResolveResult | null {
 		const allFiles = Array.from(this.entries.keys());

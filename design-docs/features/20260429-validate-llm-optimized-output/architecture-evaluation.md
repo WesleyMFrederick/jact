@@ -1,3 +1,5 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
+
 # Architecture Evaluation: LLM-Optimized Default Output for `jact validate`
 
 %% *Last Modified: 04/29/26 22:41:08* %%

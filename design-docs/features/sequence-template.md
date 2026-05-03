@@ -1,3 +1,5 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
+
 ## Phased Task Sequence
 
 *Last Modified: 04/15/26 14:29:27*

@@ -1,3 +1,5 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
+
 # Markdown Parser Tech Debt — Final Review
 
 **Reviewer:** Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)

@@ -1,3 +1,5 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
+
 # MarkdownParser Tech Debt Implementation Plan
 
 %%stop-extract-link%%

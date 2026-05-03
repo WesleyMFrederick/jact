@@ -399,6 +399,57 @@ export class CitationValidator {
 		citation: LinkObject,
 		sourceFile?: string,
 	): Promise<SingleCitationValidationResult> {
+		// Wiki fast-path (success): parser already resolved the page name (e.g. via slug step in
+		// resolveWikiPath). Re-resolving from `target.path.raw` (a Title-Case page name) loses
+		// the parser's slug result, so we trust `target.path.absolute` directly.
+		if (
+			citation.linkType === "wiki" &&
+			citation.target.path.absolute !== null &&
+			this.isFile(citation.target.path.absolute)
+		) {
+			const targetPath = citation.target.path.absolute;
+			if (citation.target.anchor) {
+				const anchorExists = await this.validateAnchorExists(
+					citation.target.anchor,
+					targetPath,
+				);
+				if (!anchorExists.valid) {
+					return this.createValidationResult(
+						citation,
+						"error",
+						`Anchor not found: #${citation.target.anchor}`,
+						anchorExists.suggestion,
+					);
+				}
+				if (anchorExists.matchedAs === "block-ref-missing-caret") {
+					return this.createValidationResult(
+						citation,
+						"warning",
+						null,
+						anchorExists.suggestion,
+					);
+				}
+			}
+			return this.createValidationResult(citation, "valid");
+		}
+
+		// Wiki fail-loud path: parser tried both raw + slug forms and missed. Surface the full
+		// attempt list so the user can see what we looked for (per loud-fail invariant).
+		if (
+			citation.linkType === "wiki" &&
+			citation.target.path.absolute === null &&
+			citation.target.path.attempted !== undefined &&
+			citation.target.path.attempted.length > 0
+		) {
+			const tried = citation.target.path.attempted.join(", ");
+			return this.createValidationResult(
+				citation,
+				"error",
+				`Wiki page not found: ${citation.target.path.raw}`,
+				`Tried: ${tried}`,
+			);
+		}
+
 		// Calculate what the standard path resolution would give us
 		const decodedRelativePath = decodeURIComponent(
 			citation.target.path.raw ?? "",

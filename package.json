@@ -41,7 +41,9 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.3",
 		"@types/node": "^24.10.1",
+		"@typescript-eslint/parser": "^8.59.1",
 		"@vitest/ui": "^4.0.18",
+		"eslint": "^10.3.0",
 		"ts-node": "^10.9.2",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.18"

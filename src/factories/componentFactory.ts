@@ -17,14 +17,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { CitationValidator } from "../CitationValidator.js";
-import { FileCache } from "../FileCache.js";
-import { MarkdownParser } from "../core/MarkdownParser/index.js";
-import { ParsedFileCache } from "../ParsedFileCache.js";
 import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.js";
-import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
 import { ForceMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
 import { SectionLinkStrategy } from "../core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
-import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
+import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { MarkdownParser } from "../core/MarkdownParser/index.js";
+import { FileCache } from "../FileCache.js";
+import { ParsedFileCache } from "../ParsedFileCache.js";
 import type { ExtractionEligibilityStrategy } from "../types/contentExtractorTypes.js";
 
 /**
@@ -33,7 +33,7 @@ import type { ExtractionEligibilityStrategy } from "../types/contentExtractorTyp
  * @returns Parser instance configured with Node.js fs module
  */
 export function createMarkdownParser(): MarkdownParser {
-	return new MarkdownParser(fs);
+	return new MarkdownParser(fs, createFileCache());
 }
 
 /**
@@ -78,6 +78,12 @@ export function createCitationValidator(
 ): CitationValidator {
 	const _parsedFileCache = parsedFileCache || createParsedFileCache();
 	const _fileCache = fileCache || createFileCache();
+	// Sync: ensures the embedded parser uses the same FileCache instance as the validator.
+	// Critical when jact.ts creates parser + parsedFileCache before the scope-seeded fileCache.
+	// defensive — some test scenarios stub ParsedFileCache without syncParserFileCache
+	if (_parsedFileCache instanceof ParsedFileCache) {
+		_parsedFileCache.syncParserFileCache(_fileCache);
+	}
 	return new CitationValidator(_parsedFileCache, _fileCache);
 }
 

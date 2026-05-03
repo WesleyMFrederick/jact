@@ -1,9 +1,5 @@
 import type { Token } from "marked";
-import type {
-	AnchorObject,
-	LinkObject,
-	ParserOutput,
-} from "./types/citationTypes.js";
+import type { LinkObject, ParserOutput } from "./types/citationTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 
 /**
@@ -48,8 +44,8 @@ class ParsedDocument {
 	 * Checks both id and urlEncodedId properties to handle all anchor formats.
 	 * Also handles URL-decoded comparisons for Obsidian anchors with stripped characters (colons, etc).
 	 *
-	 * @param {string} anchorId - Anchor ID to check (either id or urlEncodedId format)
-	 * @returns {boolean} True if anchor exists in document
+	 * @param anchorId - Anchor ID to check (either id or urlEncodedId format)
+	 * @returns True if anchor exists in document
 	 */
 	hasAnchor(anchorId: string): boolean {
 		// Try decoding the input anchor for comparison
@@ -100,8 +96,8 @@ class ParsedDocument {
 	 * Uses fuzzy matching (Levenshtein distance) to find similar anchor IDs
 	 * for suggestion generation. Returns top 5 matches sorted by similarity score.
 	 *
-	 * @param {string} anchorId - Anchor ID to find similar matches for
-	 * @returns {string[]} Array of similar anchor IDs sorted by similarity score (max 5)
+	 * @param anchorId - Anchor ID to find similar matches for
+	 * @returns Array of similar anchor IDs sorted by similarity score (max 5)
 	 */
 	findSimilarAnchors(anchorId: string): string[] {
 		// Get all anchor IDs (lazy-loaded from cache)
@@ -113,7 +109,7 @@ class ParsedDocument {
 
 	/**
 	 * Get all links in the document
-	 * @returns {Array<Object>} Array of all link objects from parser output
+	 * @returns Array of all link objects from parser output
 	 */
 	getLinks(): LinkObject[] {
 		// Return links array from parser output
@@ -126,7 +122,7 @@ class ParsedDocument {
 	 * Returns unique set of anchor IDs including both id and urlEncodedId variants.
 	 * Results are lazy-loaded and cached for performance.
 	 *
-	 * @returns {string[]} Array of all unique anchor IDs
+	 * @returns Array of all unique anchor IDs
 	 */
 	getAnchorIds(): string[] {
 		// Return cached anchor IDs (lazy-loaded)
@@ -135,7 +131,7 @@ class ParsedDocument {
 
 	/**
 	 * Extract full file content
-	 * @returns {string} Full content of parsed file
+	 * @returns Full content of parsed file
 	 */
 	extractFullContent(): string {
 		// Return content string from parser output
@@ -150,9 +146,9 @@ class ParsedDocument {
 	 * (2) find section boundary (next same-or-higher level heading),
 	 * (3) reconstruct content from token.raw properties.
 	 *
-	 * @param {string} headingText - Exact heading text to find (case-sensitive)
-	 * @param {number} [headingLevel] - Optional heading level (1-6). If not provided, looked up from headings array
-	 * @returns {string|null} Section content string or null if not found
+	 * @param headingText - Exact heading text to find (case-sensitive)
+	 * @param headingLevel - Optional heading level (1-6). If not provided, looked up from headings array
+	 * @returns Section content string or null if not found
 	 */
 	extractSection(headingText: string, headingLevel?: number): string | null {
 		// Phase 0: Look up heading level if not provided
@@ -232,8 +228,8 @@ class ParsedDocument {
 	 * Finds block anchor by ID, validates line index is within bounds,
 	 * and extracts the single line containing the block anchor.
 	 *
-	 * @param {string} anchorId - Block anchor ID without ^ prefix
-	 * @returns {string|null} Single line content string or null if not found
+	 * @param anchorId - Block anchor ID without ^ prefix
+	 * @returns Single line content string or null if not found
 	 */
 	extractBlock(anchorId: string): string | null {
 		// Find anchor with matching ID and anchorType === "block"
@@ -264,8 +260,8 @@ class ParsedDocument {
 	 * This function applies the same normalization for heading text comparison.
 	 *
 	 * @private
-	 * @param {string} text - Raw heading text
-	 * @returns {string} Normalized text matching Obsidian link anchor format
+	 * @param text - Raw heading text
+	 * @returns Normalized text matching Obsidian link anchor format
 	 */
 	private _normalizeObsidianHeading(text: string): string {
 		return text
@@ -291,8 +287,8 @@ class ParsedDocument {
 	 * we MUST recurse into .tokens to capture nested content.
 	 *
 	 * @private
-	 * @param {string} tokenType - Token type from marked.js
-	 * @returns {boolean} True if token.raw includes all child content
+	 * @param tokenType - Token type from marked.js
+	 * @returns True if token.raw includes all child content
 	 */
 	_tokenIncludesChildrenInRaw(tokenType: string): boolean {
 		// Token types where .raw includes full content (skip recursion)
@@ -314,7 +310,7 @@ class ParsedDocument {
 	 * from all anchors, ensuring unique values only.
 	 *
 	 * @private
-	 * @returns {string[]} Array of all anchor IDs
+	 * @returns Array of all anchor IDs
 	 */
 	private _getAnchorIds(): string[] {
 		// Check if cache exists
@@ -348,9 +344,9 @@ class ParsedDocument {
 	 * threshold (0.6), and returns top 5 matches sorted by score descending.
 	 *
 	 * @private
-	 * @param {string} target - Target string to match
-	 * @param {string[]} candidates - Array of candidate strings
-	 * @returns {string[]} Array of similar strings sorted by similarity (max 5)
+	 * @param target - Target string to match
+	 * @param candidates - Array of candidate strings
+	 * @returns Array of similar strings sorted by similarity (max 5)
 	 */
 	private _fuzzyMatch(target: string, candidates: string[]): string[] {
 		// Calculate similarity scores for all candidates
@@ -378,9 +374,9 @@ class ParsedDocument {
 	 * then normalizes to 0-1 range based on maximum string length.
 	 *
 	 * @private
-	 * @param {string} str1 - First string
-	 * @param {string} str2 - Second string
-	 * @returns {number} Similarity score between 0 and 1 (1 = identical)
+	 * @param str1 - First string
+	 * @param str2 - Second string
+	 * @returns Similarity score between 0 and 1 (1 = identical)
 	 */
 	private _calculateSimilarity(str1: string, str2: string): number {
 		// Handle edge cases

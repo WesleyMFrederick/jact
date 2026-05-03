@@ -51,6 +51,8 @@ export interface LinkObject {
 			absolute: string | null;
 			/** Relative path from source file (null if unresolved or internal) */
 			relative: string | null;
+			/** Wiki resolver attempt log (raw, slug+.md) when wiki resolution failed; undefined for success/non-wiki */
+			attempted?: readonly string[];
 		};
 		/** Header/block anchor (null if no anchor) */
 		anchor: string | null;
