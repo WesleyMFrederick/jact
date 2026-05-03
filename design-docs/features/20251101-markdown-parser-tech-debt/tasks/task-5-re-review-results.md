@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Task 5 Re-Review Results
 
 **Reviewer Model:** Claude Sonnet 4.5

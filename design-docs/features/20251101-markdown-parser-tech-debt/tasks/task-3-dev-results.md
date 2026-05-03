@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Task 3 Development Results
 
 **Model Used:** Claude Haiku 4.5 (claude-haiku-4-5-20251001)

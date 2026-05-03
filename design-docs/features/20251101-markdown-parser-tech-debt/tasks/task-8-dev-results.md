@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Task 8: Monolith Breakup (#18) — Development Results
 
 **Model:** Claude Haiku 4.5

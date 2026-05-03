@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # User Story: US2.7a - Enhanced CLI Help Output
 
 **Feature:** CLI Help Enhancement

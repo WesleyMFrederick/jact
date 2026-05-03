@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Extract --format markdown — Whiteboard
 
 > **Change:** extract-format-markdown

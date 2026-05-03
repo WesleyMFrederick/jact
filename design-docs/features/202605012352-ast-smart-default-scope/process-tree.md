@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 ---
 title: AST Smart-Default-Scope — Process Tree (4-Layer Skeleton)
 date: 2026-05-02

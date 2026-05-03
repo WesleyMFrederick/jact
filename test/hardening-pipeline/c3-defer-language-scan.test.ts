@@ -27,6 +27,7 @@ function walkMd(dir: string): string[] {
 	const out: string[] = [];
 	if (!existsSync(dir)) return out;
 	for (const name of readdirSync(dir)) {
+		if (name === ".archive") continue;
 		const full = join(dir, name);
 		if (statSync(full).isDirectory()) out.push(...walkMd(full));
 		else if (name.endsWith(".md")) out.push(full);

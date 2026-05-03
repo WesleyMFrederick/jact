@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Task 5 Fix Results: Link Factory Function (#30)
 
 **Task:** Task 5 — Link Factory Function (#30)

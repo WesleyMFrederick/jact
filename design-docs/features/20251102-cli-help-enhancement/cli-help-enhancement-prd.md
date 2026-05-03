@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # CLI Help Enhancement - Product Requirements Document
 
 **Feature ID:** 20251102-cli-help-enhancement

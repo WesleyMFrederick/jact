@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Todo: LLM-Optimized Default Output for `jact validate`
 
 %% *Last Modified: 04/29/26 23:22:49* %%

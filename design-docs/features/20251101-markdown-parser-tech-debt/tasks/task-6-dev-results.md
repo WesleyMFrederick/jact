@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Task 6: Header Anchor Redundancy (#29) — Dev Results
 
 **Model:** Claude Haiku 4.5

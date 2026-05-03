@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Task 3 Code Review Results
 
 **Model Used:** Claude Sonnet 4.5 (claude-sonnet-4-5-20250929)

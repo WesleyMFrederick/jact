@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Task 5 Development Results: Link Factory Function (#30)
 
 **Model:** Claude Haiku 4.5

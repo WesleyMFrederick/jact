@@ -1,3 +1,4 @@
+%% hardening: exempt-defer-language — pre-pipeline-lock baseline %%
 # Task 8: Monolith Breakup — Review Results
 
 **Reviewer:** Claude Sonnet 4.5
