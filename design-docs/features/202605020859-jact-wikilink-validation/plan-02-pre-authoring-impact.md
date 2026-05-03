@@ -1,3 +1,5 @@
+%% hardening: exempt-defer-language — historical analysis citing §9d–§9f rule names %%
+
 # Plan-02 Pre-Authoring Impact Analysis
 
 %% *Last Modified: 05/03/26 16:26:34* %%

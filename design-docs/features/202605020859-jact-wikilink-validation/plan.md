@@ -1200,6 +1200,66 @@ Both plans live in `design-docs/features/202605020859-jact-wikilink-validation/`
 
 ---
 
+## 9. Post-Plan-01 Baseline Reconciliation
+
+%% *Last Modified: 05/03/26 16:38:51* %%
+
+Plan-01 squash-merged in commit `ec85098` (date 2026-05-03), shipping a larger scope than the §8.3 hypothesis-first spike framing originally anticipated. This section reconciles the §7a Delta Architecture Table against shipped reality so plan-02 authors work from current state, not pre-spike assumptions.
+
+### 9.1 Plan-01 Shipped (commit `ec85098`)
+
+%% *Last Modified: 05/03/26 16:38:51* %%
+
+**D1 — Consolidated Wikilink Grammar:** SHIPPED.
+- `src/core/MarkdownParser/extractWikilinks.ts` covers all 10 Obsidian wikilink forms.
+- Old `extractWikiCrossDocLinks` / `extractWikiInternalLinks` removed from `extractLinks.ts`.
+
+**D4 — Wiki Page Name Resolution (core):** SHIPPED.
+- `src/core/MarkdownParser/resolveWikiPath.ts` implements 2-step exact-then-slug resolution.
+- `src/utils/wikiPageSlug.ts` exports `pageNameToSlug`.
+- `FileCache` is REQUIRED end-to-end through `MarkdownParser → extractLinks → extractWikilinks → createLinkObject` (changed from optional after Plan-01 Gate-2 review).
+- `CitationValidator` consumes parser-resolved wiki paths (no re-resolution in validator).
+- Loud-fail surfacing renders `Tried: <raw>, <slug>.md` for broken wiki errors.
+
+**Code-block / inline-code exclusion (Plan-01 Phase 5+6 scope creep):** SHIPPED.
+- `src/core/MarkdownParser/isInsideCodeBlock.ts`, `src/core/MarkdownParser/isInsideInlineCode.ts`.
+
+**Hardening pipeline scaffolding:** PARTIAL.
+- `eslint.config.js` flat config + `HARDENING-ALLOWLIST` injectable-types ban (D1-§9f).
+- `scripts/{defer-language-scan,find-dead-fields,prod-callgraph-trace,service-level-smoke,plan-eval}.sh`.
+- `test/hardening-pipeline/c1-d1-injectable-bans.test.ts` … `c6-fixture-template.test.ts`.
+- C6 closed (current session — `design-docs/hardening-pipeline/{state.md,fixture-template.md}` restored).
+- C3 RED: ~28 pre-pipeline-lock historical features/* docs contain banned-token vocabulary. Closure plan: `design-docs/features/202605030000-hardening-pipeline-c3-closure/plan.md` — exemption-marker rollout + `.archive/**` walker exclusion.
+
+### 9.2 Remaining Scope for Plan-02
+
+%% *Last Modified: 05/03/26 16:38:51* %%
+
+| Delta | Original §7a Spec | Shipped in `ec85098` | Plan-02 Residual |
+|-------|-------------------|---------------------|------------------|
+| **D1** | 10-form grammar + tests | ✅ Module + tests | Adversarial CommonMark fixtures only (`AC1–AC6` from `design-docs/hardening-pipeline/fixture-template.md`) |
+| **D2** | Residual scanner + `unrecognized[]` field + display blocks | ❌ | **Full scope** |
+| **D3** | `LinkClass` discriminator + `getLinkClass.ts` + summary extensions + Type-I `manager.validate()` interface change + structured-field exit-code refactor + verbose SUMMARY block + trailer branch order | ❌ | **Full scope** |
+| **D4** | Resolver + slugifier + Levenshtein adaptive-threshold + path-aware suggestion + multi-match disambiguation | ✅ resolver + slugifier | Levenshtein layer only (basename distance, `clamp(3, 10, floor(0.2 × pathLen))`, multi-match) |
+| **D5** | 3 doc locations | ❌ | **Full scope** |
+
+### 9.3 Plan-02 Sequencing (Post-Reconciliation)
+
+%% *Last Modified: 05/03/26 16:38:51* %%
+
+**Plan file:** `design-docs/features/202605020859-jact-wikilink-validation/plan-02-implement-deltas.md` (single monolithic plan, internal phase headings P1–P5).
+
+**Phase order:**
+- **P1 (Adversarial Fixtures, ex-D1)** — Author `test/fixtures/adversarial-commonmark/AC1–AC6.md`. Verify D1 grammar passes all 6 cases. Risk: surfaces parser-correctness bugs (Plan-01 Gate-3 Item 4 class).
+- **P2 (D2 Residual Scanner)** — Add `UnrecognizedSyntaxRecord` type + `unrecognized[]` on `ValidationResult` + minimal/verbose CLI sections. Service-smoke gate verifies writers + readers both > 0.
+- **P3 (D3 Coverage-Qualified Output + Type-I Interface)** — Add `LinkClass` + `getLinkClass.ts` + `byLinkClass`/`unrecognizedCount`/`errorBreakdown` on `ReportSummary` + `manager.validate()` `Promise<{output, result}>` + structured-field exit-code predicate + verbose SUMMARY block + trailer branch order. Largest phase; explicit ADR required for the Type-I interface change.
+- **P4 (D4 Levenshtein Suggestion Layer)** — Add adaptive-threshold basename-distance scan to `resolveWikiPath` miss path. Path-aware suggestion display in `CitationValidator`. Multi-match disambiguation.
+- **P5 (D5 Documentation Alignment)** — Update `jact/CLAUDE.md` Citation Patterns, `MarkdownParser.ts` JSDoc, `design-docs/component-guides/MarkdownParser Component Guide.md`. All three enumerate the same 10-form list.
+
+**Precondition:** `design-docs/features/202605030000-hardening-pipeline-c3-closure/plan.md` GREEN before P1 begins. Plan-02 does NOT reference the hardening plan — once C3 is GREEN, the gates self-enforce on every plan-02 commit.
+
+**Agent path (per §8.3 pipeline):** `application-tech-lead` (author from template — 5 internal phase headings) → `bdd-test-writer` (assertions per phase) → `plan-sequencer` (phase-sequence + agent assignments + escalation policy).
+
 ---
 
 ## 10. Source Footnotes
