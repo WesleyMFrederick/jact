@@ -22,7 +22,8 @@
 		"forceConsistentCasingInFileNames": true,
 		"skipLibCheck": true,
 		"noEmit": false,
-		"noImplicitAny": true
+		"noImplicitAny": true,
+		"types": ["node"]
 	},
 	"include": ["src/**/*.ts"],
 	"exclude": ["**/*.test.ts", "**/*.spec.ts", "dist/**", "node_modules/**"]
