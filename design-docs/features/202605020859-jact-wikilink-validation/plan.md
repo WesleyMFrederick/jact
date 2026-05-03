@@ -1208,7 +1208,7 @@ Plan-01 squash-merged in commit `ec85098` (date 2026-05-03), shipping a larger s
 
 ### 9.1 Plan-01 Shipped (commit `ec85098`)
 
-%% *Last Modified: 05/03/26 16:38:51* %%
+%% *Last Modified: 05/03/26 16:51:38* %%
 
 **D1 — Consolidated Wikilink Grammar:** SHIPPED.
 - `src/core/MarkdownParser/extractWikilinks.ts` covers all 10 Obsidian wikilink forms.
@@ -1228,8 +1228,7 @@ Plan-01 squash-merged in commit `ec85098` (date 2026-05-03), shipping a larger s
 - `eslint.config.js` flat config + `HARDENING-ALLOWLIST` injectable-types ban (D1-§9f).
 - `scripts/{defer-language-scan,find-dead-fields,prod-callgraph-trace,service-level-smoke,plan-eval}.sh`.
 - `test/hardening-pipeline/c1-d1-injectable-bans.test.ts` … `c6-fixture-template.test.ts`.
-- C6 closed (current session — `design-docs/hardening-pipeline/{state.md,fixture-template.md}` restored).
-- C3 RED: ~28 pre-pipeline-lock historical features/* docs contain banned-token vocabulary. Closure plan: `design-docs/features/202605030000-hardening-pipeline-c3-closure/plan.md` — exemption-marker rollout + `.archive/**` walker exclusion.
+- All 22 hardening tests GREEN as of 2026-05-03 (C1–C6). `.archive/**` excluded from C3 walker; pre-pipeline-lock files carry exemption markers; new active artifacts must comply.
 
 ### 9.2 Remaining Scope for Plan-02
 
