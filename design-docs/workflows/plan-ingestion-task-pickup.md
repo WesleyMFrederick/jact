@@ -51,28 +51,28 @@ Cold-start workflow for ingesting a plan via `jact`, reading the State Log to id
 
 ## Activity Legend
 
-%% *Last Modified: 05/04/26 11:56:03* %%
+%% *Last Modified: 05/04/26 11:58:57* %%
 
-| Node | Activity | Tool / Command | Why |
-|------|----------|----------------|-----|
-| [a] | User provides absolute plan path | — | jact requires absolute paths |
-| [b] | Render heading outline | `/jact-displaying-headings` skill OR `jact ast <abs-path> \| jq -r '.headings[] \| "\(("  " * (.level - 1)))\("#" * .level) \(.text)"'` | Must know exact heading text before calling extract |
-| [c] | Extract Goal section | `jact extract header <abs-path> "Goal"` | defines task scope and success criteria |
-| [d] | Extract Current Behavior section | `jact extract header <abs-path> "Current Behavior"` | establishes what is broken and how |
-| [e] | Extract Target Behavior section | `jact extract header <abs-path> "Target Behavior"` | defines done |
-| [f] | Extract Root Cause section | `jact extract header <abs-path> "Root Cause"` | informs where to look in codebase |
-| [g] | Extract Files to Modify section | `jact extract header <abs-path> "Files to Modify"` | seeds context bootstrap file list |
-| [h] | Extract State Log section | `jact extract header <abs-path> "State Log"` | task-pickup state, not plan context |
-| [i] | Read last commit from prior session | `git show <hash>` (hash from State Log) | optional: only if State Log contains a commit hash; surfaces what changed without re-reading full context |
-| [j] | Analyze State Log → identify next pending task | Mental analysis of completion markers + commit hashes | **HARD GATE** — wrong task = wasted context loading |
-| [k] | Extract Task X (Context Bootstrap) | `jact extract header <abs-path> "Task X - Name"` | depends on [j] to know which task |
-| [l] | Read graph report for codebase orientation | `Read graphify-out/GRAPH_REPORT.md` | orientation before navigation; god nodes reveal key files |
-| [m] | LSP symbol location per Context Bootstrap | `LSP goToDefinition`, `LSP findReferences`, `LSP workspaceSymbol` | <1s vs 60–90s for Grep; always LSP first on TS/JS |
-| [n] | Targeted Read at LSP-identified lines | `Read <file> offset:<line> limit:<N>` | depends on [m] for file:line; avoids reading full files |
-| [o] | Read related test/fixture files | `Read <test-file>` | optional: only when task touches tests |
-| [p] | Create task to track work | `TaskCreate` | after context loaded so title + description are accurate |
-| [q] | Implement task step | Edit/Write/Bash as needed | do-part of ↻ loop; repeats until task complete |
-| [r] | Update `## State Log` in plan file | `Edit` plan file | Write: commit hash + semantic intent (what decision was made and why). Skip: file lists, diffs, line numbers — git has those |
+| Node | Step Type | Activity | Tool / Command | Why |
+|------|-----------|----------|----------------|-----|
+| [a] | Deterministic | User provides absolute plan path | — | jact requires absolute paths |
+| [b] | Deterministic | Render heading outline | `/jact-displaying-headings` skill OR `jact ast <abs-path> \| jq -r '.headings[] \| "\(("  " * (.level - 1)))\("#" * .level) \(.text)"'` | Must know exact heading text before calling extract |
+| [c] | Deterministic | Extract Goal section | `jact extract header <abs-path> "Goal"` | defines task scope and success criteria |
+| [d] | Deterministic | Extract Current Behavior section | `jact extract header <abs-path> "Current Behavior"` | establishes what is broken and how |
+| [e] | Deterministic | Extract Target Behavior section | `jact extract header <abs-path> "Target Behavior"` | defines done |
+| [f] | Deterministic | Extract Root Cause section | `jact extract header <abs-path> "Root Cause"` | informs where to look in codebase |
+| [g] | Deterministic | Extract Files to Modify section | `jact extract header <abs-path> "Files to Modify"` | seeds context bootstrap file list |
+| [h] | Deterministic | Extract State Log section | `jact extract header <abs-path> "State Log"` | task-pickup state, not plan context |
+| [i] | Deterministic | Read last commit from prior session | `git show <hash>` (hash from State Log) | optional: only if State Log contains a commit hash; surfaces what changed without re-reading full context |
+| [j] | **Semantic** | Analyze State Log → identify next pending task | Mental analysis of completion markers + commit hashes | **HARD GATE** — wrong task = wasted context loading |
+| [k] | Deterministic | Extract Task X (Context Bootstrap) | `jact extract header <abs-path> "Task X - Name"` | depends on [j] to know which task |
+| [l] | Deterministic | Read graph report for codebase orientation | `Read graphify-out/GRAPH_REPORT.md` | orientation before navigation; god nodes reveal key files |
+| [m] | Deterministic | LSP symbol location per Context Bootstrap | `LSP goToDefinition`, `LSP findReferences`, `LSP workspaceSymbol` | <1s vs 60–90s for Grep; always LSP first on TS/JS |
+| [n] | Deterministic | Targeted Read at LSP-identified lines | `Read <file> offset:<line> limit:<N>` | depends on [m] for file:line; avoids reading full files |
+| [o] | Deterministic | Read related test/fixture files | `Read <test-file>` | optional: only when task touches tests |
+| [p] | Deterministic | Create task to track work | `TaskCreate` | after context loaded so title + description are accurate |
+| [q] | **Semantic** | Implement task step | Edit/Write/Bash as needed | do-part of ↻ loop; repeats until task complete |
+| [r] | **Semantic** | Update `## State Log` in plan file | `Edit` plan file | Write: commit hash + semantic intent (what decision was made and why). Skip: file lists, diffs, line numbers — git has those |
 
 ## Anti-Patterns
 
