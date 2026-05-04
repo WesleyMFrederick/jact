@@ -640,7 +640,7 @@ No "ship-with-followups," no "minor issues acceptable." Either every Ideal Outco
 
 ### Phase 0 — Baseline `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:28:48* %%
+%% *Last Modified: 05/03/26 18:29:09* %%
 
 - [x] **0.0** STATE-READ: `git rev-parse HEAD` → record as `baseline_hash: <hash>` in this plan file. Anchors entire sequence.
   - `baseline_hash: 33dc4b1af70122657a110c613580405b676c696c`
@@ -679,7 +679,8 @@ No "ship-with-followups," no "minor issues acceptable." Either every Ideal Outco
   - Plan-naming deviation surfaced: §"LSP commands to run before coding" mentions `formatForCLIVerbose` and `formatForJSON`; actual symbols are `formatForCLI` (verbose mode lives inside) and `formatAsJSON`. P3 implementing agent must use actual names when modifying jact.ts. Also §"LSP commands" mentions `ReportSummary`; actual type is `ValidationSummary`. P2/P3 agents must use `ValidationSummary` when extending the type.
   - Plan-symbol deviation surfaced: §"LSP Audit Findings" line 144 cites `getCodeBlockLines (lines 75-102)` in extractLinks.ts as a separate function. LSP `documentSymbol` confirms NO such top-level symbol exists; the byte-range query is inlined inside `extractLinks` (codeBlockLines constant at line 452, sourced from `getFencedCodeBlockLineSet` in isInsideCodeBlock.ts). The §1.4 sibling-sweep step should be reframed: "verify `extractLinks` body inlines `getFencedCodeBlockLineSet`; consider extracting if reused".
 - [x] **0.C** COMMIT: No code changes expected. If baseline notes added, commit "chore(plan-02): record Phase 0 baseline notes". `git rev-parse HEAD` → `end_hash: <hash>` recorded next to this checkbox.
-  - Baseline notes added to plan (LSP findings under 0.1, file-read summary under 0.2, test/build results under 0.3/0.4, deviations under 0.S). Commit pending.
+  - Baseline notes added to plan (LSP findings under 0.1, file-read summary under 0.2, test/build results under 0.3/0.4, deviations under 0.S). Committed as `44f039b`.
+  - `end_hash: 44f039bd3b580232c4c827318ab5c9f3caf7aa8d`
 
 ---
 
