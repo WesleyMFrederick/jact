@@ -239,6 +239,14 @@ The tool supports multiple path resolution strategies (in order):
 4. Verify all tests pass
 5. Run `npm run build` before committing
 
+### Test Fixtures:
+
+%% *Last Modified: 05/04/26 10:22:31* %%
+
+- **ALWAYS use test fixtures from `test/` folder** — files outside `test/` are not guaranteed to exist (may be archived, refactored, or removed without notice)
+- **NEVER reference design-docs or arbitrary paths in tests** — hardcode paths to `test/hardening-pipeline/fixtures/` or create fixture copies when needed
+- **BECAUSE** design-docs files may be archived, moved, or deleted; test isolation prevents flaky tests
+
 ### Component Boundaries:
 - **MarkdownParser** is NOT aware of `ParsedDocument` facade
 - **ContentExtractor** receives pre-validated links from CLI
