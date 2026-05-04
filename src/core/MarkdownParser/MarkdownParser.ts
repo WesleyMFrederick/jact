@@ -31,9 +31,19 @@ interface FileSystemInterface {
  *
  * Supports multiple link formats:
  * - Standard markdown: [text](file.md#anchor)
- * - Wiki-style: [[file.md#anchor|text]] or [[#anchor|text]]
  * - Citation format: [cite: path]
  * - Caret references: ^anchor-id
+ * - Wiki-style (10 forms per D1 grammar in src/core/MarkdownParser/extractWikilinks.ts):
+ *     1. [[Page]]
+ *     2. [[Page|Display]]
+ *     3. [[Page.md]]
+ *     4. [[Page.md|Display]]
+ *     5. [[Page#section]]
+ *     6. [[Page#section|Display]]
+ *     7. [[Page.md#section]]
+ *     8. [[Page.md#section|Display]]
+ *     9. [[#anchor]]
+ *    10. [[#anchor|Display]]
  *
  * Anchor compatibility:
  * - Obsidian block references: ^anchor-id at end of line

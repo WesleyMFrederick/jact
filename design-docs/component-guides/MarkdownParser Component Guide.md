@@ -331,6 +331,26 @@ export interface LinkObject {
 > Owned by CitationValidator. See [**`ValidationMetadata`**](CitationValidator%20Implementation%20Guide.md#ValidationMetadata%20Type%20(Discriminated%20Union)) for the full discriminated union definition.
 
 ---
+### Wikilink Grammar
+
+%% *Last Modified: 05/03/26 19:33:59* %%
+
+Source of truth: [`src/core/MarkdownParser/extractWikilinks.ts`](../../src/core/MarkdownParser/extractWikilinks.ts) (single regex per D1 — `WIKI_REGEX`). The 10 forms recognized:
+
+1. `[[Page]]` — bare page name
+2. `[[Page|Display]]` — page name with display text
+3. `[[Page.md]]` — page name with extension
+4. `[[Page.md|Display]]` — page name with extension and display text
+5. `[[Page#section]]` — page with section anchor
+6. `[[Page#section|Display]]` — page + section + display
+7. `[[Page.md#section]]` — page + extension + section
+8. `[[Page.md#section|Display]]` — page + extension + section + display
+9. `[[#anchor]]` — internal anchor only (no page)
+10. `[[#anchor|Display]]` — internal anchor with display text
+
+Display text defaults to the raw page name when omitted. Internal forms (9, 10) emit `scope: "internal"`; cross-document forms (1–8) emit `scope: "cross-document"`. All 10 produce `LinkObject` with `linkType: "wiki"`.
+
+---
 ### AnchorObject Type (Discriminated Union)
 
 ```typescript

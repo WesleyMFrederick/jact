@@ -199,10 +199,22 @@ The tool supports multiple path resolution strategies (in order):
 
 ## Citation Patterns Supported
 
+%% *Last Modified: 05/03/26 19:33:35* %%
+
 - Cross-document links: `[Text](path/to/file.md#anchor)`
 - Caret syntax: `^FR1`, `^US1-1AC1`, `^NFR2`
-- Wiki-style references: `[[#anchor|Text]]`
 - Emphasis-marked anchors: `#==**Component%20Name**==`
+- Wiki-style references — 10 forms per D1 grammar (source of truth: `src/core/MarkdownParser/extractWikilinks.ts`):
+  1. `[[Page]]`
+  2. `[[Page|Display]]`
+  3. `[[Page.md]]`
+  4. `[[Page.md|Display]]`
+  5. `[[Page#section]]`
+  6. `[[Page#section|Display]]`
+  7. `[[Page.md#section]]`
+  8. `[[Page.md#section|Display]]`
+  9. `[[#anchor]]`
+  10. `[[#anchor|Display]]`
 
 ## Exit Codes
 
