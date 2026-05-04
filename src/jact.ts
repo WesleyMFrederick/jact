@@ -25,6 +25,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { Command, Option } from "commander";
 import type { CitationValidator } from "./CitationValidator.js";
+import { computeValidationSummary } from "./CitationValidator.js";
 import {
 	checkExtractCache,
 	writeExtractCache,
@@ -238,7 +239,7 @@ export class JactCli {
 	async validate(
 		filePath: string,
 		options: CliValidateOptions = {},
-	): Promise<string> {
+	): Promise<{ output: string; result: ValidationResult }> {
 		try {
 			const startTime = Date.now();
 
@@ -271,44 +272,54 @@ export class JactCli {
 			const nestedCodeblockWarnings = detectNestedCodeblocks(fileContent);
 
 			// Apply line range filtering if specified
-			if (options.lines) {
-				const filteredResult = this.filterResultsByLineRange(
-					result,
-					options.lines,
-				);
-				if (options.format === "json") {
-					return this.formatAsJSON(filteredResult);
-				}
-				return this.formatForCLI(
-					filteredResult,
-					nestedCodeblockWarnings,
-					options.verbose ?? false,
-				);
-			}
+			const effectiveResult: ValidationResult = options.lines
+				? this.filterResultsByLineRange(result, options.lines)
+				: result;
 
-			if (options.format === "json") {
-				return this.formatAsJSON(result);
-			}
-			return this.formatForCLI(
-				result,
-				nestedCodeblockWarnings,
-				options.verbose ?? false,
-			);
+			const output =
+				options.format === "json"
+					? this.formatAsJSON(effectiveResult)
+					: this.formatForCLI(
+							effectiveResult as ValidationResult & { lineRange?: string },
+							nestedCodeblockWarnings,
+							options.verbose ?? false,
+						);
+
+			return { output, result: effectiveResult };
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
+			// Return a synthesized failure result so callers reading `result.summary`
+			// see a deterministic shape; CLI exit-code path treats this as exit 2 via
+			// the `error` field on the JSON payload (existing contract).
+			const errorResult: ValidationResult = {
+				summary: {
+					total: 0,
+					valid: 0,
+					warnings: 0,
+					errors: 0,
+					byLinkClass: { markdown: 0, wiki: 0, caret: 0 },
+					unrecognizedCount: 0,
+					errorBreakdown: { brokenLinks: 0, unrecognized: 0 },
+				},
+				links: [],
+				unrecognized: [],
+			};
 			if (options.format === "json") {
-				return JSON.stringify(
-					{
-						error: errorMessage,
-						file: filePath,
-						success: false,
-					},
-					null,
-					2,
-				);
+				return {
+					output: JSON.stringify(
+						{
+							error: errorMessage,
+							file: filePath,
+							success: false,
+						},
+						null,
+						2,
+					),
+					result: errorResult,
+				};
 			}
-			return `ERROR: ${errorMessage}`;
+			return { output: `ERROR: ${errorMessage}`, result: errorResult };
 		}
 	}
 
@@ -332,22 +343,20 @@ export class JactCli {
 			return link.line >= startLine && link.line <= endLine;
 		});
 
-		const filteredSummary = {
-			total: filteredLinks.length,
-			valid: filteredLinks.filter(
-				(link: EnrichedLinkObject) => link.validation.status === "valid",
-			).length,
-			errors: filteredLinks.filter(
-				(link: EnrichedLinkObject) => link.validation.status === "error",
-			).length,
-			warnings: filteredLinks.filter(
-				(link: EnrichedLinkObject) => link.validation.status === "warning",
-			).length,
-		};
+		// Filter unrecognized records by line range too (per D2 + GAP-5).
+		const filteredUnrecognized = result.unrecognized.filter(
+			(rec) => rec.line >= startLine && rec.line <= endLine,
+		);
+
+		const filteredSummary = computeValidationSummary(
+			filteredLinks,
+			filteredUnrecognized.length,
+		);
 
 		return {
 			...result,
 			links: filteredLinks,
+			unrecognized: filteredUnrecognized,
 			summary: filteredSummary,
 			lineRange: `${startLine}-${endLine}`,
 		};
@@ -397,8 +406,11 @@ export class JactCli {
 		lines.push(`Processed: ${result.summary.total} citations found`);
 		lines.push("");
 
-		if (result.summary.errors > 0) {
-			lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
+		const brokenLinkCount = result.summary.errorBreakdown.brokenLinks;
+		const unrecognizedCount = result.summary.unrecognizedCount;
+
+		if (brokenLinkCount > 0) {
+			lines.push(`CRITICAL ERRORS (${brokenLinkCount})`);
 			const errorLinks = result.links.filter(
 				(link) => link.validation.status === "error",
 			);
@@ -412,6 +424,21 @@ export class JactCli {
 						lines.push(`│  └─ Suggestion: ${link.validation.suggestion}`);
 					}
 				}
+				if (!isLast) lines.push("│");
+			}
+			lines.push("");
+		}
+
+		// UNRECOGNIZED SYNTAX section per §7g.4 GAP-1 — appears between CRITICAL ERRORS and WARNINGS.
+		if (unrecognizedCount > 0) {
+			lines.push(`UNRECOGNIZED SYNTAX (${unrecognizedCount})`);
+			for (const [index, rec] of result.unrecognized.entries()) {
+				const isLast = index === result.unrecognized.length - 1;
+				const prefix = isLast ? "└─" : "├─";
+				lines.push(`${prefix} Line ${rec.line}: ${rec.rawText}`);
+				lines.push(
+					`${isLast ? "   " : "│  "}└─ bracket sequence did not match wikilink grammar`,
+				);
 				if (!isLast) lines.push("│");
 			}
 			lines.push("");
@@ -467,7 +494,13 @@ export class JactCli {
 		lines.push(`- Total citations: ${result.summary.total}`);
 		lines.push(`- Valid: ${result.summary.valid}`);
 		lines.push(`- Warnings: ${result.summary.warnings}`);
-		lines.push(`- Critical errors: ${result.summary.errors}`);
+		lines.push(`- Critical errors: ${brokenLinkCount}`);
+		// §7g.4 GAP-3: SUMMARY block additions — class breakdown + unrecognized count.
+		const cls = result.summary.byLinkClass;
+		lines.push(
+			`- By link class: markdown=${cls.markdown}, wiki=${cls.wiki}, caret=${cls.caret}`,
+		);
+		lines.push(`- Unrecognized: ${unrecognizedCount}`);
 		if (nestedCodeblockWarnings.length > 0) {
 			lines.push(
 				`- Nested codeblock warnings: ${nestedCodeblockWarnings.length}`,
@@ -476,9 +509,12 @@ export class JactCli {
 		lines.push(`- Validation time: ${result.validationTime}`);
 		lines.push("");
 
-		if (result.summary.errors > 0) {
+		// Trailer branch order per §7g.6 + GAP-4: errors-first → unrecognized → warnings → all-valid.
+		if (brokenLinkCount > 0) {
+			lines.push(`VALIDATION FAILED - Fix ${brokenLinkCount} critical errors`);
+		} else if (unrecognizedCount > 0) {
 			lines.push(
-				`VALIDATION FAILED - Fix ${result.summary.errors} critical errors`,
+				`VALIDATION FAILED - ${unrecognizedCount} unrecognized syntax records`,
 			);
 		} else if (
 			result.summary.warnings > 0 ||
@@ -507,9 +543,13 @@ export class JactCli {
 		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
 	): string {
 		const lines: string[] = [];
+		const brokenLinkCount = result.summary.errorBreakdown.brokenLinks;
+		const unrecognizedCount = result.summary.unrecognizedCount;
+		const cls = result.summary.byLinkClass;
+		const coverageQualifier = `markdown: ${cls.markdown}, wiki: ${cls.wiki}, caret: ${cls.caret}`;
 
-		if (result.summary.errors > 0) {
-			lines.push(`ERRORS (${result.summary.errors})`);
+		if (brokenLinkCount > 0) {
+			lines.push(`ERRORS (${brokenLinkCount})`);
 			const errorLinks = result.links.filter(
 				(link) => link.validation.status === "error",
 			);
@@ -521,6 +561,16 @@ export class JactCli {
 						lines.push(`  suggestion: ${link.validation.suggestion}`);
 					}
 				}
+			}
+			lines.push("");
+		}
+
+		// UNRECOGNIZED section per §7g.3 GAP-1 — between ERRORS and trailer.
+		if (unrecognizedCount > 0) {
+			lines.push(`UNRECOGNIZED (${unrecognizedCount})`);
+			for (const rec of result.unrecognized) {
+				lines.push(`- Line ${rec.line}: ${rec.rawText}`);
+				lines.push(`  reason: bracket sequence did not match wikilink grammar`);
 			}
 			lines.push("");
 		}
@@ -548,24 +598,34 @@ export class JactCli {
 			lines.push("");
 		}
 
-		if (result.summary.errors > 0) {
-			// Errors → FAILED (exit 1)
-			const parts = [
-				`${result.summary.errors} ${result.summary.errors === 1 ? "error" : "errors"}`,
-			];
+		// Trailer — branch order parallels §7g.6 / verbose trailer.
+		// FAILED form per §7g.3 (g) GAP-2: counts + inline byLinkClass.
+		if (brokenLinkCount > 0 || unrecognizedCount > 0) {
+			const parts: string[] = [];
+			if (brokenLinkCount > 0) {
+				parts.push(
+					`${brokenLinkCount} ${brokenLinkCount === 1 ? "error" : "errors"}`,
+				);
+			}
 			if (totalWarnings > 0) {
 				parts.push(
 					`${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"}`,
 				);
 			}
-			lines.push(`FAILED: ${parts.join(", ")}`);
+			if (unrecognizedCount > 0) {
+				parts.push(`${unrecognizedCount} unrecognized`);
+			}
+			lines.push(`FAILED: ${parts.join(", ")} (${coverageQualifier})`);
 		} else if (totalWarnings > 0) {
-			// Warnings only → OK with note (exit 0, preserves exit code contract)
+			// Warnings only → OK with coverage qualifier + warnings note.
 			lines.push(
-				`OK: ${result.summary.total} citations valid (${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"})`,
+				`OK: ${result.summary.total} citations valid (${coverageQualifier}; ${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"})`,
 			);
 		} else {
-			lines.push(`OK: ${result.summary.total} citations valid`);
+			// Coverage qualifier per §7g.3 D3 (d) + (g).
+			lines.push(
+				`OK: ${result.summary.total} citations valid (${coverageQualifier}; ${unrecognizedCount} unrecognized)`,
+			);
 		}
 
 		return lines.join("\n");
@@ -1262,38 +1322,41 @@ Exit Codes:
 	)
 	.action(async (file: string, options: CliValidateOptions) => {
 		const manager = new JactCli();
-		let result: string;
 
 		if (options.fix) {
-			result = await manager.fix(file, options);
-			console.log(result);
-		} else {
-			result = await manager.validate(file, options);
-			console.log(result);
+			const fixOutput = await manager.fix(file, options);
+			console.log(fixOutput);
+			return;
 		}
 
-		// Set exit code based on validation result (only for validation, not fix)
-		if (!options.fix) {
-			if (options.format === "json") {
-				const parsed = JSON.parse(result);
+		// Type-I interface (per §7a D3 (f), GAP-6): manager.validate returns
+		// both formatted display string + structured ValidationResult.
+		const { output, result } = await manager.validate(file, options);
+		console.log(output);
+
+		// System errors (file-not-found etc.) — both branches share predicate.
+		if (options.format === "json") {
+			// JSON branch: error payload signals system failure (exit 2).
+			// Otherwise read structured `result.summary` directly — no JSON.parse.
+			try {
+				const parsed = JSON.parse(output) as { error?: unknown };
 				if (parsed.error) {
-					process.exit(2); // File not found or other errors
-				} else {
-					process.exit(parsed.summary?.errors > 0 ? 1 : 0);
+					process.exit(2);
 				}
-			} else {
-				if (result.includes("ERROR:")) {
-					process.exit(2); // File not found or other errors
-				} else {
-					// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
-					process.exit(
-						result.includes("FAILED:") || result.includes("VALIDATION FAILED")
-							? 1
-							: 0,
-					);
-				}
+			} catch {
+				// non-JSON output should never reach here when format === "json"
+				process.exit(2);
 			}
+		} else if (output.startsWith("ERROR:")) {
+			process.exit(2);
 		}
+
+		// Structured-field exit-code predicate (per §7a D3 (f) + GAP-5).
+		// Belt-and-suspenders disjunct retained even though `errors` is derived,
+		// so future schema drift cannot silently re-introduce a silent-pass.
+		process.exit(
+			result.summary.errors > 0 || result.summary.unrecognizedCount > 0 ? 1 : 0,
+		);
 	});
 
 // Shared option descriptions — kept in one place so wording stays consistent across subcommands

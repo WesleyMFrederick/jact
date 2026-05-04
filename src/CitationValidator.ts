@@ -1,10 +1,12 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { getLinkClass } from "./core/getLinkClass.js";
 import type ParsedDocument from "./ParsedDocument.js";
 import type { AnchorObject, LinkObject } from "./types/citationTypes.js";
 import type {
 	EnrichedLinkObject,
+	LinkClass,
 	PathConversion,
 	ValidationMetadata,
 	ValidationResult,
@@ -202,10 +204,11 @@ export class CitationValidator {
 			throw new Error(`File not found: ${filePath}`);
 		}
 
-		// 2. Get parsed document with LinkObjects
+		// 2. Get parsed document with LinkObjects + residual unrecognized records (per D2)
 		const sourceParsedDoc =
 			await this.parsedFileCache.resolveParsedFile(filePath);
 		const links = sourceParsedDoc.getLinks();
+		const unrecognized = sourceParsedDoc.getUnrecognized();
 
 		// 3. Enrich each link with validation metadata (parallel execution)
 		await Promise.all(
@@ -215,25 +218,18 @@ export class CitationValidator {
 			}),
 		);
 
-		// 4. Generate summary from enriched links
+		// 4. Generate summary from enriched links + residual records (per D3 + GAP-5)
 		const enrichedLinks = links as unknown as ValidationResult["links"];
-		const summary: ValidationSummary = {
-			total: enrichedLinks.length,
-			valid: enrichedLinks.filter((link) => link.validation.status === "valid")
-				.length,
-			warnings: enrichedLinks.filter(
-				(link) => link.validation.status === "warning",
-			).length,
-			errors: enrichedLinks.filter((link) => link.validation.status === "error")
-				.length,
-		};
+		const summary: ValidationSummary = computeValidationSummary(
+			enrichedLinks,
+			unrecognized.length,
+		);
 
-		// 5. Return enriched links + summary (no separate results array)
-		// `unrecognized` placeholder kept empty — P3 wires residual records through.
+		// 5. Return enriched links + residual records + summary
 		return {
 			summary,
 			links: enrichedLinks,
-			unrecognized: [],
+			unrecognized,
 		};
 	}
 
@@ -1137,4 +1133,45 @@ export class CitationValidator {
 
 		return result;
 	}
+}
+
+/**
+ * Compute ValidationSummary from enriched links + unrecognized count (per D3, GAP-5).
+ *
+ * `errors` is derived: `brokenLinks + unrecognized`. Existing `summary.errors > 0`
+ * predicate now structurally catches both failure classes — no consumer-doc reliance
+ * (per GAP-5). `byLinkClass` populated via getLinkClass classifier (per D3).
+ *
+ * Exported for reuse by CLI line-range filter (jact.ts).
+ */
+export function computeValidationSummary(
+	enrichedLinks: EnrichedLinkObject[],
+	unrecognizedCount: number,
+): ValidationSummary {
+	const byLinkClass: Record<LinkClass, number> = {
+		markdown: 0,
+		wiki: 0,
+		caret: 0,
+	};
+	let valid = 0;
+	let warnings = 0;
+	let brokenLinks = 0;
+	for (const link of enrichedLinks) {
+		byLinkClass[getLinkClass(link)]++;
+		if (link.validation.status === "valid") valid++;
+		else if (link.validation.status === "warning") warnings++;
+		else if (link.validation.status === "error") brokenLinks++;
+	}
+	return {
+		total: enrichedLinks.length,
+		valid,
+		warnings,
+		errors: brokenLinks + unrecognizedCount,
+		byLinkClass,
+		unrecognizedCount,
+		errorBreakdown: {
+			brokenLinks,
+			unrecognized: unrecognizedCount,
+		},
+	};
 }

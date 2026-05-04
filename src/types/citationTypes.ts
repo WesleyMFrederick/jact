@@ -1,7 +1,11 @@
 // src/types/citationTypes.ts
 
 import type { Token } from "marked";
-import type { LinkClass, ValidationMetadata } from "./validationTypes.js";
+import type {
+	LinkClass,
+	UnrecognizedSyntaxRecord,
+	ValidationMetadata,
+} from "./validationTypes.js";
 
 /** Re-export LinkClass for callers importing from citationTypes (per plan §3A.2). */
 export type { LinkClass };
@@ -171,4 +175,7 @@ export interface ParserOutput {
 
 	/** All anchors (potential link targets) in document */
 	anchors: AnchorObject[];
+
+	/** Residual `[[...]]` sequences not consumed by D1 grammar (per D2) */
+	unrecognized: UnrecognizedSyntaxRecord[];
 }

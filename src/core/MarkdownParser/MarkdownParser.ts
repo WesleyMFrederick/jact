@@ -86,16 +86,23 @@ export class MarkdownParser {
 		const tokens = marked.lexer(content);
 		const headings = this.extractHeadings(tokens);
 
+		// Single extractLinks call: surface BOTH links + unrecognized through ParserOutput.
+		// Wired in P3 so CitationValidator can populate ValidationResult.unrecognized[]
+		// and ValidationSummary.unrecognizedCount (closes P2 placeholder).
+		const { links, unrecognized } = extractLinks(
+			content,
+			filePath,
+			this.fileCache,
+		);
+
 		return {
 			filePath,
 			content,
 			tokens,
-			// `unrecognized` from extractLinks is intentionally dropped here —
-			// P3 wires residual records through ValidationResult; P2 only
-			// surfaces them via direct extractLinks callers.
-			links: this.extractLinks(content, filePath),
+			links,
 			headings,
 			anchors: this.extractAnchors(content, headings),
+			unrecognized,
 		};
 	}
 

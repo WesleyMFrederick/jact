@@ -1,5 +1,6 @@
 import type { Token } from "marked";
 import type { LinkObject, ParserOutput } from "./types/citationTypes.js";
+import type { UnrecognizedSyntaxRecord } from "./types/validationTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 
 /**
@@ -114,6 +115,14 @@ class ParsedDocument {
 	getLinks(): LinkObject[] {
 		// Return links array from parser output
 		return this._data.links;
+	}
+
+	/**
+	 * Get all residual `[[...]]` sequences not consumed by wikilink grammar (per D2).
+	 * @returns Array of UnrecognizedSyntaxRecord from extractLinks residual scanner
+	 */
+	getUnrecognized(): UnrecognizedSyntaxRecord[] {
+		return this._data.unrecognized;
 	}
 
 	/**
