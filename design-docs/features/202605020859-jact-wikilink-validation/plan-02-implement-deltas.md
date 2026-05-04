@@ -768,22 +768,22 @@ Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residu
 
 ### Phase 3A — Types + getLinkClass Classifier `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:06:44* %%
+%% *Last Modified: 05/03/26 18:55:03* %%
 
 Phase 3 split into 3A (foundation types + classifier) and 3B (consumer wiring) for context budget. 3A is pure additive — no consumer-facing changes yet.
 
-- [ ] **3A.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 2.C `end_hash`. Read Review Gate 1 findings.
-- [ ] **3A.1** IMPLEMENT: Add `LinkClass` type + `ValidationSummary` extensions (`byLinkClass`, `unrecognizedCount`, `errorBreakdown`) to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per [§7a.3 Data Shape Deltas](./plan.md#7a.3%20Data%20Shape%20Deltas) verbatim. Mark `errors` derived per GAP-5.
-- [ ] **3A.2** IMPLEMENT: Re-export `LinkClass` from `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/citationTypes.ts` per §"MODIFIED → src/types/citationTypes.ts" (line 264).
-- [ ] **3A.3** VERIFY: `npm run build` — confirm consumers may show missing-field errors on `byLinkClass` / `unrecognizedCount` / `errorBreakdown` (expected; addressed in 3B). No type-shape errors on `LinkClass` itself.
-- [ ] **3A.4** RED: Create `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/getLinkClass.test.ts` per §"ADDED → test/unit/core/getLinkClass.test.ts" assertions (lines 185–192). Five cases including the (linkType × anchorType) cross-product exhaustiveness check.
-- [ ] **3A.5** VERIFY RED: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/getLinkClass.test.ts` — confirm tests FAIL (no implementation yet).
-- [ ] **3A.6** GREEN: Create `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/getLinkClass.ts` per §"ADDED → src/core/getLinkClass.ts" sketch (lines 160–179). Three classification rules per D3.
-- [ ] **3A.7** VERIFY GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/getLinkClass.test.ts` — all cases PASS.
-- [ ] **3A.8** REFACTOR: Ensure cross-product exhaustive switch (no fall-through, no undefined return).
-- [ ] **3A.9** VERIFY: `npm run build && bun test` — full suite. No new regressions.
-- [ ] **3A.S** STATE-WRITE: Update checkboxes.
-- [ ] **3A.C** COMMIT: "feat(types): LinkClass + ValidationSummary extensions + getLinkClass classifier (D3 foundation)". `git rev-parse HEAD` → `end_hash: <hash>`.
+- [x] **3A.0** STATE-READ: `git rev-parse HEAD` → `start_hash: 3e65608` (intervening plan-only docs commit `3e65608` on top of Phase 2 back-fill `3699154` — treated as expected per team-lead Review-Gate-1 note). Read Review Gate 1 findings.
+- [x] **3A.1** IMPLEMENT: Added `LinkClass = "markdown" | "wiki" | "caret"` + extended `ValidationSummary` with `byLinkClass: Record<LinkClass, number>`, `unrecognizedCount: number`, `errorBreakdown: { brokenLinks: number; unrecognized: number }` in `src/types/validationTypes.ts` per §7a.3 verbatim. Marked `errors` derived per GAP-5.
+- [x] **3A.2** IMPLEMENT: Re-exported `LinkClass` from `src/types/citationTypes.ts` (`export type { LinkClass }`).
+- [x] **3A.3** VERIFY: `npm run build` — exactly 2 expected consumer errors (`CitationValidator.ts:220`, `jact.ts:351`) for missing `byLinkClass` / `unrecognizedCount` / `errorBreakdown` — addressed in 3B. No type-shape errors on `LinkClass` itself.
+- [x] **3A.4** RED: Created `test/unit/core/getLinkClass.test.ts` with 5 cases (wiki, markdown+block→caret, markdown+header→markdown, markdown+null→markdown, full (linkType × anchorType) cross-product exhaustiveness).
+- [x] **3A.5** VERIFY RED: `bun vitest run` confirmed FAIL — `Cannot find module '../../../src/core/getLinkClass.js'` (no impl yet).
+- [x] **3A.6** GREEN: Created `src/core/getLinkClass.ts` per sketch — switch on `linkType` with 3 classification rules (wiki / caret / markdown).
+- [x] **3A.7** VERIFY GREEN: `bun vitest run test/unit/core/getLinkClass.test.ts` → 5/5 PASS.
+- [x] **3A.8** REFACTOR: Switch is exhaustive over `linkType: "markdown" | "wiki"`; both arms return non-undefined `LinkClass`. TS `noImplicitReturns` enforces no fall-through.
+- [x] **3A.9** VERIFY: `npm run build` (2 expected consumer errors) + `bun test` → **607 pass / 1 fail** (pre-existing C3 plan-file scan persists; +5 from getLinkClass tests). Matches plan target.
+- [x] **3A.S** STATE-WRITE: Checkboxes updated.
+- [x] **3A.C** COMMIT: "feat(types): LinkClass + ValidationSummary extensions + getLinkClass classifier (D3 foundation)". `end_hash: <pending — recorded post-commit>`.
 
 ---
 

@@ -1,7 +1,10 @@
 // src/types/citationTypes.ts
 
 import type { Token } from "marked";
-import type { ValidationMetadata } from "./validationTypes.js";
+import type { LinkClass, ValidationMetadata } from "./validationTypes.js";
+
+/** Re-export LinkClass for callers importing from citationTypes (per plan §3A.2). */
+export type { LinkClass };
 
 /**
  * Link scope classification for citation validation.
