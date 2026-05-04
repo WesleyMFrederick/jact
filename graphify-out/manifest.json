@@ -1,0 +1,166 @@
+{
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/ParsedFileCache.ts": {
+    "mtime": 1777840863.9557977,
+    "hash": "382c45ba8060e5c6a266b58a2f98531d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/ParsedDocument.ts": {
+    "mtime": 1777859935.838897,
+    "hash": "b6237bef519ef1ea7fa295a690cc003a"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts": {
+    "mtime": 1777860116.090049,
+    "hash": "0cec4022ac18933a057c18ecfd55e9ce"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/FileCache.ts": {
+    "mtime": 1777861384.7455745,
+    "hash": "90d9c6f5b059aee62fc86d9e0db01dc8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/CitationValidator.ts": {
+    "mtime": 1777861468.1515088,
+    "hash": "7f7ce9ad8c96a4568282c4d51398477d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/formatExtractResult.ts": {
+    "mtime": 1777704050.8628628,
+    "hash": "1359270a088fa8c1ea541596dd964bc5"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/contentExtractorTypes.ts": {
+    "mtime": 1777704050.863591,
+    "hash": "93ed7d351861fb1a1bae77f789fa6b1f"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/citationTypes.ts": {
+    "mtime": 1777861399.820515,
+    "hash": "7666eca8452c8c8e342a80a422d8ab4b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/fileCacheTypes.ts": {
+    "mtime": 1777704050.8638678,
+    "hash": "13832cca79f89064609d8586744552cd"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts": {
+    "mtime": 1777859603.627843,
+    "hash": "eae8eae3c71fbe9c4107457b73ff0c15"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/resolveScope.ts": {
+    "mtime": 1777704050.8625476,
+    "hash": "1dfac75ded9951eca0e75c8a62c962e8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/getLinkClass.ts": {
+    "mtime": 1777859650.6302958,
+    "hash": "842622f7228be4ba4c1d772ae246af3b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/extractLinksContent.ts": {
+    "mtime": 1771544794.3487751,
+    "hash": "4ca56c3a0bd9fa6f1967f42fb95863e4"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/generateContentId.ts": {
+    "mtime": 1771544794.3488424,
+    "hash": "b02e70e82c698929854f95084e9be969"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/normalizeAnchor.ts": {
+    "mtime": 1771544794.348908,
+    "hash": "39776621ac3e70ab9b5bda4a0a5611e1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/ContentExtractor.ts": {
+    "mtime": 1771544794.34826,
+    "hash": "66f1f83676538408c60223bd2906fdb2"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/analyzeEligibility.ts": {
+    "mtime": 1771544794.3483262,
+    "hash": "9946cc4e71954f0a001f7b557cba3dca"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.ts": {
+    "mtime": 1771544794.3487062,
+    "hash": "322ba9c9698ca80668189a8a41c044ba"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.ts": {
+    "mtime": 1771544794.348577,
+    "hash": "7a1e5969e7d56559b7a06294210cb8b8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.ts": {
+    "mtime": 1771544794.3484445,
+    "hash": "917eff9a85a6e82beac0f53488a40a30"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.ts": {
+    "mtime": 1771544794.348646,
+    "hash": "0a7633eb76b9d47ff4e9bb6e04d0f495"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/ContentExtractor/eligibilityStrategies/ExtractionStrategy.ts": {
+    "mtime": 1771544794.3485134,
+    "hash": "f298d90d40b98eb252fe030c8f78e434"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractHeadings.ts": {
+    "mtime": 1771544794.3493903,
+    "hash": "2af692c90c4f058ee63a5b9ec21058c9"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/MarkdownParser.ts": {
+    "mtime": 1777862002.7132092,
+    "hash": "a763d74513acf39dd7b0b7ad9de18253"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/determineAnchorType.ts": {
+    "mtime": 1771544794.3492603,
+    "hash": "d2012983e4d773efc91892fa6b97c36b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/resolvePath.ts": {
+    "mtime": 1774463185.9819064,
+    "hash": "146db88597090a1a268562a01e0d8394"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts": {
+    "mtime": 1777859045.1972997,
+    "hash": "f802a3184a19e9295b558af72412fc72"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractAnchors.ts": {
+    "mtime": 1771544794.3493276,
+    "hash": "1bb19ddd967149c2a124aab678665261"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractWikilinks.ts": {
+    "mtime": 1777840863.957072,
+    "hash": "79cdf1fca4f8e15aea38f097e9ed1cd2"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/isInsideInlineCode.ts": {
+    "mtime": 1777840863.9576042,
+    "hash": "72f93fe14da73b54b60b903bc2cc2018"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/isInsideCodeBlock.ts": {
+    "mtime": 1777840863.9573882,
+    "hash": "08f30147605b4b59b2a11d252e830c24"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/index.ts": {
+    "mtime": 1771544794.3495374,
+    "hash": "df51712e897eb4d54dfd16d0a8556347"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/detectExtractionMarker.ts": {
+    "mtime": 1771544794.3491962,
+    "hash": "33652c93ed1883f251e0c51b72e4eb66"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/resolveWikiPath.ts": {
+    "mtime": 1777861372.6884043,
+    "hash": "7f5121bfa43c2203ecdeb56fee72ec62"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/createLinkObject.ts": {
+    "mtime": 1777861415.0972207,
+    "hash": "c77ea5c805aac37b4c18054f288160d3"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/detectNestedCodeblocks.ts": {
+    "mtime": 1773628721.2467651,
+    "hash": "49b55916d204ecbdbd6aff5f9f3c32df"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/cache/checkExtractCache.ts": {
+    "mtime": 1771544794.3477578,
+    "hash": "0b075851d5cba73e39db9b8754d0e57d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/utils/wikiPageSlug.ts": {
+    "mtime": 1777840863.9592967,
+    "hash": "8234e5e0732fcaebc40209e16034b1f6"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/utils/stringDistance.ts": {
+    "mtime": 1777704050.8641322,
+    "hash": "62a5100dce58a408e145646a66208f68"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/factories/LinkObjectFactory.ts": {
+    "mtime": 1771544794.3497107,
+    "hash": "e482c3abf72277b1a6f7f4a9c4b694b1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/factories/componentFactory.ts": {
+    "mtime": 1777840863.9582114,
+    "hash": "f39d83b6aa6ef298965329f8e32bb184"
+  }
+}
