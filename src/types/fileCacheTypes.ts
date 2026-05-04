@@ -23,6 +23,8 @@ export interface ResolveResultFailure {
 	candidates?: string[]; // reason: 'duplicate' | 'duplicate_fuzzy'
 	scope?: ScopeResolution; // populated when caller built the cache via applyScope
 	nearMisses?: string[]; // reason: 'not_found'; top-3 Levenshtein ≤ 2
+	/** Full absolute path(s) attempted during resolution (for error output). */
+	attemptedPaths?: string[];
 }
 
 export type ResolveResult = ResolveResultSuccess | ResolveResultFailure;

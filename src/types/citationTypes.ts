@@ -60,6 +60,8 @@ export interface LinkObject {
 			relative: string | null;
 			/** Wiki resolver attempt log (raw, slug+.md) when wiki resolution failed; undefined for success/non-wiki */
 			attempted?: readonly string[];
+			/** Full absolute paths attempted during wiki resolution (for error output); undefined until populated. */
+			attemptedPaths?: readonly string[];
 			/** Wiki resolver Levenshtein suggestions (full relative paths) when both attempts missed; undefined for success/non-wiki */
 			suggestions?: readonly string[];
 		};

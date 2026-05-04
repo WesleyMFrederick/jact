@@ -117,6 +117,7 @@ describe("CitationValidator — wiki suggestion-path wiring (P4)", () => {
 		attempted: readonly string[],
 		suggestions: readonly string[] | undefined,
 		raw: string,
+		opts?: { attemptedPaths?: readonly string[] },
 	): LinkObject {
 		return {
 			linkType: "wiki",
@@ -130,6 +131,7 @@ describe("CitationValidator — wiki suggestion-path wiring (P4)", () => {
 					relative: null,
 					attempted,
 					...(suggestions && { suggestions }),
+					...(opts?.attemptedPaths && { attemptedPaths: opts.attemptedPaths }),
 				},
 				anchor: null,
 			},
@@ -219,5 +221,29 @@ describe("CitationValidator — wiki suggestion-path wiring (P4)", () => {
 		expect(enriched.validation.error).toContain(
 			"Tried: Nonexistent, nonexistent.md",
 		);
+	});
+
+	it("wiki miss error renders full absolute attemptedPaths instead of raw slug forms", async () => {
+		const link = makeWikiMissLink(
+			["Heuristic Reasoning", "heuristic-reasoning.md"],
+			[],
+			"Heuristic Reasoning",
+			{
+				attemptedPaths: [
+					"/scope/wiki/Heuristic Reasoning.md",
+					"/scope/wiki/heuristic-reasoning.md",
+				],
+			},
+		);
+		const enriched = await validator.validateSingleCitation(link);
+		if (enriched.validation.status !== "error") {
+			throw new Error(
+				`expected error status, got ${enriched.validation.status}`,
+			);
+		}
+		expect(enriched.validation.error).toContain(
+			"/scope/wiki/heuristic-reasoning.md",
+		);
+		expect(enriched.validation.error).not.toContain("heuristic-reasoning.md, ");
 	});
 });

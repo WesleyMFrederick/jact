@@ -19,6 +19,8 @@ export type ResolvedPath =
 	| {
 			resolved: false;
 			attempted: [rawPath: string, slugPath: string];
+			/** Full absolute paths attempted during FileCache resolution (for error output). */
+			attemptedPaths?: readonly string[];
 			suggestions: string[];
 	  };
 
