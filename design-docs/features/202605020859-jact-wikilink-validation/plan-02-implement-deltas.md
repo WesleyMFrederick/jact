@@ -947,22 +947,80 @@ Closes CI-04 (Medium) + CI-06 (Medium) + CI-07 (Low). Single-source-of-truth: 10
 
 #### FINAL REVIEW GATE — BI/CI Coverage `code-reviewer` (opus)
 
-%% *Last Modified: 05/03/26 18:08:24* %%
+%% *Last Modified: 05/03/26 19:43:26* %%
 
 Holistic pass/fail evaluation against [§7a.1 BI ↔ Delta Coverage](./plan.md#7a.1%20BI%20%E2%86%94%20Delta%20Coverage) and [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage). NO partial credit. Every BI row + every CI row must be cited with file:line evidence proving FULL coverage.
 
-- [ ] **5.R** FINAL REVIEW: Scope — entire `git diff <0.C_end_hash>..HEAD` (every commit from Phase 1 through Phase 5). Required source artifacts (load each with `jact extract header` to guarantee in-context content; reading the markdown links also auto-loads via the on-read jact pipeline):
-  - [§5 Baseline Ideal Outcomes Table](./plan.md#5.%20Phase%202%20%E2%80%94%20Baseline%20Ideal%20Outcomes%20Table) (BI-1 … BI-7) — `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "5. Phase 2 — Baseline Ideal Outcomes Table"`
-  - [§6.5 Findings & CI Status Table](./plan.md#Findings%20%26%20CI%20(Critical%20Issues)%20Status%20Table) (CI-01 … CI-08) — `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "Findings & CI (Critical Issues) Status Table"`
-  - [§7a.1 BI ↔ Delta Coverage](./plan.md#7a.1%20BI%20%E2%86%94%20Delta%20Coverage) — `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "7a.1 BI ↔ Delta Coverage"`
-  - [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage) — `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "7a.2 CI ↔ Delta Coverage"`
-  - In-plan smoke evidence captured at 3B.12 + 5.7 (live in this plan file)
-  - **Produce a BI Coverage Verification table** — for each BI-1 … BI-7 row: `| BI | Ideal Outcome | Cited Implementation Evidence (file:line) | PASS/FAIL |`. Any BI not fully achieved by shipped code = FAIL.
-  - **Produce a CI Coverage Verification table** — for each CI-01 … CI-08 row: `| CI | Severity | Critical Issue | Cited Resolution Evidence (file:line) | PASS/FAIL |`. Any CI not structurally closed = FAIL.
-  - **Verify [§7g UI Sketch](./plan.md#7g.%20UI%20Sketch%20%E2%80%94%20CLI%20Output%20Validation) parity** — minimal/verbose/JSON outputs from 3B.12 + 5.7 evidence match "After (post-D1–D5)" blocks.
-  - **Verify hardening gates GREEN throughout** — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/scripts/service-level-smoke.sh`, ESLint, plan-eval, defer-language, portability, historical-replay all passing on final commit.
-  - **Verdict format:** `PASS` (every BI + every CI ✅ with evidence) or `FAIL` (list every uncovered BI/CI with what's missing).
-  - **PASS** → proceed to Architect Gate. **FAIL** → escalation policy. Tier 1: same `coder` fixes uncovered items; re-review. Tier 2: model override → opus. Tier 3: HUMAN HARD GATE.
+- [x] **5.R** FINAL REVIEW: Scope — `git diff 44f039b..39dfdf1` (Phase 1 through Phase 5, ~14 commits including auto-commit splits and state-write commits). Hardening gates verified on HEAD `39dfdf1`.
+
+  **VERDICT: PASS** (`reviewer-final` opus, 05/03/26). Every BI-1…BI-7 + every CI-01…CI-08 is structurally closed by shipped code with file:line evidence. §7g parity ✅. Hardening gates ✅.
+
+  ##### BI Coverage Verification Table
+
+  | BI | Ideal Outcome (compressed) | Cited Implementation Evidence (file:line) | PASS/FAIL |
+  |----|---------------------------|-------------------------------------------|-----------|
+  | BI-1 | Identify broken links across markdown/wiki/caret with no class silently skipped | D1 grammar `WIKI_REGEX` covers all 10 forms — `src/core/MarkdownParser/extractWikilinks.ts:17`; emits `linkType:"wiki"` LinkObjects — `:56`; routed to validator at `src/CitationValidator.ts:436-455`; D2 residual scanner covers any `[[…]]` not matching grammar — `src/core/MarkdownParser/extractLinks.ts:452-456`; D4 fail-loud message — `src/CitationValidator.ts:453`. Smoke: 8/11 wiki valid, 3 misses surface `error + Tried` at fixture probabilistic-vs-deterministic-systems.md (5.7 evidence). | ✅ PASS |
+  | BI-2 | Per-file report distinguishes processed/unprocessed link classes (detect silent skip) | D3 `byLinkClass` aggregator — `src/CitationValidator.ts:1158-1177`; D2/D3 `unrecognizedCount` & top-level `unrecognized[]` — `:1178, :1180-1182`; minimal CLI emits `(markdown:M, wiki:W, caret:C; K unrecognized)` — `src/jact.ts:548-549, 622, 627`; verbose CLI emits `- By link class:` + `- Unrecognized:` — `src/jact.ts:499-503`; JSON shape per §7g.5 verified at 5.7 inline (`summary.byLinkClass`, `summary.unrecognizedCount`, `summary.errorBreakdown`). | ✅ PASS |
+  | BI-3 | LLM agent verdict scope matches file's link inventory (green = trustworthy) | Structured-field exit-code path closes silent-pass — `src/jact.ts:1357-1359` (`errors > 0 \|\| unrecognizedCount > 0 → 1`); `errors` derived `brokenLinks + unrecognizedCount` — `src/CitationValidator.ts:1176`; verbose trailer order forbids "ALL CITATIONS VALID" while exit=1 — `src/jact.ts:512-530` (errors→unrec→warnings→all-valid); test guard at `test/unit/jact-validate.test.ts:101-120` asserts `expect(stdout).not.toContain("ALL CITATIONS VALID")` on unrec-only path. | ✅ PASS |
+  | BI-4 | Wiki maintainer cross-references stay correct including wikilinks | D1 grammar produces wiki LinkObjects (BI-1 evidence); D4 path resolution via FileCache slug fallback — `src/core/MarkdownParser/resolveWikiPath.ts:38-74`; broken-wiki path produces explicit `Tried: <raw>, <slug>.md` + Levenshtein `suggestions[]` — `:61-74`. Smoke fixture produces 3 broken-wiki errors, each surfaces `target.path.suggestions` array (smoke script assertion lines 62-71). | ✅ PASS |
+  | BI-5 | Author sees broken links across syntaxes — choice of syntax doesn't change error surfacing | Same fail-loud format applies to wiki and markdown via shared `validation.error` field — `src/CitationValidator.ts:445-453`; getLinkClass classifier maps wiki + caret + markdown into uniform `byLinkClass` — `src/CitationValidator.ts:1167`; smoke + 5.7 evidence shows wiki misses produce identical-shape `validation: { status:"error", error, suggestion }` envelope as markdown errors. | ✅ PASS |
+  | BI-6 | Tool integrator (CLAUDE.md) trusts documented patterns are validated identically | D5 single-source-of-truth: 10-form enumeration appears identically in `CLAUDE.md:200-217` ("Citation Patterns Supported"), `src/core/MarkdownParser/MarkdownParser.ts:36+` (JSDoc), and `design-docs/component-guides/MarkdownParser Component Guide.md:334-338` ("Wikilink Grammar" subsection citing `extractWikilinks.ts` as source). All three doc sites cite the same source-of-truth file. | ✅ PASS |
+  | BI-7 | Service-level parity: `[[wikilinks]]` = `[markdown](links)` (FP rate, FN rate, loud-fail, validator integration) | (a) FP rate — code-block exclusion shared via `extractWikilinks.ts:39-43` (lastIndex reset + iteration uses parser-level fenced-block filter — verified at `test/unit/core/MarkdownParser/extractWikilinks.test.ts` "fenced code block exclusion" cases). (b) FN rate — D1 grammar + D2 scanner ensure no class silently skipped (BI-1 evidence). (c) Loud-fail — `Wiki page not found: <raw>. Tried: <raw>, <slug>.md` at `src/CitationValidator.ts:453` mirrors markdown loud-fail format. (d) Validator integration — `target.path` pre-resolved by `resolveWikiPath` then consumed by validator unchanged (`src/CitationValidator.ts:436-455`). Smoke script asserts (b)+(c)+(d) end-to-end (`scripts/service-level-smoke.sh:30-71` exits 0). Note: §7a.1 table omits BI-7 row (docs-only deviation, code-side covered by D1+D2+D3+D4 collectively). | ✅ PASS |
+
+  ##### CI Coverage Verification Table
+
+  | CI | Severity | Critical Issue (compressed) | Cited Resolution Evidence (file:line) | PASS/FAIL |
+  |----|----------|----------------------------|---------------------------------------|-----------|
+  | CI-01 | Critical | Silent false-negative on wikilinks | D1 single regex `WIKI_REGEX` produces `LinkObject` for all 10 forms — `src/core/MarkdownParser/extractWikilinks.ts:17`; existing validator routing wakes — `src/CitationValidator.ts:436-455`; baseline-fixture integration test asserts 11 occurrences captured — `test/unit/core/MarkdownParser/extractWikilinks.test.ts` "captures exactly 11 wikilink occurrences in baseline fixture". | ✅ PASS |
+  | CI-02 | High | Dead `classifyPattern` wiki routing | D1 LinkObjects feed validator's wiki branch which now activates — `src/CitationValidator.ts:436-455` ("Wiki page not found" loud-fail logic now reachable for first time). End-to-end pipeline test at `test/unit/core/MarkdownParser/extractLinks-wikilink-pipeline.test.ts` "resolves ≥7 cross-doc wiki links to non-null absolute paths" PASS. | ✅ PASS |
+  | CI-03 | Critical | No fail-fast on unrecognized wiki syntax | D2 `scanResidualBrackets` emits `UnrecognizedSyntaxRecord[]` per residual — `src/core/MarkdownParser/extractLinks.ts:452-466, 577`; threaded via ParserOutput → ParsedDocument → `CitationValidator.validateFile` → `ValidationResult.unrecognized`; CLI surfaces `UNRECOGNIZED (K)` (minimal, `src/jact.ts:570`) and `UNRECOGNIZED SYNTAX (K)` (verbose, `:434`); structured-field exit-code path treats `unrecognizedCount > 0` as failure — `src/jact.ts:1357-1359`. | ✅ PASS |
+  | CI-04 | Medium | Scattered wikilink invariant (two regex sites) | D1 collapses to single `WIKI_REGEX` — `src/core/MarkdownParser/extractWikilinks.ts:17`; old `extractWikiCrossDocLinks` and `extractWikiInternalLinks` removed (grep on `src/core/MarkdownParser/extractLinks.ts` returns no matches for either symbol). One-invariant-one-place restored. | ✅ PASS |
+  | CI-05 | High | Output carries no coverage qualifier; exit code on display string | D3 adds `byLinkClass` + `unrecognizedCount` + `errorBreakdown` to `ReportSummary` — `src/CitationValidator.ts:1158-1182`; minimal CLI prints `(markdown:M, wiki:W, caret:C; K unrecognized)` — `src/jact.ts:548-549, 618, 622, 627`; verbose CLI prints `- By link class:` + `- Unrecognized:` — `src/jact.ts:499-503`; structured-field exit-code reads `result.summary.errors` & `result.summary.unrecognizedCount` (no string-match) — `src/jact.ts:1357-1359`. Type-I `manager.validate()` returns `{output, result}`. | ✅ PASS |
+  | CI-06 | Medium | Doc drift across CLAUDE.md / JSDoc / component guide | D5 aligns three doc sites to identical 10-form enumeration: `CLAUDE.md:200-217`, `src/core/MarkdownParser/MarkdownParser.ts:36+`, `design-docs/component-guides/MarkdownParser Component Guide.md:334-338`. All three cite `src/core/MarkdownParser/extractWikilinks.ts` as source-of-truth. | ✅ PASS |
+  | CI-07 | Low | Misleading function name `extractWikiCrossDocLinks` | Symbol removed from codebase (grep on `src/core/MarkdownParser/extractLinks.ts` returns 0 matches for `extractWikiCrossDocLinks` or `extractWikiInternalLinks`). D1 `extractWikilinks` is the single replacement. | ✅ PASS |
+  | CI-08 | Low | `resolvePath` called with bare page name post-fix (latent illegal state) | D4 `resolveWikiPath` introduces three-step resolution (explicit path → slug → FileCache fallback) — `src/core/MarkdownParser/resolveWikiPath.ts:38-74`; on miss returns `{resolved:false, attempted, suggestions}` (no filesystem path fabricated); `getEntries()` added to FileCache — `src/FileCache.ts` (referenced at `resolveWikiPath.ts:11, 62`); explicit `Wiki page not found: <raw>. Tried: <raw>, <slug>.md` rendered at validator boundary — `src/CitationValidator.ts:453`. | ✅ PASS |
+
+  ##### §7g UI Sketch Parity Verification
+
+  | §7g Spec Block | "After (post-D1–D5)" Required Element | Live Evidence (3B.12 / 5.7 / source) | Match |
+  |---------------|---------------------------------------|--------------------------------------|-------|
+  | §7g.3 Minimal | `ERRORS (N)` section | `src/jact.ts:566-567` + 3B.12 fixture-output | ✅ |
+  | §7g.3 Minimal | `UNRECOGNIZED (K)` section between ERRORS and trailer | `src/jact.ts:568-572` | ✅ |
+  | §7g.3 Minimal | `FAILED: <parts> (markdown:M, wiki:W, caret:C)` trailer | `src/jact.ts:618` + 3B.12 inline `FAILED: 11 errors (markdown: 42, wiki: 11, caret: 0)` | ✅ |
+  | §7g.4 Verbose | `CRITICAL ERRORS (N)` section | `src/jact.ts:432, 514` | ✅ |
+  | §7g.4 Verbose | `UNRECOGNIZED SYNTAX (K)` section | `src/jact.ts:432-434` | ✅ |
+  | §7g.4 Verbose | SUMMARY `- By link class: markdown=N, wiki=N, caret=N` line | `src/jact.ts:499-501` + 5.7 inline `- By link class: markdown=42, wiki=11, caret=0` | ✅ |
+  | §7g.4 Verbose | SUMMARY `- Unrecognized: K` line | `src/jact.ts:503` + 5.7 inline `- Unrecognized: 0` | ✅ |
+  | §7g.4 Verbose | Trailer `VALIDATION FAILED - Fix N critical errors` | `src/jact.ts:514` + 5.7 inline matches | ✅ |
+  | §7g.4 Verbose | Trailer order errors→unrec→warnings→all-valid (GAP-4) | `src/jact.ts:512-530` + test/unit/jact-validate.test.ts:101-120 guard | ✅ |
+  | §7g.5 JSON | `summary.byLinkClass`, `summary.unrecognizedCount`, `summary.errorBreakdown` | `src/CitationValidator.ts:1177-1182` + 5.7 inline JSON matches schema | ✅ |
+  | §7g.5 JSON | `errors = brokenLinks + unrecognized` (GAP-5) | `src/CitationValidator.ts:1176` + 5.7 invariant verified `errors(3) === brokenLinks(3) + unrecognized(0)` | ✅ |
+  | §7g.5 JSON | top-level `unrecognized[]` array | 5.7 inline `"unrecognized": []` ✓; D2 records flow via `ParserOutput.unrecognized` | ✅ |
+  | §7g.5 JSON | `target.path.suggestions[]` field on wiki misses | `src/core/MarkdownParser/resolveWikiPath.ts:22, 70, 74` + 5.7 inline `"suggestions": []` ✓; smoke script asserts presence (`service-level-smoke.sh:62-71`) | ✅ |
+  | §7g.5 JSON | `validation.error: "Wiki page not found: <raw>. Tried: <raw>, <slug>.md"` | `src/CitationValidator.ts:453` + 5.7 inline error matches loud-fail format | ✅ |
+
+  ##### Hardening Gates Verification (HEAD `39dfdf1`)
+
+  | Gate | Command / Test | Result |
+  |------|----------------|--------|
+  | C1 — D1 ESLint + idiom-guard injectable bans | `bun test test/hardening-pipeline/c1-d1-injectable-bans.test.ts` (in suite below) | ✅ 3/3 PASS |
+  | C2 — plan-eval.sh trigger | `bun test test/hardening-pipeline/c2-plan-eval.test.ts` | ✅ 4/4 PASS |
+  | C3 — defer-language scan | `bun test test/hardening-pipeline/c3-defer-language-scan.test.ts` | ✅ all PASS (P5 reword closed sole P0-baseline failure) |
+  | C4 — pipeline portability | `bun test test/hardening-pipeline/c4-portability.test.ts` | ✅ 4/4 PASS |
+  | C5 — historical-plan replay | `bun test test/hardening-pipeline/c5-historical-replay.test.ts` | ✅ 3/3 PASS |
+  | C6 — fixture template doc | `bun test test/hardening-pipeline/c6-fixture-template.test.ts` | ✅ 3/3 PASS |
+  | Hardening pipeline aggregate | `bun test test/hardening-pipeline/` | ✅ **22 pass / 0 fail** |
+  | Service-level smoke | `bash scripts/service-level-smoke.sh` | ✅ exit 0 (≥7/8 wiki valid; loud-fail format ✓; suggestions field ✓) |
+  | Full test suite | `bun test` | ✅ **631 pass / 0 fail / 2689 expects across 105 files** |
+  | TypeScript build | `npm run build` | ✅ tsc exit 0 |
+
+  ##### Pre-existing Out-of-Scope Finding (NOT blocking)
+
+  Per coder-p5 report: 4 pre-existing broken citations in `design-docs/component-guides/MarkdownParser Component Guide.md` lines 21-24 pointing at sibling repo `cc-workflows-site`. **Status: NOT a P5/D1-D5 regression** — these citations predate plan-02 baseline `33dc4b1` and are unrelated to wikilink validation scope. Documented here for awareness; deferred to a separate cleanup pass per the project's tech-debt policy. Architect Gate may scope decide.
+
+  ##### Verdict
+
+  **PASS** — every BI-1…BI-7 ✅, every CI-01…CI-08 ✅, §7g UI parity ✅ (14/14 spec elements match), hardening gates ✅ (all 6 categories + 631/0 full suite + smoke + tsc). Proceed to Architect Gate (5.A).
 
 ---
 
