@@ -188,8 +188,8 @@
     "hash": "ea5472884538a618501817e98a9a2379"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/FileCache.gitignore.test.ts": {
-    "mtime": 1777917821.0233486,
-    "hash": "9eb1fa0825464798c543cebd388ece18"
+    "mtime": 1777919884.0612466,
+    "hash": "ef667da3a2f83727196df2cc0b214683"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/formatExtractResult.test.ts": {
     "mtime": 1777704050.8692703,
@@ -348,8 +348,8 @@
     "hash": "031705ce237767d25fdd6ca120bbc52a"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/ast-default-scope.test.ts": {
-    "mtime": 1777840863.963854,
-    "hash": "f83c04afed5c1a6122c31ac92df4be72"
+    "mtime": 1777918704.6371722,
+    "hash": "776f3ecb498f465ac2ed720b1c590769"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/backtick-anchor-links.test.js": {
     "mtime": 1771544794.3577282,
@@ -468,8 +468,8 @@
     "hash": "3a689304c3a09675b62d931683749767"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/FileCache.ts": {
-    "mtime": 1777917635.7897024,
-    "hash": "e69df96a000faef19b912899c23911e3"
+    "mtime": 1777919905.765442,
+    "hash": "df9601d78136983c4bed139965a26eec"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/CitationValidator.ts": {
     "mtime": 1777915078.2610652,
@@ -663,6 +663,10 @@
     "mtime": 1777840863.9515774,
     "hash": "7c116a0e88af02ac83b06cc61ffef0fa"
   },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/workflows/plan-ingestion-task-pickup.md": {
+    "mtime": 1777921347.179289,
+    "hash": "bc31f0488e7cbf7965607673002bbbfe"
+  },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/CLI Architecture Overview.md": {
     "mtime": 1773752796.6816533,
     "hash": "7683aa96d0d29d78818fb5dca2d5c57c"
@@ -726,6 +730,14 @@
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/fixtures/wikilink-plan-01.md": {
     "mtime": 1777915516.9821677,
     "hash": "31c2237cc09cd0bc6b50b727acb85767"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/fixtures/dir2/plan.md": {
+    "mtime": 1777918695.2250025,
+    "hash": "a778f1c5fa5741237c6882279ba26df9"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/fixtures/dir1/plan.md": {
+    "mtime": 1777918695.2232983,
+    "hash": "a778f1c5fa5741237c6882279ba26df9"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/extract-test-target-1.md": {
     "mtime": 1771544794.3535416,
