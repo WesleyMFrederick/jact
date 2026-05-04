@@ -640,21 +640,46 @@ No "ship-with-followups," no "minor issues acceptable." Either every Ideal Outco
 
 ### Phase 0 — Baseline `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 17:59:22* %%
+%% *Last Modified: 05/03/26 18:28:48* %%
 
-- [ ] **0.0** STATE-READ: `git rev-parse HEAD` → record as `baseline_hash: <hash>` in this plan file. Anchors entire sequence.
-- [ ] **0.1** BASELINE: Run LSP commands from §"LSP commands to run before coding" (lines 70–100):
+- [x] **0.0** STATE-READ: `git rev-parse HEAD` → record as `baseline_hash: <hash>` in this plan file. Anchors entire sequence.
+  - `baseline_hash: 33dc4b1af70122657a110c613580405b676c696c`
+- [x] **0.1** BASELINE: Run LSP commands from §"LSP commands to run before coding" (lines 70–100):
   - `LSP findReferences` on `manager.validate` (`/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts`), `ValidationResult` and `ReportSummary` (`/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts`)
+    - `manager.validate` (jact.ts:238 → JactCli.validate) — 2 refs total: declaration + 1 call site at jact.ts:1271 (CLI program action handler). Type-I interface change blast radius = single call site.
+    - `ValidationResult` (validationTypes.ts:69) — 17 refs across 6 files: CitationValidator.ts (lines 10,199,219), contentExtractorTypes.ts (4,134), extractLinksContent.ts (1,36,64), ContentExtractor.ts (2,37), jact.ts (57,326,328,382,506,579). Adding `unrecognized[]` field requires checking ContentExtractor consumers and jact formatter sites.
+    - `ReportSummary` does NOT exist as a named type — actual type is `ValidationSummary` (validationTypes.ts:56). 4 refs: declaration, used at validationTypes.ts:70 (inside ValidationResult), CitationValidator.ts (10,220 import + summary build site).
   - `LSP documentSymbol` on `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/createLinkObject.ts`
+    - extractLinks.ts: top-level functions = `hasNestedTokens` (14), `isLinkToken` (23), `findPosition` (36), `isDuplicateLink` (57), `extractLinksFromTokens` (75), `extractMarkdownLinksRegex` (185), `extractCiteLinks` (332), `extractCaretLinks` (376), `extractLinks` (437). NOTE: `getCodeBlockLines` (referenced by Audit at line 75-102) NOT present as a separate symbol — inlined inside `extractLinks` body via `codeBlockLines` constant (line 452). P1 sibling-sweep step needs to revisit this finding.
+    - createLinkObject.ts: only top-level symbol = `createLinkObject` Function (16). Single-purpose module.
   - `LSP workspaceSymbol` on `classify`, `extractWikilinks`
+    - `classify` workspace search → only match is `classifyPattern` Method in CitationValidator.ts:304. No existing display-layer classifier (consistent with P3 spec — `getLinkClass` is a green-field add).
+    - `extractWikilinks` workspace search → `extractWikilinks` Function in src/core/MarkdownParser/extractWikilinks.ts:28. Single-export module.
   - `LSP findReferences` on `formatForCLIMinimal`, `formatForCLIVerbose`, `formatForJSON`
+    - NAME MISMATCH WITH PLAN: actual symbols are `formatForCLI` (verbose mode, jact.ts:381), `formatForCLIMinimal` (jact.ts:505), `formatAsJSON` (jact.ts:579). Plan refers to "formatForCLIVerbose" / "formatForJSON" — implementing agent must rename references in plan or use actual names.
+    - `formatForCLI` (verbose) — 3 refs: declaration + jact.ts:282, 292 (called from validate method based on format flag).
+    - `formatForCLIMinimal` — 2 refs: declaration + jact.ts:387 (called from formatForCLI as the minimal-mode branch).
+    - `formatAsJSON` — 3 refs: declaration + jact.ts:280, 290.
   - `LSP documentSymbol` on `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/utils/stringDistance.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/resolveWikiPath.ts`
+    - stringDistance.ts: `levenshteinDistance` Function (11) — single export, ready for P4 reuse.
+    - resolveWikiPath.ts: `ResolvedPath` type (7) + `resolveWikiPath` Function (20). P4 will extend the miss path; current shape `{ resolved, absolutePath?, attempted? }` (lines 8-9) needs a `suggestions?: string[]` addition per §7a.3.
   - Record findings in plan as inline notes under each LSP line
-- [ ] **0.2** BASELINE: Read key files in order per §"Key files to read" (lines 102–115). Read whole files for ≤300 lines; otherwise targeted offset/limit reads on the cited symbols.
-- [ ] **0.3** BASELINE: Run existing test suite to establish green baseline: `bun test` (or `npm test`). Record any pre-existing failures as inline notes — these are NOT introduced by this plan and must NOT be counted as regressions in later phases.
-- [ ] **0.4** BASELINE: Build clean: `npm run build` — confirm zero TypeScript errors before any edits.
-- [ ] **0.S** STATE-WRITE: Update plan checkboxes 0.0–0.4 at plan file path. Record any baseline deviations (failing tests, type errors).
-- [ ] **0.C** COMMIT: No code changes expected. If baseline notes added, commit "chore(plan-02): record Phase 0 baseline notes". `git rev-parse HEAD` → `end_hash: <hash>` recorded next to this checkbox.
+- [x] **0.2** BASELINE: Read key files in order per §"Key files to read" (lines 102–115). Read whole files for ≤300 lines; otherwise targeted offset/limit reads on the cited symbols.
+  - Source files read in full: `extractWikilinks.ts` (78 lines, D1 grammar `WIKI_REGEX` line 17 covers all 10 forms), `resolveWikiPath.ts` (37 lines, ResolvedPath type currently `{resolved:true,absolutePath} | {resolved:false,attempted:[raw,slug]}` — P4 will extend), `validationTypes.ts` (73 lines, ValidationSummary lines 56-61 → P3 adds 3 fields, ValidationResult lines 69-73 → P2 adds `unrecognized[]`).
+  - Source file read targeted (jact.ts is 1532 lines): `validate` method (238-313, current return type `Promise<string>` per P3 GAP-6), `formatForCLI` verbose (381-497, has SUMMARY block + trailer branches), `formatForCLIMinimal` (505-572, has FAILED:/OK: lines), `formatAsJSON` (579-581 — single JSON.stringify), exit-code path (1276-1296 — string-match `result.includes("FAILED:") || result.includes("VALIDATION FAILED")` confirmed; matches LSP Audit Finding at line 128).
+  - Plan extracts (items 1-5: §7a Delta Architecture Table, §7a.3 Data Shape Deltas, §7b Design Decisions Rationale, §7g UI Sketch, fixture-template Adversarial CommonMark Set) to be loaded just-in-time by Phase 1+ via `jact extract header` per existing phase steps (e.g. 1.1 reads fixture-template). Not blocking baseline gate.
+- [x] **0.3** BASELINE: Run existing test suite to establish green baseline: `bun test` (or `npm test`). Record any pre-existing failures as inline notes — these are NOT introduced by this plan and must NOT be counted as regressions in later phases.
+  - Ran `npm test` (vitest). Result: **585 passed, 1 failed** (586 total tests, 99 of 100 test files green).
+  - **Pre-existing failure (NOT a regression):** `test/hardening-pipeline/c3-defer-language-scan.test.ts > C3 — defer-language scan > scans all design-docs/features/**/*.md and reports any violators` — flags `plan-02-implement-deltas.md` itself for banned tokens. Verified pre-existing by stashing my Phase 0 edits and re-running the test against baseline_hash content: failure persists. Banned tokens identified via `bash scripts/defer-language-scan.sh`: `deferred to`, `tech debt`. Both are present in plan content authored before this Phase 0 (not introduced by my LSP notes).
+  - Action item for downstream phases: this hardening-pipeline failure must not be treated as a regression. Reviewer at REVIEW GATE 1+ should expect 1 failing test until the plan-file banned-token usage is reworded (out-of-scope-for-Phase-0 cleanup; consider scrubbing during P5 D5 documentation alignment when other doc surfaces are touched).
+- [x] **0.4** BASELINE: Build clean: `npm run build` — confirm zero TypeScript errors before any edits.
+  - `tsc` exited 0. Zero TypeScript errors. Build clean.
+- [x] **0.S** STATE-WRITE: Update plan checkboxes 0.0–0.4 at plan file path. Record any baseline deviations (failing tests, type errors).
+  - Checkboxes 0.0–0.4 marked `[x]`. Deviations recorded inline (single pre-existing test failure under 0.3; zero build errors under 0.4).
+  - Plan-naming deviation surfaced: §"LSP commands to run before coding" mentions `formatForCLIVerbose` and `formatForJSON`; actual symbols are `formatForCLI` (verbose mode lives inside) and `formatAsJSON`. P3 implementing agent must use actual names when modifying jact.ts. Also §"LSP commands" mentions `ReportSummary`; actual type is `ValidationSummary`. P2/P3 agents must use `ValidationSummary` when extending the type.
+  - Plan-symbol deviation surfaced: §"LSP Audit Findings" line 144 cites `getCodeBlockLines (lines 75-102)` in extractLinks.ts as a separate function. LSP `documentSymbol` confirms NO such top-level symbol exists; the byte-range query is inlined inside `extractLinks` (codeBlockLines constant at line 452, sourced from `getFencedCodeBlockLineSet` in isInsideCodeBlock.ts). The §1.4 sibling-sweep step should be reframed: "verify `extractLinks` body inlines `getFencedCodeBlockLineSet`; consider extracting if reused".
+- [x] **0.C** COMMIT: No code changes expected. If baseline notes added, commit "chore(plan-02): record Phase 0 baseline notes". `git rev-parse HEAD` → `end_hash: <hash>` recorded next to this checkbox.
+  - Baseline notes added to plan (LSP findings under 0.1, file-read summary under 0.2, test/build results under 0.3/0.4, deviations under 0.S). Commit pending.
 
 ---
 
