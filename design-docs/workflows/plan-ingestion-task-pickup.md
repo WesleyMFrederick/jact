@@ -51,18 +51,18 @@ Cold-start workflow for ingesting a plan via `jact`, reading the State Log to id
 
 ## Activity Legend
 
-%% *Last Modified: 05/04/26 11:54:25* %%
+%% *Last Modified: 05/04/26 11:56:03* %%
 
 | Node | Activity | Tool / Command | Why |
 |------|----------|----------------|-----|
 | [a] | User provides absolute plan path | — | jact requires absolute paths |
 | [b] | Render heading outline | `/jact-displaying-headings` skill OR `jact ast <abs-path> \| jq -r '.headings[] \| "\(("  " * (.level - 1)))\("#" * .level) \(.text)"'` | Must know exact heading text before calling extract |
-| [c] | Extract Goal section | `jact extract header <abs-path> "Goal"` | parallel: independent of d–g |
-| [d] | Extract Current Behavior section | `jact extract header <abs-path> "Current Behavior"` | parallel: independent of c, e–g |
-| [e] | Extract Target Behavior section | `jact extract header <abs-path> "Target Behavior"` | parallel: independent of c–d, f–g |
-| [f] | Extract Root Cause section | `jact extract header <abs-path> "Root Cause"` | parallel: independent of c–e, g |
-| [g] | Extract Files to Modify section | `jact extract header <abs-path> "Files to Modify"` | parallel: independent of c–f |
-| [h] | Extract State Log section | `jact extract header <abs-path> "State Log"` | sequential: task-pickup state, not plan context |
+| [c] | Extract Goal section | `jact extract header <abs-path> "Goal"` | defines task scope and success criteria |
+| [d] | Extract Current Behavior section | `jact extract header <abs-path> "Current Behavior"` | establishes what is broken and how |
+| [e] | Extract Target Behavior section | `jact extract header <abs-path> "Target Behavior"` | defines done |
+| [f] | Extract Root Cause section | `jact extract header <abs-path> "Root Cause"` | informs where to look in codebase |
+| [g] | Extract Files to Modify section | `jact extract header <abs-path> "Files to Modify"` | seeds context bootstrap file list |
+| [h] | Extract State Log section | `jact extract header <abs-path> "State Log"` | task-pickup state, not plan context |
 | [i] | Read last commit from prior session | `git show <hash>` (hash from State Log) | optional: only if State Log contains a commit hash; surfaces what changed without re-reading full context |
 | [j] | Analyze State Log → identify next pending task | Mental analysis of completion markers + commit hashes | **HARD GATE** — wrong task = wasted context loading |
 | [k] | Extract Task X (Context Bootstrap) | `jact extract header <abs-path> "Task X - Name"` | depends on [j] to know which task |
