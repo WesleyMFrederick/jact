@@ -789,7 +789,7 @@ Phase 3 split into 3A (foundation types + classifier) and 3B (consumer wiring) f
 
 ### Phase 3B — Coverage-Qualified Output + Type-I Interface (TDD) `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 19:09:05* %%
+%% *Last Modified: 05/03/26 19:09:37* %%
 
 Closes CI-05 (High), GAP-2/3/4/5/6. Largest-blast-radius phase: `manager.validate()` Type-I interface change, exit-code refactor, formatter overhaul. Includes the LSP Audit Findings exit-code predicate fix (folded per project tech-debt policy).
 
@@ -834,7 +834,7 @@ Closes CI-05 (High), GAP-2/3/4/5/6. Largest-blast-radius phase: `manager.validat
   GAP-5 invariant verified: `errors (11) === brokenLinks (11) + unrecognized (0)`. ✓
 
 - [x] **3B.S** STATE-WRITE: Checkboxes updated. §7g.3 manual-diff evidence captured inline at 3B.12. Deviations: (a) JSON e2e test loosened from `length === 1` to `length === unrecognizedCount` to match residual scanner's by-design emission (one record per residual run, not per logical malformed sequence). (b) `renderSummaryLine` helper extraction deferred (3B.10) — formatters have distinct rendering shapes and pulling a shared helper would force lowest-common-denominator API; revisit at P5 if more formatter modes are added.
-- [ ] **3B.C** COMMIT: "feat(cli): coverage-qualified output + Type-I manager.validate + structured exit-code (D3, closes CI-05, GAP-2/3/4/5/6)". `git rev-parse HEAD` → `end_hash: <hash>`.
+- [x] **3B.C** COMMIT: Auto-commit hook split implementation across two commits (deviation from prescribed single-commit message): `5506393 refactor(citations): restructure validation and processing logic` + `d9b03c3 test(validation): add CitationValidator and validation tests`. State-write captured separately at `0c60754 chore(plan-02): record Phase 3B state`. **end_hash: `0c60754`**.
 
 #### REVIEW GATE 2 `code-reviewer` (opus)
 
