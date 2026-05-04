@@ -229,9 +229,11 @@ export class CitationValidator {
 		};
 
 		// 5. Return enriched links + summary (no separate results array)
+		// `unrecognized` placeholder kept empty — P3 wires residual records through.
 		return {
 			summary,
 			links: enrichedLinks,
+			unrecognized: [],
 		};
 	}
 

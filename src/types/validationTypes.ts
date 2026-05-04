@@ -51,6 +51,24 @@ export interface EnrichedLinkObject extends LinkObject {
 }
 
 /**
+ * UnrecognizedSyntaxRecord - residual-bracket scanner output (per D2)
+ *
+ * Emitted by extractLinks for any `[[...]]` sequence that the consolidated
+ * wikilink grammar did not consume. Closes CI-03 (Critical) — no fail-fast
+ * on unrecognized wiki — by surfacing residual brackets to the validator.
+ */
+export interface UnrecognizedSyntaxRecord {
+	/** 1-based line number where residual bracket sequence begins */
+	line: number;
+	/** 0-based column where residual bracket sequence begins */
+	column: number;
+	/** Matched bracket sequence text */
+	rawText: string;
+	/** Syntax family — reserved for future families (e.g., "footnote") */
+	syntaxFamily: "wiki";
+}
+
+/**
  * ValidationSummary - Aggregate counts derived from enriched links
  */
 export interface ValidationSummary {
@@ -69,5 +87,7 @@ export interface ValidationSummary {
 export interface ValidationResult {
 	summary: ValidationSummary;
 	links: EnrichedLinkObject[];
+	/** Residual `[[...]]` sequences not consumed by D1 grammar (per D2) */
+	unrecognized: UnrecognizedSyntaxRecord[];
 	validationTime?: string;
 }

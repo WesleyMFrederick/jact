@@ -2,11 +2,27 @@ import type { Token, Tokens } from "marked";
 import { marked } from "marked";
 import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
+import type { UnrecognizedSyntaxRecord } from "../../types/validationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
 import { detectExtractionMarker } from "./detectExtractionMarker.js";
 import { extractWikilinks } from "./extractWikilinks.js";
 import { getFencedCodeBlockLineSet } from "./isInsideCodeBlock.js";
 import { isInsideInlineCode } from "./isInsideInlineCode.js";
+
+/**
+ * A byte-range coordinate (line + column + length) covered by a previously
+ * extracted, valid construct. The residual-bracket scanner consults this set
+ * to avoid double-counting valid `[[wikilink]]` pairs as residuals.
+ *
+ * line: 1-based, matching LinkObject.line.
+ * column: 0-based, matching LinkObject.column.
+ * length: char count of the consumed span on that line.
+ */
+export interface ConsumedRange {
+	line: number;
+	column: number;
+	length: number;
+}
 
 /**
  * Type guard for tokens with nested token arrays
