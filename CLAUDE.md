@@ -241,11 +241,12 @@ The tool supports multiple path resolution strategies (in order):
 
 ### Test Fixtures:
 
-%% *Last Modified: 05/04/26 10:22:31* %%
+%% *Last Modified: 05/04/26 10:25:32* %%
 
-- **ALWAYS use test fixtures from `test/` folder** — files outside `test/` are not guaranteed to exist (may be archived, refactored, or removed without notice)
-- **NEVER reference design-docs or arbitrary paths in tests** — hardcode paths to `test/hardening-pipeline/fixtures/` or create fixture copies when needed
-- **BECAUSE** design-docs files may be archived, moved, or deleted; test isolation prevents flaky tests
+- **ALWAYS use test fixtures from `test/` folder, BECAUSE files outside `test/` are not guaranteed to exist** (may be archived, moved, or deleted)
+- **NEVER hardcode paths to design-docs/** — copy files to `test/<suite>/fixtures/` instead
+- When design-docs files are needed by tests: copy them to fixtures once, then reference only the fixture copy
+- Hardcoded external paths = flaky tests; fixture copies = reliable isolation
 
 ### Component Boundaries:
 - **MarkdownParser** is NOT aware of `ParsedDocument` facade

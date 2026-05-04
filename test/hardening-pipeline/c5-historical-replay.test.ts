@@ -14,11 +14,11 @@ const REPO_ROOT = join(import.meta.dirname, "..", "..");
 const SCRIPT = join(REPO_ROOT, "scripts/plan-eval.sh");
 const PLAN_PARENT = join(
 	REPO_ROOT,
-	"design-docs/features/.archive/202605020859-jact-wikilink-validation/plan.md",
+	"test/hardening-pipeline/fixtures/wikilink-plan-parent.md",
 );
 const PLAN_01 = join(
 	REPO_ROOT,
-	"design-docs/features/.archive/202605020859-jact-wikilink-validation/plan-01-spike-wikilink-resolution.md",
+	"test/hardening-pipeline/fixtures/wikilink-plan-01.md",
 );
 
 function runEval(planPath: string): { exitCode: number; stdout: string } {
