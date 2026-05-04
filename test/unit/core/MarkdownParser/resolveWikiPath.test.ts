@@ -7,6 +7,7 @@ const SRC_PATH = "/vault/source.md";
 // Minimal FileCache stub — exact key match only; no extension normalization
 function makeTestFileCache(entries: Record<string, string>): {
 	resolveFile(filename: string): ResolveResult;
+	getEntries(): Array<{ basename: string; relativePath: string }>;
 } {
 	return {
 		resolveFile(filename: string): ResolveResult {
@@ -19,6 +20,44 @@ function makeTestFileCache(entries: Record<string, string>): {
 				reason: "not_found",
 				message: `not found: ${filename}`,
 			};
+		},
+		// Existing tests don't exercise Levenshtein scan; return empty so suggestions=[].
+		getEntries() {
+			return [];
+		},
+	};
+}
+
+// Stub that supports D4 Levenshtein scan via getEntries() returning {basename, relativePath}.
+function makeLevTestFileCache(
+	entries: Array<{
+		basename: string;
+		relativePath: string;
+		absolutePath?: string;
+	}>,
+): {
+	resolveFile(filename: string): ResolveResult;
+	getEntries(): Array<{ basename: string; relativePath: string }>;
+} {
+	const map = new Map<string, string>();
+	for (const e of entries) {
+		if (e.absolutePath !== undefined) map.set(e.basename, e.absolutePath);
+	}
+	return {
+		resolveFile(filename: string): ResolveResult {
+			const path = map.get(filename);
+			if (path !== undefined) return { found: true, path };
+			return {
+				found: false,
+				reason: "not_found",
+				message: `not found: ${filename}`,
+			};
+		},
+		getEntries() {
+			return entries.map(({ basename, relativePath }) => ({
+				basename,
+				relativePath,
+			}));
 		},
 	};
 }
