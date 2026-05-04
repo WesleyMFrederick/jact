@@ -185,10 +185,12 @@ describe("ast — scope cannot be resolved (M3)", () => {
 // ---------------------------------------------------------------------------
 describe("ast ↔ extract parity (Ideal Outcome 1 acceptance)", () => {
 	it("Scenario 9: given same ambiguous filename input, when both ast and extract file run, then both stderrs contain matched-files + Pass --scope substrings", async () => {
+		const fixturesDir = join(__dirname, "fixtures");
+
 		let astStderr = "";
 		let astCode = 0;
 		try {
-			await execAsync(`node "${CLI_PATH}" ast plan.md`, { cwd: JACT_ROOT });
+			await execAsync(`node "${CLI_PATH}" ast plan.md`, { cwd: fixturesDir });
 			expect.fail("ast should have failed for ambiguous filename");
 		} catch (error: unknown) {
 			const err = error as { code: number; stderr: string };
@@ -200,7 +202,7 @@ describe("ast ↔ extract parity (Ideal Outcome 1 acceptance)", () => {
 		let extractCode = 0;
 		try {
 			await execAsync(`node "${CLI_PATH}" extract file plan.md`, {
-				cwd: JACT_ROOT,
+				cwd: fixturesDir,
 			});
 			expect.fail("extract file should have failed for ambiguous filename");
 		} catch (error: unknown) {
