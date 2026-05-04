@@ -1,4 +1,460 @@
 {
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/vitest.config.js": {
+    "mtime": 1771547625.8840141,
+    "hash": "29e7781d7a1f6b2ee4707ff1017e5ec1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/eslint.config.js": {
+    "mtime": 1777840863.9521556,
+    "hash": "4f49d345a76b674c467f23de099a009e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/tools/citation-manager/test/setup.js": {
+    "mtime": 1771544794.3606045,
+    "hash": "71200f1be02925d2930db1c11f0d02f7"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parser-internal-links.test.js": {
+    "mtime": 1771566227.6086721,
+    "hash": "89883344a81ccd8a7b287c11967fd665"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/extraction-strategy-interface.test.js": {
+    "mtime": 1771544794.3517344,
+    "hash": "6d1cc59317a48ecc492fec1ccba59c33"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/idiom-guards.test.ts": {
+    "mtime": 1777840863.963635,
+    "hash": "35d2971e36fcd9dae70bfc360fdcd948"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parsed-document.test.js": {
+    "mtime": 1771544794.3592663,
+    "hash": "4ff4fac6cfe980dd4f92f29f71fdc530"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parsed-document-extraction.test.js": {
+    "mtime": 1771566227.6084301,
+    "hash": "7ed9a9b2f12f133eded1a279e687a96c"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parser-extraction-markers.test.js": {
+    "mtime": 1771544794.359429,
+    "hash": "0a9b7160c1ec29a9eab345ff62f98aa7"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parser-output-contract.test.js": {
+    "mtime": 1777860189.4882264,
+    "hash": "b0707347d2d4486ae2efab163c2649f3"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/code-block-exclusion.test.js": {
+    "mtime": 1771544794.3514159,
+    "hash": "9a49f6582764b8daca0b67d5342b3334"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parser-obsidian-colon-anchors.test.js": {
+    "mtime": 1771544794.3597722,
+    "hash": "7a4851e67a4b0708043c30bd94231bf9"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/stop-marker-strategy.test.js": {
+    "mtime": 1771544794.3606808,
+    "hash": "408dea08275dadaa533052b834ce5c8d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parser-link-factory.test.js": {
+    "mtime": 1771544794.3596973,
+    "hash": "85d81571d82482a8d6471ec6e24f7b0e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/validation.test.js": {
+    "mtime": 1777860197.824076,
+    "hash": "fcf20f1376db1e9f8b3cf89058fd9b2c"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/factory.test.js": {
+    "mtime": 1771544794.351799,
+    "hash": "c4adf0396275aab6230a3035f4835a50"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/warning-validation.test.js": {
+    "mtime": 1771566227.610494,
+    "hash": "2394796386678ec13bc70116523b03cc"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/obsidian-block-references.test.js": {
+    "mtime": 1771544794.3590946,
+    "hash": "a3ad9dad10589ee127f49a5a99caac67"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/test-no-duplication.test.js": {
+    "mtime": 1771544794.3608308,
+    "hash": "ad774f37b0f421968fc8effc0f0e6777"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/enhanced-citations.test.js": {
+    "mtime": 1777840863.9595857,
+    "hash": "9581d27b645743d1bdf6fe0144d75790"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-warning-output.test.js": {
+    "mtime": 1777533515.3624182,
+    "hash": "31f4595343352defbdd1b32b2ce4ebe9"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-execution-detection.test.js": {
+    "mtime": 1777704050.864403,
+    "hash": "47db7c2701777b5f00a3a9d0647cf748"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/poc-block-extraction.test.js": {
+    "mtime": 1771544794.360258,
+    "hash": "4680a466dad94d8e715f653ea8d5a893"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/section-link-strategy.test.js": {
+    "mtime": 1771544794.3605306,
+    "hash": "641e187d8b10491889d3c3e824ff47f5"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/path-conversion.test.js": {
+    "mtime": 1771566227.6090455,
+    "hash": "b1744f8b578aabedc4119b883282b055"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/generate-content-id.test.js": {
+    "mtime": 1771544794.357233,
+    "hash": "8715e0f83d9c8a9b613294b9fc183876"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/story-validation.test.js": {
+    "mtime": 1771566227.6092653,
+    "hash": "e41c96e2d7395fd628d0007f6918f941"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/folder-link-detection.test.js": {
+    "mtime": 1771544794.357099,
+    "hash": "5f1defa01d7fcddc17f64c631be69330"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/setup.js": {
+    "mtime": 1771544794.3606045,
+    "hash": "71200f1be02925d2930db1c11f0d02f7"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/force-marker-strategy.test.js": {
+    "mtime": 1771544794.3571656,
+    "hash": "5b6b1a0d616a9f881ae9defd61882d3b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/content-extractor.test.js": {
+    "mtime": 1771566227.6066954,
+    "hash": "c1a720174795900ea36d26619e9e412b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/analyze-eligibility.test.js": {
+    "mtime": 1771566227.6039221,
+    "hash": "a169eaba424e6b1cca91756ff0cbae9e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parsed-file-cache.test.js": {
+    "mtime": 1771544794.3593507,
+    "hash": "4d37af2a808377df59178c31f18e4798"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/parser-heading-anchor-derivation.test.js": {
+    "mtime": 1771544794.3595302,
+    "hash": "dd9a6c529a4913d25d1b08843fef3342"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/component-factory.test.js": {
+    "mtime": 1771566227.60629,
+    "hash": "c55873d0f5206f434e08db8d5556d9e8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/normalize-anchor.test.ts": {
+    "mtime": 1771544794.3590198,
+    "hash": "f4194d2923c916add5fc0b03e4dc77b9"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-flag-strategy.test.js": {
+    "mtime": 1771544794.3506536,
+    "hash": "0fb57aff32164e4dffd92bc8a8194dff"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-cli-wiring.test.ts": {
+    "mtime": 1771566227.6098244,
+    "hash": "a9c7c94544ca9c119959ca948ce50c29"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/findNearMisses.test.ts": {
+    "mtime": 1777704050.8690836,
+    "hash": "ce0cdefc64971c8e2859ce18b08773aa"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts": {
+    "mtime": 1777913492.3669295,
+    "hash": "d41fc907083b394f182d902b920d4624"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-validate.test.ts": {
+    "mtime": 1777860439.0021791,
+    "hash": "5ad8ee2d5545f3abc6b07869a9ca6778"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/resolvePath.test.ts": {
+    "mtime": 1774463185.9824677,
+    "hash": "507b3af1f20cb7163db5b87e56faf9b4"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/extractLinks-line-ref-suffix.test.ts": {
+    "mtime": 1777859097.8455145,
+    "hash": "6192d1ac9f1ef75deb633dacb56c23ce"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/FileCache.test.ts": {
+    "mtime": 1777704050.8685305,
+    "hash": "6958946ef8e4bb00c79141cb48363f82"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/extractLinks-backtick-footnote.test.ts": {
+    "mtime": 1777859105.326303,
+    "hash": "54daf7d41d4dbf60d070a0e8759e7378"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/resolveWikiPath.test.ts": {
+    "mtime": 1777913524.972892,
+    "hash": "a815dfe4ea0f9ba899038c479d6f36b0"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-cli-methods.test.ts": {
+    "mtime": 1777860177.121444,
+    "hash": "ea5472884538a618501817e98a9a2379"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/FileCache.gitignore.test.ts": {
+    "mtime": 1777917821.0233486,
+    "hash": "9eb1fa0825464798c543cebd388ece18"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/formatExtractResult.test.ts": {
+    "mtime": 1777704050.8692703,
+    "hash": "faf11e183e30cf0ce9fc59a2fbd5c1c2"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-cli-class-types.test.ts": {
+    "mtime": 1771566227.6095948,
+    "hash": "b594de5dbb16f7336bacafc2c9b72936"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/FileCache.errors.test.ts": {
+    "mtime": 1777704050.8682265,
+    "hash": "a1c5b13f6f11187e8be45ed49af9dd44"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/extractLinks-fenced-exclusion.test.ts": {
+    "mtime": 1777859106.6021574,
+    "hash": "c3977469345ce78a76ba6cc283fde8cd"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-cli.test.js": {
+    "mtime": 1777704050.8694599,
+    "hash": "43f60b17261fd94dd40a1a6cf506dc1d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/extractLinks-type-safety.test.ts": {
+    "mtime": 1771566227.6094854,
+    "hash": "e904fc0d216fa0e1c309ab6ec5cb7592"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/types/cliTypes.test.ts": {
+    "mtime": 1771544794.3620172,
+    "hash": "80c7a3b8c098b9f36df7ca6c2287ee73"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/resolveScope.test.ts": {
+    "mtime": 1777704050.868888,
+    "hash": "7ac94068dfacbdee710dc7a24d0e2729"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/getLinkClass.test.ts": {
+    "mtime": 1777859642.3684578,
+    "hash": "252516aac72c88c3551a4486e5545cb7"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts": {
+    "mtime": 1777859065.4390888,
+    "hash": "f7b42b8d198e18f4343502ddccc73d14"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/isInsideInlineCode.test.ts": {
+    "mtime": 1777840863.9649847,
+    "hash": "f0a60099e6d54b9ab323f4f0c854508f"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/resolveWikiPath.test.ts": {
+    "mtime": 1777861328.024966,
+    "hash": "159ccbed31f64d3c6a6c5748c0f3e7b8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractWikilinks.test.ts": {
+    "mtime": 1777840863.9647439,
+    "hash": "3528f755d02f129eca6078154022284b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks-wikilink-pipeline.test.ts": {
+    "mtime": 1777859094.3867533,
+    "hash": "29f4fa2eb8baf59667211401905b9454"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/utils/wikiPageSlug.test.ts": {
+    "mtime": 1777840863.965898,
+    "hash": "07a10e4640e8dd62349599d73ce7f688"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/factories/component-factory-types.test.ts": {
+    "mtime": 1771544794.3616734,
+    "hash": "dbe1ef355232b6058bade2c8c965f55e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/factories/link-object-factory.test.js": {
+    "mtime": 1771544794.361904,
+    "hash": "82dd79533fa5c155084dc87fcabdfe75"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/factories/link-object-factory-types.test.ts": {
+    "mtime": 1771544794.3618279,
+    "hash": "7e9d57a08666fd22ebb21fe467c8edff"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/factories/component-factory.test.js": {
+    "mtime": 1771544794.3617508,
+    "hash": "da42d5323581187ced28a950a68a1b3c"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/types/validationTypes.test.ts": {
+    "mtime": 1771544794.3611026,
+    "hash": "826b0dbfbb5d5426dd2eee69555a5375"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/types/citationTypes.test.ts": {
+    "mtime": 1771544794.3609433,
+    "hash": "c12ac66ccee397f7ba73ea724d43f45c"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/types/contentExtractorTypes.test.ts": {
+    "mtime": 1771544794.3610234,
+    "hash": "33c22497a285e6ebdb65173cbb8cc6e0"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cache/checkExtractCache.test.ts": {
+    "mtime": 1771544794.3504179,
+    "hash": "ce6d2bf4008c32dc01db8f324ff20146"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/c3-defer-language-scan.test.ts": {
+    "mtime": 1777852022.2872736,
+    "hash": "f3575a21655bac1b70656a017c6ac7b4"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/c4-portability.test.ts": {
+    "mtime": 1777840863.9622838,
+    "hash": "3fcb0e54e0abd3a8881e0a5280e4415a"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/c5-historical-replay.test.ts": {
+    "mtime": 1777915520.452363,
+    "hash": "e64285714c56a3ef38d954f49356bef3"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/c2-plan-eval.test.ts": {
+    "mtime": 1777840863.9618487,
+    "hash": "9ee9d76bb49e27d25267342c23e05258"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/c1-d1-injectable-bans.test.ts": {
+    "mtime": 1777840863.9615433,
+    "hash": "bc6fda806ec060acb11c7c42cd2d051b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/c6-fixture-template.test.ts": {
+    "mtime": 1777840863.962637,
+    "hash": "cf6e7117e325921a79776800b59bf3b3"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/fixtures/cheat-injectable-optional.ts": {
+    "mtime": 1777840863.9628131,
+    "hash": "6936debcb4b5bb45c024ee6e198c1166"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-integration/extract-command.test.js": {
+    "mtime": 1777704050.8647919,
+    "hash": "b1577619c6f2c259471ad1ec358d1dc5"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-integration/base-paths-npm-script.test.js": {
+    "mtime": 1771566227.604521,
+    "hash": "acb772326cd326fea55ab2c67fd0f0e9"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-integration/extract-header-format.test.ts": {
+    "mtime": 1777704050.8656566,
+    "hash": "60b0fc1efbc8e97a14bed8e4cd187ae0"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-integration/extract-header-block-count.test.ts": {
+    "mtime": 1773752796.685756,
+    "hash": "e6b174e82080b44d44711f3b1a43c743"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-integration/extract-links-e2e.test.js": {
+    "mtime": 1777704050.8662617,
+    "hash": "b824f8ff756bdb9c9ec93e25b8dfa3ef"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-integration/extract-links-session-cache.test.ts": {
+    "mtime": 1777704050.8664722,
+    "hash": "dbefbf6d347ba2165268cb695caf2d64"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/cli-integration/extract-header.test.js": {
+    "mtime": 1777704050.865959,
+    "hash": "cb73f6568113a9d9e0ec22fb1ca2fdde"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/cli-help.test.ts": {
+    "mtime": 1777704050.86722,
+    "hash": "458d78cc56a79882dbef23dd8068ecb4"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator-anchor-matching.test.js": {
+    "mtime": 1771544794.3579354,
+    "hash": "031705ce237767d25fdd6ca120bbc52a"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/ast-default-scope.test.ts": {
+    "mtime": 1777840863.963854,
+    "hash": "f83c04afed5c1a6122c31ac92df4be72"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/backtick-anchor-links.test.js": {
+    "mtime": 1771544794.3577282,
+    "hash": "a8a9a48aa6b725175503edacf15878c2"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator-single-citation.test.js": {
+    "mtime": 1771544794.3582346,
+    "hash": "3b679b5bcfb02a41563bdb13bd572bdc"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/end-to-end-cache.test.js": {
+    "mtime": 1771544794.3586323,
+    "hash": "8b11a14c27b2e3c18e4f10987d45b2f1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator-repo-root-resolution.test.js": {
+    "mtime": 1773628721.2511334,
+    "hash": "ab7741501fd126ae97427baa0e365489"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/us2.1-acceptance-criteria.test.js": {
+    "mtime": 1771566227.6077516,
+    "hash": "5ae0c3669b6d2bb6909ef5b4ff38578d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/extraction-eligibility-precedence.test.js": {
+    "mtime": 1771566227.6074486,
+    "hash": "aa8c6ded65d7313739540dde3469ee7e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/e2e-parser-to-extractor.test.js": {
+    "mtime": 1771544794.3585484,
+    "hash": "dfef434bb24cf32f16b1bc522a1f7034"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/extract-default-scope.test.ts": {
+    "mtime": 1777704050.8675334,
+    "hash": "ee8653a601a8ac67352571ab72f4b11b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator.test.js": {
+    "mtime": 1771544794.3582973,
+    "hash": "6d27acec2b126a7cf076cb203d8726c8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator-wiki-pre-resolved.test.ts": {
+    "mtime": 1777840863.964147,
+    "hash": "fbf888d004189b398ba9dfff57c4dbeb"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/cli-extract-file.test.js": {
+    "mtime": 1777704050.8670442,
+    "hash": "9fa463f6fd06810b44eb2932f8c105cb"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator-cache.test.js": {
+    "mtime": 1771544794.3580108,
+    "hash": "f1d0bb67726c018d08ab0d591e626144"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/parsed-file-cache-facade.test.js": {
+    "mtime": 1771544794.358786,
+    "hash": "4f67b3e07b0266270b8ce7dbe0d0450a"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/content-extraction-workflow.test.js": {
+    "mtime": 1771544794.3584685,
+    "hash": "8af09eafac4ed16dd18aa31ed47b026b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/caret-version-false-positives.test.js": {
+    "mtime": 1773173442.5961056,
+    "hash": "146e22c7a93486da23a2ec2c2bb64272"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/us2.2-acceptance-criteria.test.js": {
+    "mtime": 1771566227.6080523,
+    "hash": "d392769950133a1a7c9d79a72ccdb059"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/extract-verbose.test.ts": {
+    "mtime": 1777704050.867881,
+    "hash": "3aa07bf7808a0ff1b2129df7a71bf0cd"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator-enrichment.test.js": {
+    "mtime": 1771544794.3580909,
+    "hash": "96aced035f264d029e81363fbe32e566"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator-parsed-document.test.js": {
+    "mtime": 1771544794.358168,
+    "hash": "4a4de6bdcde351ed3e288d963f7226e5"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/citation-validator-nested-codeblocks.test.js": {
+    "mtime": 1773628721.2508879,
+    "hash": "46c68c3d7514fe178b4c657fa2263647"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/ContentExtractor/total-content-length.test.js": {
+    "mtime": 1771544794.3576608,
+    "hash": "1a269dd4a834cc74d10e3f036753ba75"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/integration/ContentExtractor/content-deduplication.test.js": {
+    "mtime": 1771544794.3575742,
+    "hash": "6f7abba772d1a9c48a9d440ae599a05b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-13-target-script.ts": {
+    "mtime": 1773628721.249593,
+    "hash": "2f4283474e5b27694a5360bd27edd364"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/adversarial-commonmark.test.ts": {
+    "mtime": 1777858596.309114,
+    "hash": "8aede0204c47a6a2d02ceaac5a78ffdc"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/helpers/cli-runner.js": {
+    "mtime": 1771544794.357402,
+    "hash": "3cf6fd4ea76ce83042d3b463468acbdc"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/helpers/cli-runner.d.ts": {
+    "mtime": 1771544794.357338,
+    "hash": "666022421b5e1a88ca4b7aa026736300"
+  },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/ParsedFileCache.ts": {
     "mtime": 1777840863.9557977,
     "hash": "382c45ba8060e5c6a266b58a2f98531d"
@@ -8,16 +464,16 @@
     "hash": "b6237bef519ef1ea7fa295a690cc003a"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts": {
-    "mtime": 1777860116.090049,
-    "hash": "0cec4022ac18933a057c18ecfd55e9ce"
+    "mtime": 1777917715.2759254,
+    "hash": "3a689304c3a09675b62d931683749767"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/FileCache.ts": {
-    "mtime": 1777861384.7455745,
-    "hash": "90d9c6f5b059aee62fc86d9e0db01dc8"
+    "mtime": 1777917635.7897024,
+    "hash": "e69df96a000faef19b912899c23911e3"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/CitationValidator.ts": {
-    "mtime": 1777861468.1515088,
-    "hash": "7f7ce9ad8c96a4568282c4d51398477d"
+    "mtime": 1777915078.2610652,
+    "hash": "0181eeabe88b1d266cb1bc4ffb0de56a"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/formatExtractResult.ts": {
     "mtime": 1777704050.8628628,
@@ -28,12 +484,12 @@
     "hash": "93ed7d351861fb1a1bae77f789fa6b1f"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/citationTypes.ts": {
-    "mtime": 1777861399.820515,
-    "hash": "7666eca8452c8c8e342a80a422d8ab4b"
+    "mtime": 1777913448.0705814,
+    "hash": "6d84c765041d9666813d806074e52758"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/fileCacheTypes.ts": {
-    "mtime": 1777704050.8638678,
-    "hash": "13832cca79f89064609d8586744552cd"
+    "mtime": 1777913417.7850215,
+    "hash": "8f7f378dc197943b7630664257fb0df7"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts": {
     "mtime": 1777859603.627843,
@@ -132,12 +588,12 @@
     "hash": "33652c93ed1883f251e0c51b72e4eb66"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/resolveWikiPath.ts": {
-    "mtime": 1777861372.6884043,
-    "hash": "7f5121bfa43c2203ecdeb56fee72ec62"
+    "mtime": 1777916078.064985,
+    "hash": "22d0fc5c31136841f99b7dad1834b54a"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/createLinkObject.ts": {
-    "mtime": 1777861415.0972207,
-    "hash": "c77ea5c805aac37b4c18054f288160d3"
+    "mtime": 1777913686.0831585,
+    "hash": "e26ed4b83297fd3c65db36a526072d23"
   },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/detectNestedCodeblocks.ts": {
     "mtime": 1773628721.2467651,
@@ -155,6 +611,10 @@
     "mtime": 1777704050.8641322,
     "hash": "62a5100dce58a408e145646a66208f68"
   },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/utils/parseGitignore.ts": {
+    "mtime": 1777917743.924075,
+    "hash": "b4b64b0a4b627b19225f803d633f1a4c"
+  },
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/factories/LinkObjectFactory.ts": {
     "mtime": 1771544794.3497107,
     "hash": "e482c3abf72277b1a6f7f4a9c4b694b1"
@@ -162,5 +622,505 @@
   "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/factories/componentFactory.ts": {
     "mtime": 1777840863.9582114,
     "hash": "f39d83b6aa6ef298965329f8e32bb184"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/README.md": {
+    "mtime": 1777704050.854362,
+    "hash": "8b8878ec0e6288400635ba8cd5f555b1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/CLAUDE.md": {
+    "mtime": 1777915532.9864502,
+    "hash": "b5a501de4337bd9bca37837892d34ffa"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/ARCHITECTURE-Citation-Manager.md": {
+    "mtime": 1771544794.3243449,
+    "hash": "c0ab0c4c3ba3ebef78517c9302a4e4d1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/Bugs & Known Issues.md": {
+    "mtime": 1771544794.3244562,
+    "hash": "5a859cf31a18321ae9cae307378ee650"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/Web Site Design Prompt.md": {
+    "mtime": 1771544794.3245392,
+    "hash": "617c13533e6b718c741387284befda15"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/research/Markdown Link Flavors.md": {
+    "mtime": 1771544794.346522,
+    "hash": "4d43dd1fa2a1312500399ec15b566922"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/hardening-pipeline/state.md": {
+    "mtime": 1777839375.352905,
+    "hash": "a1599d6c594751f9005fb41917eff6e8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/hardening-pipeline/fixture-template.md": {
+    "mtime": 1777838662.3562403,
+    "hash": "1e9feeb42a8e735380f48451712d330f"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/sequence-template.md": {
+    "mtime": 1777840863.9518433,
+    "hash": "af3f38e8c513631ac43c91a829bb41a6"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/plan-template.md": {
+    "mtime": 1777840863.9515774,
+    "hash": "7c116a0e88af02ac83b06cc61ffef0fa"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/CLI Architecture Overview.md": {
+    "mtime": 1773752796.6816533,
+    "hash": "7683aa96d0d29d78818fb5dca2d5c57c"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/component-guides.md": {
+    "mtime": 1773706828.4866996,
+    "hash": "5c196760a6e546a7750e8d6e733bc098"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/CLI Orchestrator Implementation Guide.md": {
+    "mtime": 1773628721.2434673,
+    "hash": "6a9719f9d0b0e626be0076fb40e51cfa"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/ContentExtractor Component Guide.md": {
+    "mtime": 1773752796.6820455,
+    "hash": "a953f14d42aea68ade208058a648b155"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/ParsedDocument Implementation Guide.md": {
+    "mtime": 1771544794.325731,
+    "hash": "f05964bbc50d2843cbcbbab0809a2018"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/MarkdownParser Component Guide.md": {
+    "mtime": 1777866257.6185782,
+    "hash": "c30f01a4b3307a01075dd08bbbc50508"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/ParsedFileCache Implementation Guide.md": {
+    "mtime": 1771544794.325885,
+    "hash": "dce63a0d481b11683cf25786749b8f2b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/SessionCache Component Guide.md": {
+    "mtime": 1771544794.3259923,
+    "hash": "72a63f7ecbe5a0779473549ebda73d34"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/CitationValidator Implementation Guide.md": {
+    "mtime": 1777910934.3114479,
+    "hash": "478deb29babe830a99105dfe3445eff0"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/whiteboards/markdown-parser-whiteboard.md": {
+    "mtime": 1771544794.3288705,
+    "hash": "928f9dfa9a7ff9a6c82f506b7f2e6849"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/README.md": {
+    "mtime": 1771566227.6036808,
+    "hash": "2c735fd6f29666e43c6d6d1346c215c2"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/fixtures/dirty-plan.md": {
+    "mtime": 1777840863.9634154,
+    "hash": "c5afc175fabf91699fc86e1f8aa740dc"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/fixtures/clean-plan.md": {
+    "mtime": 1777840863.9632075,
+    "hash": "e1b455411c139aec0106c35d5fd78745"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/fixtures/wikilink-plan-parent.md": {
+    "mtime": 1777915516.9803534,
+    "hash": "408d5d36a86a90221a93b28539d36661"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/fixtures/clean-design-doc.md": {
+    "mtime": 1777840863.9629793,
+    "hash": "ad5ea94a72390fb391c86f9eb5a380a3"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/hardening-pipeline/fixtures/wikilink-plan-01.md": {
+    "mtime": 1777915516.9821677,
+    "hash": "31c2237cc09cd0bc6b50b727acb85767"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/extract-test-target-1.md": {
+    "mtime": 1771544794.3535416,
+    "hash": "56507ced60b9f6067dba89d34ff2b889"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wiki-cross-doc.md": {
+    "mtime": 1771544794.3570235,
+    "hash": "76dde1603991707a56cf96dc0e14ccc1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/fix-test-multiple.md": {
+    "mtime": 1771544794.3537555,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-100-source.md": {
+    "mtime": 1771544794.3543289,
+    "hash": "45a2546f3def328a537b09e093876b84"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/multiple-links-same-target.md": {
+    "mtime": 1771544794.3545892,
+    "hash": "b5e0ea5b9cc98441127869bee13102b9"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/full-file-links.md": {
+    "mtime": 1771544794.354073,
+    "hash": "a4015653ca5f40e576857fb97e930a8a"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/fix-test-anchor.md": {
+    "mtime": 1771544794.3536243,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/complex-headers.md": {
+    "mtime": 1771544794.3524778,
+    "hash": "a69a762d2e14860ce82ba14bafe905c0"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/auto-fix-no-fix-needed.md": {
+    "mtime": 1771544794.3520288,
+    "hash": "5eb044ada38dda99382f11028bcd6399"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/folder-link-test.md": {
+    "mtime": 1771544794.3540144,
+    "hash": "837e4a772228b20d35a2d3895dad50fd"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/shared-target.md": {
+    "mtime": 1771544794.354962,
+    "hash": "746c5da5c91e87db5e39ef6c73ee975e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/fix-test-legacy.md": {
+    "mtime": 1771544794.353712,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/backtick-anchors.md": {
+    "mtime": 1771544794.3522854,
+    "hash": "4ea3c3a05c56d54f46ca1246ada45094"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-16-nested-backticks.md": {
+    "mtime": 1773628721.2498105,
+    "hash": "5cfbc39be35b7cb508a1504f89a3a8b2"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/anchor-matching.md": {
+    "mtime": 1771544794.3519673,
+    "hash": "1c1d715a0537bcf02325c64f09011e29"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/anchor-matching-source.md": {
+    "mtime": 1771544794.351904,
+    "hash": "415698235356808b15c2d7d6eb320137"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-100-backslash-bracket-heading.md": {
+    "mtime": 1771544794.354203,
+    "hash": "bb99793edb023900f9ab567366996c12"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/broken-links.md": {
+    "mtime": 1771544794.3523479,
+    "hash": "c6519cfefc9d3965c29bb8da3c08f61a"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-27-backtick-heading.md": {
+    "mtime": 1771544794.354392,
+    "hash": "2db1c840f8008f79bbdad32710956da8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/version-detection-story.md": {
+    "mtime": 1771544794.3568592,
+    "hash": "2b9dbe09193ead5772e0fe428e887cb1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/content-aggregation-prd.md": {
+    "mtime": 1771544794.3526497,
+    "hash": "d43de6e05ff4c37f102d0378c692cdb5"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/extract-verbose-fixture.md": {
+    "mtime": 1777704050.866754,
+    "hash": "40fa48b0a3160d2b85e59d1334223ee1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/fix-test-no-issues.md": {
+    "mtime": 1771544794.3537993,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/enhanced-citations.md": {
+    "mtime": 1771544794.3527405,
+    "hash": "74f58681e11b1876fafa8274cc1279aa"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/valid-citations.md": {
+    "mtime": 1771544794.3567524,
+    "hash": "46796f20c17123b46c98883a3c4d6e6d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-100-colon-heading.md": {
+    "mtime": 1771544794.354264,
+    "hash": "48da6a321f447b86fab22052b6b51c97"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-13-repo-root-target.md": {
+    "mtime": 1773628721.2493896,
+    "hash": "a69159fc499fe5b0c384a9faec04de3c"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/auto-fix-selective.md": {
+    "mtime": 1771544794.3520966,
+    "hash": "fc4105e782919c9b0853365a0329fcbe"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/fix-test-validation.md": {
+    "mtime": 1771544794.353934,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/parens-in-anchors.md": {
+    "mtime": 1771544794.354653,
+    "hash": "4b466d5d3f7a5159c4afe2394d2cb406"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/warning-test-source.md": {
+    "mtime": 1771544794.3569615,
+    "hash": "77717059b96932beca4e3bed5ca58b48"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-81-block-anchor-source.md": {
+    "mtime": 1771544794.3544626,
+    "hash": "d9c15442d84c1db45dd54e8f2678a4cc"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/inline-code-with-links.md": {
+    "mtime": 1771544794.3541358,
+    "hash": "13db1b2ec8cbf0bb27ef602e44b6d9ee"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/test-target.md": {
+    "mtime": 1771544794.3551276,
+    "hash": "f5f93fdef42ac80ec807ce2564bca017"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/fix-test-reporting.md": {
+    "mtime": 1771544794.3538854,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/fix-test-combined.md": {
+    "mtime": 1771544794.3536663,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/auto-fix-target.md": {
+    "mtime": 1771544794.3522177,
+    "hash": "40f10def2c598ead49dedf166b87eee4"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-16-tilde-outer-valid.md": {
+    "mtime": 1773628721.2500148,
+    "hash": "a101d0cab05f41e58bcb7b2cb1b68d93"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.3-implement-extract-links-subcommand-implement-plan.md": {
+    "mtime": 1771544794.3566494,
+    "hash": "e8b25aad59557c721a9cb835e0a8bc3c"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/code-blocks-with-links.md": {
+    "mtime": 1771544794.352412,
+    "hash": "bf28c95a9b6449f7279b7f0c3eae802d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/scope-test.md": {
+    "mtime": 1771544794.3547182,
+    "hash": "afa103a529a06192bd412a1f8b454e71"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/extract-test-target-2.md": {
+    "mtime": 1771544794.3535988,
+    "hash": "11960a1226c85636a2f89d334a3faac8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/auto-fix-source.md": {
+    "mtime": 1771544794.3521564,
+    "hash": "4f6b959523d0e0a6d286e5e14965ea24"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/issue-81-block-anchor-target.md": {
+    "mtime": 1771544794.3545272,
+    "hash": "9ef05675146ac43423393ed22e2eb491"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/extract-test-source.md": {
+    "mtime": 1771544794.3534803,
+    "hash": "56c92ba201f26be0ff414eb8eca5bfe8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/fix-test-path.md": {
+    "mtime": 1771544794.3538427,
+    "hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2/mixed-links-source.md": {
+    "mtime": 1771544794.3557837,
+    "hash": "ec35754f4711361bf06e519aa9c2a2d7"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2/target-doc.md": {
+    "mtime": 1771544794.355843,
+    "hash": "13f013a277e2b0c97a46046bda4a1568"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2/error-links-source.md": {
+    "mtime": 1771544794.3557255,
+    "hash": "125703a569403a720654c4d4b84fe807"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/duplicate-content-source.md": {
+    "mtime": 1771544794.3561287,
+    "hash": "582c1571389c3d3e56e1110e3dd86df6"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/mixed-links-source.md": {
+    "mtime": 1771544794.3561876,
+    "hash": "b81240b7a4d00986e671ae64a3888ff0"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/all-failed-links.md": {
+    "mtime": 1771544794.3559372,
+    "hash": "5a34033e08f875e0d71d69c98bf04eb4"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/target-2.md": {
+    "mtime": 1771544794.3563135,
+    "hash": "c382ac73a4a297734de96cc7674f35c0"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/cross-file-duplicates.md": {
+    "mtime": 1771544794.3560674,
+    "hash": "a0e5aed5fb291ffca2815a2b34ff4c92"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/target-doc.md": {
+    "mtime": 1771544794.3565013,
+    "hash": "26c0107b552c8e1d6478957859ecf891"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/target-doc-b.md": {
+    "mtime": 1771544794.3564382,
+    "hash": "5fdb22eb0595ae70aebcc0534686f154"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/target-doc-a.md": {
+    "mtime": 1771544794.3563805,
+    "hash": "986c8c40b8f5c86f39dd425d465ca6c4"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/comprehensive-test.md": {
+    "mtime": 1771544794.3560019,
+    "hash": "d9d0abac73fc70105aab98a4bf79f333"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.2a/target-1.md": {
+    "mtime": 1771544794.356253,
+    "hash": "eaf4a410cf57aa9ea3c2ff90dbc73786"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md": {
+    "mtime": 1777840863.9599004,
+    "hash": "6380712589b9fc69e27930b55ed01e19"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/wiki/separation-of-concerns.md": {
+    "mtime": 1777840863.9609165,
+    "hash": "7f07aaac2598cdc3a15d5e16669ff8c3"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/wiki/hardening-principle-open-questions-research.md": {
+    "mtime": 1777840863.9605203,
+    "hash": "26170f7774f9a30c0e51e039201a17b8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/wiki/the-hardening-principle.md": {
+    "mtime": 1777840863.9612412,
+    "hash": "5af0075677c09f06b6e0a80c7faaab76"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/wiki/silent-failure.md": {
+    "mtime": 1777840863.9610178,
+    "hash": "7f07aaac2598cdc3a15d5e16669ff8c3"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/wiki/building-effective-agents.md": {
+    "mtime": 1777840863.960192,
+    "hash": "26170f7774f9a30c0e51e039201a17b8"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/wiki/determinism.md": {
+    "mtime": 1777840863.9604335,
+    "hash": "7ec8911202413e28fe2cbf0009955ed3"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC4.md": {
+    "mtime": 1777858480.2031612,
+    "hash": "835c153fb6cdb0656862c1ccd639188b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC5.md": {
+    "mtime": 1777858484.936094,
+    "hash": "ab7f080fcb94844719bd2e36efd86aa2"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC1.md": {
+    "mtime": 1777858463.2250938,
+    "hash": "64bb03d7767e5bf98af72d80a6e28dad"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC6.md": {
+    "mtime": 1777858492.5949247,
+    "hash": "6bb68391ce119d0e20895db8f87ce53d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC2.md": {
+    "mtime": 1777858468.6451042,
+    "hash": "b2d3f726bf82878f0addf0e70803c34a"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC3.md": {
+    "mtime": 1777858474.781763,
+    "hash": "347ab08252aab0825c8044570c7898b1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/extract-file/sample-document.md": {
+    "mtime": 1771544794.3533123,
+    "hash": "27e20f2ed1460dbac5902565a06e2945"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/extract-file/scoped/nested-file.md": {
+    "mtime": 1771544794.3534126,
+    "hash": "825b66d85fc8cf20dec956707acac0d5"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/subdir/issue-13-non-md-footnote-source.md": {
+    "mtime": 1773628721.250633,
+    "hash": "6f0aa8f1ab34235e260d7cddd9cba3c0"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/subdir/warning-test-target.md": {
+    "mtime": 1771544794.355065,
+    "hash": "5ea14abdb3450a86c16e85d021747eec"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/subdir/issue-13-footnote-source.md": {
+    "mtime": 1773628721.2504191,
+    "hash": "4452a542451c1cf3856192c7741857a9"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.1/parser-markers-whitespace.md": {
+    "mtime": 1771544794.3556275,
+    "hash": "a430a7a699f7a692c063e255669e6898"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.1/e2e-full-file-no-flag.md": {
+    "mtime": 1771544794.3552217,
+    "hash": "dde15aaad0de3497eff0343672aab528"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.1/e2e-mixed-markers.md": {
+    "mtime": 1771544794.3552814,
+    "hash": "60a86bb85f7d17f3075d6f47f22df47f"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.1/parser-markers-html-comment.md": {
+    "mtime": 1771544794.3554602,
+    "hash": "fd09fdfc2681f3056c3e76a332ec4455"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.1/parser-markers-stop-extract.md": {
+    "mtime": 1771544794.355571,
+    "hash": "716cb422014539c57b28f4d7acf85126"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.1/parser-markers-no-marker.md": {
+    "mtime": 1771544794.3555171,
+    "hash": "97f419643bc2577f3429e5fa03e5b0de"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.1/parser-markers-force-extract.md": {
+    "mtime": 1771544794.355401,
+    "hash": "6581c4e91ecb81a7aaaac4ea9c6dd413"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/us2.1/e2e-various-formats.md": {
+    "mtime": 1771544794.3553405,
+    "hash": "cf466d5bae219e5113e04b702199a7f1"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/enrichment/valid-links-target.md": {
+    "mtime": 1771544794.353089,
+    "hash": "94d955b8482677edb02c8893cfc26c50"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/enrichment/valid-links-source.md": {
+    "mtime": 1771544794.3530285,
+    "hash": "91e246c45f6da402e05a689b8c80d102"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/enrichment/warning-links-target.md": {
+    "mtime": 1771544794.3532116,
+    "hash": "0d41e92ff2c8211ad7809f0a5e26d04e"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/enrichment/error-links-target.md": {
+    "mtime": 1771544794.352905,
+    "hash": "4591d6d274bedc60b0ae4cba49b14908"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/enrichment/warning-links-source.md": {
+    "mtime": 1771544794.3531508,
+    "hash": "c03de8460f3301403d48dd4464cae116"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/enrichment/error-links-source.md": {
+    "mtime": 1771544794.3528452,
+    "hash": "cce4606cfd18df3c5311a81d5e2a677b"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/enrichment/mixed-validation-source.md": {
+    "mtime": 1771544794.3529654,
+    "hash": "b27737feb0a31f7ac58cec5f148b6045"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/section-extraction/source.md": {
+    "mtime": 1771544794.3548975,
+    "hash": "1b5641d5221229d68050035c60c38bec"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/section-extraction/links.md": {
+    "mtime": 1771544794.354824,
+    "hash": "4e4c12ef337fb2c870beeab5f795f4c6"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/architecture-principles/core/DESIGN-PRINCIPLES.md": {
+    "mtime": 1777840863.9447777,
+    "hash": "45fddde5ffd897012a9a8caea597237d"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md": {
+    "mtime": 1777840863.945123,
+    "hash": "413a6b9bf4d1971df26b1ea948bb5876"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/architecture-principles/ai-coding/AGENTIC-WORKFLOW-PRINCIPLES.md": {
+    "mtime": 1777840863.9443827,
+    "hash": "a07b89078a844af5d1de23c9250c4b17"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/assets/Pasted image 20251205175951.png": {
+    "mtime": 1771544794.3270214,
+    "hash": "a5e12dd3f5886767e16b2e18599256cd"
+  },
+  "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/assets/Pasted image 20251205180009.png": {
+    "mtime": 1771544794.3281384,
+    "hash": "a5e12dd3f5886767e16b2e18599256cd"
   }
 }
