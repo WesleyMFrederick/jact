@@ -3,26 +3,6 @@
 ## Overview
 Parses markdown files into structured objects containing outgoing links and header/anchors for consumption by downstream components.
 
-### Problem
-1. Downstream components like [**`CitationValidator`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Citation%20Validator) and [**`ContentExtractor`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ContentExtractor) need a structured, queryable representation of a markdown document's links and anchors. ^P1
-2. Parsing raw markdown text with regular expressions in each component would be repetitive, brittle, and inefficient. ^P2
-3. The system needs a single, reliable component to transform a raw markdown file into a consistent and explicit data model. ^P3
-
-### Solution
-The [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) component provides centralized markdown parsing by:
-1. accepting a file path, reading the document, and applying parsing strategies to produce a comprehensive [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface) object ^S1
-2. wrapping output in the [**`ParsedDocument`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.ParsedDocument) facade before consumption, decoupling consumers from parser internals ([P1](#^P1)) ^S2
-3. producing two primary collections: [**`LinkObject[]`**](MarkdownParser%20Component%20Guide.md#LinkObject%20Interface) and [**`AnchorObject[]`**](MarkdownParser%20Component%20Guide.md#AnchorObject%20Type%20(Discriminated%20Union)), centralizing parsing logic and eliminating regex duplication ([P2](#^P2), [P3](#^P3)) ^S3
-
-### Impact
-
-| Problem ID | Problem | Solution ID | Solution | Impact | Principles | How Principle Applies |
-| :--------: | ------- | :---------: | -------- | ------ | ---------- | --------------------- |
-| [P1](#^P1) | Components need structured representation | [S1](#^S1), [S2](#^S2) | Single parse with comprehensive [**`ParserOutput`**](MarkdownParser%20Component%20Guide.md#ParserOutput%20Interface) + facade wrapping | Fewer errors navigating data; stable consumer interface | [Data Model First](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^data-model-first) | Clean data structures lead to clean code; structured output prevents navigation errors |
-| [P2](#^P2) | Regex duplication across components | [S3](#^S3) | Centralized link/anchor extraction | 100% reduction in duplicated parsing logic (0 regex per consumer vs N) | [Single Responsibility](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^single-responsibility) | Parser parses; consumers consume - each component has one clear concern |
-| [P3](#^P3) | No reliable transformer | [S1](#^S1) | DI-enabled [**`MarkdownParser`**](../ARCHITECTURE-Citation-Manager.md#Citation%20Manager.Markdown%20Parser) class | Flexible testing (mock fs for unit, real fs for integration) | [Dependency Abstraction](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^dependency-abstraction) | Depend on FileSystemInterface abstraction, not concrete node:fs |
-| [P1](#^P1) | Type safety for anchors | [S3](#^S3) | TypeScript discriminated unions ([**`AnchorObject`**](MarkdownParser%20Component%20Guide.md#AnchorObject%20Type%20(Discriminated%20Union))) | Impossible to represent invalid anchor states | [Illegal States Unrepresentable](../../../../../cc-workflows-site/design-docs/Architecture%20Principles.md#^illegal-states-unrepresentable) | Header vs block enforced at type level; invalid combinations cannot compile |
-
 ### Boundaries
 
 The component is exclusively responsible for transforming a raw markdown string into the structured [**`ParserOutput`**](#ParserOutput%20Interface). Its responsibilities are strictly limited to syntactic analysis. The component is **not** aware of the `ParsedDocument` facade that wraps its output. The component is **not** responsible for:
