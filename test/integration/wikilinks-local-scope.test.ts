@@ -23,23 +23,16 @@ function makeLocalScopeFileCache(
 	}>,
 ): {
 	resolveFile(filename: string): ResolveResult;
-	getEntries(): Array<{ basename: string; relativePath: string }>;
-	resolveFileLocalFirst?(
-		filename: string,
-		sourceFile: string,
-	): {
-		found: boolean;
-		path?: string;
-		relativePath?: string;
-		source: "local" | "global" | "none";
-	};
+	getEntries(): Array<{
+		basename: string;
+		relativePath: string;
+		absolutePath: string;
+	}>;
 } {
 	const map = new Map<string, string>();
-	const pathMap = new Map<string, string>();
 
 	for (const e of entries) {
 		map.set(e.basename, e.absolutePath);
-		pathMap.set(e.absolutePath, e.relativePath);
 	}
 
 	return {
@@ -53,52 +46,11 @@ function makeLocalScopeFileCache(
 			};
 		},
 		getEntries() {
-			return entries.map(({ basename, relativePath }) => ({
+			return entries.map(({ basename, relativePath, absolutePath }) => ({
 				basename,
 				relativePath,
+				absolutePath,
 			}));
-		},
-		// Placeholder: actual implementation in FileCache.resolveFileLocalFirst
-		resolveFileLocalFirst(filename: string, sourceFile: string) {
-			const sourceDir = sourceFile.substring(0, sourceFile.lastIndexOf("/"));
-
-			// Try same directory
-			const sameDir = `${sourceDir}/${filename}`;
-			for (const [basename, absPath] of map) {
-				if (basename === filename && absPath === sameDir) {
-					return {
-						found: true,
-						path: absPath,
-						relativePath: filename,
-						source: "local",
-					};
-				}
-			}
-
-			// Try parent directory
-			const parentDir = sourceDir.substring(0, sourceDir.lastIndexOf("/"));
-			for (const [basename, absPath] of map) {
-				if (basename === filename && absPath.startsWith(parentDir)) {
-					const relPath = absPath.substring(parentDir.length + 1);
-					return {
-						found: true,
-						path: absPath,
-						relativePath: `../${relPath}`,
-						source: "local",
-					};
-				}
-			}
-
-			// Fallback to global
-			const globalResult = this.resolveFile(filename);
-			if (globalResult.found) {
-				return {
-					found: true,
-					path: globalResult.path,
-					source: "global",
-				};
-			}
-			return { found: false, source: "none" };
 		},
 	};
 }

@@ -440,7 +440,11 @@ export class FileCache {
 	 * When buildCache has not been called (no scope), relativePath falls back
 	 * to the basename — caller still gets a usable string.
 	 */
-	getEntries(): Array<{ basename: string; relativePath: string }> {
+	getEntries(): Array<{
+		basename: string;
+		relativePath: string;
+		absolutePath: string;
+	}> {
 		const root =
 			this.scope?.scope !== undefined && this.scope.scope !== ""
 				? (() => {
@@ -451,13 +455,17 @@ export class FileCache {
 						}
 					})()
 				: null;
-		const result: Array<{ basename: string; relativePath: string }> = [];
+		const result: Array<{
+			basename: string;
+			relativePath: string;
+			absolutePath: string;
+		}> = [];
 		for (const [basename, paths] of this.entries) {
 			for (const absolutePath of paths) {
 				const relativePath = root
 					? this.path.relative(root, absolutePath)
 					: basename;
-				result.push({ basename, relativePath });
+				result.push({ basename, relativePath, absolutePath });
 			}
 		}
 		return result;
