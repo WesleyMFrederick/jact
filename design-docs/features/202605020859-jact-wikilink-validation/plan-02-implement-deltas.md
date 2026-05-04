@@ -644,15 +644,15 @@ No "ship-with-followups," no "minor issues acceptable." Either every Ideal Outco
 
 ### Phase 0 — Baseline `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 17:59:22* %%
 
 - [ ] **0.0** STATE-READ: `git rev-parse HEAD` → record as `baseline_hash: <hash>` in this plan file. Anchors entire sequence.
 - [ ] **0.1** BASELINE: Run LSP commands from §"LSP commands to run before coding" (lines 70–100):
-  - `LSP findReferences` on `manager.validate` (src/jact.ts), `ValidationResult` and `ReportSummary` (src/types/validationTypes.ts)
-  - `LSP documentSymbol` on src/core/MarkdownParser/extractLinks.ts, createLinkObject.ts
+  - `LSP findReferences` on `manager.validate` (`/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts`), `ValidationResult` and `ReportSummary` (`/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts`)
+  - `LSP documentSymbol` on `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/createLinkObject.ts`
   - `LSP workspaceSymbol` on `classify`, `extractWikilinks`
   - `LSP findReferences` on `formatForCLIMinimal`, `formatForCLIVerbose`, `formatForJSON`
-  - `LSP documentSymbol` on src/utils/stringDistance.ts, src/core/MarkdownParser/resolveWikiPath.ts
+  - `LSP documentSymbol` on `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/utils/stringDistance.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/resolveWikiPath.ts`
   - Record findings in plan as inline notes under each LSP line
 - [ ] **0.2** BASELINE: Read key files in order per §"Key files to read" (lines 102–115). Read whole files for ≤300 lines; otherwise targeted offset/limit reads on the cited symbols.
 - [ ] **0.3** BASELINE: Run existing test suite to establish green baseline: `bun test` (or `npm test`). Record any pre-existing failures as inline notes — these are NOT introduced by this plan and must NOT be counted as regressions in later phases.
@@ -664,15 +664,15 @@ No "ship-with-followups," no "minor issues acceptable." Either every Ideal Outco
 
 ### Phase 1 — Adversarial Fixtures + Sibling Sweep `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 17:59:43* %%
 
 Verifies shipped D1 grammar against CommonMark §4.5/§6.1/§6.5 edge cases (AC1–AC6) and consolidates the `getCodeBlockLines` ↔ `isInsideCodeBlock` parallel implementation flagged in LSP Audit Findings.
 
 - [ ] **1.0** STATE-READ: `git rev-parse HEAD` → `start_hash: <hash>`. Verify matches `end_hash` from 0.C. If mismatch, run `git log --oneline <0.C_end_hash>..HEAD` to identify intervening commits. Read plan, review Phase 0 checkboxes + LSP notes.
-- [ ] **1.1** READ: `jact extract header design-docs/hardening-pipeline/fixture-template.md "Adversarial CommonMark Set"` — load AC1–AC6 source.
-- [ ] **1.2** RED: Create `test/fixtures/adversarial-commonmark/AC1.md` … `AC6.md` plus paired `<AC-id>.expected.json` files per §"ADDED → test/fixtures/adversarial-commonmark/AC<N>" assertions (lines 207–215). AC1–AC5 expected: D1 grammar consumes all wiki-shaped sequences, `unrecognized[]` empty. AC6 intentionally tests residual emission (will pass after P2 only).
-- [ ] **1.3** VERIFY: `bun vitest run test/fixtures/adversarial-commonmark/` — confirm RED only on AC6 (residual case); AC1–AC5 should already PASS against shipped D1 grammar. If AC1–AC5 fail, [H-D1-regex] hypothesis is FALSIFIED — STOP and escalate (D1 grammar gap, not just residual scanner).
-- [ ] **1.4** SIBLING SWEEP: Per LSP Audit Findings (line 144) and Plan-01 §9b rule #2, decide consolidation between `getCodeBlockLines` (extractLinks.ts:75-102) and `isInsideCodeBlock.ts`. Read both. If `getCodeBlockLines` has no consumers outside extractLinks.ts AND `isInsideCodeBlock` covers the same byte-range query, REMOVE `getCodeBlockLines` and update extractLinks.ts callers to use `isInsideCodeBlock`. If `getCodeBlockLines` has a unique line-pair output consumed elsewhere, keep both with a JSDoc note pointing each to the other.
+- [ ] **1.1** READ: `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/hardening-pipeline/fixture-template.md "Adversarial CommonMark Set"` — load AC1–AC6 source.
+- [ ] **1.2** RED: Create `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC1.md` … `AC6.md` plus paired `<AC-id>.expected.json` files per §"ADDED → test/fixtures/adversarial-commonmark/AC<N>" assertions (lines 207–215). AC1–AC5 expected: D1 grammar consumes all wiki-shaped sequences, `unrecognized[]` empty. AC6 intentionally tests residual emission (will pass after P2 only).
+- [ ] **1.3** VERIFY: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/` — confirm RED only on AC6 (residual case); AC1–AC5 should already PASS against shipped D1 grammar. If AC1–AC5 fail, [H-D1-regex] hypothesis is FALSIFIED — STOP and escalate (D1 grammar gap, not just residual scanner).
+- [ ] **1.4** SIBLING SWEEP: Per LSP Audit Findings (line 144) and Plan-01 §9b rule #2, decide consolidation between `getCodeBlockLines` (`/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts:75-102`) and `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/isInsideCodeBlock.ts`. Read both. If `getCodeBlockLines` has no consumers outside extractLinks.ts AND `isInsideCodeBlock` covers the same byte-range query, REMOVE `getCodeBlockLines` and update extractLinks.ts callers to use `isInsideCodeBlock`. If `getCodeBlockLines` has a unique line-pair output consumed elsewhere, keep both with a JSDoc note pointing each to the other.
 - [ ] **1.5** VERIFY: `npm run build && bun test` — full suite. Pre-existing failures from 0.3 may persist; no new regressions.
 - [ ] **1.S** STATE-WRITE: Update plan checkboxes. Record sweep decision (REMOVED `getCodeBlockLines` vs. KEPT BOTH) inline in §"REMOVED" section of File Changes.
 - [ ] **1.C** COMMIT: "test(wikilink): add adversarial CommonMark fixtures (AC1-AC6) + consolidate code-block byte-range query". `git rev-parse HEAD` → `end_hash: <hash>`.
@@ -681,18 +681,18 @@ Verifies shipped D1 grammar against CommonMark §4.5/§6.1/§6.5 edge cases (AC1
 
 ### Phase 2 — D2 Residual-Bracket Scanner (TDD) `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:00:04* %%
 
 Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residual-scanner emission inside `extractLinks.ts`. AC6 fixture from Phase 1 transitions to GREEN.
 
 - [ ] **2.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 1.C `end_hash`.
-- [ ] **2.1** IMPLEMENT (types only): Add `UnrecognizedSyntaxRecord` interface + `unrecognized: UnrecognizedSyntaxRecord[]` field to `ValidationResult` in `src/types/validationTypes.ts` per §7a.3 verbatim.
+- [ ] **2.1** IMPLEMENT (types only): Add `UnrecognizedSyntaxRecord` interface + `unrecognized: UnrecognizedSyntaxRecord[]` field to `ValidationResult` in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per §7a.3 verbatim.
 - [ ] **2.2** VERIFY: `npm run build` — confirm type extension compiles, consumers may show `unrecognized` missing-field errors (expected; addressed in 2.4).
-- [ ] **2.3** RED: Add residual-scanner emission cases to `test/unit/core/MarkdownParser/extractLinks.test.ts` per §"MODIFIED → test/unit/core/MarkdownParser/extractLinks.test.ts" assertions (lines 419–426). Five cases: residual outside code, residual inside fenced block (skip), residual inside inline code (skip), residual adjacent to valid wikilink (no double-count), <5ms perf gate on 10KB input.
-- [ ] **2.4** VERIFY RED: `bun vitest run test/unit/core/MarkdownParser/extractLinks.test.ts` — confirm new cases FAIL.
-- [ ] **2.5** GREEN: Implement residual-bracket scanner in `src/core/MarkdownParser/extractLinks.ts` per §"MODIFIED → src/core/MarkdownParser/extractLinks.ts" sketch (lines 270–289). Re-scan source after all extractors; emit `UnrecognizedSyntaxRecord` per `[[…]]` not in consumed-ranges; reuse `isInsideCodeBlock` to skip fenced + inline-code spans. Update `extractLinks` return shape to `{ links, unrecognized }`. Update direct call sites to consume both fields (do NOT yet propagate to ValidationResult — that is P3 wiring).
-- [ ] **2.6** VERIFY GREEN: `bun vitest run test/unit/core/MarkdownParser/extractLinks.test.ts` — all cases PASS, including <5ms perf gate.
-- [ ] **2.7** VERIFY: `bun vitest run test/fixtures/adversarial-commonmark/AC6.expected.json` — AC6 residual fixture transitions to GREEN.
+- [ ] **2.3** RED: Add residual-scanner emission cases to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` per §"MODIFIED → test/unit/core/MarkdownParser/extractLinks.test.ts" assertions (lines 419–426). Five cases: residual outside code, residual inside fenced block (skip), residual inside inline code (skip), residual adjacent to valid wikilink (no double-count), <5ms perf gate on 10KB input.
+- [ ] **2.4** VERIFY RED: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` — confirm new cases FAIL.
+- [ ] **2.5** GREEN: Implement residual-bracket scanner in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts` per §"MODIFIED → src/core/MarkdownParser/extractLinks.ts" sketch (lines 270–289). Re-scan source after all extractors; emit `UnrecognizedSyntaxRecord` per `[[…]]` not in consumed-ranges; reuse `isInsideCodeBlock` to skip fenced + inline-code spans. Update `extractLinks` return shape to `{ links, unrecognized }`. Update direct call sites to consume both fields (do NOT yet propagate to ValidationResult — that is P3 wiring).
+- [ ] **2.6** VERIFY GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` — all cases PASS, including <5ms perf gate.
+- [ ] **2.7** VERIFY: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC6.expected.json` — AC6 residual fixture transitions to GREEN.
 - [ ] **2.8** REFACTOR: Clean residual scanner — name helpers descriptively, JSDoc the consumed-ranges contract, ensure no redundant scans.
 - [ ] **2.9** VERIFY: `npm run build && bun test` — full suite. No new regressions vs. 0.3 baseline.
 - [ ] **2.S** STATE-WRITE: Update checkboxes. Note any deviations.
@@ -700,9 +700,9 @@ Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residu
 
 #### REVIEW GATE 1 `code-reviewer` (opus)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:00:15* %%
 
-- [ ] **2.R** REVIEW: Scope — `src/types/validationTypes.ts`, `src/core/MarkdownParser/extractLinks.ts`, `test/unit/core/MarkdownParser/extractLinks.test.ts`, `test/fixtures/adversarial-commonmark/`. Run `git diff <0.C_end_hash>..HEAD`. Read plan §7a row D2 and §7a.2 row CI-03.
+- [ ] **2.R** REVIEW: Scope — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/`. Run `git diff <0.C_end_hash>..HEAD`. Read plan §7a row D2 and §7a.2 row CI-03.
   - **Verify:** D2 sketch implemented as specified (residual scanner, isInsideCodeBlock reuse, no double-count vs. valid wikilinks)
   - **Verify:** `UnrecognizedSyntaxRecord` shape matches §7a.3 verbatim (line, column, rawText, syntaxFamily)
   - **Verify:** AC1–AC6 fixtures all PASS post-P2 (Phase 1 [H-D1-regex] + Phase 2 [H: <5ms benchmark] both verified)
@@ -713,18 +713,18 @@ Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residu
 
 ### Phase 3A — Types + getLinkClass Classifier `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:00:32* %%
 
 Phase 3 split into 3A (foundation types + classifier) and 3B (consumer wiring) for context budget. 3A is pure additive — no consumer-facing changes yet.
 
 - [ ] **3A.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 2.C `end_hash`. Read Review Gate 1 findings.
-- [ ] **3A.1** IMPLEMENT: Add `LinkClass` type + `ValidationSummary` extensions (`byLinkClass`, `unrecognizedCount`, `errorBreakdown`) to `src/types/validationTypes.ts` per §7a.3 verbatim. Mark `errors` derived per GAP-5.
-- [ ] **3A.2** IMPLEMENT: Re-export `LinkClass` from `src/types/citationTypes.ts` per §"MODIFIED → src/types/citationTypes.ts" (line 264).
+- [ ] **3A.1** IMPLEMENT: Add `LinkClass` type + `ValidationSummary` extensions (`byLinkClass`, `unrecognizedCount`, `errorBreakdown`) to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per §7a.3 verbatim. Mark `errors` derived per GAP-5.
+- [ ] **3A.2** IMPLEMENT: Re-export `LinkClass` from `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/citationTypes.ts` per §"MODIFIED → src/types/citationTypes.ts" (line 264).
 - [ ] **3A.3** VERIFY: `npm run build` — confirm consumers may show missing-field errors on `byLinkClass` / `unrecognizedCount` / `errorBreakdown` (expected; addressed in 3B). No type-shape errors on `LinkClass` itself.
-- [ ] **3A.4** RED: Create `test/unit/core/getLinkClass.test.ts` per §"ADDED → test/unit/core/getLinkClass.test.ts" assertions (lines 185–192). Five cases including the (linkType × anchorType) cross-product exhaustiveness check.
-- [ ] **3A.5** VERIFY RED: `bun vitest run test/unit/core/getLinkClass.test.ts` — confirm tests FAIL (no implementation yet).
-- [ ] **3A.6** GREEN: Create `src/core/getLinkClass.ts` per §"ADDED → src/core/getLinkClass.ts" sketch (lines 160–179). Three classification rules per D3.
-- [ ] **3A.7** VERIFY GREEN: `bun vitest run test/unit/core/getLinkClass.test.ts` — all cases PASS.
+- [ ] **3A.4** RED: Create `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/getLinkClass.test.ts` per §"ADDED → test/unit/core/getLinkClass.test.ts" assertions (lines 185–192). Five cases including the (linkType × anchorType) cross-product exhaustiveness check.
+- [ ] **3A.5** VERIFY RED: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/getLinkClass.test.ts` — confirm tests FAIL (no implementation yet).
+- [ ] **3A.6** GREEN: Create `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/getLinkClass.ts` per §"ADDED → src/core/getLinkClass.ts" sketch (lines 160–179). Three classification rules per D3.
+- [ ] **3A.7** VERIFY GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/getLinkClass.test.ts` — all cases PASS.
 - [ ] **3A.8** REFACTOR: Ensure cross-product exhaustive switch (no fall-through, no undefined return).
 - [ ] **3A.9** VERIFY: `npm run build && bun test` — full suite. No new regressions.
 - [ ] **3A.S** STATE-WRITE: Update checkboxes.
@@ -734,31 +734,31 @@ Phase 3 split into 3A (foundation types + classifier) and 3B (consumer wiring) f
 
 ### Phase 3B — Coverage-Qualified Output + Type-I Interface (TDD) `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:01:07* %%
 
 Closes CI-05 (High), GAP-2/3/4/5/6. Largest-blast-radius phase: `manager.validate()` Type-I interface change, exit-code refactor, formatter overhaul. Includes the LSP Audit Findings exit-code predicate fix (folded per project tech-debt policy).
 
 - [ ] **3B.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 3A.C `end_hash`.
-- [ ] **3B.1** IMPLEMENT: Wire `CitationValidator.ts` to populate new `ReportSummary` fields per §"MODIFIED → src/CitationValidator.ts" sketch (lines 291–311). Call `getLinkClass(link)` per link → `byLinkClass`. Populate `errorBreakdown.{brokenLinks, unrecognized}` unconditionally. Make `summary.errors = brokenLinks + unrecognized`.
-- [ ] **3B.2** RED: Add byLinkClass + errorBreakdown assertions to `test/unit/CitationValidator.test.ts` per §"MODIFIED → test/unit/CitationValidator.test.ts" lines 449–457 (subset for P3B; suggestion-path assertions deferred to P4).
-- [ ] **3B.3** VERIFY RED → GREEN: `bun vitest run test/unit/CitationValidator.test.ts`. Iterate until GREEN.
-- [ ] **3B.4** IMPLEMENT: `manager.validate()` Type-I return-shape change in `src/jact.ts` per §"MODIFIED → src/jact.ts" diff (lines 318–354). Return `{ output, result }`. Drop `JSON.parse(output)` in JSON branch.
+- [ ] **3B.1** IMPLEMENT: Wire `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/CitationValidator.ts` to populate new `ReportSummary` fields per §"MODIFIED → src/CitationValidator.ts" sketch (lines 291–311). Call `getLinkClass(link)` per link → `byLinkClass`. Populate `errorBreakdown.{brokenLinks, unrecognized}` unconditionally. Make `summary.errors = brokenLinks + unrecognized`.
+- [ ] **3B.2** RED: Add byLinkClass + errorBreakdown assertions to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts` per §"MODIFIED → test/unit/CitationValidator.test.ts" lines 449–457 (subset for P3B; suggestion-path assertions deferred to P4).
+- [ ] **3B.3** VERIFY RED → GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts`. Iterate until GREEN.
+- [ ] **3B.4** IMPLEMENT: `manager.validate()` Type-I return-shape change in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts` per §"MODIFIED → src/jact.ts" diff (lines 318–354). Return `{ output, result }`. Drop `JSON.parse(output)` in JSON branch.
 - [ ] **3B.5** IMPLEMENT: Update `formatForCLIMinimal` per §7g.3 — coverage qualifier `OK: N citations valid (markdown: M, wiki: W, caret: C; U unrecognized)`. Add UNRECOGNIZED section between ERRORS and trailer per §7g.3 GAP-1 (lines 357–367).
 - [ ] **3B.6** IMPLEMENT: Update `formatForCLIVerbose` per §7g.4 — SUMMARY block additions (`- By link class:` + `- Unrecognized:`) and trailer branch order per §7g.6 + GAP-4 (errors > 0 → "VALIDATION FAILED"; else unrecognizedCount > 0 → "VALIDATION FAILED - K unrecognized syntax records"; else warnings > 0 → "VALIDATION PASSED WITH WARNINGS"; else "ALL CITATIONS VALID").
-- [ ] **3B.7** IMPLEMENT: Replace string-match exit-code predicate (jact.ts:1280-1295) with structured-field predicate per §7a D3 (f) + LSP Audit Findings: `process.exit(result.summary.errors > 0 || result.summary.unrecognizedCount > 0 ? 1 : 0)`. Belt-and-suspenders disjunct retained per GAP-5.
-- [ ] **3B.8** RED: Add manager.validate() return-shape + exit-code matrix assertions to `test/unit/jact-validate.test.ts` per §"MODIFIED → test/unit/jact-validate.test.ts" lines 463–484. Four exit-code scenarios + four trailer-branch scenarios + JSON end-to-end.
-- [ ] **3B.9** VERIFY RED → GREEN: `bun vitest run test/unit/jact-validate.test.ts`. Iterate until GREEN.
+- [ ] **3B.7** IMPLEMENT: Replace string-match exit-code predicate (`/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts:1280-1295`) with structured-field predicate per §7a D3 (f) + LSP Audit Findings: `process.exit(result.summary.errors > 0 || result.summary.unrecognizedCount > 0 ? 1 : 0)`. Belt-and-suspenders disjunct retained per GAP-5.
+- [ ] **3B.8** RED: Add manager.validate() return-shape + exit-code matrix assertions to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-validate.test.ts` per §"MODIFIED → test/unit/jact-validate.test.ts" lines 463–484. Four exit-code scenarios + four trailer-branch scenarios + JSON end-to-end.
+- [ ] **3B.9** VERIFY RED → GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-validate.test.ts`. Iterate until GREEN.
 - [ ] **3B.10** REFACTOR: Clean formatters — extract `renderSummaryLine` helpers if duplication exists between minimal/verbose. Confirm exit-code predicate has zero string-match dependencies.
 - [ ] **3B.11** VERIFY: `npm run build && bun test` — full suite. No new regressions.
-- [ ] **3B.12** SMOKE: `npm run jact:validate test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md` — manual diff against §7g.3 "After (post-D1–D5)" minimal-mode block. Capture output inline in plan as Phase 3B verification evidence.
+- [ ] **3B.12** SMOKE: `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md` — manual diff against §7g.3 "After (post-D1–D5)" minimal-mode block. Capture output inline in plan as Phase 3B verification evidence.
 - [ ] **3B.S** STATE-WRITE: Update checkboxes. Record §7g.3 manual-diff evidence.
 - [ ] **3B.C** COMMIT: "feat(cli): coverage-qualified output + Type-I manager.validate + structured exit-code (D3, closes CI-05, GAP-2/3/4/5/6)". `git rev-parse HEAD` → `end_hash: <hash>`.
 
 #### REVIEW GATE 2 `code-reviewer` (opus)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:01:16* %%
 
-- [ ] **3B.R** REVIEW: Scope — `src/CitationValidator.ts`, `src/jact.ts`, `test/unit/CitationValidator.test.ts`, `test/unit/jact-validate.test.ts`. Run `git diff <2.C_end_hash>..HEAD` (covers 3A + 3B). Read plan §7a row D3, §7a.2 row CI-05, §7g.3/.4/.5/.6 UI Sketch.
+- [ ] **3B.R** REVIEW: Scope — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/CitationValidator.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-validate.test.ts`. Run `git diff <2.C_end_hash>..HEAD` (covers 3A + 3B). Read plan §7a row D3, §7a.2 row CI-05, §7g.3/.4/.5/.6 UI Sketch.
   - **Verify:** §7g.6 exit-code matrix (all 4 scenarios) — structured-field predicate, no string-match
   - **Verify:** §7g.4 trailer branch order — never prints "ALL CITATIONS VALID" while exit code is 1 (GAP-4 closure)
   - **Verify:** Type-I `manager.validate()` return-shape change is consistent across all callers (consumer audit per Plan-01 §9c)
@@ -770,21 +770,21 @@ Closes CI-05 (High), GAP-2/3/4/5/6. Largest-blast-radius phase: `manager.validat
 
 ### Phase 4 — D4 Levenshtein Suggestion Layer (TDD) `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:01:44* %%
 
 Closes GAP-7, GAP-8, completes CI-08 closure.
 
 - [ ] **4.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 3B.C `end_hash`. Read Review Gate 2 findings.
-- [ ] **4.1** RED: Add Levenshtein scenarios to `test/unit/core/MarkdownParser/resolveWikiPath.test.ts` per §"MODIFIED → test/unit/core/MarkdownParser/resolveWikiPath.test.ts" assertions (lines 433–442). Six cases: single-typo within threshold, multi-match disambiguation, ceiling clamp (≥10), floor clamp (≤3), no-match → empty suggestions, hit-path NOT invoked (cost-optimization).
-- [ ] **4.2** VERIFY RED: `bun vitest run test/unit/core/MarkdownParser/resolveWikiPath.test.ts` — confirm new cases FAIL.
-- [ ] **4.3** GREEN: Implement adaptive-threshold Levenshtein scan in `src/core/MarkdownParser/resolveWikiPath.ts` per §"MODIFIED → src/core/MarkdownParser/resolveWikiPath.ts" sketch (lines 374–393). On both `FileCache.resolveFile(rawPath)` AND `FileCache.resolveFile(slug+".md")` miss only. Threshold = `clamp(3, 10, floor(0.2 * candidate.relativePath.length))`. Basename distance only. Return shape gains `suggestions: string[]` (full relative paths).
-- [ ] **4.4** VERIFY GREEN: `bun vitest run test/unit/core/MarkdownParser/resolveWikiPath.test.ts` — all cases PASS, including [H-D4-suggestion-threshold] verification.
-- [ ] **4.5** RED: Add suggestion-path assertions to `test/unit/CitationValidator.test.ts` (the 3 cases deferred from 3B.2: single-suggestion → full path; multi-suggestion → comma-space-join; zero-suggestion → null).
-- [ ] **4.6** GREEN: Wire `CitationValidator.ts` to consume `suggestions[]` from `resolveWikiPath` per §"MODIFIED → src/CitationValidator.ts" P4 portion (lines 296–311). Single match → single full path; ≥2 → comma-space-join; 0 → null.
-- [ ] **4.7** VERIFY: `bun vitest run test/unit/CitationValidator.test.ts` — all cases PASS.
+- [ ] **4.1** RED: Add Levenshtein scenarios to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/resolveWikiPath.test.ts` per §"MODIFIED → test/unit/core/MarkdownParser/resolveWikiPath.test.ts" assertions (lines 433–442). Six cases: single-typo within threshold, multi-match disambiguation, ceiling clamp (≥10), floor clamp (≤3), no-match → empty suggestions, hit-path NOT invoked (cost-optimization).
+- [ ] **4.2** VERIFY RED: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/resolveWikiPath.test.ts` — confirm new cases FAIL.
+- [ ] **4.3** GREEN: Implement adaptive-threshold Levenshtein scan in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/resolveWikiPath.ts` per §"MODIFIED → src/core/MarkdownParser/resolveWikiPath.ts" sketch (lines 374–393). On both `FileCache.resolveFile(rawPath)` AND `FileCache.resolveFile(slug+".md")` miss only. Threshold = `clamp(3, 10, floor(0.2 * candidate.relativePath.length))`. Basename distance only. Return shape gains `suggestions: string[]` (full relative paths).
+- [ ] **4.4** VERIFY GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/resolveWikiPath.test.ts` — all cases PASS, including [H-D4-suggestion-threshold] verification.
+- [ ] **4.5** RED: Add suggestion-path assertions to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts` (the 3 cases deferred from 3B.2: single-suggestion → full path; multi-suggestion → comma-space-join; zero-suggestion → null).
+- [ ] **4.6** GREEN: Wire `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/CitationValidator.ts` to consume `suggestions[]` from `resolveWikiPath` per §"MODIFIED → src/CitationValidator.ts" P4 portion (lines 296–311). Single match → single full path; ≥2 → comma-space-join; 0 → null.
+- [ ] **4.7** VERIFY: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts` — all cases PASS.
 - [ ] **4.8** REFACTOR: Ensure Levenshtein scan only fires on miss (cost-optimization assertion in 4.1 must hold).
 - [ ] **4.9** VERIFY: `npm run build && bun test` — full suite. No new regressions.
-- [ ] **4.10** SMOKE: Run `bash scripts/service-level-smoke.sh` (per §Verification line 580) — exit 0; ≥7/8 wiki valid; loud-fail format `Tried: <raw>, <slug>.md` retained. Suggestion line surfaces on miss.
+- [ ] **4.10** SMOKE: Run `bash /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/scripts/service-level-smoke.sh` (per §Verification line 580) — exit 0; ≥7/8 wiki valid; loud-fail format `Tried: <raw>, <slug>.md` retained. Suggestion line surfaces on miss.
 - [ ] **4.S** STATE-WRITE: Update checkboxes.
 - [ ] **4.C** COMMIT: "feat(resolver): adaptive-threshold Levenshtein suggestion layer (D4, closes GAP-7/8, CI-08)". `git rev-parse HEAD` → `end_hash: <hash>`.
 
@@ -792,20 +792,20 @@ Closes GAP-7, GAP-8, completes CI-08 closure.
 
 ### Phase 5 — D5 Documentation Alignment `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:02:06* %%
 
 Closes CI-04 (Medium) + CI-06 (Medium) + CI-07 (Low). Single-source-of-truth: 10-form enumeration appears identically in three locations.
 
 - [ ] **5.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 4.C `end_hash`.
-- [ ] **5.1** READ: `src/core/MarkdownParser/extractWikilinks.ts` — confirm shipped grammar covers exactly the 10 forms enumerated in plan §7b D1 rationale. List them explicitly.
-- [ ] **5.2** UPDATE: `src/core/MarkdownParser/MarkdownParser.ts` JSDoc (lines 31-35) — replace narrow examples with the 10-form enumeration in plan §7b D1 order.
-- [ ] **5.3** UPDATE: `jact/CLAUDE.md` "Citation Patterns Supported" section — replace narrow wikilink examples with the 10-form enumeration. Identical wording to JSDoc per single-source-of-truth.
-- [ ] **5.4** UPDATE: `design-docs/component-guides/MarkdownParser Component Guide.md` — add "Wikilink Grammar" subsection listing the 10 forms with one example each. Cite `src/core/MarkdownParser/extractWikilinks.ts` as source.
-- [ ] **5.5** VERIFY: Run the 10-form parity diff per §Verification line 571: `diff <(grep -A 20 "Citation Patterns Supported" jact/CLAUDE.md) <(grep -A 20 "Wikilink Grammar" "design-docs/component-guides/MarkdownParser Component Guide.md")` — manual review confirms 10-form enumeration in both.
+- [ ] **5.1** READ: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractWikilinks.ts` — confirm shipped grammar covers exactly the 10 forms enumerated in plan §7b D1 rationale. List them explicitly.
+- [ ] **5.2** UPDATE: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/MarkdownParser.ts` JSDoc (lines 31-35) — replace narrow examples with the 10-form enumeration in plan §7b D1 order.
+- [ ] **5.3** UPDATE: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/CLAUDE.md` "Citation Patterns Supported" section — replace narrow wikilink examples with the 10-form enumeration. Identical wording to JSDoc per single-source-of-truth.
+- [ ] **5.4** UPDATE: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/MarkdownParser Component Guide.md` — add "Wikilink Grammar" subsection listing the 10 forms with one example each. Cite `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractWikilinks.ts` as source.
+- [ ] **5.5** VERIFY: Run the 10-form parity diff per §Verification line 571: `diff <(grep -A 20 "Citation Patterns Supported" /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/CLAUDE.md) <(grep -A 20 "Wikilink Grammar" "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/MarkdownParser Component Guide.md")` — manual review confirms 10-form enumeration in both.
 - [ ] **5.6** VERIFY: `npm run build && bun test` — no regressions from doc-only edits (sanity check).
 - [ ] **5.7** SMOKE: §7g.4 verbose-mode + §7g.5 JSON-mode manual diffs:
-  - `npm run jact:validate test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md -- --verbose` vs §7g.4 "After"
-  - `npm run jact:validate test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md -- --format json | jq` vs §7g.5 "After"
+  - `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md -- --verbose` vs §7g.4 "After"
+  - `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md -- --format json | jq` vs §7g.5 "After"
   - Capture both outputs inline as Phase 5 verification evidence.
 - [ ] **5.S** STATE-WRITE: Update checkboxes. Record §7g.4 + §7g.5 manual-diff evidence.
 - [ ] **5.C** COMMIT: "docs(wikilink): align CLAUDE.md + JSDoc + component guide to 10-form D1 grammar (D5, closes CI-04/06/07)". `git rev-parse HEAD` → `end_hash: <hash>`.
@@ -814,20 +814,20 @@ Closes CI-04 (Medium) + CI-06 (Medium) + CI-07 (Low). Single-source-of-truth: 10
 
 #### FINAL REVIEW GATE — BI/CI Coverage `code-reviewer` (opus)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:02:24* %%
 
 Holistic pass/fail evaluation against `plan.md §7a.1 BI ↔ Delta Coverage` and `§7a.2 CI ↔ Delta Coverage`. NO partial credit. Every BI row + every CI row must be cited with file:line evidence proving FULL coverage.
 
 - [ ] **5.R** FINAL REVIEW: Scope — entire `git diff <0.C_end_hash>..HEAD` (every commit from Phase 1 through Phase 5). Read in order:
-  1. `plan.md §5 Baseline Ideal Outcomes Table` (BI-1 through BI-7)
-  2. `plan.md §6.5 Findings & CI Status Table` (CI-01 through CI-08)
-  3. `plan.md §7a.1 BI ↔ Delta Coverage` table
-  4. `plan.md §7a.2 CI ↔ Delta Coverage` table
-  5. `plan-02-implement-deltas.md §Verification` smoke evidence captured in 3B.12, 5.7
+  1. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §5 Baseline Ideal Outcomes Table` (BI-1 through BI-7)
+  2. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §6.5 Findings & CI Status Table` (CI-01 through CI-08)
+  3. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §7a.1 BI ↔ Delta Coverage` table
+  4. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §7a.2 CI ↔ Delta Coverage` table
+  5. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan-02-implement-deltas.md §Verification` smoke evidence captured in 3B.12, 5.7
   - **Produce a BI Coverage Verification table** — for each BI-1 … BI-7 row: `| BI | Ideal Outcome | Cited Implementation Evidence (file:line) | PASS/FAIL |`. Any BI not fully achieved by shipped code = FAIL.
   - **Produce a CI Coverage Verification table** — for each CI-01 … CI-08 row: `| CI | Severity | Critical Issue | Cited Resolution Evidence (file:line) | PASS/FAIL |`. Any CI not structurally closed = FAIL.
   - **Verify §7g UI Sketch parity** — minimal/verbose/JSON outputs from 3B.12 + 5.7 evidence match "After (post-D1–D5)" blocks.
-  - **Verify hardening gates GREEN throughout** — service-level-smoke.sh, ESLint, plan-eval, defer-language, portability, historical-replay all passing on final commit.
+  - **Verify hardening gates GREEN throughout** — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/scripts/service-level-smoke.sh`, ESLint, plan-eval, defer-language, portability, historical-replay all passing on final commit.
   - **Verdict format:** `PASS` (every BI + every CI ✅ with evidence) or `FAIL` (list every uncovered BI/CI with what's missing).
   - **PASS** → proceed to Architect Gate. **FAIL** → escalation policy. Tier 1: same `coder` fixes uncovered items; re-review. Tier 2: model override → opus. Tier 3: HUMAN HARD GATE.
 
@@ -835,13 +835,13 @@ Holistic pass/fail evaluation against `plan.md §7a.1 BI ↔ Delta Coverage` and
 
 #### ARCHITECT GATE `application-tech-lead` (opus)
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:02:32* %%
 
 Final architecture evaluation. Independent of Final Review Gate — the BI/CI gate verifies coverage; the architect gate verifies the implementation is architecturally sound and free of enterprise-pattern creep.
 
 - [ ] **5.A** ARCHITECT EVAL: Scope — entire `git diff <0.C_end_hash>..HEAD`. Use `evaluate-against-architecture-principles` skill against ALL 9 principle categories (Modular Design, Data-First Design, Action-Based File Organization, Format/Interface Design, MVP Principles, Deterministic Offloading, Self-Contained Naming, Safety-First Design, Anti-Patterns). Cross-reference shipped code against:
-  - `plan.md §6.5 [i0] Baseline Architecture Principles Evaluation` (the principle violations the Deltas were designed to close)
-  - `plan.md §7f [i3] Delta Architecture Eval Results` (the predicted post-Delta principle scores)
+  - `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §6.5 [i0] Baseline Architecture Principles Evaluation` (the principle violations the Deltas were designed to close)
+  - `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §7f [i3] Delta Architecture Eval Results` (the predicted post-Delta principle scores)
   - **Verify:** Type-I `manager.validate()` change introduced an ADR or equivalent change-note (per §7a D3 Notes column GAP-6 requirement)
   - **Verify:** No new enterprise-scale complexity (DI containers, abstract factories, etc.) — pragmatic application-scale patterns only
   - **Verify:** Module boundaries respect Plan-01 §9b sibling-sweep rule + black-box-interfaces principle
