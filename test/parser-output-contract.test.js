@@ -226,6 +226,8 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 
 		// Then: Output matches the documented MarkdownParser.Output.DataContract
 		// Required top-level fields per contract
+		// `unrecognized` added in P3 (D2 wiring) — surfaces residual `[[...]]` records
+		// from extractLinks scanner so CitationValidator can populate ValidationResult.
 		const requiredFields = [
 			"filePath",
 			"content",
@@ -233,6 +235,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 			"links",
 			"headings",
 			"anchors",
+			"unrecognized",
 		];
 		for (const field of requiredFields) {
 			expect(result).toHaveProperty(field);
@@ -342,7 +345,9 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 
 		// Then: Full anchor with parentheses captured
 		const link = result.links.find(
-			(l) => l.target.anchor === "ValidationMetadata%20Type%20(Discriminated%20Union)",
+			(l) =>
+				l.target.anchor ===
+				"ValidationMetadata%20Type%20(Discriminated%20Union)",
 		);
 		expect(link).toBeDefined();
 		expect(link.fullMatch).toBe(
@@ -360,10 +365,14 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 
 		// Then: Full anchor with parentheses captured
 		const link = result.links.find(
-			(l) => l.scope === "internal" && l.target.anchor === "Heading%20(With%20Parens)",
+			(l) =>
+				l.scope === "internal" &&
+				l.target.anchor === "Heading%20(With%20Parens)",
 		);
 		expect(link).toBeDefined();
-		expect(link.fullMatch).toBe("[heading with parens](#Heading%20(With%20Parens))");
+		expect(link.fullMatch).toBe(
+			"[heading with parens](#Heading%20(With%20Parens))",
+		);
 	});
 
 	it("should not regress on standard links without parentheses in anchors", async () => {
@@ -395,7 +404,9 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 		expect(line4Links.length).toBe(2);
 
 		const withParens = line4Links.find((l) => l.target.anchor?.includes("("));
-		const withoutParens = line4Links.find((l) => l.target.anchor === "Normal%20Anchor");
+		const withoutParens = line4Links.find(
+			(l) => l.target.anchor === "Normal%20Anchor",
+		);
 
 		expect(withParens).toBeDefined();
 		expect(withParens.target.anchor).toBe("Section%20(Notes)");

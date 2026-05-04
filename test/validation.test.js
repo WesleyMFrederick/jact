@@ -20,8 +20,11 @@ describe("JACT Integration Tests", () => {
 				},
 			);
 
-			// Minimal default output: single OK line (SC-1)
-			expect(output).toMatch(/^OK: \d+ citations valid$/m);
+			// Minimal default output: single OK line with coverage qualifier
+			// (per §7g.3 D3 (d) + (g)): "OK: N citations valid (markdown: M, wiki: W, caret: C; U unrecognized)"
+			expect(output).toMatch(
+				/^OK: \d+ citations valid \(markdown: \d+, wiki: \d+, caret: \d+; \d+ unrecognized\)$/m,
+			);
 		} catch (error) {
 			// If execSync throws, it means non-zero exit code
 			expect.fail(
