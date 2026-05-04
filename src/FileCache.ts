@@ -390,6 +390,38 @@ export class FileCache {
 		return result;
 	}
 
+	/**
+	 * Return all cached entries as `{basename, relativePath}` for downstream
+	 * Levenshtein suggestion scanning (per D4). Relative paths are computed
+	 * against the realScopeFolder (symlink-resolved) so suggestions surface
+	 * folder context (e.g. `wiki/concepts/the-hardening-principle.md`).
+	 *
+	 * When buildCache has not been called (no scope), relativePath falls back
+	 * to the basename — caller still gets a usable string.
+	 */
+	getEntries(): Array<{ basename: string; relativePath: string }> {
+		const root =
+			this.scope?.scope !== undefined && this.scope.scope !== ""
+				? (() => {
+						try {
+							return this.fs.realpathSync(this.path.resolve(this.scope.scope));
+						} catch {
+							return this.path.resolve(this.scope.scope);
+						}
+					})()
+				: null;
+		const result: Array<{ basename: string; relativePath: string }> = [];
+		for (const [basename, paths] of this.entries) {
+			for (const absolutePath of paths) {
+				const relativePath = root
+					? this.path.relative(root, absolutePath)
+					: basename;
+				result.push({ basename, relativePath });
+			}
+		}
+		return result;
+	}
+
 	// Get cache statistics (total files, duplicates)
 	getCacheStats(): CacheStatsDetail {
 		const duplicates = this.duplicateNames();

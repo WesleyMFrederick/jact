@@ -432,7 +432,9 @@ export class CitationValidator {
 		}
 
 		// Wiki fail-loud path: parser tried both raw + slug forms and missed. Surface the full
-		// attempt list so the user can see what we looked for (per loud-fail invariant).
+		// attempt list inline (loud-fail invariant). When the resolver supplied Levenshtein
+		// suggestions (D4), promote them to validation.suggestion so the test/CLI can render
+		// them: single match → full relative path; ≥2 → comma-space-joined paths; 0 → null.
 		if (
 			citation.linkType === "wiki" &&
 			citation.target.path.absolute === null &&
@@ -440,11 +442,16 @@ export class CitationValidator {
 			citation.target.path.attempted.length > 0
 		) {
 			const tried = citation.target.path.attempted.join(", ");
+			const suggestions = citation.target.path.suggestions;
+			const suggestionMessage =
+				suggestions !== undefined && suggestions.length > 0
+					? suggestions.join(", ")
+					: null;
 			return this.createValidationResult(
 				citation,
 				"error",
-				`Wiki page not found: ${citation.target.path.raw}`,
-				`Tried: ${tried}`,
+				`Wiki page not found: ${citation.target.path.raw}. Tried: ${tried}`,
+				suggestionMessage,
 			);
 		}
 

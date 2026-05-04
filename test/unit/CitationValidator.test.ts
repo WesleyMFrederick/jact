@@ -3,7 +3,10 @@
 // computeValidationSummary helper. Suggestion-path assertions deferred to P4.
 
 import { describe, expect, it } from "vitest";
-import { computeValidationSummary } from "../../src/CitationValidator.js";
+import {
+	CitationValidator,
+	computeValidationSummary,
+} from "../../src/CitationValidator.js";
 import type { LinkObject } from "../../src/types/citationTypes.js";
 import type {
 	EnrichedLinkObject,
@@ -105,5 +108,116 @@ describe("computeValidationSummary — D3 byLinkClass + errorBreakdown wiring", 
 		expect(summary.warnings).toBe(2);
 		expect(summary.errorBreakdown.brokenLinks).toBe(1);
 		expect(summary.errors).toBe(2); // 1 broken + 1 unrecognized
+	});
+});
+
+describe("CitationValidator — wiki suggestion-path wiring (P4)", () => {
+	// Build a wiki LinkObject in the fail-loud shape (resolveWikiPath miss-path output).
+	function makeWikiMissLink(
+		attempted: readonly string[],
+		suggestions: readonly string[] | undefined,
+		raw: string,
+	): LinkObject {
+		return {
+			linkType: "wiki",
+			scope: "cross-document",
+			anchorType: null,
+			source: { path: { absolute: "/v/source.md" } },
+			target: {
+				path: {
+					raw,
+					absolute: null,
+					relative: null,
+					attempted,
+					...(suggestions && { suggestions }),
+				},
+				anchor: null,
+			},
+			text: null,
+			fullMatch: `[[${raw}]]`,
+			line: 1,
+			column: 0,
+			extractionMarker: null,
+		};
+	}
+
+	// Stubs — the wiki fail-loud branch hits before either dep is dereferenced.
+	const stubFileCache = {
+		resolveFile() {
+			return {
+				found: false as const,
+				reason: "not_found" as const,
+				message: "stub",
+			};
+		},
+	};
+	const stubParsedFileCache = {
+		async resolveParsedFile() {
+			throw new Error("not used in wiki fail-loud path");
+		},
+	};
+	const validator = new CitationValidator(stubParsedFileCache, stubFileCache);
+
+	it("single suggestion → validation.suggestion equals the single full relative path", async () => {
+		const link = makeWikiMissLink(
+			["Some Page", "some-page.md"],
+			["wiki/concepts/some-page-actual.md"],
+			"Some Page",
+		);
+		const enriched = await validator.validateSingleCitation(link);
+		if (enriched.validation.status !== "error") {
+			throw new Error(
+				`expected error status, got ${enriched.validation.status}`,
+			);
+		}
+		expect(enriched.validation.suggestion).toBe(
+			"wiki/concepts/some-page-actual.md",
+		);
+		// Loud-fail format retained inline in error.
+		expect(enriched.validation.error).toContain(
+			"Tried: Some Page, some-page.md",
+		);
+	});
+
+	it("≥2 suggestions → validation.suggestion equals comma-space-joined full paths", async () => {
+		const link = makeWikiMissLink(
+			[
+				"The Hardening Principle (concept)",
+				"the-hardening-principle-concept.md",
+			],
+			[
+				"wiki/concepts/the-hardening-principle.md",
+				"wiki/summaries/the-hardening-principle.md",
+				"raw-sources/claude-code-principles/the-hardening-principle.md",
+			],
+			"The Hardening Principle (concept)",
+		);
+		const enriched = await validator.validateSingleCitation(link);
+		if (enriched.validation.status !== "error") {
+			throw new Error(
+				`expected error status, got ${enriched.validation.status}`,
+			);
+		}
+		expect(enriched.validation.suggestion).toBe(
+			"wiki/concepts/the-hardening-principle.md, wiki/summaries/the-hardening-principle.md, raw-sources/claude-code-principles/the-hardening-principle.md",
+		);
+	});
+
+	it("zero suggestions → validation.suggestion remains absent (null) — loud-fail Tried: still in error", async () => {
+		const link = makeWikiMissLink(
+			["Nonexistent", "nonexistent.md"],
+			[], // explicit empty
+			"Nonexistent",
+		);
+		const enriched = await validator.validateSingleCitation(link);
+		if (enriched.validation.status !== "error") {
+			throw new Error(
+				`expected error status, got ${enriched.validation.status}`,
+			);
+		}
+		expect(enriched.validation.suggestion).toBeUndefined();
+		expect(enriched.validation.error).toContain(
+			"Tried: Nonexistent, nonexistent.md",
+		);
 	});
 });
