@@ -73,7 +73,7 @@ describe("extractLinks — residual-bracket scanner (D2)", () => {
 
 		const wikiLinks = result.links.filter((l) => l.linkType === "wiki");
 		expect(wikiLinks).toHaveLength(1);
-		expect(wikiLinks[0]?.target.rawPath).toBe("ValidPage");
+		expect(wikiLinks[0]?.target.path.raw).toBe("ValidPage");
 
 		expect(result.unrecognized).toHaveLength(1);
 		const residual = result.unrecognized[0];

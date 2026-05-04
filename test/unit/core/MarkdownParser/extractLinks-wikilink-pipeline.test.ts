@@ -30,7 +30,7 @@ describe("extractLinks — full pipeline with seeded FileCache", () => {
 		fileCache.buildCache(WIKI_DIR);
 
 		const content = fs.readFileSync(FIXTURE_PATH, "utf-8");
-		const links = extractLinks(content, FIXTURE_PATH, fileCache);
+		const { links } = extractLinks(content, FIXTURE_PATH, fileCache);
 
 		const crossDocWikiLinks = links.filter(
 			(l) => l.linkType === "wiki" && l.scope === "cross-document",
@@ -53,7 +53,7 @@ describe("extractLinks — full pipeline with seeded FileCache", () => {
 		fileCache.buildCache(WIKI_DIR);
 
 		const content = fs.readFileSync(FIXTURE_PATH, "utf-8");
-		const links = extractLinks(content, FIXTURE_PATH, fileCache);
+		const { links } = extractLinks(content, FIXTURE_PATH, fileCache);
 
 		const hardeningLink = links.find(
 			(l) =>

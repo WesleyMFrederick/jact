@@ -90,6 +90,9 @@ export class MarkdownParser {
 			filePath,
 			content,
 			tokens,
+			// `unrecognized` from extractLinks is intentionally dropped here —
+			// P3 wires residual records through ValidationResult; P2 only
+			// surfaces them via direct extractLinks callers.
 			links: this.extractLinks(content, filePath),
 			headings,
 			anchors: this.extractAnchors(content, headings),
@@ -109,7 +112,7 @@ export class MarkdownParser {
 	 * @returns Array of link objects with { linkType, scope, anchorType, source, target, text, fullMatch, line, column }
 	 */
 	extractLinks(content: string, sourcePath: string): LinkObject[] {
-		return extractLinks(content, sourcePath, this.fileCache);
+		return extractLinks(content, sourcePath, this.fileCache).links;
 	}
 
 	/**

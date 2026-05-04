@@ -20,7 +20,7 @@ describe("extractLinks — line-reference suffix stripping", () => {
 			"[^S-001]: `/Users/wes/project/file.md:L57`",
 		].join("\n");
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);
@@ -35,7 +35,7 @@ describe("extractLinks — line-reference suffix stripping", () => {
 			"[^S-002]: `/Users/wes/project/file.md:L57,L61`",
 		].join("\n");
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);
@@ -50,7 +50,7 @@ describe("extractLinks — line-reference suffix stripping", () => {
 			"[^S-003]: `/Users/wes/project/file.md:L57,L61,L65`",
 		].join("\n");
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);
@@ -65,7 +65,7 @@ describe("extractLinks — line-reference suffix stripping", () => {
 			"[^S-004]: `/Users/wes/project/file.md:L57-L61`",
 		].join("\n");
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);
@@ -80,7 +80,7 @@ describe("extractLinks — line-reference suffix stripping", () => {
 			"[^S-005]: `/Users/wes/project/file.md:57`",
 		].join("\n");
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);
@@ -93,7 +93,7 @@ describe("extractLinks — line-reference suffix stripping", () => {
 		// should not be affected by this fix.
 		const content = "See [link](file.md#heading) for details.";
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);

@@ -27,7 +27,7 @@ describe("extractLinks — regex extractors skip fenced code blocks (one-invaria
 			"After [cite: real2.md].",
 		].join("\n");
 		const src = tmpSourcePath(content);
-		const links = extractLinks(content, src, emptyFileCache);
+		const { links } = extractLinks(content, src, emptyFileCache);
 
 		const citeRaws = links
 			.filter((l) => l.fullMatch.startsWith("[cite:"))
@@ -51,7 +51,7 @@ describe("extractLinks — regex extractors skip fenced code blocks (one-invaria
 			"~~~",
 		].join("\n");
 		const src = tmpSourcePath(content);
-		const links = extractLinks(content, src, emptyFileCache);
+		const { links } = extractLinks(content, src, emptyFileCache);
 		const citeRaws = links
 			.filter((l) => l.fullMatch.startsWith("[cite:"))
 			.map((l) => l.target.path.raw);

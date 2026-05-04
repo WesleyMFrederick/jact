@@ -435,6 +435,76 @@ function extractCaretLinks(
 }
 
 /**
+ * Residual-bracket scanner (per D2). Re-scans source after all extractors and
+ * emits one `UnrecognizedSyntaxRecord` per `[[…]]` (or unmatched `[[…`) NOT
+ * already covered by `consumedRanges`. Skips fenced code blocks and inline
+ * code spans via the same helpers used by upstream extractors, so suppression
+ * is consistent across the pipeline.
+ *
+ * Contract:
+ *   - `consumedRanges` lists (line, column, length) tuples for valid wikilinks
+ *     so adjacent residuals (e.g. `[[Valid]] [[broken`) are not double-counted.
+ *   - For unmatched openers (no closing `]]` on the same line), `rawText` runs
+ *     from `[[` to end-of-line.
+ *
+ * Performance: linear in source size; <5ms on 10KB input ([H: <5ms] per §7b D2).
+ */
+export function scanResidualBrackets(
+	source: string,
+	consumedRanges: ConsumedRange[],
+	fencedLines: Set<number>,
+): UnrecognizedSyntaxRecord[] {
+	const records: UnrecognizedSyntaxRecord[] = [];
+	const lines = source.split("\n");
+	const openerRegex = /\[\[/g;
+
+	for (let i = 0; i < lines.length; i++) {
+		if (fencedLines.has(i)) continue;
+		const line = lines[i];
+		if (line === undefined) continue;
+
+		const rangesOnLine = consumedRanges.filter((r) => r.line === i + 1);
+
+		openerRegex.lastIndex = 0;
+		let match = openerRegex.exec(line);
+		while (match !== null) {
+			const col = match.index;
+
+			// Skip opener if already consumed by a valid wikilink at this position.
+			const isConsumed = rangesOnLine.some(
+				(r) => col >= r.column && col < r.column + r.length,
+			);
+			if (isConsumed) {
+				match = openerRegex.exec(line);
+				continue;
+			}
+
+			// Skip opener inside an inline code span.
+			if (isInsideInlineCode(line, col)) {
+				match = openerRegex.exec(line);
+				continue;
+			}
+
+			// rawText: from `[[` to closing `]]` on the same line, else to EOL.
+			const tail = line.substring(col);
+			const closeIdx = tail.indexOf("]]");
+			const rawText = closeIdx === -1 ? tail : tail.substring(0, closeIdx + 2);
+
+			records.push({
+				line: i + 1,
+				column: col,
+				rawText,
+				syntaxFamily: "wiki",
+			});
+
+			match = openerRegex.exec(line);
+		}
+	}
+
+	return records;
+}
+
+/**
  * Extract all link references from markdown content
  *
  * Uses token-first extraction for standard markdown links (via marked.lexer tokens),
@@ -448,13 +518,14 @@ function extractCaretLinks(
  *
  * @param content - Full markdown file content
  * @param sourcePath - Absolute path to the source file being parsed
- * @returns Array of link objects with { linkType, scope, anchorType, source, target, text, fullMatch, line, column }
+ * @returns `{ links, unrecognized }` — links from all extractors and any
+ *   `[[…]]` sequences NOT consumed by the D1 grammar (per D2).
  */
 export function extractLinks(
 	content: string,
 	sourcePath: string,
 	fileCache: FileCache,
-): LinkObject[] {
+): { links: LinkObject[]; unrecognized: UnrecognizedSyntaxRecord[] } {
 	const links: LinkObject[] = [];
 	const lines = content.split("\n");
 	const sourceAbsolutePath = sourcePath;
@@ -468,7 +539,8 @@ export function extractLinks(
 	const codeBlockLines = getFencedCodeBlockLineSet(content);
 
 	// Wiki-style links (all forms): [[...]] — NOT in CommonMark
-	links.push(...extractWikilinks(content, sourceAbsolutePath, fileCache));
+	const wikiLinks = extractWikilinks(content, sourceAbsolutePath, fileCache);
+	links.push(...wikiLinks);
 
 	// Phase 2: Regex extraction for patterns not in CommonMark or not caught by token parser
 	lines.forEach((line, index) => {
@@ -494,5 +566,19 @@ export function extractLinks(
 		extractCaretLinks(line, index, sourceAbsolutePath, links, fileCache);
 	});
 
-	return links;
+	// Phase 3 (D2): residual-bracket scan. Consumed ranges seed from valid
+	// wikilinks so adjacent residuals are not double-counted (e.g.
+	// `[[Valid]] [[broken` emits exactly one residual at column of `[[broken`).
+	const consumedRanges: ConsumedRange[] = wikiLinks.map((l) => ({
+		line: l.line,
+		column: l.column,
+		length: l.fullMatch.length,
+	}));
+	const unrecognized = scanResidualBrackets(
+		content,
+		consumedRanges,
+		codeBlockLines,
+	);
+
+	return { links, unrecognized };
 }

@@ -19,7 +19,7 @@ describe("extractLinks — backtick footnote paths (issue #11)", () => {
 			"[^S-001]: `/Users/wes/project/design-docs/Gemini-LBNL-Prompt.md`",
 		].join("\n");
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);
@@ -37,7 +37,7 @@ describe("extractLinks — backtick footnote paths (issue #11)", () => {
 			"[^S-001]: `/Users/wes/project/design-docs/Gemini-LBNL-Prompt.md:17-36`",
 		].join("\n");
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);
@@ -53,7 +53,7 @@ describe("extractLinks — backtick footnote paths (issue #11)", () => {
 		// ensure we don't break normal links that happen to have no backticks.
 		const content = "See [normal](other-file.md) for details.";
 
-		const links = extractLinks(content, "/some/source.md");
+		const { links } = extractLinks(content, "/some/source.md");
 		const crossDocLinks = links.filter((l) => l.scope === "cross-document");
 
 		expect(crossDocLinks.length).toBeGreaterThan(0);

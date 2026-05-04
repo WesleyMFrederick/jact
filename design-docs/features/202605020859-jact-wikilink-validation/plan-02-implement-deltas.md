@@ -714,22 +714,33 @@ Verifies shipped D1 grammar against CommonMark §4.5/§6.1/§6.5 edge cases (AC1
 
 ### Phase 2 — D2 Residual-Bracket Scanner (TDD) `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:06:20* %%
+%% *Last Modified: 05/03/26 18:46:40* %%
 
 Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residual-scanner emission inside `extractLinks.ts`. AC6 fixture from Phase 1 transitions to GREEN.
 
-- [ ] **2.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 1.C `end_hash`.
-- [ ] **2.1** IMPLEMENT (types only): Add `UnrecognizedSyntaxRecord` interface + `unrecognized: UnrecognizedSyntaxRecord[]` field to `ValidationResult` in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per [§7a.3 Data Shape Deltas](./plan.md#7a.3%20Data%20Shape%20Deltas) verbatim.
-- [ ] **2.2** VERIFY: `npm run build` — confirm type extension compiles, consumers may show `unrecognized` missing-field errors (expected; addressed in 2.4).
-- [ ] **2.3** RED: Add residual-scanner emission cases to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` per §"MODIFIED → test/unit/core/MarkdownParser/extractLinks.test.ts" assertions (lines 419–426). Five cases: residual outside code, residual inside fenced block (skip), residual inside inline code (skip), residual adjacent to valid wikilink (no double-count), <5ms perf gate on 10KB input.
-- [ ] **2.4** VERIFY RED: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` — confirm new cases FAIL.
-- [ ] **2.5** GREEN: Implement residual-bracket scanner in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts` per §"MODIFIED → src/core/MarkdownParser/extractLinks.ts" sketch (lines 270–289). Re-scan source after all extractors; emit `UnrecognizedSyntaxRecord` per `[[…]]` not in consumed-ranges; reuse `isInsideCodeBlock` to skip fenced + inline-code spans. Update `extractLinks` return shape to `{ links, unrecognized }`. Update direct call sites to consume both fields (do NOT yet propagate to ValidationResult — that is P3 wiring).
-- [ ] **2.6** VERIFY GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` — all cases PASS, including <5ms perf gate.
-- [ ] **2.7** VERIFY: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC6.expected.json` — AC6 residual fixture transitions to GREEN.
-- [ ] **2.8** REFACTOR: Clean residual scanner — name helpers descriptively, JSDoc the consumed-ranges contract, ensure no redundant scans.
-- [ ] **2.9** VERIFY: `npm run build && bun test` — full suite. No new regressions vs. 0.3 baseline.
-- [ ] **2.S** STATE-WRITE: Update checkboxes. Note any deviations.
-- [ ] **2.C** COMMIT: "feat(parser): residual-bracket scanner emits UnrecognizedSyntaxRecord (D2, closes CI-03)". `git rev-parse HEAD` → `end_hash: <hash>`.
+- [x] **2.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 1.C `end_hash`.
+  - `start_hash: 9cc8138bf60aaba97b97d406ee36d8288a2183d8` — matches Phase 1 carryover anchor (back-fill commit `9cc8138` recording 1.C `end_hash: 447c22e`). HEAD at the documented Phase 1 endpoint.
+- [x] **2.1** IMPLEMENT (types only): Add `UnrecognizedSyntaxRecord` interface + `unrecognized: UnrecognizedSyntaxRecord[]` field to `ValidationResult` in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per [§7a.3 Data Shape Deltas](./plan.md#7a.3%20Data%20Shape%20Deltas) verbatim.
+  - Added `UnrecognizedSyntaxRecord { line, column, rawText, syntaxFamily: "wiki" }` and required `unrecognized: UnrecognizedSyntaxRecord[]` on `ValidationResult`. Field shape matches §7a.3 verbatim.
+- [x] **2.2** VERIFY: `npm run build` — confirm type extension compiles, consumers may show `unrecognized` missing-field errors (expected; addressed in 2.4).
+  - tsc surfaced exactly the expected consumer error: `CitationValidator.ts:232` missing `unrecognized` field. Resolved by setting `unrecognized: []` placeholder on `validateFile` return — P3 will populate for real. Build then green.
+- [x] **2.3** RED: Add residual-scanner emission cases to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` per §"MODIFIED → test/unit/core/MarkdownParser/extractLinks.test.ts" assertions (lines 419–426). Five cases: residual outside code, residual inside fenced block (skip), residual inside inline code (skip), residual adjacent to valid wikilink (no double-count), <5ms perf gate on 10KB input.
+  - Created new file `extractLinks.test.ts` with all 5 BDD cases. Imports `extractLinks` and (newly exported) `scanResidualBrackets` for direct perf measurement.
+- [x] **2.4** VERIFY RED: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` — confirm new cases FAIL.
+  - All 5 new cases failed as expected (no return-shape change yet, no `scanResidualBrackets` export yet).
+- [x] **2.5** GREEN: Implement residual-bracket scanner in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts` per §"MODIFIED → src/core/MarkdownParser/extractLinks.ts" sketch (lines 270–289). Re-scan source after all extractors; emit `UnrecognizedSyntaxRecord` per `[[…]]` not in consumed-ranges; reuse `isInsideCodeBlock` to skip fenced + inline-code spans. Update `extractLinks` return shape to `{ links, unrecognized }`. Update direct call sites to consume both fields (do NOT yet propagate to ValidationResult — that is P3 wiring).
+  - Added exported `ConsumedRange` interface + `scanResidualBrackets()` helper. Updated `extractLinks` to return `{ links, unrecognized }`. Reuses `getFencedCodeBlockLineSet` (line-set hoisted once) and `isInsideInlineCode` for code-span suppression. Direct callers updated: `MarkdownParser.extractLinks` returns `.links`; `MarkdownParser.parseFile` drops `.unrecognized` (per plan note — P3 wiring); 4 test files (`extractLinks-wikilink-pipeline`, `extractLinks-line-ref-suffix`, `extractLinks-backtick-footnote`, `extractLinks-fenced-exclusion`) updated to destructure `{ links }`. Adversarial test runner already adapter-tolerant.
+- [x] **2.6** VERIFY GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` — all cases PASS, including <5ms perf gate.
+  - 5/5 PASS. Total test file duration 13ms; perf gate measured well under 5ms threshold.
+- [x] **2.7** VERIFY: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/AC6.expected.json` — AC6 residual fixture transitions to GREEN.
+  - Ran `bun vitest run test/fixtures/adversarial-commonmark/`. All 12 tests PASS (AC1–AC6 × 2 assertions). AC6 `emits 1 unrecognized record(s)` flipped from RED→GREEN.
+- [x] **2.8** REFACTOR: Clean residual scanner — name helpers descriptively, JSDoc the consumed-ranges contract, ensure no redundant scans.
+  - `scanResidualBrackets` already named descriptively, contract documented via JSDoc on both the function and the `ConsumedRange` interface. Single linear pass per line; fenced-line set hoisted once at the call site (no redundant rescans).
+- [x] **2.9** VERIFY: `npm run build && bun test` — full suite. No new regressions vs. 0.3 baseline.
+  - `tsc` exit 0. `bun test`: **602 passed / 1 failed** (603 total). Test count delta vs Phase 1 baseline (596/2): +6 pass (5 new extractLinks cases + AC6 flip), -1 fail (AC6 flip). Sole remaining failure is the pre-existing C3 defer-language scan flagging this plan file's banned tokens — carried over from §0.3 baseline, NOT a regression.
+- [x] **2.S** STATE-WRITE: Update checkboxes. Note any deviations.
+  - No deviations from plan steps. One scope note: the §7a.3 verbatim type insertion includes only the D2 fields (`UnrecognizedSyntaxRecord`, `ValidationResult.unrecognized[]`). The other §7a.3 deltas (`LinkClass`, `byLinkClass`, `unrecognizedCount`, `errorBreakdown`) are explicitly P3 scope and remain untouched here per plan.
+- [x] **2.C** COMMIT: "feat(parser): residual-bracket scanner emits UnrecognizedSyntaxRecord (D2, closes CI-03)". `git rev-parse HEAD` → `end_hash: <hash>`.
 
 #### REVIEW GATE 1 `code-reviewer` (opus)
 
