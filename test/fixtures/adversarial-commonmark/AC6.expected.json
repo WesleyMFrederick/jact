@@ -1,0 +1,8 @@
+{
+  "id": "AC6",
+  "commonMarkSection": "§6.5",
+  "edgeCase": "Multi-backtick span spanning a wiki link",
+  "wikilinks": 1,
+  "unrecognizedCount": 1,
+  "notes": "RED until P2. Only [[ValidNormalWiki]] extracted today; [[InsideMultiBacktickSuppressed]] correctly skipped via isInsideInlineCode; unclosed [[ fragment is wiki-shaped but unmatched by D1 — residual scanner (D2) emits 1 record after P2."
+}
