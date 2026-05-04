@@ -18,7 +18,7 @@ Cold-start workflow for ingesting a plan via `jact`, reading the State Log to id
 
 ## Visual Tree
 
-%% *Last Modified: 05/04/26 11:54:09* %%
+%% *Last Modified: 05/04/26 11:56:24* %%
 
 ```
 → plan-ingestion-to-task-pickup
@@ -32,8 +32,8 @@ Cold-start workflow for ingesting a plan via `jact`, reading the State Log to id
 │   └── [g] jact extract header "Files to Modify"
 ├── [h] jact extract header "State Log"
 ├── × prior-session-context
-│   ├── [i] git show <hash from State Log>
-│   └── [τ] (skip — no prior commit)
+│   ├── [τ] (skip — no prior commit)
+│   └── [i] git show <hash from State Log>
 ├── [j] analyze State Log → identify next pending task     ← HARD GATE
 ├── [k] jact extract header "Task X" (Context Bootstrap)
 ├── [l] read graphify-out/GRAPH_REPORT.md                  ← codebase orientation
