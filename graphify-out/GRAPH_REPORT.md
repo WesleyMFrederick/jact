@@ -9,19 +9,19 @@
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_CLI Testing|CLI Testing]]
-- [[_COMMUNITY_File Resolution|File Resolution]]
-- [[_COMMUNITY_Extraction Strategies|Extraction Strategies]]
-- [[_COMMUNITY_Citation Validation|Citation Validation]]
-- [[_COMMUNITY_Link Classification|Link Classification]]
-- [[_COMMUNITY_Dependency Injection|Dependency Injection]]
-- [[_COMMUNITY_Result Caching|Result Caching]]
-- [[_COMMUNITY_CLI Commands|CLI Commands]]
+- [[_COMMUNITY_CLI Orchestration|CLI Orchestration]]
+- [[_COMMUNITY_Link Validation|Link Validation]]
+- [[_COMMUNITY_File Resolution & Caching|File Resolution & Caching]]
+- [[_COMMUNITY_MarkdownParser Core|MarkdownParser Core]]
 - [[_COMMUNITY_Content Extraction|Content Extraction]]
-- [[_COMMUNITY_Document Parsing|Document Parsing]]
-- [[_COMMUNITY_Anchor Detection|Anchor Detection]]
-- [[_COMMUNITY_Type Definitions|Type Definitions]]
-- [[_COMMUNITY_Path Resolution|Path Resolution]]
+- [[_COMMUNITY_Factory Pattern|Factory Pattern]]
+- [[_COMMUNITY_Cache Management|Cache Management]]
+- [[_COMMUNITY_JactCli CLI|JactCli CLI]]
+- [[_COMMUNITY_Eligibility Analysis|Eligibility Analysis]]
+- [[_COMMUNITY_ParsedDocument Facade|ParsedDocument Facade]]
+- [[_COMMUNITY_MarkdownParser|MarkdownParser]]
+- [[_COMMUNITY_Wiki Path Resolution|Wiki Path Resolution]]
+- [[_COMMUNITY_CLI Test Utilities|CLI Test Utilities]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `CitationValidator` - 36 edges
@@ -49,35 +49,35 @@
 
 ## Communities (44 total, 5 thin omitted)
 
-### Community 0 - "CLI Testing"
+### Community 0 - "CLI Orchestration"
 Cohesion: 0.11
 Nodes (15): createLinkObject(), detectExtractionMarker(), determineAnchorType(), extractCaretLinks(), extractCiteLinks(), extractLinks(), extractLinksFromTokens(), extractMarkdownLinksRegex() (+7 more)
 
-### Community 1 - "File Resolution"
+### Community 1 - "Link Validation"
 Cohesion: 0.1
 Nodes (7): FileCache, findNearMisses(), isGitignored(), matchWildcardPattern(), parseGitignore(), patternMatches(), levenshteinDistance()
 
-### Community 2 - "Extraction Strategies"
+### Community 2 - "File Resolution & Caching"
 Cohesion: 0.14
 Nodes (8): createEligibilityAnalyzer(), CliFlagStrategy, ExtractionStrategy, ForceMarkerStrategy, SectionLinkStrategy, StopMarkerStrategy, formatExtractResult(), TestStrategy
 
-### Community 5 - "Dependency Injection"
+### Community 5 - "Factory Pattern"
 Cohesion: 0.16
 Nodes (5): createCitationValidator(), createContentExtractor(), createFileCache(), createMarkdownParser(), createParsedFileCache()
 
-### Community 6 - "Result Caching"
+### Community 6 - "Cache Management"
 Cohesion: 0.17
 Nodes (7): checkExtractCache(), computeCacheKey(), writeExtractCache(), resolveScope(), walkUpFor(), LinkObjectFactory, detectNestedCodeblocks()
 
-### Community 8 - "Content Extraction"
+### Community 8 - "Eligibility Analysis"
 Cohesion: 0.27
 Nodes (6): analyzeEligibility(), ContentExtractor, extractLinksContent(), generateContentId(), decodeUrlAnchor(), normalizeBlockId()
 
-### Community 10 - "Anchor Detection"
+### Community 10 - "MarkdownParser"
 Cohesion: 0.2
 Nodes (3): extractAnchors(), extractHeadings(), MarkdownParser
 
-### Community 11 - "Type Definitions"
+### Community 11 - "Wiki Path Resolution"
 Cohesion: 0.29
 Nodes (3): clamp(), resolveWikiPath(), pageNameToSlug()
 
@@ -89,17 +89,17 @@ Nodes (3): clamp(), resolveWikiPath(), pageNameToSlug()
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `CitationValidator` connect `Community 3` to `Community 4`, `Community 5`, `Community 6`?**
+- **Why does `CitationValidator` connect `MarkdownParser Core` to `Content Extraction`, `Factory Pattern`, `Cache Management`?**
   _High betweenness centrality (0.123) - this node is a cross-community bridge._
-- **Why does `FileCache` connect `Community 1` to `Community 0`, `Community 4`, `Community 5`, `Community 6`, `Community 10`?**
+- **Why does `FileCache` connect `Link Validation` to `CLI Orchestration`, `Content Extraction`, `Factory Pattern`, `Cache Management`, `MarkdownParser`?**
   _High betweenness centrality (0.118) - this node is a cross-community bridge._
-- **Why does `JactCli` connect `Community 7` to `Community 5`, `Community 6`?**
+- **Why does `JactCli` connect `JactCli CLI` to `Factory Pattern`, `Cache Management`?**
   _High betweenness centrality (0.076) - this node is a cross-community bridge._
 - **What connects `TestStrategy` to the rest of the system?**
   _1 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Community 0` be split into smaller, more focused modules?**
+- **Should `CLI Orchestration` be split into smaller, more focused modules?**
   _Cohesion score 0.11 - nodes in this community are weakly interconnected._
-- **Should `Community 1` be split into smaller, more focused modules?**
+- **Should `Link Validation` be split into smaller, more focused modules?**
   _Cohesion score 0.1 - nodes in this community are weakly interconnected._
-- **Should `Community 2` be split into smaller, more focused modules?**
+- **Should `File Resolution & Caching` be split into smaller, more focused modules?**
   _Cohesion score 0.14 - nodes in this community are weakly interconnected._
