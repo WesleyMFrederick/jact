@@ -1,5 +1,5 @@
 // Per D4 (a). Sibling to resolvePath.ts. FileCache is an injected parameter (per [H-D4-factory]).
-import { basename, dirname, resolve } from "node:path";
+import { dirname } from "node:path";
 import type { ResolveResult } from "../../types/fileCacheTypes.js";
 import { levenshteinDistance } from "../../utils/stringDistance.js";
 import { pageNameToSlug } from "../../utils/wikiPageSlug.js";
@@ -40,31 +40,20 @@ function clamp(value: number, lo: number, hi: number): number {
 /**
  * Wiki page name resolver with local-first fuzzy resolution.
  *
- * Step 0: rawPath starts with ./ or ../ → resolve relative to sourceAbsolutePath
  * Step 1: fileCache.resolveFile(rawPath)              — handles already-slugged or .md forms
  * Step 2: fileCache.resolveFile(slug + ".md")         — handles Title Case / em dash page names
  * Step 3: local-biased Levenshtein — files within 2 directory levels get 1.5× threshold;
  *         a local fuzzy hit returns resolved: true (not just a suggestion).
  * Step 4: global Levenshtein fallback → suggestions[] only, resolved: false.
  *         Cost optimization: scan only fires when steps 1–3 all miss.
+ *
+ * Note: relative paths (./  ../) are routed via resolvePath in createLinkObject, not here.
  */
 export function resolveWikiPath(
 	rawPath: string,
 	sourceAbsolutePath: string,
 	fileCache: WikiPathFileCache,
 ): ResolvedPath {
-	// Step 0: rawPath is already a relative file path — resolve from sourceAbsolutePath
-	if (rawPath.startsWith("./") || rawPath.startsWith("../")) {
-		const sourceDir = dirname(sourceAbsolutePath);
-		for (const candidate of [rawPath, `${rawPath}.md`]) {
-			const absPath = resolve(sourceDir, candidate);
-			const r = fileCache.resolveFile(basename(absPath));
-			if (r.found && r.path === absPath) {
-				return { resolved: true, absolutePath: absPath };
-			}
-		}
-	}
-
 	const step1 = fileCache.resolveFile(rawPath);
 	if (step1.found) {
 		return { resolved: true, absolutePath: step1.path };
