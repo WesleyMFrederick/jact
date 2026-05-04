@@ -106,7 +106,7 @@ describe("FileCache — .gitignore filtering (RED)", () => {
 		expect(entryPaths).toContain("wiki/example.md");
 	});
 
-	it.skip("negate pattern (!) re-includes a file inside an otherwise-excluded dir", () => {
+	it("negate pattern (!) re-includes a file inside an otherwise-excluded dir", () => {
 		// TODO: Negate pattern support - requires recursive pattern matching
 		writeFile(".claude/tool.md");
 		writeFile(".claude/important.md");

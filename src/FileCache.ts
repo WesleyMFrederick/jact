@@ -153,18 +153,17 @@ export class FileCache {
 				// Compute relative path for gitignore filtering
 				const relativePath = this.path.relative(rootPath, fullPath);
 
-				// Check if this path should be ignored
-				if (
-					gitignorePatterns.length > 0 &&
-					isGitignored(gitignorePatterns, relativePath, stat.isDirectory())
-				) {
-					continue;
-				}
-
 				if (stat.isDirectory()) {
+					// For directories: recurse even if ignored, because negate patterns may re-include files inside
 					this.scanDirectory(fullPath, gitignorePatterns, rootPath);
 				} else if (entry.endsWith(".md")) {
-					this.addToCache(entry, fullPath);
+					// For files: check if this path should be ignored
+					if (
+						gitignorePatterns.length === 0 ||
+						!isGitignored(gitignorePatterns, relativePath, false)
+					) {
+						this.addToCache(entry, fullPath);
+					}
 				}
 			}
 		} catch (error) {
