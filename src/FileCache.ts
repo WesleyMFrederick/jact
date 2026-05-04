@@ -1,5 +1,10 @@
 import type { ScopeResolution } from "./core/resolveScope.js";
 import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
+import {
+	type GitignorePattern,
+	isGitignored,
+	parseGitignore,
+} from "./utils/parseGitignore.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 
 interface FileEntry {
@@ -68,12 +73,14 @@ export class FileCache {
 	 * @param scopeFolder - Root folder to scan (can be symlink, will be resolved)
 	 * @param verbose - When true, log duplicate filename warnings to stderr
 	 * @param scope - Optional resolution metadata used by resolveFile to enrich error messages
+	 * @param options - Optional configuration: respectGitignore (default true) to filter .gitignore-excluded paths
 	 * @returns Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
 	buildCache(
 		scopeFolder: string,
 		verbose = false,
 		scope?: ScopeResolution,
+		options?: { respectGitignore?: boolean },
 	): CacheStats {
 		this.entries.clear();
 		this.scope = scope;
@@ -88,7 +95,19 @@ export class FileCache {
 		}
 		this.resolvedScopeFolder = targetScanFolder;
 
-		this.scanDirectory(targetScanFolder);
+		// Parse .gitignore if respectGitignore is not false
+		let gitignorePatterns: GitignorePattern[] = [];
+		if (options?.respectGitignore !== false) {
+			const gitignorePath = this.path.join(targetScanFolder, ".gitignore");
+			try {
+				const content = this.fs.readFileSync(gitignorePath, "utf8");
+				gitignorePatterns = parseGitignore(content);
+			} catch {
+				// No .gitignore or unreadable — proceed with no filter
+			}
+		}
+
+		this.scanDirectory(targetScanFolder, gitignorePatterns, targetScanFolder);
 
 		const dupNames = this.duplicateNames();
 
@@ -119,7 +138,11 @@ export class FileCache {
 		return dups;
 	}
 
-	private scanDirectory(dirPath: string): void {
+	private scanDirectory(
+		dirPath: string,
+		gitignorePatterns: GitignorePattern[] = [],
+		rootPath: string = dirPath,
+	): void {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
 
@@ -127,8 +150,19 @@ export class FileCache {
 				const fullPath = this.path.join(dirPath, entry);
 				const stat = this.fs.statSync(fullPath);
 
+				// Compute relative path for gitignore filtering
+				const relativePath = this.path.relative(rootPath, fullPath);
+
+				// Check if this path should be ignored
+				if (
+					gitignorePatterns.length > 0 &&
+					isGitignored(gitignorePatterns, relativePath, stat.isDirectory())
+				) {
+					continue;
+				}
+
 				if (stat.isDirectory()) {
-					this.scanDirectory(fullPath);
+					this.scanDirectory(fullPath, gitignorePatterns, rootPath);
 				} else if (entry.endsWith(".md")) {
 					this.addToCache(entry, fullPath);
 				}
