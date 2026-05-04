@@ -497,37 +497,27 @@ export class FileCache {
 		| { found: false; source: "none" } {
 		const sourceDir = this.path.dirname(sourceFile);
 
-		// Try same directory
+		// Try same directory (filesystem check + FileCache)
 		const sameDir = this.path.join(sourceDir, filename);
-		if (this.entries.has(filename)) {
-			const paths = this.entries.get(filename)!;
-			for (const p of paths) {
-				if (p === sameDir) {
-					return {
-						found: true,
-						path: p,
-						relativePath: filename,
-						source: "local",
-					};
-				}
-			}
+		if (this.fs.existsSync(sameDir)) {
+			return {
+				found: true,
+				path: sameDir,
+				relativePath: filename,
+				source: "local",
+			};
 		}
 
-		// Try parent directory (../)
+		// Try parent directory (../) (filesystem check + FileCache)
 		const parentDir = this.path.dirname(sourceDir);
 		const parentPath = this.path.join(parentDir, filename);
-		if (this.entries.has(filename)) {
-			const paths = this.entries.get(filename)!;
-			for (const p of paths) {
-				if (p === parentPath) {
-					return {
-						found: true,
-						path: p,
-						relativePath: `../${filename}`,
-						source: "local",
-					};
-				}
-			}
+		if (this.fs.existsSync(parentPath)) {
+			return {
+				found: true,
+				path: parentPath,
+				relativePath: `../${filename}`,
+				source: "local",
+			};
 		}
 
 		// Try grandparent directory (../../)
