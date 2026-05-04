@@ -44,77 +44,25 @@ Cold-start workflow for ingesting a plan via `jact`, reading the State Log to id
 
 ## Activity Legend
 
-%% *Last Modified: 05/04/26 11:47:37* %%
+%% *Last Modified: 05/04/26 11:49:14* %%
 
-| Node | Activity | Tool / Command |
-|------|----------|----------------|
-| [a] | User provides absolute plan path | — |
-| [b] | Render heading outline (file structure scan) | `/jact-displaying-headings` skill OR `jact ast <abs-path> \| jq -r '.headings[] \| "\(("  " * (.level - 1)))\("#" * .level) \(.text)"'` |
-| [c] | Extract Goal section | `jact extract header <abs-path> "Goal"` |
-| [d] | Extract Current Behavior section | `jact extract header <abs-path> "Current Behavior"` |
-| [e] | Extract Target Behavior section | `jact extract header <abs-path> "Target Behavior"` |
-| [f] | Extract Root Cause section | `jact extract header <abs-path> "Root Cause"` |
-| [g] | Extract Files to Modify section | `jact extract header <abs-path> "Files to Modify"` |
-| [h] | Extract State Log section | `jact extract header <abs-path> "State Log"` |
-| [i] | Analyze State Log → identify next pending task | Mental analysis of completion markers + commit hashes |
-| [j] | Extract Task X (Context Bootstrap) | `jact extract header <abs-path> "Task X - Name"` |
-| [k] | Read graph report for codebase orientation | `Read graphify-out/GRAPH_REPORT.md` |
-| [l] | LSP symbol location per Context Bootstrap | `LSP goToDefinition`, `LSP findReferences`, `LSP workspaceSymbol` |
-| [m] | Targeted Read at LSP-identified lines | `Read <file> offset:<line> limit:<N>` |
-| [n] | Read related test/fixture files | `Read <test-file>` |
-| [o] | Create task to track work | `TaskCreate` |
-
-## Why This Order
-
-%% *Last Modified: 05/04/26 11:44:50* %%
-
-### 1. `b` (outline) before `c–g` (sections)
-
-%% *Last Modified: 05/04/26 11:48:01* %%
-
-You must see the heading structure before you know which exact heading text to pass to `jact extract header`. The outline is the cheap scan; section extraction is the targeted pull.
-
-### 2. `c–g` in parallel
-
-%% *Last Modified: 05/04/26 11:48:01* %%
-
-Goal, Current Behavior, Target Behavior, Root Cause, and Files to Modify are all independent of each other. Run all five header extracts in a single message with parallel tool calls.
-
-### 3. `h` (State Log) sequential after `c–g`
-
-%% *Last Modified: 05/04/26 11:48:01* %%
-
-State Log is read separately because its purpose is different — it's not plan context, it's task-pickup state. Extract it alone so analysis (`i`) has a clean signal.
-
-### 4. `i` (State Log analysis) before `j` (Task extraction)
-
-%% *Last Modified: 05/04/26 11:48:01* %%
-
-You cannot extract "Task X" until you know which X is next. The State Log tells you what's done (commit hashes) and what's pending. This is a **HARD GATE** — wrong task = wasted context loading.
-
-### 5. `k` (graphify) before `l` (LSP)
-
-%% *Last Modified: 05/04/26 11:48:01* %%
-
-Graphify gives community structure and god nodes — orientation. LSP gives precise symbol locations. Read the map before navigating individual streets.
-
-### 6. `l` (LSP) before `m` (Read)
-
-%% *Last Modified: 05/04/26 11:48:01* %%
-
-For TS/JS projects, **always use LSP first** for symbol lookups (per project CLAUDE.md). LSP returns `file:line` in <1s; raw Grep/Glob is 60–90s and noisier. Then `Read` with `offset`/`limit` for line-level inspection.
-
-### 7. `n` (test files) optional
-
-%% *Last Modified: 05/04/26 11:48:01* %%
-
-Test context only needed when the task involves test changes (e.g., removing `.skip`, adding new tests). For pure refactor tasks, skip.
-
-### 8. `o` (TaskCreate) at the end
-
-%% *Last Modified: 05/04/26 11:48:01* %%
-
-Once context is loaded and you know the task scope, create the task with full title and description. Earlier creation = stale or vague task.
+| Node | Activity | Tool / Command | Why |
+|------|----------|----------------|-----|
+| [a] | User provides absolute plan path | — | jact requires absolute paths |
+| [b] | Render heading outline | `/jact-displaying-headings` skill OR `jact ast <abs-path> \| jq -r '.headings[] \| "\(("  " * (.level - 1)))\("#" * .level) \(.text)"'` | Must know exact heading text before calling extract |
+| [c] | Extract Goal section | `jact extract header <abs-path> "Goal"` | parallel: independent of d–g |
+| [d] | Extract Current Behavior section | `jact extract header <abs-path> "Current Behavior"` | parallel: independent of c, e–g |
+| [e] | Extract Target Behavior section | `jact extract header <abs-path> "Target Behavior"` | parallel: independent of c–d, f–g |
+| [f] | Extract Root Cause section | `jact extract header <abs-path> "Root Cause"` | parallel: independent of c–e, g |
+| [g] | Extract Files to Modify section | `jact extract header <abs-path> "Files to Modify"` | parallel: independent of c–f |
+| [h] | Extract State Log section | `jact extract header <abs-path> "State Log"` | sequential: task-pickup state, not plan context |
+| [i] | Analyze State Log → identify next pending task | Mental analysis of completion markers + commit hashes | **HARD GATE** — wrong task = wasted context loading |
+| [j] | Extract Task X (Context Bootstrap) | `jact extract header <abs-path> "Task X - Name"` | depends on [i] to know which task |
+| [k] | Read graph report for codebase orientation | `Read graphify-out/GRAPH_REPORT.md` | orientation before navigation; god nodes reveal key files |
+| [l] | LSP symbol location per Context Bootstrap | `LSP goToDefinition`, `LSP findReferences`, `LSP workspaceSymbol` | <1s vs 60–90s for Grep; always LSP first on TS/JS |
+| [m] | Targeted Read at LSP-identified lines | `Read <file> offset:<line> limit:<N>` | depends on [l] for file:line; avoids reading full files |
+| [n] | Read related test/fixture files | `Read <test-file>` | optional: only when task touches tests |
+| [o] | Create task to track work | `TaskCreate` | after context loaded so title + description are accurate |
 
 ## Anti-Patterns
 
