@@ -748,14 +748,21 @@ Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residu
 
 #### REVIEW GATE 1 `code-reviewer` (opus)
 
-%% *Last Modified: 05/03/26 18:06:35* %%
+%% *Last Modified: 05/03/26 18:51:21* %%
 
-- [ ] **2.R** REVIEW: Scope — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/`. Run `git diff <0.C_end_hash>..HEAD`. Read [§7a Delta Architecture Table](./plan.md#7a.%20Delta%20Architecture%20Table) row D2 and [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage) row CI-03.
+- [x] **2.R** REVIEW: Scope — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/`. Run `git diff <0.C_end_hash>..HEAD`. Read [§7a Delta Architecture Table](./plan.md#7a.%20Delta%20Architecture%20Table) row D2 and [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage) row CI-03.
   - **Verify:** D2 sketch implemented as specified (residual scanner, isInsideCodeBlock reuse, no double-count vs. valid wikilinks)
   - **Verify:** `UnrecognizedSyntaxRecord` shape matches [§7a.3 Data Shape Deltas](./plan.md#7a.3%20Data%20Shape%20Deltas) verbatim (line, column, rawText, syntaxFamily)
   - **Verify:** AC1–AC6 fixtures all PASS post-P2 (Phase 1 [H-D1-regex] + Phase 2 [H: <5ms benchmark] both verified)
   - **Verify:** No regressions in pre-existing tests
   - **Verdict:** PASS → proceed to Phase 3A. FAIL → escalation policy (Tier 1 → 2 → 3).
+  - **VERDICT: PASS** (`reviewer-g1` opus, 05/03/26). Evidence:
+    - **D2 sketch:** `scanResidualBrackets` (`extractLinks.ts:451-504`) runs after all extractors; reuses `getFencedCodeBlockLineSet` (line 540) + `isInsideInlineCode` (line 482); seeds `consumedRanges` from valid wikilinks (lines 572-576) so adjacent valid+broken (`[[Valid]] [[broken`) emits exactly 1 residual.
+    - **Type shape verbatim:** `UnrecognizedSyntaxRecord` at `validationTypes.ts:60-69` matches §7a.3 declaration (line:1-based, column:0-based, rawText:string, syntaxFamily:"wiki"); `ValidationResult.unrecognized: UnrecognizedSyntaxRecord[]` at `validationTypes.ts:91`.
+    - **AC1–AC6:** `bun vitest run test/fixtures/adversarial-commonmark/` → 12/12 PASS (AC6 residual-emission flipped GREEN post-P2).
+    - **Perf gate:** `extractLinks.test.ts:85-121` — 10KB warmup+measure, `expect(elapsed).toBeLessThan(5)` PASSES (file duration 13ms total).
+    - **No regressions:** Full suite `bun test` → 602 pass / 1 fail (sole failure is pre-existing C3 defer-language scan; +6 pass / -1 fail vs Phase 1 baseline 596/2).
+    - **Note (P3 carryover):** `extractLinks` returns `{ links, unrecognized }` but `CitationValidator.validateFile` uses `unrecognized: []` placeholder (line 232). Wiring the real array through ValidationResult is explicit P3 scope per plan §2.5; not a P2 defect.
 
 ---
 
