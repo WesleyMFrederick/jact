@@ -232,17 +232,17 @@ export class FileCache {
 			: `File "${filename}" not found in scope folder.`;
 		const didYouMean =
 			nearMisses.length > 0 ? ` Did you mean: ${nearMisses.join(", ")}?` : "";
+		// Always build attempted paths — whether scope was explicit or auto-resolved
+		// (resolvedScopeFolder is always set by buildCache, regardless of scope source)
 		const attemptedFullPath = this.resolvedScopeFolder
 			? this.path.join(this.resolvedScopeFolder, filename)
-			: undefined;
+			: filename;
 		return {
 			found: false,
 			reason: "not_found",
 			...(nearMisses.length > 0 && { nearMisses }),
 			...(this.scope !== undefined && { scope: this.scope }),
-			...(attemptedFullPath !== undefined && {
-				attemptedPaths: [attemptedFullPath],
-			}),
+			attemptedPaths: [attemptedFullPath],
 			message: `${scopeStr}${didYouMean}`,
 		};
 	}

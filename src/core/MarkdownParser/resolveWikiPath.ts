@@ -77,6 +77,8 @@ export function resolveWikiPath(
 		...(step1.attemptedPaths ?? []),
 		...(step2.attemptedPaths ?? []),
 	];
+	// Always include attemptedPaths for consistent error output
+	// (whether scope was explicit or auto-resolved)
 	return {
 		resolved: false,
 		attempted: [rawPath, slugPath],

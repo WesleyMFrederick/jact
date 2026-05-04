@@ -243,20 +243,16 @@ export class JactCli {
 		try {
 			const startTime = Date.now();
 
-			// Build file cache if scope is provided
-			if (options.scope) {
-				const cacheStats = this.fileCache.buildCache(
-					options.scope,
-					options.verbose ?? false,
-				);
-				// Only show cache messages in verbose, non-JSON mode
-				if (options.verbose && options.format !== "json") {
-					console.log(
-						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
-					);
-					if (cacheStats.duplicates > 0) {
+			// Apply scope resolution (auto-resolve if not explicit) and build file cache
+			this.applyScope(options, filePath);
+			// Only show cache messages in verbose, non-JSON mode
+			if (options.verbose && options.format !== "json") {
+				const cacheStats = this.fileCache.getCacheStats?.();
+				if (cacheStats && cacheStats.totalFiles > 0) {
+					console.log(`Scanned ${cacheStats.totalFiles} files in cache`);
+					if (cacheStats.duplicates.length > 0) {
 						console.log(
-							`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
+							`WARNING: Found ${cacheStats.duplicates.length} duplicate filenames`,
 						);
 					}
 				}
