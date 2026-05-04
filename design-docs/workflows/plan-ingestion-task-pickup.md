@@ -94,3 +94,31 @@ Cold-start workflow for ingesting a plan via `jact`, reading the State Log to id
 %% *Last Modified: 05/04/26 11:54:36* %%
 
 The HARD GATE at `[j]` enforces **actions before choices**: you must extract State Log (`h`), optionally read the prior commit (`i`), then analyze (`j`) before you can extract the right Task (`k`). The choice of which Task to load is determined by the State Log content — not assumed up front.
+
+## LSP Tool
+
+The LSP tool has 9 operations:
+
+  ┌──────────────────────┬──────────────────────────────────────────────────────┐
+  │      Operation       │                     What it does                     │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ goToDefinition       │ Find where a symbol is defined                       │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ findReferences       │ Find all references to a symbol                      │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ hover                │ Get type info / docs for a symbol                    │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ documentSymbol       │ List all symbols in a file                           │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ workspaceSymbol      │ Search symbols across the workspace                  │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ goToImplementation   │ Find implementations of an interface/abstract method │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ prepareCallHierarchy │ Get call hierarchy item at a position                │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ incomingCalls        │ Who calls this function                              │
+  ├──────────────────────┼──────────────────────────────────────────────────────┤
+  │ outgoingCalls        │ What this function calls                             │
+  └──────────────────────┴──────────────────────────────────────────────────────┘
+
+  All ops require filePath, line, and character (all 1-based).
