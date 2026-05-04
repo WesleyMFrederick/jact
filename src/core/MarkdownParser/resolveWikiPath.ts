@@ -9,6 +9,17 @@ import { pageNameToSlug } from "../../utils/wikiPageSlug.js";
 export interface WikiPathFileCache {
 	resolveFile(filename: string): ResolveResult;
 	getEntries(): Array<{ basename: string; relativePath: string }>;
+	resolveFileLocalFirst?(
+		filename: string,
+		sourceFile: string,
+	):
+		| {
+				found: true;
+				path: string;
+				relativePath?: string | undefined;
+				source: "local" | "global";
+		  }
+		| { found: false; source: "none" };
 }
 
 // Return shape carries both attempted forms so the validator's broken-link reason
@@ -45,7 +56,7 @@ function clamp(value: number, lo: number, hi: number): number {
  */
 export function resolveWikiPath(
 	rawPath: string,
-	_sourceAbsolutePath: string,
+	sourceAbsolutePath: string,
 	fileCache: WikiPathFileCache,
 ): ResolvedPath {
 	const step1 = fileCache.resolveFile(rawPath);
@@ -59,7 +70,18 @@ export function resolveWikiPath(
 		return { resolved: true, absolutePath: step2.path };
 	}
 
-	// Both miss — adaptive-threshold Levenshtein scan (basename distance only).
+	// Step 3: Try local-scope search (if sourceFile provided and method available)
+	if (sourceAbsolutePath && fileCache.resolveFileLocalFirst) {
+		const localResult = fileCache.resolveFileLocalFirst(
+			slugPath,
+			sourceAbsolutePath,
+		);
+		if (localResult.found) {
+			return { resolved: true, absolutePath: localResult.path };
+		}
+	}
+
+	// Step 4: Both miss — adaptive-threshold Levenshtein scan (basename distance only).
 	// Collect candidates with distances, sort by distance, limit to top 3.
 	const candidatesWithDistance: Array<{ path: string; distance: number }> = [];
 	for (const entry of fileCache.getEntries()) {

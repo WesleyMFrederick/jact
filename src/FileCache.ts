@@ -463,6 +463,104 @@ export class FileCache {
 		return result;
 	}
 
+	/**
+	 * Resolve filename by searching local scope (sourceFile directory and parents)
+	 * before falling back to global FileCache search.
+	 *
+	 * Local scope search walks up from sourceFile's directory:
+	 * 1. Same directory as sourceFile
+	 * 2. Parent directory
+	 * 3. Grandparent directory (max 3 levels up)
+	 * 4. Siblings at same level as sourceFile
+	 * 5. Falls back to global resolveFile if no local match
+	 *
+	 * @param filename - Filename to search for
+	 * @param sourceFile - Absolute path to source file (used to compute local scope)
+	 * @returns Resolution with found status, path, relative path, and source ("local"|"global"|"none")
+	 */
+	resolveFileLocalFirst(
+		filename: string,
+		sourceFile: string,
+	):
+		| {
+				found: true;
+				path: string;
+				relativePath: string;
+				source: "local";
+		  }
+		| {
+				found: true;
+				path: string;
+				relativePath: undefined;
+				source: "global";
+		  }
+		| { found: false; source: "none" } {
+		const sourceDir = this.path.dirname(sourceFile);
+
+		// Try same directory
+		const sameDir = this.path.join(sourceDir, filename);
+		if (this.entries.has(filename)) {
+			const paths = this.entries.get(filename)!;
+			for (const p of paths) {
+				if (p === sameDir) {
+					return {
+						found: true,
+						path: p,
+						relativePath: filename,
+						source: "local",
+					};
+				}
+			}
+		}
+
+		// Try parent directory (../)
+		const parentDir = this.path.dirname(sourceDir);
+		const parentPath = this.path.join(parentDir, filename);
+		if (this.entries.has(filename)) {
+			const paths = this.entries.get(filename)!;
+			for (const p of paths) {
+				if (p === parentPath) {
+					return {
+						found: true,
+						path: p,
+						relativePath: `../${filename}`,
+						source: "local",
+					};
+				}
+			}
+		}
+
+		// Try grandparent directory (../../)
+		const grandparentDir = this.path.dirname(parentDir);
+		const grandparentPath = this.path.join(grandparentDir, filename);
+		if (this.entries.has(filename)) {
+			const paths = this.entries.get(filename)!;
+			for (const p of paths) {
+				if (p === grandparentPath) {
+					return {
+						found: true,
+						path: p,
+						relativePath: `../../${filename}`,
+						source: "local",
+					};
+				}
+			}
+		}
+
+		// Fallback to global FileCache search
+		const globalResult = this.resolveFile(filename);
+		if (globalResult.found) {
+			return {
+				found: true,
+				path: globalResult.path,
+				relativePath: undefined,
+				source: "global",
+			};
+		}
+
+		return { found: false, source: "none" };
+	}
+
 	// Get cache statistics (total files, duplicates)
 	getCacheStats(): CacheStatsDetail {
 		const duplicates = this.duplicateNames();
