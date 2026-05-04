@@ -768,7 +768,7 @@ Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residu
 
 ### Phase 3A — Types + getLinkClass Classifier `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:55:03* %%
+%% *Last Modified: 05/03/26 18:55:27* %%
 
 Phase 3 split into 3A (foundation types + classifier) and 3B (consumer wiring) for context budget. 3A is pure additive — no consumer-facing changes yet.
 
@@ -783,7 +783,7 @@ Phase 3 split into 3A (foundation types + classifier) and 3B (consumer wiring) f
 - [x] **3A.8** REFACTOR: Switch is exhaustive over `linkType: "markdown" | "wiki"`; both arms return non-undefined `LinkClass`. TS `noImplicitReturns` enforces no fall-through.
 - [x] **3A.9** VERIFY: `npm run build` (2 expected consumer errors) + `bun test` → **607 pass / 1 fail** (pre-existing C3 plan-file scan persists; +5 from getLinkClass tests). Matches plan target.
 - [x] **3A.S** STATE-WRITE: Checkboxes updated.
-- [x] **3A.C** COMMIT: "feat(types): LinkClass + ValidationSummary extensions + getLinkClass classifier (D3 foundation)". `end_hash: <pending — recorded post-commit>`.
+- [x] **3A.C** COMMIT: "feat(types): LinkClass + ValidationSummary extensions + getLinkClass classifier (D3 foundation)". `end_hash: 9c84499`.
 
 ---
 
