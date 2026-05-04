@@ -41,6 +41,7 @@ export class FileCache {
 	private path: typeof import("path");
 	private entries: Map<string, string[]>; // filename -> all paths in scan order
 	private scope: ScopeResolution | undefined = undefined; // set by buildCache; embedded in error messages from resolveFile
+	private resolvedScopeFolder: string | undefined = undefined; // absolute scope root; used by buildNotFoundFailure to build attempted full paths
 
 	/**
 	 * Initialize cache with file system and path dependencies
@@ -85,6 +86,7 @@ export class FileCache {
 		} catch (_error) {
 			targetScanFolder = absoluteScopeFolder;
 		}
+		this.resolvedScopeFolder = targetScanFolder;
 
 		this.scanDirectory(targetScanFolder);
 
@@ -230,8 +232,8 @@ export class FileCache {
 			: `File "${filename}" not found in scope folder.`;
 		const didYouMean =
 			nearMisses.length > 0 ? ` Did you mean: ${nearMisses.join(", ")}?` : "";
-		const attemptedFullPath = this.scope?.scope
-			? this.path.join(this.scope.scope, filename)
+		const attemptedFullPath = this.resolvedScopeFolder
+			? this.path.join(this.resolvedScopeFolder, filename)
 			: undefined;
 		return {
 			found: false,
