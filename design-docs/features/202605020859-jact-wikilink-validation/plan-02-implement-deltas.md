@@ -101,13 +101,13 @@ LSP workspaceSymbol: extractWikilinks
 
 ### Key files to read (in order)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:20:24* %%
 
-1. `design-docs/features/202605020859-jact-wikilink-validation/plan.md` §7a Delta Architecture Table — single source of truth for File / Section / Before / After per Delta
-2. `design-docs/features/202605020859-jact-wikilink-validation/plan.md` §7a.3 Data Shape Deltas — TypeScript shapes (verbatim into ADDED code blocks)
-3. `design-docs/features/202605020859-jact-wikilink-validation/plan.md` §7b D2/D3/D4/D5 rationale headers — why behind each Delta
-4. `design-docs/features/202605020859-jact-wikilink-validation/plan.md` §7g UI Sketch §7g.3–§7g.6 — Before/After CLI output expectations (P3 verification baseline)
-5. `design-docs/hardening-pipeline/fixture-template.md` §"Adversarial CommonMark Set" — AC1–AC6 cases (P1 fixture skeleton)
+1. `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "7a. Delta Architecture Table"` — single source of truth for File / Section / Before / After per Delta
+2. `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "7a.3 Data Shape Deltas"` — TypeScript shapes (verbatim into ADDED code blocks)
+3. `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "7b. Design Decisions Rationale"` — why behind each Delta (D2/D3/D4/D5)
+4. `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "7g. UI Sketch — CLI Output Validation"` — Before/After CLI output expectations (§7g.3–§7g.6, P3 verification baseline)
+5. `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/hardening-pipeline/fixture-template.md "Adversarial CommonMark Set"` — AC1–AC6 cases (P1 fixture skeleton)
 6. `src/core/MarkdownParser/extractWikilinks.ts` — shipped D1 grammar (P1 baseline, P2 sibling)
 7. `src/core/MarkdownParser/resolveWikiPath.ts` — shipped D4 resolver core (P4 extension point)
 8. `src/jact.ts` — `manager.validate()` + `formatForCLIMinimal` + exit-code predicate (P3 surgery surface)
