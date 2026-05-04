@@ -600,7 +600,7 @@ jact validate test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-sys
 
 ## Phased Task Sequence
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:06:14* %%
 
 **Roles:**
 
@@ -611,16 +611,12 @@ jact validate test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-sys
 | Reviewer | opus | `code-reviewer` | `/Users/wesleyfrederick/Documents/ObsidianVaultNew/0_SoftwareDevelopment/jact/claude/agents/code-reviewer.md` (model override → opus) |
 | Architect | opus | `application-tech-lead` | `/Users/wesleyfrederick/Documents/ObsidianVaultNew/0_SoftwareDevelopment/jact/claude/agents/application-tech-lead.md` |
 
-**Plan file:** `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan-02-implement-deltas.md`
-
-**Design plan (BI/CI source of truth):** `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md`
-
 **Final review success criterion (PASS/FAIL only — no partial credit):**
 
 The final `code-reviewer` gate (`5.R`) and the `application-tech-lead` architect gate (`5.A`) must both return **PASS**. PASS requires:
 
-1. **§7a.1 BI ↔ Delta Coverage** — Every BI-1 through BI-7 row from `plan.md §5 Baseline Ideal Outcomes Table` is FULLY covered by the shipped implementation. Reviewer cites concrete file:line evidence per BI row. Partial coverage = FAIL.
-2. **§7a.2 CI ↔ Delta Coverage** — Every CI-01 through CI-08 row from `plan.md §6.5 Findings & CI Status Table` is FULLY closed by the shipped implementation. Reviewer cites concrete file:line evidence per CI row. Any unresolved CI = FAIL.
+1. [§7a.1 BI ↔ Delta Coverage](./plan.md#7a.1%20BI%20%E2%86%94%20Delta%20Coverage) — Every BI-1 through BI-7 row from [§5 Baseline Ideal Outcomes Table](./plan.md#5.%20Phase%202%20%E2%80%94%20Baseline%20Ideal%20Outcomes%20Table) is FULLY covered by the shipped implementation. Reviewer cites concrete file:line evidence per BI row. Partial coverage = FAIL.
+2. [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage) — Every CI-01 through CI-08 row from [§6.5 Findings & CI Status Table](./plan.md#Findings%20%26%20CI%20(Critical%20Issues)%20Status%20Table) is FULLY closed by the shipped implementation. Reviewer cites concrete file:line evidence per CI row. Any unresolved CI = FAIL.
 
 No "ship-with-followups," no "minor issues acceptable." Either every Ideal Outcome and Critical Issue is structurally addressed by the merged code, or the gate FAILS and execution returns to coder.
 
@@ -681,12 +677,12 @@ Verifies shipped D1 grammar against CommonMark §4.5/§6.1/§6.5 edge cases (AC1
 
 ### Phase 2 — D2 Residual-Bracket Scanner (TDD) `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:00:04* %%
+%% *Last Modified: 05/03/26 18:06:20* %%
 
 Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residual-scanner emission inside `extractLinks.ts`. AC6 fixture from Phase 1 transitions to GREEN.
 
 - [ ] **2.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 1.C `end_hash`.
-- [ ] **2.1** IMPLEMENT (types only): Add `UnrecognizedSyntaxRecord` interface + `unrecognized: UnrecognizedSyntaxRecord[]` field to `ValidationResult` in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per §7a.3 verbatim.
+- [ ] **2.1** IMPLEMENT (types only): Add `UnrecognizedSyntaxRecord` interface + `unrecognized: UnrecognizedSyntaxRecord[]` field to `ValidationResult` in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per [§7a.3 Data Shape Deltas](./plan.md#7a.3%20Data%20Shape%20Deltas) verbatim.
 - [ ] **2.2** VERIFY: `npm run build` — confirm type extension compiles, consumers may show `unrecognized` missing-field errors (expected; addressed in 2.4).
 - [ ] **2.3** RED: Add residual-scanner emission cases to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` per §"MODIFIED → test/unit/core/MarkdownParser/extractLinks.test.ts" assertions (lines 419–426). Five cases: residual outside code, residual inside fenced block (skip), residual inside inline code (skip), residual adjacent to valid wikilink (no double-count), <5ms perf gate on 10KB input.
 - [ ] **2.4** VERIFY RED: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts` — confirm new cases FAIL.
@@ -700,11 +696,11 @@ Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residu
 
 #### REVIEW GATE 1 `code-reviewer` (opus)
 
-%% *Last Modified: 05/03/26 18:00:15* %%
+%% *Last Modified: 05/03/26 18:06:35* %%
 
-- [ ] **2.R** REVIEW: Scope — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/`. Run `git diff <0.C_end_hash>..HEAD`. Read plan §7a row D2 and §7a.2 row CI-03.
+- [ ] **2.R** REVIEW: Scope — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractLinks.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/MarkdownParser/extractLinks.test.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/adversarial-commonmark/`. Run `git diff <0.C_end_hash>..HEAD`. Read [§7a Delta Architecture Table](./plan.md#7a.%20Delta%20Architecture%20Table) row D2 and [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage) row CI-03.
   - **Verify:** D2 sketch implemented as specified (residual scanner, isInsideCodeBlock reuse, no double-count vs. valid wikilinks)
-  - **Verify:** `UnrecognizedSyntaxRecord` shape matches §7a.3 verbatim (line, column, rawText, syntaxFamily)
+  - **Verify:** `UnrecognizedSyntaxRecord` shape matches [§7a.3 Data Shape Deltas](./plan.md#7a.3%20Data%20Shape%20Deltas) verbatim (line, column, rawText, syntaxFamily)
   - **Verify:** AC1–AC6 fixtures all PASS post-P2 (Phase 1 [H-D1-regex] + Phase 2 [H: <5ms benchmark] both verified)
   - **Verify:** No regressions in pre-existing tests
   - **Verdict:** PASS → proceed to Phase 3A. FAIL → escalation policy (Tier 1 → 2 → 3).
@@ -713,12 +709,12 @@ Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residu
 
 ### Phase 3A — Types + getLinkClass Classifier `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:00:32* %%
+%% *Last Modified: 05/03/26 18:06:44* %%
 
 Phase 3 split into 3A (foundation types + classifier) and 3B (consumer wiring) for context budget. 3A is pure additive — no consumer-facing changes yet.
 
 - [ ] **3A.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 2.C `end_hash`. Read Review Gate 1 findings.
-- [ ] **3A.1** IMPLEMENT: Add `LinkClass` type + `ValidationSummary` extensions (`byLinkClass`, `unrecognizedCount`, `errorBreakdown`) to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per §7a.3 verbatim. Mark `errors` derived per GAP-5.
+- [ ] **3A.1** IMPLEMENT: Add `LinkClass` type + `ValidationSummary` extensions (`byLinkClass`, `unrecognizedCount`, `errorBreakdown`) to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/validationTypes.ts` per [§7a.3 Data Shape Deltas](./plan.md#7a.3%20Data%20Shape%20Deltas) verbatim. Mark `errors` derived per GAP-5.
 - [ ] **3A.2** IMPLEMENT: Re-export `LinkClass` from `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/types/citationTypes.ts` per §"MODIFIED → src/types/citationTypes.ts" (line 264).
 - [ ] **3A.3** VERIFY: `npm run build` — confirm consumers may show missing-field errors on `byLinkClass` / `unrecognizedCount` / `errorBreakdown` (expected; addressed in 3B). No type-shape errors on `LinkClass` itself.
 - [ ] **3A.4** RED: Create `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/core/getLinkClass.test.ts` per §"ADDED → test/unit/core/getLinkClass.test.ts" assertions (lines 185–192). Five cases including the (linkType × anchorType) cross-product exhaustiveness check.
@@ -734,7 +730,7 @@ Phase 3 split into 3A (foundation types + classifier) and 3B (consumer wiring) f
 
 ### Phase 3B — Coverage-Qualified Output + Type-I Interface (TDD) `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:01:07* %%
+%% *Last Modified: 05/03/26 18:07:12* %%
 
 Closes CI-05 (High), GAP-2/3/4/5/6. Largest-blast-radius phase: `manager.validate()` Type-I interface change, exit-code refactor, formatter overhaul. Includes the LSP Audit Findings exit-code predicate fix (folded per project tech-debt policy).
 
@@ -743,27 +739,27 @@ Closes CI-05 (High), GAP-2/3/4/5/6. Largest-blast-radius phase: `manager.validat
 - [ ] **3B.2** RED: Add byLinkClass + errorBreakdown assertions to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts` per §"MODIFIED → test/unit/CitationValidator.test.ts" lines 449–457 (subset for P3B; suggestion-path assertions deferred to P4).
 - [ ] **3B.3** VERIFY RED → GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts`. Iterate until GREEN.
 - [ ] **3B.4** IMPLEMENT: `manager.validate()` Type-I return-shape change in `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts` per §"MODIFIED → src/jact.ts" diff (lines 318–354). Return `{ output, result }`. Drop `JSON.parse(output)` in JSON branch.
-- [ ] **3B.5** IMPLEMENT: Update `formatForCLIMinimal` per §7g.3 — coverage qualifier `OK: N citations valid (markdown: M, wiki: W, caret: C; U unrecognized)`. Add UNRECOGNIZED section between ERRORS and trailer per §7g.3 GAP-1 (lines 357–367).
-- [ ] **3B.6** IMPLEMENT: Update `formatForCLIVerbose` per §7g.4 — SUMMARY block additions (`- By link class:` + `- Unrecognized:`) and trailer branch order per §7g.6 + GAP-4 (errors > 0 → "VALIDATION FAILED"; else unrecognizedCount > 0 → "VALIDATION FAILED - K unrecognized syntax records"; else warnings > 0 → "VALIDATION PASSED WITH WARNINGS"; else "ALL CITATIONS VALID").
-- [ ] **3B.7** IMPLEMENT: Replace string-match exit-code predicate (`/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts:1280-1295`) with structured-field predicate per §7a D3 (f) + LSP Audit Findings: `process.exit(result.summary.errors > 0 || result.summary.unrecognizedCount > 0 ? 1 : 0)`. Belt-and-suspenders disjunct retained per GAP-5.
+- [ ] **3B.5** IMPLEMENT: Update `formatForCLIMinimal` per [§7g.3 Minimal Mode](./plan.md#7g.3%20Minimal%20Mode%20(default%20%60jact%20validate%60)) — coverage qualifier `OK: N citations valid (markdown: M, wiki: W, caret: C; U unrecognized)`. Add UNRECOGNIZED section between ERRORS and trailer per [§7g.3](./plan.md#7g.3%20Minimal%20Mode%20(default%20%60jact%20validate%60)) GAP-1 (lines 357–367).
+- [ ] **3B.6** IMPLEMENT: Update `formatForCLIVerbose` per [§7g.4 Verbose Mode](./plan.md#7g.4%20Verbose%20Mode%20(%60jact%20validate%20--verbose%60)) — SUMMARY block additions (`- By link class:` + `- Unrecognized:`) and trailer branch order per [§7g.6 Exit Code Path](./plan.md#7g.6%20Exit%20Code%20Path%20(Both%20String-Match%20and%20Structured-Field%20Branches)) + GAP-4 (errors > 0 → "VALIDATION FAILED"; else unrecognizedCount > 0 → "VALIDATION FAILED - K unrecognized syntax records"; else warnings > 0 → "VALIDATION PASSED WITH WARNINGS"; else "ALL CITATIONS VALID").
+- [ ] **3B.7** IMPLEMENT: Replace string-match exit-code predicate (`/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts:1280-1295`) with structured-field predicate per [§7a Delta Architecture Table](./plan.md#7a.%20Delta%20Architecture%20Table) D3 (f) + LSP Audit Findings: `process.exit(result.summary.errors > 0 || result.summary.unrecognizedCount > 0 ? 1 : 0)`. Belt-and-suspenders disjunct retained per GAP-5.
 - [ ] **3B.8** RED: Add manager.validate() return-shape + exit-code matrix assertions to `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-validate.test.ts` per §"MODIFIED → test/unit/jact-validate.test.ts" lines 463–484. Four exit-code scenarios + four trailer-branch scenarios + JSON end-to-end.
 - [ ] **3B.9** VERIFY RED → GREEN: `bun vitest run /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-validate.test.ts`. Iterate until GREEN.
 - [ ] **3B.10** REFACTOR: Clean formatters — extract `renderSummaryLine` helpers if duplication exists between minimal/verbose. Confirm exit-code predicate has zero string-match dependencies.
 - [ ] **3B.11** VERIFY: `npm run build && bun test` — full suite. No new regressions.
-- [ ] **3B.12** SMOKE: `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md` — manual diff against §7g.3 "After (post-D1–D5)" minimal-mode block. Capture output inline in plan as Phase 3B verification evidence.
-- [ ] **3B.S** STATE-WRITE: Update checkboxes. Record §7g.3 manual-diff evidence.
+- [ ] **3B.12** SMOKE: `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md` — manual diff against [§7g.3 Minimal Mode](./plan.md#7g.3%20Minimal%20Mode%20(default%20%60jact%20validate%60)) "After (post-D1–D5)" block. Capture output inline in plan as Phase 3B verification evidence.
+- [ ] **3B.S** STATE-WRITE: Update checkboxes. Record [§7g.3](./plan.md#7g.3%20Minimal%20Mode%20(default%20%60jact%20validate%60)) manual-diff evidence.
 - [ ] **3B.C** COMMIT: "feat(cli): coverage-qualified output + Type-I manager.validate + structured exit-code (D3, closes CI-05, GAP-2/3/4/5/6)". `git rev-parse HEAD` → `end_hash: <hash>`.
 
 #### REVIEW GATE 2 `code-reviewer` (opus)
 
-%% *Last Modified: 05/03/26 18:01:16* %%
+%% *Last Modified: 05/03/26 18:07:31* %%
 
-- [ ] **3B.R** REVIEW: Scope — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/CitationValidator.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-validate.test.ts`. Run `git diff <2.C_end_hash>..HEAD` (covers 3A + 3B). Read plan §7a row D3, §7a.2 row CI-05, §7g.3/.4/.5/.6 UI Sketch.
-  - **Verify:** §7g.6 exit-code matrix (all 4 scenarios) — structured-field predicate, no string-match
-  - **Verify:** §7g.4 trailer branch order — never prints "ALL CITATIONS VALID" while exit code is 1 (GAP-4 closure)
+- [ ] **3B.R** REVIEW: Scope — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/CitationValidator.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/CitationValidator.test.ts`, `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/unit/jact-validate.test.ts`. Run `git diff <2.C_end_hash>..HEAD` (covers 3A + 3B). Read [§7a Delta Architecture Table](./plan.md#7a.%20Delta%20Architecture%20Table) row D3, [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage) row CI-05, and [§7g UI Sketch](./plan.md#7g.%20UI%20Sketch%20%E2%80%94%20CLI%20Output%20Validation) (.3 / .4 / .5 / .6 subsections).
+  - **Verify:** [§7g.6 Exit Code Path](./plan.md#7g.6%20Exit%20Code%20Path%20(Both%20String-Match%20and%20Structured-Field%20Branches)) matrix (all 4 scenarios) — structured-field predicate, no string-match
+  - **Verify:** [§7g.4 Verbose Mode](./plan.md#7g.4%20Verbose%20Mode%20(%60jact%20validate%20--verbose%60)) trailer branch order — never prints "ALL CITATIONS VALID" while exit code is 1 (GAP-4 closure)
   - **Verify:** Type-I `manager.validate()` return-shape change is consistent across all callers (consumer audit per Plan-01 §9c)
   - **Verify:** `errors` derivation matches GAP-5 (`brokenLinks + unrecognized`)
-  - **Verify:** §7g.3 manual-diff evidence in 3B.12 matches "After" block
+  - **Verify:** [§7g.3 Minimal Mode](./plan.md#7g.3%20Minimal%20Mode%20(default%20%60jact%20validate%60)) manual-diff evidence in 3B.12 matches "After" block
   - **Verdict:** PASS → proceed to Phase 4. FAIL → escalation policy.
 
 ---
@@ -792,41 +788,41 @@ Closes GAP-7, GAP-8, completes CI-08 closure.
 
 ### Phase 5 — D5 Documentation Alignment `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:02:06* %%
+%% *Last Modified: 05/03/26 18:07:54* %%
 
 Closes CI-04 (Medium) + CI-06 (Medium) + CI-07 (Low). Single-source-of-truth: 10-form enumeration appears identically in three locations.
 
 - [ ] **5.0** STATE-READ: `git rev-parse HEAD` → `start_hash`. Verify matches 4.C `end_hash`.
-- [ ] **5.1** READ: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractWikilinks.ts` — confirm shipped grammar covers exactly the 10 forms enumerated in plan §7b D1 rationale. List them explicitly.
-- [ ] **5.2** UPDATE: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/MarkdownParser.ts` JSDoc (lines 31-35) — replace narrow examples with the 10-form enumeration in plan §7b D1 order.
+- [ ] **5.1** READ: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractWikilinks.ts` — confirm shipped grammar covers exactly the 10 forms enumerated in [§7b Design Decisions Rationale](./plan.md#7b.%20Design%20Decisions%20Rationale) D1 row. List them explicitly.
+- [ ] **5.2** UPDATE: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/MarkdownParser.ts` JSDoc (lines 31-35) — replace narrow examples with the 10-form enumeration in [§7b D1](./plan.md#7b.%20Design%20Decisions%20Rationale) order.
 - [ ] **5.3** UPDATE: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/CLAUDE.md` "Citation Patterns Supported" section — replace narrow wikilink examples with the 10-form enumeration. Identical wording to JSDoc per single-source-of-truth.
 - [ ] **5.4** UPDATE: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/MarkdownParser Component Guide.md` — add "Wikilink Grammar" subsection listing the 10 forms with one example each. Cite `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/core/MarkdownParser/extractWikilinks.ts` as source.
 - [ ] **5.5** VERIFY: Run the 10-form parity diff per §Verification line 571: `diff <(grep -A 20 "Citation Patterns Supported" /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/CLAUDE.md) <(grep -A 20 "Wikilink Grammar" "/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/component-guides/MarkdownParser Component Guide.md")` — manual review confirms 10-form enumeration in both.
 - [ ] **5.6** VERIFY: `npm run build && bun test` — no regressions from doc-only edits (sanity check).
-- [ ] **5.7** SMOKE: §7g.4 verbose-mode + §7g.5 JSON-mode manual diffs:
-  - `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md -- --verbose` vs §7g.4 "After"
-  - `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md -- --format json | jq` vs §7g.5 "After"
+- [ ] **5.7** SMOKE: [§7g.4 Verbose Mode](./plan.md#7g.4%20Verbose%20Mode%20(%60jact%20validate%20--verbose%60)) + [§7g.5 JSON Mode](./plan.md#7g.5%20JSON%20Mode%20(%60jact%20validate%20--format%20json%60)) manual diffs:
+  - `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md -- --verbose` vs [§7g.4](./plan.md#7g.4%20Verbose%20Mode%20(%60jact%20validate%20--verbose%60)) "After"
+  - `npm run jact:validate /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md -- --format json | jq` vs [§7g.5](./plan.md#7g.5%20JSON%20Mode%20(%60jact%20validate%20--format%20json%60)) "After"
   - Capture both outputs inline as Phase 5 verification evidence.
-- [ ] **5.S** STATE-WRITE: Update checkboxes. Record §7g.4 + §7g.5 manual-diff evidence.
+- [ ] **5.S** STATE-WRITE: Update checkboxes. Record [§7g.4](./plan.md#7g.4%20Verbose%20Mode%20(%60jact%20validate%20--verbose%60)) + [§7g.5](./plan.md#7g.5%20JSON%20Mode%20(%60jact%20validate%20--format%20json%60)) manual-diff evidence.
 - [ ] **5.C** COMMIT: "docs(wikilink): align CLAUDE.md + JSDoc + component guide to 10-form D1 grammar (D5, closes CI-04/06/07)". `git rev-parse HEAD` → `end_hash: <hash>`.
 
 ---
 
 #### FINAL REVIEW GATE — BI/CI Coverage `code-reviewer` (opus)
 
-%% *Last Modified: 05/03/26 18:02:24* %%
+%% *Last Modified: 05/03/26 18:08:24* %%
 
-Holistic pass/fail evaluation against `plan.md §7a.1 BI ↔ Delta Coverage` and `§7a.2 CI ↔ Delta Coverage`. NO partial credit. Every BI row + every CI row must be cited with file:line evidence proving FULL coverage.
+Holistic pass/fail evaluation against [§7a.1 BI ↔ Delta Coverage](./plan.md#7a.1%20BI%20%E2%86%94%20Delta%20Coverage) and [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage). NO partial credit. Every BI row + every CI row must be cited with file:line evidence proving FULL coverage.
 
-- [ ] **5.R** FINAL REVIEW: Scope — entire `git diff <0.C_end_hash>..HEAD` (every commit from Phase 1 through Phase 5). Read in order:
-  1. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §5 Baseline Ideal Outcomes Table` (BI-1 through BI-7)
-  2. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §6.5 Findings & CI Status Table` (CI-01 through CI-08)
-  3. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §7a.1 BI ↔ Delta Coverage` table
-  4. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §7a.2 CI ↔ Delta Coverage` table
-  5. `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan-02-implement-deltas.md §Verification` smoke evidence captured in 3B.12, 5.7
+- [ ] **5.R** FINAL REVIEW: Scope — entire `git diff <0.C_end_hash>..HEAD` (every commit from Phase 1 through Phase 5). Required source artifacts (load each with `jact extract header` to guarantee in-context content; reading the markdown links also auto-loads via the on-read jact pipeline):
+  - [§5 Baseline Ideal Outcomes Table](./plan.md#5.%20Phase%202%20%E2%80%94%20Baseline%20Ideal%20Outcomes%20Table) (BI-1 … BI-7) — `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "5. Phase 2 — Baseline Ideal Outcomes Table"`
+  - [§6.5 Findings & CI Status Table](./plan.md#Findings%20%26%20CI%20(Critical%20Issues)%20Status%20Table) (CI-01 … CI-08) — `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "Findings & CI (Critical Issues) Status Table"`
+  - [§7a.1 BI ↔ Delta Coverage](./plan.md#7a.1%20BI%20%E2%86%94%20Delta%20Coverage) — `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "7a.1 BI ↔ Delta Coverage"`
+  - [§7a.2 CI ↔ Delta Coverage](./plan.md#7a.2%20CI%20%E2%86%94%20Delta%20Coverage) — `jact extract header /Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md "7a.2 CI ↔ Delta Coverage"`
+  - In-plan smoke evidence captured at 3B.12 + 5.7 (live in this plan file)
   - **Produce a BI Coverage Verification table** — for each BI-1 … BI-7 row: `| BI | Ideal Outcome | Cited Implementation Evidence (file:line) | PASS/FAIL |`. Any BI not fully achieved by shipped code = FAIL.
   - **Produce a CI Coverage Verification table** — for each CI-01 … CI-08 row: `| CI | Severity | Critical Issue | Cited Resolution Evidence (file:line) | PASS/FAIL |`. Any CI not structurally closed = FAIL.
-  - **Verify §7g UI Sketch parity** — minimal/verbose/JSON outputs from 3B.12 + 5.7 evidence match "After (post-D1–D5)" blocks.
+  - **Verify [§7g UI Sketch](./plan.md#7g.%20UI%20Sketch%20%E2%80%94%20CLI%20Output%20Validation) parity** — minimal/verbose/JSON outputs from 3B.12 + 5.7 evidence match "After (post-D1–D5)" blocks.
   - **Verify hardening gates GREEN throughout** — `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/scripts/service-level-smoke.sh`, ESLint, plan-eval, defer-language, portability, historical-replay all passing on final commit.
   - **Verdict format:** `PASS` (every BI + every CI ✅ with evidence) or `FAIL` (list every uncovered BI/CI with what's missing).
   - **PASS** → proceed to Architect Gate. **FAIL** → escalation policy. Tier 1: same `coder` fixes uncovered items; re-review. Tier 2: model override → opus. Tier 3: HUMAN HARD GATE.
@@ -835,14 +831,14 @@ Holistic pass/fail evaluation against `plan.md §7a.1 BI ↔ Delta Coverage` and
 
 #### ARCHITECT GATE `application-tech-lead` (opus)
 
-%% *Last Modified: 05/03/26 18:02:32* %%
+%% *Last Modified: 05/03/26 18:08:39* %%
 
 Final architecture evaluation. Independent of Final Review Gate — the BI/CI gate verifies coverage; the architect gate verifies the implementation is architecturally sound and free of enterprise-pattern creep.
 
 - [ ] **5.A** ARCHITECT EVAL: Scope — entire `git diff <0.C_end_hash>..HEAD`. Use `evaluate-against-architecture-principles` skill against ALL 9 principle categories (Modular Design, Data-First Design, Action-Based File Organization, Format/Interface Design, MVP Principles, Deterministic Offloading, Self-Contained Naming, Safety-First Design, Anti-Patterns). Cross-reference shipped code against:
-  - `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §6.5 [i0] Baseline Architecture Principles Evaluation` (the principle violations the Deltas were designed to close)
-  - `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan.md §7f [i3] Delta Architecture Eval Results` (the predicted post-Delta principle scores)
-  - **Verify:** Type-I `manager.validate()` change introduced an ADR or equivalent change-note (per §7a D3 Notes column GAP-6 requirement)
+  - [§6.5 [i0] Baseline Architecture Principles Evaluation](./plan.md#6.5.%20%5Bi0%5D%20Baseline%20Architecture%20Principles%20Evaluation) (the principle violations the Deltas were designed to close)
+  - [§7f [i3] Delta Architecture Eval Results](./plan.md#7f.%20%5Bi3%5D%20Delta%20Architecture%20Eval%20Results) (the predicted post-Delta principle scores)
+  - **Verify:** Type-I `manager.validate()` change introduced an ADR or equivalent change-note (per [§7a Delta Architecture Table](./plan.md#7a.%20Delta%20Architecture%20Table) D3 Notes column GAP-6 requirement)
   - **Verify:** No new enterprise-scale complexity (DI containers, abstract factories, etc.) — pragmatic application-scale patterns only
   - **Verify:** Module boundaries respect Plan-01 §9b sibling-sweep rule + black-box-interfaces principle
   - **Verify:** Tech debt acknowledged per project policy — no skipped reviewer/diagnostic findings deferred
@@ -874,15 +870,13 @@ Final architecture evaluation. Independent of Final Review Gate — the BI/CI ga
 
 #### Plan File Checkbox Rule
 
-%% *Last Modified: 05/03/26 17:58:11* %%
+%% *Last Modified: 05/03/26 18:08:56* %%
 
 **Every agent MUST update plan checkboxes after completing tasks.**
 
-Plan file: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan-02-implement-deltas.md`
-
 Include this instruction in EVERY agent spawn prompt:
 
-> After completing each task step, update the plan file checkbox from `- [ ]` to `- [x]` for that step. For STATE-WRITE steps, also record any deviations as inline notes. For COMMIT steps, record the `end_hash` value next to the checkbox using `git rev-parse HEAD`. Plan file path: `<plan file path above>`. Design plan (BI/CI source of truth) path: `<plan.md path above>`.
+> After completing each task step, update the plan file checkbox from `- [ ]` to `- [x]` for that step. For STATE-WRITE steps, also record any deviations as inline notes. For COMMIT steps, record the `end_hash` value next to the checkbox using `git rev-parse HEAD`. Plan file: `/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/design-docs/features/202605020859-jact-wikilink-validation/plan-02-implement-deltas.md` (this is the only path you need — every other reference (design plan sections, source files, fixtures) appears as inline links or absolute paths in the task descriptions themselves).
 
 #### Spawn Sequence (just-in-time)
 
