@@ -60,7 +60,8 @@ export function resolveWikiPath(
 	}
 
 	// Both miss — adaptive-threshold Levenshtein scan (basename distance only).
-	const suggestions: string[] = [];
+	// Collect candidates with distances, sort by distance, limit to top 3.
+	const candidatesWithDistance: Array<{ path: string; distance: number }> = [];
 	for (const entry of fileCache.getEntries()) {
 		const threshold = clamp(
 			Math.floor(SUGGESTION_THRESHOLD_RATIO * entry.relativePath.length),
@@ -69,14 +70,20 @@ export function resolveWikiPath(
 		);
 		const distance = levenshteinDistance(slugPath, entry.basename);
 		if (distance <= threshold) {
-			suggestions.push(entry.relativePath);
+			candidatesWithDistance.push({ path: entry.relativePath, distance });
 		}
 	}
 
-	const attemptedPaths: string[] = [
-		...(step1.attemptedPaths ?? []),
-		...(step2.attemptedPaths ?? []),
-	];
+	// Sort by distance (minimal changes first) and take top 3
+	const suggestions: string[] = candidatesWithDistance
+		.sort((a, b) => a.distance - b.distance)
+		.slice(0, 3)
+		.map((c) => c.path);
+
+	// Deduplicate attemptedPaths to avoid redundant paths in error output
+	const attemptedPaths: string[] = Array.from(
+		new Set([...(step1.attemptedPaths ?? []), ...(step2.attemptedPaths ?? [])]),
+	);
 	// Always include attemptedPaths for consistent error output
 	// (whether scope was explicit or auto-resolved)
 	return {
