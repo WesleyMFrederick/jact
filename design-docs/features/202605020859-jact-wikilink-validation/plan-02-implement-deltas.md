@@ -159,7 +159,7 @@ LSP `documentSymbol` sweep flags potential parallel-implementation per Plan-01 �
 
 #### `src/core/getLinkClass.ts` (P3)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:34:42* %%
 
 ```typescript
 // Display-layer discriminator separate from LinkObject.linkType.
@@ -175,19 +175,26 @@ import type { LinkClass } from "../types/validationTypes.js";
 export const getLinkClass = (link: LinkObject): LinkClass => {
   // implementing agent fills in body
 };
+
+// Test assertions (BDD — verified in test/unit/core/getLinkClass.test.ts):
+// Given a wiki LinkObject, when getLinkClass(link) runs, then it returns "wiki".
+// Given a markdown LinkObject with anchorType === "block", when getLinkClass(link) runs, then it returns "caret".
+// Given a markdown LinkObject with anchorType === "header", when getLinkClass(link) runs, then it returns "markdown".
+// Given a markdown LinkObject with no anchor (anchorType undefined), when getLinkClass(link) runs, then it returns "markdown".
+// Given the full (linkType × anchorType) cross-product, when each combination is classified, then every combination maps to exactly one LinkClass — exhaustiveness invariant; no input falls through to undefined.
 ```
 
 #### `test/unit/core/getLinkClass.test.ts` (P3)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:34:56* %%
 
 ```typescript
-// Test assertions (per §7a.3 + §7g UI Sketch):
-// 1. wiki LinkObject → "wiki"
-// 2. markdown LinkObject with anchorType "block" → "caret"
-// 3. markdown LinkObject with anchorType "header" → "markdown"
-// 4. markdown LinkObject with no anchor → "markdown"
-// 5. exhaustiveness: every (linkType × anchorType) cross-product covered
+// Test assertions (BDD — per §7a.3 + §7g UI Sketch):
+// Given a wiki LinkObject, when getLinkClass(link) runs, then it returns "wiki".
+// Given a markdown LinkObject with anchorType === "block", when getLinkClass(link) runs, then it returns "caret".
+// Given a markdown LinkObject with anchorType === "header", when getLinkClass(link) runs, then it returns "markdown".
+// Given a markdown LinkObject with no anchor, when getLinkClass(link) runs, then it returns "markdown".
+// Given the (linkType × anchorType) cross-product, when iterated, then every cell maps to exactly one LinkClass — no fall-through, no undefined return.
 ```
 
 #### `test/fixtures/adversarial-commonmark/AC1.md` … `AC6.md` (P1)
@@ -201,14 +208,16 @@ Source: `design-docs/hardening-pipeline/fixture-template.md` §"Adversarial Comm
 
 #### `test/fixtures/adversarial-commonmark/AC<N>.expected.json` (P1)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:35:09* %%
 
 ```typescript
-// Test assertions per AC fixture:
-// 1. {{primaryBehavior}}   — D1 grammar correctly parses despite adversarial markdown context
-// 2. byLinkClass count     — matches expected wiki/markdown/caret distribution
-// 3. unrecognized[] shape  — empty for AC1–AC5; AC6 may intentionally trigger residual scanner
-// 4. exit code             — 0 if all valid, 1 if any broken or unrecognized
+// Test assertions (BDD — per AC fixture, verifies [H-D1-regex] under adversarial CommonMark §4.5/§6.1/§6.5):
+// Given AC<N>.md adversarial input, when MarkdownParser parses it, then byLinkClass.wiki count === expected wiki distribution (D1 grammar holds despite adversarial context — no silent drops).
+// Given AC<N>.md, when validation runs, then errors[].linkType matches the expected shape per fixture (correct classification, no link miscounted).
+// Given AC1–AC5 fixtures (non-residual cases), when parsed, then unrecognized[] is empty (D1 consumes all wiki-shaped sequences).
+// Given AC6 fixture (intentionally triggers residual scanner), when parsed, then unrecognized[] contains the malformed sequence with rawText, line, column populated.
+// Given any AC fixture with errors === 0 AND unrecognizedCount === 0, when validate runs, then exit code is 0; otherwise exit code is 1 (loud-fail invariant).
+// [H-D1-regex] verification step — plan-01 shipped grammar must survive these adversarial cases without modification.
 ```
 
 ### MODIFIED
@@ -217,7 +226,7 @@ Source: `design-docs/hardening-pipeline/fixture-template.md` §"Adversarial Comm
 
 #### `src/types/validationTypes.ts` (P2 + P3)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:35:21* %%
 
 Per §7a.3 Data Shape Deltas (verbatim).
 
@@ -253,17 +262,31 @@ Per §7a.3 Data Shape Deltas (verbatim).
 + unrecognized: UnrecognizedSyntaxRecord[];        // per D2
     validationTime?: string;
   }
+
+// Test assertions (BDD — type-shape invariants verified by consumers in CitationValidator.test.ts + jact-validate.test.ts):
+// Given any ValidationResult, when consumers read summary.errors, then errors === errorBreakdown.brokenLinks + errorBreakdown.unrecognized (GAP-5 derived predicate; no consumer doc-reliance).
+// Given a ValidationResult, when summary.byLinkClass is iterated, then keys exhaustively cover {"markdown" | "wiki" | "caret"} (LinkClass union completeness).
+// Given a ValidationResult with summary.unrecognizedCount === K, when unrecognized[].length is read, then it equals K (count and array stay in sync).
+// Given any UnrecognizedSyntaxRecord, when emitted, then line ≥ 1 (1-based) AND column ≥ 0 (0-based) AND rawText is non-empty AND syntaxFamily === "wiki".
+// Given a consumer destructuring { summary, links } and predicating on summary.errors > 0, when unrecognized[] is non-empty, then the predicate fires (silent-pass loophole structurally closed per GAP-5).
 ```
 
 #### `src/types/citationTypes.ts` (P3)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:35:30* %%
 
 Re-export `LinkClass` from `validationTypes` for callers that already import from `citationTypes`. No shape change to `LinkObject` (`linkType: "markdown" | "wiki"` unchanged — `LinkClass` is display-only).
 
+```typescript
+// Test assertions (BDD — verified by type-contract tests + downstream consumer compile checks):
+// Given a caller importing LinkClass from "../types/citationTypes.js", when the import resolves, then the resolved type is identical to LinkClass exported from validationTypes (single source of truth — re-export only, no divergent definition).
+// Given the existing LinkObject, when its linkType field is inspected, then it remains the union "markdown" | "wiki" (no breaking change — display LinkClass is additive only).
+// Given any code path constructing a LinkObject, when it sets linkType, then no caller writes linkType === "caret" (caret is display-layer only, never on LinkObject).
+```
+
 #### `src/core/MarkdownParser/extractLinks.ts` (P2)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:35:44* %%
 
 Add residual-bracket scanner running after all extractors. Emits `UnrecognizedSyntaxRecord[]` for any `[[...]]` sequences the grammar did not consume.
 
@@ -280,11 +303,19 @@ Add residual-bracket scanner running after all extractors. Emits `UnrecognizedSy
 // Sibling-module sweep result (per §9b #2):
 //   - getCodeBlockLines (lines 75-102) consolidates with isInsideCodeBlock.ts
 //   - residual scanner reuses isInsideCodeBlock to skip fenced + inline-code spans
+//
+// Test assertions (BDD — verified in test/unit/core/MarkdownParser/extractLinks.test.ts):
+// Given source text containing an unmatched [[… outside any code block, when extractLinks runs, then unrecognized[] contains exactly one UnrecognizedSyntaxRecord matching the raw bracket sequence at the correct 1-based line and 0-based column.
+// Given source text with [[…]] inside a fenced ```code``` block, when extractLinks runs, then NO UnrecognizedSyntaxRecord is emitted for that span (isInsideCodeBlock skip path).
+// Given source text with [[…]] inside an inline `code` span, when extractLinks runs, then NO UnrecognizedSyntaxRecord is emitted (isInsideInlineCode skip path).
+// Given source where a residual [[ sits adjacent to a valid [[wikilink]], when extractLinks runs, then the valid wikilink is in links[] AND only the residual portion appears in unrecognized[] (consumed-ranges set must exclude valid spans).
+// Given a 10KB adversarial input with mixed code blocks, valid wikilinks, and residuals, when the residual scanner runs, then total scan time is <5ms ([H: <5ms benchmark] verification per §7b D2).
+// Given any input, when extractLinks completes, then return shape is { links: LinkObject[], unrecognized: UnrecognizedSyntaxRecord[] } (Type-I shape change — all call sites must consume both fields).
 ```
 
 #### `src/CitationValidator.ts` (P3 + P4)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:36:02* %%
 
 P3: populate new `ReportSummary` fields (`byLinkClass`, `unrecognizedCount`, `errorBreakdown`).
 P4: populate `ValidationMetadata.suggestion` from `resolveWikiPath` miss path with adaptive-threshold Levenshtein result.
@@ -300,11 +331,20 @@ P4: populate `ValidationMetadata.suggestion` from `resolveWikiPath` miss path wi
 // summary.errors becomes derived (per GAP-5):
 //   errors = brokenLinkCount + unrecognizedCount
 // summary.errorBreakdown.{brokenLinks, unrecognized} populated unconditionally
+//
+// Test assertions (BDD — verified in test/unit/CitationValidator.test.ts):
+// Given a fixture mixing markdown + wiki + caret links, when CitationValidator runs, then summary.byLinkClass.{markdown,wiki,caret} reflect the count by getLinkClass(link) — every link counted exactly once, no link uncounted.
+// Given a fixture containing residual [[… sequences in source, when CitationValidator runs, then summary.unrecognizedCount === unrecognized[].length (count and array stay in sync).
+// Given any fixture, when CitationValidator computes summary, then errorBreakdown.brokenLinks + errorBreakdown.unrecognized === summary.errors (GAP-5 derived invariant; consumers checking summary.errors > 0 catch both failure classes).
+// Given a broken wiki ref where resolveWikiPath returns suggestions of length 1, when CitationValidator surfaces validation.suggestion, then it equals the single full relative path (parent-folder context preserved).
+// Given a broken wiki ref where resolveWikiPath returns suggestions of length ≥ 2 (duplicate basenames in different folders), when CitationValidator surfaces validation.suggestion, then it equals the comma-space-joined list of full relative paths (multi-match disambiguation per §7g.3 firing-table).
+// Given a broken wiki ref where resolveWikiPath returns suggestions of length 0, when CitationValidator surfaces validation.suggestion, then it remains null (no false-positive suggestion).
+// Given a wiki ref that resolves cleanly, when CitationValidator runs, then validation.suggestion is null (suggestion only fires on miss path).
 ```
 
 #### `src/jact.ts` (P3)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:36:33* %%
 
 ```diff
   // manager.validate() return-shape — Type I interface change per §7a D3 (f), GAP-6
@@ -355,11 +395,45 @@ P2 minimal-mode UNRECOGNIZED section (per §7g.3 GAP-1):
 //
 // Verbose mode (per §7g.4): "UNRECOGNIZED SYNTAX (K)" block
 // using existing ├─/└─ indentation pattern
+//
+// Test assertions (BDD — verified in test/unit/jact-validate.test.ts):
+//
+// manager.validate() return shape (Type-I per GAP-6):
+// Given a caller awaiting manager.validate(path, opts), when the promise resolves, then it returns { output: string, result: ValidationResult } (no longer a bare string).
+// Given options.format === "json", when the JSON branch runs, then it does NOT call JSON.parse(output) — result is already structured (GAP-6 closure).
+//
+// formatForCLIMinimal — OK path (per §7g.3 D3 (d)):
+// Given summary { valid: 42, byLinkClass: { markdown: 30, wiki: 10, caret: 2 }, unrecognizedCount: 0, errors: 0 }, when formatForCLIMinimal renders, then output === "OK: 42 citations valid (markdown: 30, wiki: 10, caret: 2; 0 unrecognized)".
+//
+// formatForCLIMinimal — FAILED path (per §7g.3 D3 (g)):
+// Given summary { errors: 4, unrecognizedCount: 1, byLinkClass: { markdown: 30, wiki: 7, caret: 2 } }, when formatForCLIMinimal renders, then trailer matches /^FAILED: 4 errors(?:, 0 warnings)?, 1 unrecognized \(markdown: 30, wiki: 7, caret: 2\)$/ (inline byLinkClass per USER decision in GAP-2).
+//
+// formatForCLIMinimal — UNRECOGNIZED section (GAP-1):
+// Given summary.unrecognizedCount > 0, when formatForCLIMinimal renders, then output contains an "UNRECOGNIZED (K)" header between ERRORS section and trailer line, with one "- Line N: <rawText>" record per occurrence (per-occurrence visibility — count-only signal forbidden).
+//
+// formatForCLIVerbose — SUMMARY block (per §7g.4 + D3 (h), GAP-3):
+// Given verbose rendering of any summary, when SUMMARY block is built, then it contains the lines "- By link class: markdown=N, wiki=N, caret=N" AND "- Unrecognized: K" between "- Critical errors:" and "- Validation time:" (each on its own line for human-friendly scanning).
+//
+// formatForCLIVerbose — UNRECOGNIZED SYNTAX block (GAP-1):
+// Given verbose rendering with unrecognizedCount > 0, when output is built, then it contains an "UNRECOGNIZED SYNTAX (K)" section using ├─ Line N: <rawText> / └─ <reason> indentation (parallel position to CRITICAL ERRORS / WARNINGS).
+//
+// formatForCLIVerbose — trailer branch order (per §7g.6 + D3 (i), GAP-4):
+// Given errors > 0, when trailer renders, then output contains "VALIDATION FAILED" (highest precedence — fires regardless of unrecognized/warnings).
+// Given errors === 0 AND unrecognizedCount > 0, when trailer renders, then output contains "VALIDATION FAILED - K unrecognized syntax records" (GAP-4 closure: never prints "ALL CITATIONS VALID" while exit code is 1).
+// Given errors === 0 AND unrecognizedCount === 0 AND warnings > 0, when trailer renders, then output contains "VALIDATION PASSED WITH WARNINGS".
+// Given errors === 0 AND unrecognizedCount === 0 AND warnings === 0, when trailer renders, then output contains "ALL CITATIONS VALID".
+//
+// Exit-code predicate (per §7g.6 + D3 (f), GAP-5/GAP-6):
+// Given result.summary { errors: 0, unrecognizedCount: 0 }, when exit-code path runs, then process.exit(0) fires.
+// Given result.summary { errors > 0, unrecognizedCount: 0 }, when exit-code path runs, then process.exit(1) fires.
+// Given result.summary { errors: 0, unrecognizedCount > 0 }, when exit-code path runs, then process.exit(1) fires (belt-and-suspenders disjunct survives even though errors is now derived per GAP-5).
+// Given result.summary { errors > 0, unrecognizedCount > 0 }, when exit-code path runs, then process.exit(1) fires.
+// Given the post-edit code, when grepped, then no occurrence of `output.includes("FAILED:")` or `output.includes("VALIDATION FAILED")` remains in the exit-code path (LSP audit fix removed — string-match exit-code branch deleted).
 ```
 
 #### `src/core/MarkdownParser/resolveWikiPath.ts` (P4)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:36:53* %%
 
 Add adaptive-threshold Levenshtein scan on miss path.
 
@@ -377,67 +451,133 @@ Add adaptive-threshold Levenshtein scan on miss path.
 //   length === 1 → validation.suggestion = full relative path
 //   length >= 2 → validation.suggestion = comma-space-join (multi-match disambiguation)
 //   length === 0 → validation.suggestion stays null
+//
+// Test assertions (BDD — verified in test/unit/core/MarkdownParser/resolveWikiPath.test.ts; also acts as [H-D4-suggestion-threshold] verification):
+// Given a wiki ref whose raw and slug+".md" both miss FileCache, when resolveWikiPath runs, then return shape includes { resolved: false, attempted: [raw, slug+".md"], suggestions: string[] } (suggestions populated unconditionally — empty array if none within threshold).
+// Given a single FileCache candidate whose basename is within the adaptive threshold of slug+".md", when resolveWikiPath returns, then suggestions === [<full relative path of that one candidate>] (parent-folder context preserved, not just basename).
+// Given multiple FileCache candidates within threshold (duplicate basenames in different folders, e.g., the-hardening-principle.md in wiki/concepts/, wiki/summaries/, raw-sources/...), when resolveWikiPath returns, then suggestions is the full list of full relative paths — NO silent drop of alternatives (multi-match disambiguation per §7g.3 firing-table; GAP-8 closure).
+// Given a candidate with relativePath length 40, when threshold is computed, then threshold === clamp(3, 10, floor(0.2 × 40)) === 8.
+// Given a candidate with relativePath length ≤ 14 (shallow path), when threshold is computed, then threshold === 3 (floor clamp fires — small typos still match).
+// Given a candidate with relativePath length ≥ 50 (deep path), when threshold is computed, then threshold === 10 (ceiling clamp fires — prevents absurd matches in very deep paths).
+// Given no FileCache basename within threshold of slug+".md", when resolveWikiPath returns, then suggestions === [] (downstream validation.suggestion stays null — no false-positive).
+// Given Levenshtein distance computation, when distances are computed, then distance is taken against basename only (NOT against full relative path — typos live in basenames per GAP-8 path-aware revision).
+// Given a wiki ref that resolves successfully via FileCache (raw OR slug+".md"), when resolveWikiPath returns, then it does NOT invoke the Levenshtein scan (cost optimization — suggestion only fires on miss).
+// [H-D4-suggestion-threshold] verification — adaptive threshold balances false-positive headroom across vault depth distribution; clamp(3,10,...) keeps output coherent under length extremes per GAP-8.
 ```
 
 #### `src/core/MarkdownParser/MarkdownParser.ts` (P5)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:37:10* %%
 
 JSDoc at lines 31-35 currently lists narrow wikilink forms. Update to enumerate all 10 forms covered by D1 grammar (matches `extractWikilinks.ts` shipped behavior).
 
+```typescript
+// Test assertions (BDD — 10-form parity verified by P5 manual diff in Verification phase):
+// Given the JSDoc at MarkdownParser.ts:31-35, when read, then it enumerates exactly 10 wikilink forms in the order used in §7b D1 rationale.
+// Given the JSDoc enumeration, when diffed against jact/CLAUDE.md "Citation Patterns Supported" section, then both surfaces list identical 10 forms (CI-04 documentation drift closed).
+// Given the JSDoc enumeration, when diffed against design-docs/component-guides/MarkdownParser Component Guide.md "Wikilink Grammar" subsection, then both surfaces list identical 10 forms (CI-06 documentation drift closed).
+// Given the JSDoc forms, when each example is fed through extractWikilinks.ts, then every form parses successfully (JSDoc is not aspirational — it documents shipped behavior).
+```
+
 #### `jact/CLAUDE.md` (P5)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:37:19* %%
 
 "Citation Patterns Supported" section — replace narrow wikilink examples with the 10-form enumeration. Match the order used in §7b D1 rationale.
 
+```typescript
+// Test assertions (BDD — verified via Verification phase manual diff):
+// Given the "Citation Patterns Supported" section in jact/CLAUDE.md, when read, then it lists exactly 10 wikilink forms in the order used in §7b D1 rationale.
+// Given each enumerated form, when fed through extractWikilinks.ts, then it parses (documentation matches shipped grammar — no aspirational entries).
+// Given the section, when diffed against MarkdownParser.ts JSDoc and the component guide "Wikilink Grammar" subsection, then 10-form parity holds across all three surfaces (CI-04 / CI-06 closure; D5 single-source-of-truth invariant).
+```
+
 #### `design-docs/component-guides/MarkdownParser Component Guide.md` (P5)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:37:26* %%
 
 Add new subsection "Wikilink Grammar" listing the 10 forms with one example each. Cite `src/core/MarkdownParser/extractWikilinks.ts` as the implementation source.
 
+```typescript
+// Test assertions (BDD — verified via Verification phase manual diff):
+// Given the new "Wikilink Grammar" subsection, when read, then it lists exactly 10 forms with one concrete example each.
+// Given the subsection, when read, then it cites src/core/MarkdownParser/extractWikilinks.ts as the implementation source (single source of truth pointer for D5).
+// Given the subsection, when diffed against jact/CLAUDE.md "Citation Patterns Supported" and MarkdownParser.ts JSDoc, then 10-form parity holds across all three surfaces (CI-04 / CI-06 closure).
+// Given each example in the subsection, when fed through extractWikilinks.ts, then it parses (no aspirational entries — guide documents shipped behavior).
+```
+
 #### `test/unit/core/MarkdownParser/extractLinks.test.ts` (P2)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:37:39* %%
 
-Add residual-scanner emission cases:
-- Unmatched `[[…` produces `UnrecognizedSyntaxRecord`
-- Inside fenced code block: NO emission
-- Inside inline-code span: NO emission
-- Adjacent to valid wikilink: only the unmatched portion emitted
-- `<5ms` performance check on 10KB input
+Add residual-scanner emission cases.
+
+```typescript
+// Test assertions (BDD — residual-scanner emission cases per §7g.3 GAP-1 + §7b D2):
+// Given source text containing an unmatched `[[…` outside any code block, when extractLinks runs, then unrecognized[] contains exactly one UnrecognizedSyntaxRecord with rawText, line (1-based), and column (0-based) populated correctly.
+// Given source text with `[[…]]` inside a fenced ```code``` block, when extractLinks runs, then NO UnrecognizedSyntaxRecord is emitted for that span (isInsideCodeBlock skip path holds).
+// Given source text with `[[…]]` inside an inline `code` span, when extractLinks runs, then NO UnrecognizedSyntaxRecord is emitted (isInsideInlineCode skip path holds).
+// Given source where a residual `[[` sits adjacent to a valid `[[wikilink]]`, when extractLinks runs, then the valid wikilink appears in links[] AND only the residual portion appears in unrecognized[] (consumed-ranges set excludes valid spans — no double-counting).
+// Given a 10KB adversarial input with mixed code blocks, valid wikilinks, and residuals, when the residual scanner runs, then total scan time is <5ms ([H: <5ms benchmark] verification per §7b D2 — performance hypothesis).
+```
 
 #### `test/unit/core/MarkdownParser/resolveWikiPath.test.ts` (P4)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:37:55* %%
 
-Add Levenshtein scenarios:
-- Single-typo basename → exact one suggestion (full relative path)
-- Multi-match within threshold → comma-separated suggestions
-- Long deep path → threshold = 10 (clamp ceiling); short shallow path → threshold = 3 (clamp floor)
-- No match within threshold → `suggestions: []`
+Add Levenshtein scenarios.
+
+```typescript
+// Test assertions (BDD — adaptive-threshold Levenshtein scan; [H-D4-suggestion-threshold] verification):
+// Given a single-typo basename within threshold (e.g., slug "the-hardening-principle-concept.md", FileCache contains "wiki/concepts/the-hardening-principle.md", basename distance 8, threshold 8), when resolveWikiPath runs, then suggestions === ["wiki/concepts/the-hardening-principle.md"] (single match returns single full relative path).
+// Given multiple FileCache candidates within threshold (duplicate basenames in different folders — e.g., the-hardening-principle.md exists in wiki/concepts/, wiki/summaries/, raw-sources/claude-code-principles/), when resolveWikiPath runs, then suggestions contains all 3 full relative paths (multi-match disambiguation per GAP-8 — folder context preserved).
+// Given a long deep candidate (relativePath length ≥ 50, e.g., "raw-sources/claude-code-principles/the-hardening-principle.md" length 60), when threshold is computed, then threshold === 10 (ceiling clamp fires).
+// Given a short shallow candidate (relativePath length ≤ 14), when threshold is computed, then threshold === 3 (floor clamp fires — small typos still match in shallow paths).
+// Given a slug whose closest basename distance exceeds the candidate's adaptive threshold, when resolveWikiPath runs, then suggestions === [] (no false-positive — downstream validation.suggestion stays null).
+// Given a wiki ref that resolves on FileCache.resolveFile(rawPath) OR FileCache.resolveFile(slug+".md"), when resolveWikiPath returns, then the Levenshtein scan is NOT invoked (cost optimization — suggestion only fires on miss).
+```
 
 #### `test/unit/CitationValidator.test.ts` (P3 + P4)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:38:09* %%
 
-- `byLinkClass` correctly partitions a mixed fixture (markdown + wiki + caret)
-- `unrecognizedCount` increments on residual `[[…` in source
-- `errorBreakdown.brokenLinks + .unrecognized === errors`
-- Suggestion display: single match shows full path; multi-match shows comma-joined paths
+```typescript
+// Test assertions (BDD — byLinkClass + suggestion paths per P3 + P4):
+// Given a mixed fixture containing markdown + wiki + caret links, when CitationValidator runs, then summary.byLinkClass.markdown === count of markdown LinkObjects AND .wiki === count of wiki LinkObjects AND .caret === count of caret LinkObjects (every link counted exactly once via getLinkClass).
+// Given a fixture containing residual `[[…` in source, when CitationValidator runs, then summary.unrecognizedCount increments to match unrecognized[].length (count and array stay in sync per GAP-5).
+// Given any fixture, when CitationValidator computes summary, then errorBreakdown.brokenLinks + errorBreakdown.unrecognized === summary.errors (GAP-5 derived invariant — consumers checking summary.errors > 0 catch both failure classes).
+// Given a broken wiki ref where resolveWikiPath returns a single suggestion candidate, when CitationValidator builds validation.suggestion, then it equals the single full relative path (parent-folder context preserved).
+// Given a broken wiki ref where resolveWikiPath returns ≥ 2 candidates, when CitationValidator builds validation.suggestion, then it equals the comma-space-joined list of full relative paths (multi-match disambiguation per §7g.3 firing-table).
+// Given a broken wiki ref where resolveWikiPath returns zero candidates, when CitationValidator builds validation.suggestion, then it remains null (no false-positive).
+// Given a fixture with zero links, when CitationValidator runs, then summary.byLinkClass === { markdown: 0, wiki: 0, caret: 0 } AND summary.errors === 0 AND unrecognizedCount === 0 (empty-fixture edge case).
+```
 
 #### `test/unit/jact-validate.test.ts` (P3)
 
-%% *Last Modified: 05/03/26 16:41:19* %%
+%% *Last Modified: 05/03/26 17:38:27* %%
 
-- `manager.validate()` returns `{ output, result }` (no `JSON.parse(output)` needed for JSON mode)
-- Exit-code matrix:
-  - errors=0, unrecognized=0 → exit 0
-  - errors>0, unrecognized=0 → exit 1
-  - errors=0, unrecognized>0 → exit 1 (per disjunct, even though `errors` now derived)
-  - errors>0, unrecognized>0 → exit 1
-- Verbose trailer branch order matches §7g.6 (FAILED / FAILED-K / WARNINGS / VALID)
+```typescript
+// Test assertions (BDD — manager.validate() Type-I shape change + exit-code matrix per P3, GAP-5/6):
+//
+// manager.validate() return shape:
+// Given a caller awaiting manager.validate(path, opts), when the promise resolves, then it returns { output: string, result: ValidationResult } (no longer Promise<string>).
+// Given options.format === "json", when the JSON branch runs, then no JSON.parse(output) call is made (result is already structured — GAP-6 closure).
+//
+// Exit-code matrix (per §7g.6 + D3 (f)):
+// Given result.summary { errors: 0, unrecognizedCount: 0 }, when exit-code path runs, then process.exit(0) fires.
+// Given result.summary { errors > 0, unrecognizedCount: 0 }, when exit-code path runs, then process.exit(1) fires.
+// Given result.summary { errors: 0, unrecognizedCount > 0 }, when exit-code path runs, then process.exit(1) fires (belt-and-suspenders disjunct survives even though errors is derived per GAP-5).
+// Given result.summary { errors > 0, unrecognizedCount > 0 }, when exit-code path runs, then process.exit(1) fires.
+//
+// Verbose trailer branch order (per §7g.6 + D3 (i), GAP-4 closure):
+// Given errors > 0 (regardless of unrecognized/warnings), when verbose trailer renders, then output contains "VALIDATION FAILED" (highest precedence).
+// Given errors === 0 AND unrecognizedCount > 0, when verbose trailer renders, then output contains "VALIDATION FAILED - K unrecognized syntax records" (GAP-4: never prints "ALL CITATIONS VALID" while exit code is 1 — contradiction loophole closed).
+// Given errors === 0 AND unrecognizedCount === 0 AND warnings > 0, when verbose trailer renders, then output contains "VALIDATION PASSED WITH WARNINGS".
+// Given errors === 0 AND unrecognizedCount === 0 AND warnings === 0, when verbose trailer renders, then output contains "ALL CITATIONS VALID".
+//
+// JSON mode end-to-end (per §7g.5):
+// Given a fixture with mixed pass/fail wikilinks, when `jact validate --format json` runs, then parsed output contains summary.byLinkClass, summary.unrecognizedCount, top-level unrecognized[], and links[i].validation.suggestion fields (D2/D3/D4 schema deltas all present).
+```
 
 ### REMOVED
 
