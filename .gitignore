@@ -94,3 +94,12 @@ styles/
 #critique files
 critique-risks-logs/
 claude-code-transcripts/
+
+# design-docs
+design-docs/
+
+# graphify
+graphify-out
+
+# build files
+dist
