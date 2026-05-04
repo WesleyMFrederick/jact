@@ -96,3 +96,29 @@ Cold-start workflow for ingesting a plan via `jact`, reading the State Log to id
 The HARD GATE at `[j]` enforces **actions before choices**: you must extract State Log (`h`), optionally read the prior commit (`i`), then analyze (`j`) before you can extract the right Task (`k`). The choice of which Task to load is determined by the State Log content — not assumed up front.
 
 ## LSP Tool
+
+%% *Last Modified: 05/04/26 12:07:08* %%
+
+Interact with Language Server Protocol (LSP) servers to get code intelligence features.
+
+**All operations require the same 3 params** (in addition to `operation`):
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `filePath` | string | Absolute or relative path to the file |
+| `line` | integer (1-based) | Line number as shown in editors |
+| `character` | integer (1-based) | Character offset as shown in editors |
+
+**Operations:**
+
+| Operation | Description |
+|-----------|-------------|
+| `goToDefinition` | Find where a symbol is defined |
+| `findReferences` | Find all references to a symbol |
+| `hover` | Get hover information (documentation, type info) for a symbol |
+| `documentSymbol` | Get all symbols (functions, classes, variables) in a document |
+| `workspaceSymbol` | Search for symbols across the entire workspace |
+| `goToImplementation` | Find implementations of an interface or abstract method |
+| `prepareCallHierarchy` | Get call hierarchy item at a position (functions/methods) |
+| `incomingCalls` | Find all functions/methods that call the function at a position |
+| `outgoingCalls` | Find all functions/methods called by the function at a position |
