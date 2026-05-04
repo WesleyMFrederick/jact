@@ -441,7 +441,9 @@ export class CitationValidator {
 			citation.target.path.attempted !== undefined &&
 			citation.target.path.attempted.length > 0
 		) {
-			const tried = citation.target.path.attempted.join(", ");
+			const tried =
+				citation.target.path.attemptedPaths?.join(", ") ??
+				citation.target.path.attempted.join(", ");
 			const suggestions = citation.target.path.suggestions;
 			const suggestionMessage =
 				suggestions !== undefined && suggestions.length > 0

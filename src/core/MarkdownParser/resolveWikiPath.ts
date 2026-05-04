@@ -73,5 +73,14 @@ export function resolveWikiPath(
 		}
 	}
 
-	return { resolved: false, attempted: [rawPath, slugPath], suggestions };
+	const attemptedPaths: string[] = [
+		...(step1.attemptedPaths ?? []),
+		...(step2.attemptedPaths ?? []),
+	];
+	return {
+		resolved: false,
+		attempted: [rawPath, slugPath],
+		...(attemptedPaths.length > 0 && { attemptedPaths }),
+		suggestions,
+	};
 }

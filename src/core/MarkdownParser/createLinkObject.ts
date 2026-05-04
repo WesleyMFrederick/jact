@@ -32,6 +32,7 @@ export function createLinkObject(params: {
 	// Links like [[target-doc.md#section]] already specify a filename and resolve via resolvePath.
 	let absolutePath: string | null;
 	let attempted: readonly string[] | undefined;
+	let attemptedPaths: readonly string[] | undefined;
 	let suggestions: readonly string[] | undefined;
 	if (
 		params.linkType === "wiki" &&
@@ -56,6 +57,8 @@ export function createLinkObject(params: {
 			absolutePath = null;
 			// Surface attempted paths so the validator can render both forms in error.
 			attempted = wikiResolved.attempted;
+			// Surface full absolute paths attempted (for error output).
+			attemptedPaths = wikiResolved.attemptedPaths;
 			// Surface Levenshtein suggestions (D4) so the validator can build validation.suggestion.
 			suggestions = wikiResolved.suggestions;
 		}
@@ -80,6 +83,7 @@ export function createLinkObject(params: {
 				absolute: absolutePath,
 				relative: relativePath,
 				...(attempted && { attempted }),
+				...(attemptedPaths && { attemptedPaths }),
 				...(suggestions && { suggestions }),
 			},
 			anchor: params.anchor,

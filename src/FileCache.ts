@@ -230,11 +230,17 @@ export class FileCache {
 			: `File "${filename}" not found in scope folder.`;
 		const didYouMean =
 			nearMisses.length > 0 ? ` Did you mean: ${nearMisses.join(", ")}?` : "";
+		const attemptedFullPath = this.scope?.scope
+			? this.path.join(this.scope.scope, filename)
+			: undefined;
 		return {
 			found: false,
 			reason: "not_found",
 			...(nearMisses.length > 0 && { nearMisses }),
 			...(this.scope !== undefined && { scope: this.scope }),
+			...(attemptedFullPath !== undefined && {
+				attemptedPaths: [attemptedFullPath],
+			}),
 			message: `${scopeStr}${didYouMean}`,
 		};
 	}
