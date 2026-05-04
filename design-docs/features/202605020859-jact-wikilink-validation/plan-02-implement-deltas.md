@@ -714,7 +714,7 @@ Verifies shipped D1 grammar against CommonMark §4.5/§6.1/§6.5 edge cases (AC1
 
 ### Phase 2 — D2 Residual-Bracket Scanner (TDD) `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:46:40* %%
+%% *Last Modified: 05/03/26 18:48:26* %%
 
 Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residual-scanner emission inside `extractLinks.ts`. AC6 fixture from Phase 1 transitions to GREEN.
 
@@ -741,6 +741,10 @@ Closes CI-03 (Critical) and GAP-1. Adds `UnrecognizedSyntaxRecord` type + residu
 - [x] **2.S** STATE-WRITE: Update checkboxes. Note any deviations.
   - No deviations from plan steps. One scope note: the §7a.3 verbatim type insertion includes only the D2 fields (`UnrecognizedSyntaxRecord`, `ValidationResult.unrecognized[]`). The other §7a.3 deltas (`LinkClass`, `byLinkClass`, `unrecognizedCount`, `errorBreakdown`) are explicitly P3 scope and remain untouched here per plan.
 - [x] **2.C** COMMIT: "feat(parser): residual-bracket scanner emits UnrecognizedSyntaxRecord (D2, closes CI-03)". `git rev-parse HEAD` → `end_hash: <hash>`.
+  - Phase 2 spans **two** commits (auto-commit hook fired mid-phase):
+    - `0686792` "feat(MarkdownParser): add link extraction functionality" — auto-commit captured the type additions (`UnrecognizedSyntaxRecord`, `ValidationResult.unrecognized[]`), the `unrecognized: []` placeholder in `CitationValidator.validateFile`, the new `extractLinks.test.ts` (5 cases), and the initial scanner export. Auto-generated commit message; not authored by me.
+    - `a4a8f7c` "feat(parser): residual-bracket scanner emits UnrecognizedSyntaxRecord (D2, closes CI-03)" — completes Phase 2: full scanner body, `extractLinks` return-shape change to `{ links, unrecognized }`, consumer updates (MarkdownParser + 4 test files), plan state-write.
+  - `end_hash: a4a8f7c58066a48b4c0236a2fe4336dba56cd4cb`
 
 #### REVIEW GATE 1 `code-reviewer` (opus)
 
