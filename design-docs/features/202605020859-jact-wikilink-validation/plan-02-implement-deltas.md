@@ -686,7 +686,7 @@ No "ship-with-followups," no "minor issues acceptable." Either every Ideal Outco
 
 ### Phase 1 — Adversarial Fixtures + Sibling Sweep `coder` (sonnet)
 
-%% *Last Modified: 05/03/26 18:38:17* %%
+%% *Last Modified: 05/03/26 18:38:40* %%
 
 Verifies shipped D1 grammar against CommonMark §4.5/§6.1/§6.5 edge cases (AC1–AC6) and consolidates the `getCodeBlockLines` ↔ `isInsideCodeBlock` parallel implementation flagged in LSP Audit Findings.
 
@@ -707,7 +707,8 @@ Verifies shipped D1 grammar against CommonMark §4.5/§6.1/§6.5 edge cases (AC1
 - [x] **1.S** STATE-WRITE: Update plan checkboxes. Record sweep decision (REMOVED `getCodeBlockLines` vs. KEPT BOTH) inline in §"REMOVED" section of File Changes.
   - Sweep decision: **NO-OP — nothing removed, nothing kept-with-JSDoc; symbol does not exist.** No edit to §"REMOVED" required because no implementation was removed. Recording the determination here to keep the audit trail localized to Phase 1.
 - [x] **1.C** COMMIT: "test(wikilink): add adversarial CommonMark fixtures (AC1-AC6) + consolidate code-block byte-range query". `git rev-parse HEAD` → `end_hash: <hash>`.
-  - Commit message will reflect the NO-OP sweep finding (verified, not consolidated). `end_hash` recorded post-commit.
+  - Committed as `447c22e`. Commit message reflects NO-OP sweep finding (verified, not consolidated).
+  - `end_hash: 447c22ef1f25275d65fa96c3aa44f7b2c79d5ccb`
 
 ---
 
