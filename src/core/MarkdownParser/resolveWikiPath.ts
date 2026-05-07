@@ -85,6 +85,8 @@ export function resolveWikiPath(
 					SUGGESTION_THRESHOLD_FLOOR,
 					SUGGESTION_THRESHOLD_CEIL,
 				) * 1.5;
+			if (Math.abs(slugPath.length - entry.basename.length) > threshold)
+				continue;
 			const distance = levenshteinDistance(slugPath, entry.basename);
 			if (distance <= threshold) {
 				if (!bestLocal || distance < bestLocal.distance) {
@@ -107,6 +109,7 @@ export function resolveWikiPath(
 			SUGGESTION_THRESHOLD_FLOOR,
 			SUGGESTION_THRESHOLD_CEIL,
 		);
+		if (Math.abs(slugPath.length - entry.basename.length) > threshold) continue;
 		const distance = levenshteinDistance(slugPath, entry.basename);
 		if (distance <= threshold) {
 			candidatesWithDistance.push({ path: entry.relativePath, distance });

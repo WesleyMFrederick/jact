@@ -395,10 +395,13 @@ class ParsedDocument {
 		// Case-insensitive comparison via shared distance helper
 		const a = str1.toLowerCase();
 		const b = str2.toLowerCase();
+		// Length pre-filter: if len diff alone exceeds the 0.7×maxLen distance budget
+		// (i.e. max possible similarity ≤ 0.3), skip the O(m×n) DP entirely.
+		const maxLength = Math.max(a.length, b.length);
+		if (Math.abs(a.length - b.length) > maxLength * 0.7) return 0.0;
 		const distance = levenshteinDistance(a, b);
 
 		// Normalize to 0-1 range (1 = identical, 0 = completely different)
-		const maxLength = Math.max(a.length, b.length);
 		return 1 - distance / maxLength;
 	}
 }
