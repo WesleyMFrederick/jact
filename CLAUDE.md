@@ -204,6 +204,8 @@ The tool supports multiple path resolution strategies (in order):
 
 ## graphify
 
+%% *Last Modified: 05/07/26 08:54:41* %%
+
 This project has a graphify knowledge graph at graphify-out/.
 
 Rules:
@@ -211,3 +213,64 @@ Rules:
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
 - For cross-module "how does X relate to Y" questions, prefer `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` over grep — these traverse the graph's EXTRACTED + INFERRED edges instead of scanning files
 - After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+
+## Baseline Code Gathering Process
+
+%% *Last Modified: 05/07/26 08:54:41* %%
+
+Before implementing any change request, gather baseline understanding of the affected code. Goal: know what to change and what it touches before writing a single line.
+
+### Step 1: Map the neighborhood (graphify)
+
+%% *Last Modified: 05/07/26 08:54:41* %%
+
+Run `graphify explain "<target>"` on the file or function the user identified. This returns connections, community, and degree. Repeat for each direct neighbor that looks relevant (consumers, callees).
+
+```bash
+$(cat graphify-out/.graphify_python) -m graphify explain "<target_symbol>"
+```
+
+### Step 2: Trace the call chain (graphify path)
+
+%% *Last Modified: 05/07/26 08:54:41* %%
+
+If the change affects a component consumed by other modules, trace the shortest path to the primary consumer:
+
+```bash
+$(cat graphify-out/.graphify_python) -m graphify path "<changed_module>" "<consumer_module>"
+```
+
+This reveals intermediate dependencies that may need updating.
+
+### Step 3: Confirm call sites (Grep)
+
+%% *Last Modified: 05/07/26 08:54:41* %%
+
+Use Grep to find exact import and invocation lines in the files graphify identified:
+
+```bash
+# Grep for the function/export name in each consuming file
+```
+
+This grounds the graph edges in actual line numbers.
+
+### Step 4: Read the hot path (Read)
+
+%% *Last Modified: 05/07/26 08:54:41* %%
+
+Read the specific code sections where the target is called. Use `offset`/`limit` to read only the relevant function or loop, not the entire file. Focus on:
+- How the target is invoked (args, return value usage)
+- What surrounds it (loops, conditionals, error handling)
+- Performance characteristics (per-call allocation, recursion depth)
+
+### Step 5: Write analysis, then present
+
+%% *Last Modified: 05/07/26 08:54:41* %%
+
+Write findings to `design-docs/<topic>-analysis.md` with:
+- Current behavior and call chain
+- Identified problem (with data if available)
+- Ranked alternatives with effort/impact/deps tradeoffs
+- Recommendation
+
+Present a scannable summary in chat. The file is the durable artifact; chat is the executive briefing.
