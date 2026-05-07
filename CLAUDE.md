@@ -85,9 +85,9 @@ Core Components:
 
 %% *Last Modified: 05/07/26 08:43:37* %%
 
-```bash
-find src -type f -not -name '.DS_Store' | sort
-```
+
+Run !`find src -type f -not -name '.DS_Store' | sort`
+
 
 ### Key Design Patterns
 
@@ -135,19 +135,6 @@ test/
 
 ## Component Interaction Patterns
 
-### Workflow: Extract Links Command
-1. **CLI Orchestrator** receives `extract links` command
-2. Creates `CitationValidator` and `ContentExtractor` via factory
-3. **Phase 0**: Calls `validator.validateFile()` to discover and validate links
-4. **Phase 1**: Passes enriched links to `contentExtractor.extractContent()`
-5. **Phase 2**: ContentExtractor retrieves target documents via `ParsedFileCache`
-6. **Phase 3**: Deduplicates content and outputs JSON
-
-### Workflow: Extract Header/File Commands
-1. **CLI Orchestrator** creates synthetic link via `LinkObjectFactory`
-2. Calls `validator.validateSingleCitation()` to validate synthetic link
-3. Continues with same Phases 1-3 as `extract links`
-
 ### Key Principle: Separation of Concerns
 - **MarkdownParser**: Only syntactic analysis, produces raw AST data
 - **ParsedDocument**: Facade that provides semantic interface over parser output
@@ -155,20 +142,6 @@ test/
 - **ContentExtractor**: Content retrieval and deduplication
 - **CLI Orchestrator**: Command routing, output formatting
 
-## Design Documentation
-
-The project includes extensive architecture documentation:
-
-- **ARCHITECTURE-Citation-Manager.md**: C4 model diagrams and system context
-- **component-guides/**: Implementation guides for each component
-  - CLI Orchestrator Implementation Guide
-  - CitationValidator Implementation Guide
-  - ContentExtractor Component Guide
-  - MarkdownParser Component Guide
-  - ParsedDocument Implementation Guide
-  - ParsedFileCache Implementation Guide
-
-**When modifying components**: Review the corresponding implementation guide in `design-docs/component-guides/` before making changes.
 
 ## Path Resolution Strategy
 
@@ -228,12 +201,6 @@ The tool supports multiple path resolution strategies (in order):
 - **NEVER hardcode paths to design-docs/** — copy files to `test/<suite>/fixtures/` instead
 - When design-docs files are needed by tests: copy them to fixtures once, then reference only the fixture copy
 - Hardcoded external paths = flaky tests; fixture copies = reliable isolation
-
-### Component Boundaries:
-- **MarkdownParser** is NOT aware of `ParsedDocument` facade
-- **ContentExtractor** receives pre-validated links from CLI
-- **ParsedFileCache** ensures single parse per file
-- CLI orchestrates, components do NOT call each other directly (except through injected dependencies)
 
 ## graphify
 
