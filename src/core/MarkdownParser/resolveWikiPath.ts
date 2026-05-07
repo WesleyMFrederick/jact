@@ -65,55 +65,53 @@ export function resolveWikiPath(
 		return { resolved: true, absolutePath: step2.path };
 	}
 
-	// Step 3: Local-biased fuzzy resolution — files within 2 directory levels of
-	// sourceAbsolutePath get 1.5× threshold headroom; a local hit returns resolved: true.
-	if (sourceAbsolutePath) {
-		const sourceDir = dirname(sourceAbsolutePath);
-		const parentDir = dirname(sourceDir);
-		let bestLocal: { path: string; distance: number } | null = null;
-
-		for (const entry of fileCache.getEntries()) {
-			if (!entry.absolutePath) continue;
-			const isLocal =
-				entry.absolutePath.startsWith(sourceDir + "/") ||
-				entry.absolutePath.startsWith(parentDir + "/");
-			if (!isLocal) continue;
-
-			const threshold =
-				clamp(
-					Math.floor(SUGGESTION_THRESHOLD_RATIO * entry.relativePath.length),
-					SUGGESTION_THRESHOLD_FLOOR,
-					SUGGESTION_THRESHOLD_CEIL,
-				) * 1.5;
-			if (Math.abs(slugPath.length - entry.basename.length) > threshold)
-				continue;
-			const distance = levenshteinDistance(slugPath, entry.basename);
-			if (distance <= threshold) {
-				if (!bestLocal || distance < bestLocal.distance) {
-					bestLocal = { path: entry.absolutePath, distance };
-				}
-			}
-		}
-
-		if (bestLocal) {
-			return { resolved: true, absolutePath: bestLocal.path };
-		}
-	}
-
-	// Step 4: All miss — adaptive-threshold Levenshtein scan (basename distance only).
-	// Collect candidates with distances, sort by distance, limit to top 3.
+	// Steps 3+4 merged: single pass over FileCache entries.
+	// Local entries (within 2 directory levels of source) get 1.5× threshold headroom;
+	// a local fuzzy hit returns resolved: true.
+	// Ceiling pre-filter fires before clamp() to eliminate impossible candidates cheaply.
+	const sourceDir = sourceAbsolutePath ? dirname(sourceAbsolutePath) : null;
+	const parentDir = sourceDir ? dirname(sourceDir) : null;
+	let bestLocal: { path: string; distance: number } | null = null;
 	const candidatesWithDistance: Array<{ path: string; distance: number }> = [];
+
 	for (const entry of fileCache.getEntries()) {
-		const threshold = clamp(
+		const lenDiff = Math.abs(slugPath.length - entry.basename.length);
+		// Ceiling pre-filter: skip entries that cannot match at any threshold (max is CEIL × 1.5)
+		if (lenDiff > SUGGESTION_THRESHOLD_CEIL * 1.5) continue;
+
+		const baseThreshold = clamp(
 			Math.floor(SUGGESTION_THRESHOLD_RATIO * entry.relativePath.length),
 			SUGGESTION_THRESHOLD_FLOOR,
 			SUGGESTION_THRESHOLD_CEIL,
 		);
-		if (Math.abs(slugPath.length - entry.basename.length) > threshold) continue;
+
+		const isLocal =
+			entry.absolutePath !== undefined &&
+			sourceDir !== null &&
+			parentDir !== null &&
+			(entry.absolutePath.startsWith(sourceDir + "/") ||
+				entry.absolutePath.startsWith(parentDir + "/"));
+
+		const localThreshold = baseThreshold * 1.5;
+		const qualifiesForLocal = isLocal && lenDiff <= localThreshold;
+		const qualifiesForGlobal = lenDiff <= baseThreshold;
+
+		if (!qualifiesForLocal && !qualifiesForGlobal) continue;
+
 		const distance = levenshteinDistance(slugPath, entry.basename);
-		if (distance <= threshold) {
+
+		if (qualifiesForLocal && distance <= localThreshold && entry.absolutePath) {
+			if (!bestLocal || distance < bestLocal.distance) {
+				bestLocal = { path: entry.absolutePath, distance };
+			}
+		}
+		if (qualifiesForGlobal && distance <= baseThreshold) {
 			candidatesWithDistance.push({ path: entry.relativePath, distance });
 		}
+	}
+
+	if (bestLocal) {
+		return { resolved: true, absolutePath: bestLocal.path };
 	}
 
 	// Sort by distance (minimal changes first) and take top 3
