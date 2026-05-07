@@ -77,7 +77,7 @@ function isDuplicateLink(
 		line: number;
 		column: number;
 	},
-	existingLinks: LinkObject[],
+	existingLinks: ReadonlyArray<LinkObject>,
 ): boolean {
 	return existingLinks.some(
 		(l) => l.line === candidate.line && l.column === candidate.column,
@@ -199,146 +199,174 @@ function extractLinksFromTokens(
  * Only extracts links NOT already extracted by token parser.
  */
 function extractMarkdownLinksRegex(
-	line: string,
-	index: number,
+	lines: string[],
+	codeBlockLines: Set<number>,
 	sourceAbsolutePath: string,
-	links: LinkObject[],
+	existingLinks: ReadonlyArray<LinkObject>,
 	fileCache: FileCache,
-): void {
-	// Pattern for markdown links: [text](path#anchor)
-	// Permissive anchor pattern allows spaces, colons, parens (supports 2 levels of nesting)
-	const linkPattern =
-		/\[([^\]]+)\]\(([^)#]+\.md)(?:#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+))?\)/g;
-	let match = linkPattern.exec(line);
-	while (match !== null) {
-		const text = match[1] ?? "";
-		const rawPath = match[2] ?? "";
-		const anchor = match[3] ?? null;
-		const fullMatch = match[0];
+): LinkObject[] {
+	const extractedLinks: LinkObject[] = [];
+	const isKnownLink = (candidate: {
+		rawPath: string | null;
+		anchor: string | null;
+		line: number;
+		column: number;
+	}): boolean =>
+		isDuplicateLink(candidate, existingLinks) ||
+		isDuplicateLink(candidate, extractedLinks);
 
-		// Skip if inside inline code (backticks)
-		if (isInsideInlineCode(line, match.index)) {
-			match = linkPattern.exec(line);
+	for (let index = 0; index < lines.length; index++) {
+		// Skip lines inside fenced code blocks - they contain code examples, not real links
+		if (codeBlockLines.has(index)) {
 			continue;
 		}
 
-		// Skip if already extracted by token parser using robust deduplication
-		const alreadyExtracted = isDuplicateLink(
-			{ rawPath, anchor, line: index + 1, column: match.index },
-			links,
-		);
-		if (!alreadyExtracted) {
-			const linkObject = createLinkObject({
-				linkType: "markdown",
-				scope: "cross-document",
-				anchor,
-				rawPath,
-				sourceAbsolutePath,
-				text,
-				fullMatch,
-				line: index + 1,
-				column: match.index,
-				extractionMarker: detectExtractionMarker(
-					line,
-					match.index + fullMatch.length,
-				),
-				fileCache,
-			});
-			links.push(linkObject);
-		}
-		match = linkPattern.exec(line);
-	}
+		const line = lines[index];
+		if (line === undefined) continue;
 
-	// Internal anchor links: [text](#anchor) with permissive anchor (supports 2 levels of nesting)
-	const internalAnchorRegex =
-		/\[([^\]]+)\]\(#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+)\)/g;
-	match = internalAnchorRegex.exec(line);
-	while (match !== null) {
-		const text = match[1] ?? "";
-		const anchor = match[2] ?? "";
-		const fullMatch = match[0];
-
-		// Skip if inside inline code (backticks)
-		if (isInsideInlineCode(line, match.index)) {
-			match = internalAnchorRegex.exec(line);
-			continue;
-		}
-
-		// Skip if already extracted using robust deduplication
-		const alreadyExtracted = isDuplicateLink(
-			{ rawPath: null, anchor, line: index + 1, column: match.index },
-			links,
-		);
-		if (!alreadyExtracted) {
-			const linkObject = createLinkObject({
-				linkType: "markdown",
-				scope: "internal",
-				anchor,
-				rawPath: null,
-				sourceAbsolutePath,
-				text,
-				fullMatch,
-				line: index + 1,
-				column: match.index,
-				extractionMarker: detectExtractionMarker(
-					line,
-					match.index + fullMatch.length,
-				),
-				fileCache,
-			});
-			links.push(linkObject);
-		}
-		match = internalAnchorRegex.exec(line);
-	}
-
-	// Relative doc links without .md extension: [text](path/to/file#anchor)
-	const relativeDocRegex =
-		/\[([^\]]+)\]\(([^)]*\/[^)#]+)(?:#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+))?\)/g;
-	match = relativeDocRegex.exec(line);
-	while (match !== null) {
-		const filepath = match[2] ?? "";
-		if (
-			filepath &&
-			!filepath.endsWith(".md") &&
-			!filepath.startsWith("http") &&
-			!filepath.startsWith("vscode://") &&
-			filepath.includes("/")
-		) {
+		// Pattern for markdown links: [text](path#anchor)
+		// Permissive anchor pattern allows spaces, colons, parens (supports 2 levels of nesting)
+		const linkPattern =
+			/\[([^\]]+)\]\(([^)#]+\.md)(?:#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+))?\)/g;
+		let match = linkPattern.exec(line);
+		while (match !== null) {
 			const text = match[1] ?? "";
 			const rawPath = match[2] ?? "";
 			const anchor = match[3] ?? null;
 			const fullMatch = match[0];
 
 			// Skip if inside inline code (backticks)
-			if (!isInsideInlineCode(line, match.index)) {
-				// Skip if already extracted using robust deduplication
-				const alreadyExtracted = isDuplicateLink(
-					{ rawPath, anchor, line: index + 1, column: match.index },
-					links,
-				);
-				if (!alreadyExtracted) {
-					const linkObject = createLinkObject({
-						linkType: "markdown",
-						scope: "cross-document",
-						anchor,
+			if (isInsideInlineCode(line, match.index)) {
+				match = linkPattern.exec(line);
+				continue;
+			}
+
+			// Skip if already extracted by token parser using robust deduplication
+			const alreadyExtracted = isKnownLink({
+				rawPath,
+				anchor,
+				line: index + 1,
+				column: match.index,
+			});
+			if (!alreadyExtracted) {
+				const linkObject = createLinkObject({
+					linkType: "markdown",
+					scope: "cross-document",
+					anchor,
+					rawPath,
+					sourceAbsolutePath,
+					text,
+					fullMatch,
+					line: index + 1,
+					column: match.index,
+					extractionMarker: detectExtractionMarker(
+						line,
+						match.index + fullMatch.length,
+					),
+					fileCache,
+				});
+				extractedLinks.push(linkObject);
+			}
+			match = linkPattern.exec(line);
+		}
+
+		// Internal anchor links: [text](#anchor) with permissive anchor (supports 2 levels of nesting)
+		const internalAnchorRegex =
+			/\[([^\]]+)\]\(#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+)\)/g;
+		match = internalAnchorRegex.exec(line);
+		while (match !== null) {
+			const text = match[1] ?? "";
+			const anchor = match[2] ?? "";
+			const fullMatch = match[0];
+
+			// Skip if inside inline code (backticks)
+			if (isInsideInlineCode(line, match.index)) {
+				match = internalAnchorRegex.exec(line);
+				continue;
+			}
+
+			// Skip if already extracted using robust deduplication
+			const alreadyExtracted = isKnownLink({
+				rawPath: null,
+				anchor,
+				line: index + 1,
+				column: match.index,
+			});
+			if (!alreadyExtracted) {
+				const linkObject = createLinkObject({
+					linkType: "markdown",
+					scope: "internal",
+					anchor,
+					rawPath: null,
+					sourceAbsolutePath,
+					text,
+					fullMatch,
+					line: index + 1,
+					column: match.index,
+					extractionMarker: detectExtractionMarker(
+						line,
+						match.index + fullMatch.length,
+					),
+					fileCache,
+				});
+				extractedLinks.push(linkObject);
+			}
+			match = internalAnchorRegex.exec(line);
+		}
+
+		// Relative doc links without .md extension: [text](path/to/file#anchor)
+		const relativeDocRegex =
+			/\[([^\]]+)\]\(([^)]*\/[^)#]+)(?:#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+))?\)/g;
+		match = relativeDocRegex.exec(line);
+		while (match !== null) {
+			const filepath = match[2] ?? "";
+			if (
+				filepath &&
+				!filepath.endsWith(".md") &&
+				!filepath.startsWith("http") &&
+				!filepath.startsWith("vscode://") &&
+				filepath.includes("/")
+			) {
+				const text = match[1] ?? "";
+				const rawPath = match[2] ?? "";
+				const anchor = match[3] ?? null;
+				const fullMatch = match[0];
+
+				// Skip if inside inline code (backticks)
+				if (!isInsideInlineCode(line, match.index)) {
+					// Skip if already extracted using robust deduplication
+					const alreadyExtracted = isKnownLink({
 						rawPath,
-						sourceAbsolutePath,
-						text,
-						fullMatch,
+						anchor,
 						line: index + 1,
 						column: match.index,
-						extractionMarker: detectExtractionMarker(
-							line,
-							match.index + fullMatch.length,
-						),
-						fileCache,
 					});
-					links.push(linkObject);
+					if (!alreadyExtracted) {
+						const linkObject = createLinkObject({
+							linkType: "markdown",
+							scope: "cross-document",
+							anchor,
+							rawPath,
+							sourceAbsolutePath,
+							text,
+							fullMatch,
+							line: index + 1,
+							column: match.index,
+							extractionMarker: detectExtractionMarker(
+								line,
+								match.index + fullMatch.length,
+							),
+							fileCache,
+						});
+						extractedLinks.push(linkObject);
+					}
 				}
 			}
+			match = relativeDocRegex.exec(line);
 		}
-		match = relativeDocRegex.exec(line);
 	}
+
+	return extractedLinks;
 }
 
 /**
@@ -543,28 +571,30 @@ export function extractLinks(
 	links.push(...wikiLinks);
 
 	// Phase 2: Regex extraction for patterns not in CommonMark or not caught by token parser
+	// Regex fallback for markdown links with non-URL-encoded anchors
+	// (CommonMark only recognizes URL-encoded anchors, but Obsidian allows raw spaces/colons)
+	const phase2Links = extractMarkdownLinksRegex(
+		lines,
+		codeBlockLines,
+		sourceAbsolutePath,
+		links,
+		fileCache,
+	);
+
 	lines.forEach((line, index) => {
 		// Skip lines inside fenced code blocks - they contain code examples, not real links
 		if (codeBlockLines.has(index)) {
 			return;
 		}
 
-		// Regex fallback for markdown links with non-URL-encoded anchors
-		// (CommonMark only recognizes URL-encoded anchors, but Obsidian allows raw spaces/colons)
-		extractMarkdownLinksRegex(
-			line,
-			index,
-			sourceAbsolutePath,
-			links,
-			fileCache,
-		);
-
 		// Citation format: [cite: path] — NOT in CommonMark
-		extractCiteLinks(line, index, sourceAbsolutePath, links, fileCache);
+		extractCiteLinks(line, index, sourceAbsolutePath, phase2Links, fileCache);
 
 		// Caret syntax references: ^anchor-id — NOT in CommonMark
-		extractCaretLinks(line, index, sourceAbsolutePath, links, fileCache);
+		extractCaretLinks(line, index, sourceAbsolutePath, phase2Links, fileCache);
 	});
+	phase2Links.sort((a, b) => a.line - b.line);
+	links.push(...phase2Links);
 
 	// Phase 3 (D2): residual-bracket scan. Consumed ranges seed from valid
 	// wikilinks so adjacent residuals are not double-counted (e.g.

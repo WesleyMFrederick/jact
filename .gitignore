@@ -103,3 +103,6 @@ graphify-out
 
 # build files
 dist
+
+# AppMap
+tmp/appmap/
