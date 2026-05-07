@@ -30,6 +30,26 @@ function writeFile(relPath: string): string {
 	return fullPath;
 }
 
+describe("FileCache — scan error handling", () => {
+	it("buildCache throws if a directory becomes unreadable during scan", () => {
+		// Skip when running as root: chmod restrictions do not apply to root.
+		const uid = process.getuid?.();
+		if (uid === 0) return;
+
+		writeFile("docs/readme.md");
+		const restrictedDir = path.join(tmpDir, "restricted");
+		fs.mkdirSync(restrictedDir);
+		fs.writeFileSync(path.join(restrictedDir, "secret.md"), "# Secret");
+		fs.chmodSync(restrictedDir, 0o000);
+
+		try {
+			expect(() => cache.buildCache(tmpDir)).toThrow();
+		} finally {
+			fs.chmodSync(restrictedDir, 0o755);
+		}
+	});
+});
+
 describe("M1 — not-found error format", () => {
 	it("given filename not in entries, when resolveFile fails, then error message contains 'not found in scope=<path>'", () => {
 		writeFile("alpha.md");

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { FileCache } from "../../src/FileCache.js";
 
 let tmpDir: string;
@@ -181,6 +181,109 @@ describe("FileCache — resolveFile duplicate match", () => {
 		const result = cache.resolveFile("bar.md");
 		expect(result.found).toBe(false);
 		if (!result.found) expect(result.message).toContain("bar.md");
+	});
+});
+
+describe("FileCache — skipDirectories option", () => {
+	const scope = () => ({ scope: tmpDir, source: "explicit" as const });
+
+	it("skips directories matching a name in string array", () => {
+		writeFile("docs/readme.md");
+		writeFile("vendor/lib.md");
+
+		cache.buildCache(tmpDir, false, scope(), { skipDirectories: ["vendor"] });
+		const entries = cache.getEntries().map((e) => e.relativePath);
+
+		expect(entries).toContain("docs/readme.md");
+		expect(entries).not.toContain("vendor/lib.md");
+	});
+
+	it("skips directories matching a name in a Set", () => {
+		writeFile("docs/readme.md");
+		writeFile("vendor/lib.md");
+
+		cache.buildCache(tmpDir, false, scope(), {
+			skipDirectories: new Set(["vendor"]),
+		});
+		const entries = cache.getEntries().map((e) => e.relativePath);
+
+		expect(entries).toContain("docs/readme.md");
+		expect(entries).not.toContain("vendor/lib.md");
+	});
+
+	it("does not skip directories absent from the set", () => {
+		writeFile("docs/readme.md");
+		writeFile("assets/guide.md");
+
+		cache.buildCache(tmpDir, false, scope(), { skipDirectories: ["vendor"] });
+		const entries = cache.getEntries().map((e) => e.relativePath);
+
+		expect(entries).toContain("docs/readme.md");
+		expect(entries).toContain("assets/guide.md");
+	});
+
+	it("empty skipDirectories skips nothing extra", () => {
+		writeFile("docs/readme.md");
+		writeFile("assets/guide.md");
+
+		cache.buildCache(tmpDir, false, scope(), { skipDirectories: [] });
+		const entries = cache.getEntries().map((e) => e.relativePath);
+
+		expect(entries).toContain("docs/readme.md");
+		expect(entries).toContain("assets/guide.md");
+	});
+});
+
+describe("FileCache — maxDepth limiting", () => {
+	let warnSpy: MockInstance;
+	const scope = () => ({ scope: tmpDir, source: "explicit" as const });
+
+	beforeEach(() => {
+		warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		warnSpy.mockRestore();
+	});
+
+	it("maxDepth:0 indexes only root-level .md files", () => {
+		writeFile("root.md");
+		writeFile("level1/nested.md");
+
+		cache.buildCache(tmpDir, false, scope(), { maxDepth: 0 });
+		const entries = cache.getEntries().map((e) => e.relativePath);
+
+		expect(entries).toContain("root.md");
+		expect(entries).not.toContain("level1/nested.md");
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining("Scan depth limit (0) reached"),
+		);
+	});
+
+	it("maxDepth:1 indexes root + depth-1 files but not depth-2", () => {
+		writeFile("root.md");
+		writeFile("level1/file.md");
+		writeFile("level1/level2/deep.md");
+
+		cache.buildCache(tmpDir, false, scope(), { maxDepth: 1 });
+		const entries = cache.getEntries().map((e) => e.relativePath);
+
+		expect(entries).toContain("root.md");
+		expect(entries).toContain("level1/file.md");
+		expect(entries).not.toContain("level1/level2/deep.md");
+		expect(warnSpy).toHaveBeenCalledWith(
+			expect.stringContaining("Scan depth limit (1) reached"),
+		);
+	});
+
+	it("no maxDepth option scans all depths without warning", () => {
+		writeFile("a/b/c/d/deep.md");
+
+		cache.buildCache(tmpDir, false, scope());
+		const entries = cache.getEntries().map((e) => e.relativePath);
+
+		expect(entries).toContain("a/b/c/d/deep.md");
+		expect(warnSpy).not.toHaveBeenCalled();
 	});
 });
 

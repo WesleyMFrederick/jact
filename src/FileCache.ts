@@ -3,6 +3,12 @@ import type { ScopeResolution } from "./core/resolveScope.js";
 import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 
+/** Stack entry for iterative directory traversal. */
+interface ScanStackEntry {
+	dir: string;
+	depth: number;
+}
+
 interface FileEntry {
 	filename: string;
 	path: string;
@@ -72,7 +78,7 @@ export class FileCache {
 	}
 
 	/**
-	 * Build cache by recursively scanning scope folder
+	 * Build cache by scanning scope folder
 	 *
 	 * Resolves symlinks before scanning to prevent duplicate entries from symlink artifacts.
 	 * Scans all subdirectories for .md files and indexes by filename. Warns if duplicate
@@ -81,14 +87,22 @@ export class FileCache {
 	 * @param scopeFolder - Root folder to scan (can be symlink, will be resolved)
 	 * @param verbose - When true, log duplicate filename warnings to stderr
 	 * @param scope - Optional resolution metadata used by resolveFile to enrich error messages
-	 * @param options - Optional configuration: respectGitignore (default true) to filter .gitignore-excluded paths
+	 * @param options - Optional configuration:
+	 *   - respectGitignore (default true): filter .gitignore-excluded paths and apply DEFAULT_SCAN_IGNORE_PATTERNS
+	 *   - skipDirectories: additional directory names to prune by name before gitignore checks
+	 *   - maxDepth: maximum directory depth to descend into (default: unlimited). Warns when limit excludes dirs.
 	 * @returns Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
+	 * @throws {Error} if any directory is unreadable during scan (fail-fast; no silent partial scans)
 	 */
 	buildCache(
 		scopeFolder: string,
 		verbose = false,
 		scope?: ScopeResolution,
-		options?: { respectGitignore?: boolean },
+		options?: {
+			respectGitignore?: boolean;
+			skipDirectories?: string[] | Set<string>;
+			maxDepth?: number;
+		},
 	): CacheStats {
 		this.entries.clear();
 		this.scope = scope;
@@ -103,19 +117,22 @@ export class FileCache {
 		}
 		this.resolvedScopeFolder = targetScanFolder;
 
-		let ig: Ignore | null = null;
+		let ignoreRules: Ignore | null = null;
 		if (options?.respectGitignore !== false) {
-			ig = ignore().add(DEFAULT_SCAN_IGNORE_PATTERNS);
+			ignoreRules = ignore().add(DEFAULT_SCAN_IGNORE_PATTERNS);
 			const gitignorePath = this.path.join(targetScanFolder, ".gitignore");
 			try {
 				const content = this.fs.readFileSync(gitignorePath, "utf8");
-				ig.add(content);
+				ignoreRules.add(content);
 			} catch {
 				// No .gitignore or unreadable — proceed with default scan ignores only
 			}
 		}
 
-		this.scanDirectory(targetScanFolder, ig, targetScanFolder);
+		const skipDirectories = new Set<string>(options?.skipDirectories);
+		const maxDepth = options?.maxDepth ?? Number.MAX_SAFE_INTEGER;
+
+		this.scanDirectory(targetScanFolder, ignoreRules, targetScanFolder, skipDirectories, maxDepth);
 
 		const dupNames = this.duplicateNames();
 
@@ -146,44 +163,75 @@ export class FileCache {
 		return dups;
 	}
 
+	/**
+	 * Iteratively scans for markdown files under dirPath while honoring ignore rules.
+	 *
+	 * Uses an explicit stack (instead of recursion) to:
+	 * - Eliminate call-frame overhead and stack-overflow risk on deep trees.
+	 * - Support depth limiting without recursive parameter threading.
+	 *
+	 * Dirent metadata from `readdirSync({ withFileTypes: true })` provides isDirectory()
+	 * without a separate statSync call. Symlinks still require a single statSync to
+	 * follow the link and determine the target type.
+	 *
+	 * @throws {Error} if any directory is unreadable (fail-fast; no silent partial scans)
+	 */
 	private scanDirectory(
 		dirPath: string,
-		ig: Ignore | null,
+		ignoreRules: Ignore | null,
 		rootPath: string,
+		skipDirectories: Set<string>,
+		maxDepth: number,
 	): void {
-		try {
-			const entries = this.fs.readdirSync(dirPath, { withFileTypes: true });
+		const stack: ScanStackEntry[] = [{ dir: dirPath, depth: 0 }];
+
+		while (stack.length > 0) {
+			const top = stack.pop();
+			if (top === undefined) break; // unreachable; satisfies noUncheckedIndexedAccess
+
+			const { dir: currentDir, depth: currentDepth } = top;
+
+			// Surface unreadable-directory failures to the caller instead of silently
+			// continuing with an incomplete scan (which would produce false not-found errors).
+			const entries = this.fs.readdirSync(currentDir, { withFileTypes: true });
 
 			for (const entry of entries) {
-				const fullPath = this.path.join(dirPath, entry.name);
+				const fullPath = this.path.join(currentDir, entry.name);
 				let isDirectory = entry.isDirectory();
 
-				// Preserve statSync-followed symlink behavior from the previous traversal,
-				// while avoiding an extra syscall for regular files and directories.
+				// Preserve statSync-followed symlink behavior: check the link target's type.
+				// Regular files and directories avoid the extra syscall.
 				if (entry.isSymbolicLink()) {
 					isDirectory = this.fs.statSync(fullPath).isDirectory();
 				}
 
 				if (isDirectory) {
-					if (ig) {
+					// Name-based skip (before gitignore — no path computation needed).
+					if (skipDirectories.has(entry.name)) continue;
+
+					// Gitignore check (defer path.relative until actually needed).
+					if (ignoreRules) {
 						const relativePath = this.path.relative(rootPath, fullPath);
-						if (ig.ignores(relativePath + "/")) continue;
+						if (ignoreRules.ignores(relativePath + "/")) continue;
 					}
-					this.scanDirectory(fullPath, ig, rootPath);
+
+					// Depth limit: warn and skip instead of silently truncating the scan.
+					if (currentDepth >= maxDepth) {
+						console.warn(
+							`Warning: Scan depth limit (${maxDepth}) reached; skipping ${fullPath}`,
+						);
+						continue;
+					}
+
+					stack.push({ dir: fullPath, depth: currentDepth + 1 });
 				} else if (entry.name.endsWith(".md")) {
-					if (ig) {
+					if (ignoreRules) {
 						const relativePath = this.path.relative(rootPath, fullPath);
-						if (ig.ignores(relativePath)) continue;
+						if (ignoreRules.ignores(relativePath)) continue;
 					}
 					this.addToCache(entry.name, fullPath);
 				}
 			}
-		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			console.warn(
-				`Warning: Could not read directory ${dirPath}: ${errorMessage}`,
-			);
 		}
 	}
 
