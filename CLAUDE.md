@@ -23,7 +23,7 @@ npm test              # Run all Vitest tests
 npm run test:watch    # Run tests in watch mode
 ```
 
-### Citation Tool Commands
+### `jact` (Just Another Context Tool) Commands To Validate & Extract Markdown Content
 
 %% *Last Modified: 05/01/26 21:23:24* %%
 
