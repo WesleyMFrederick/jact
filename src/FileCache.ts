@@ -15,6 +15,18 @@ interface CacheStatsDetail {
 	duplicates: string[];
 }
 
+const DEFAULT_SCAN_IGNORE_PATTERNS = [
+	".git/",
+	".hg/",
+	".svn/",
+	".venv/",
+	"venv/",
+	"node_modules/",
+	"dist/",
+	"build/",
+	"coverage/",
+];
+
 /**
  * Filename-based cache for smart file resolution
  *
@@ -93,12 +105,13 @@ export class FileCache {
 
 		let ig: Ignore | null = null;
 		if (options?.respectGitignore !== false) {
+			ig = ignore().add(DEFAULT_SCAN_IGNORE_PATTERNS);
 			const gitignorePath = this.path.join(targetScanFolder, ".gitignore");
 			try {
 				const content = this.fs.readFileSync(gitignorePath, "utf8");
-				ig = ignore().add(content);
+				ig.add(content);
 			} catch {
-				// No .gitignore or unreadable — proceed with no filter
+				// No .gitignore or unreadable — proceed with default scan ignores only
 			}
 		}
 
@@ -139,20 +152,30 @@ export class FileCache {
 		rootPath: string,
 	): void {
 		try {
-			const entries = this.fs.readdirSync(dirPath);
+			const entries = this.fs.readdirSync(dirPath, { withFileTypes: true });
 
 			for (const entry of entries) {
-				const fullPath = this.path.join(dirPath, entry);
-				const stat = this.fs.statSync(fullPath);
-				const relativePath = this.path.relative(rootPath, fullPath);
+				const fullPath = this.path.join(dirPath, entry.name);
+				let isDirectory = entry.isDirectory();
 
-				if (stat.isDirectory()) {
-					if (ig && ig.ignores(relativePath + "/")) continue;
-					this.scanDirectory(fullPath, ig, rootPath);
-				} else if (entry.endsWith(".md")) {
-					if (!ig || !ig.ignores(relativePath)) {
-						this.addToCache(entry, fullPath);
+				// Preserve statSync-followed symlink behavior from the previous traversal,
+				// while avoiding an extra syscall for regular files and directories.
+				if (entry.isSymbolicLink()) {
+					isDirectory = this.fs.statSync(fullPath).isDirectory();
+				}
+
+				if (isDirectory) {
+					if (ig) {
+						const relativePath = this.path.relative(rootPath, fullPath);
+						if (ig.ignores(relativePath + "/")) continue;
 					}
+					this.scanDirectory(fullPath, ig, rootPath);
+				} else if (entry.name.endsWith(".md")) {
+					if (ig) {
+						const relativePath = this.path.relative(rootPath, fullPath);
+						if (ig.ignores(relativePath)) continue;
+					}
+					this.addToCache(entry.name, fullPath);
 				}
 			}
 		} catch (error) {

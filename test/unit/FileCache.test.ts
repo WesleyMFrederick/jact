@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FileCache } from "../../src/FileCache.js";
 
 let tmpDir: string;
@@ -24,6 +24,60 @@ function writeFile(relPath: string, content = "# Test"): string {
 	fs.writeFileSync(fullPath, content);
 	return fullPath;
 }
+
+describe("FileCache — scanDirectory traversal efficiency", () => {
+	it("does not stat regular directory entries while building cache", () => {
+		writeFile("docs/readme.md");
+		writeFile("docs/notes.txt");
+		writeFile("wiki/page.md");
+
+		const statSpy = vi.spyOn(fs, "statSync");
+		try {
+			const stats = cache.buildCache(tmpDir);
+
+			expect(stats.totalFiles).toBe(2);
+			expect(statSpy).not.toHaveBeenCalled();
+		} finally {
+			statSpy.mockRestore();
+		}
+	});
+
+	it("prunes default heavy directories before descending", () => {
+		writeFile("docs/readme.md");
+		writeFile(".git/objects/note.md");
+		writeFile(".venv/lib/site-packages/package/readme.md");
+
+		const stats = cache.buildCache(tmpDir, false, {
+			scope: tmpDir,
+			source: "explicit",
+		});
+		const entries = cache.getEntries().map((entry) => entry.relativePath);
+
+		expect(stats.totalFiles).toBe(1);
+		expect(entries).toContain("docs/readme.md");
+		expect(entries).not.toContain(".git/objects/note.md");
+		expect(entries).not.toContain(".venv/lib/site-packages/package/readme.md");
+	});
+
+	it("respectGitignore:false disables default heavy-directory pruning", () => {
+		writeFile("docs/readme.md");
+		writeFile(".venv/lib/site-packages/package/readme.md");
+
+		const stats = cache.buildCache(
+			tmpDir,
+			false,
+			{ scope: tmpDir, source: "explicit" },
+			{
+				respectGitignore: false,
+			},
+		);
+		const entries = cache.getEntries().map((entry) => entry.relativePath);
+
+		expect(stats.totalFiles).toBe(1);
+		expect(entries).toContain("docs/readme.md");
+		expect(entries).toContain(".venv/lib/site-packages/package/readme.md");
+	});
+});
 
 describe("FileCache — entries data shape", () => {
 	it("single unique file: totalFiles 1, duplicates 0", () => {
