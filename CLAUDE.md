@@ -29,31 +29,31 @@ npm run test:watch    # Run tests in watch mode
 
 ```bash
 # Validate citations (CLI output)
-npm run jact:validate path/to/file.md
+jact validate path/to/file.md
 
 # Validate with JSON output
-npm run jact:validate path/to/file.md -- --format json
+jact validate path/to/file.md --format json
 
 # Validate with line filtering
-npm run jact:validate path/to/file.md -- --lines 150-160
+jact validate path/to/file.md --lines 150-160
 
 # In-repo: scope auto-inferred from cwd (.git or package.json walk-up)
-npm run jact:validate path/to/file.md
+jact validate path/to/file.md
 
 # Cross-project / explicit override only:
-npm run jact:validate path/to/file.md -- --scope /other/project/docs
+jact validate path/to/file.md --scope /other/project/docs
 
 # Auto-fix broken citations
-npm run jact:validate path/to/file.md -- --fix
+jact validate path/to/file.md --fix
 
 # View AST and extracted data
-npm run jact:ast path/to/file.md
+jact ast path/to/file.md
 
 # Extract base paths
-npm run jact:base-paths path/to/file.md
+jact base-paths path/to/file.md
 
 # Extract content from links
-npm run jact:extract path/to/file.md
+jact extract path/to/file.md
 
 # Direct CLI usage (after npm link)
 # In-repo: scope auto-inferred from cwd
