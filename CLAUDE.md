@@ -204,7 +204,7 @@ The tool supports multiple path resolution strategies (in order):
 
 ### Feature Design-Doc Naming and Persistence
 
-%% *Last Modified: 05/07/26 10:56:31* %%
+%% *Last Modified: 05/07/26 11:14:13* %%
 
 **ALWAYS create a feature directory in `design-docs/features/` for any new feature or feature update, BECAUSE design artifacts without a persistent home get scattered across `design-docs/` root or lost between sessions.**
 
@@ -217,13 +217,13 @@ The tool supports multiple path resolution strategies (in order):
   - `2605081400-CitationValidator-add-depth-limiting/`
   - `2605090830-MarkdownParser-fix-nested-emphasis/`
 
-**File naming inside feature directories:** `YYMMDDHHMM-{purpose}.md`
-- Every file gets its own creation timestamp, BECAUSE features span multiple days and artifact ordering matters for traceability
-- `{purpose}` = kebab-case description of the artifact's role (e.g., `optimization-analysis`, `architecture-evaluation`, `todo`, `tool-selection-learnings`)
-- Examples:
-  - `2605070945-optimization-analysis.md`
-  - `2605071030-tool-selection-learnings.md`
-  - `2605071031-todo.md`
+**File naming inside feature directories:** `{folder-name}-{file-type}.md`
+- Files re-use the full folder name and append a kebab-case file-type suffix, BECAUSE a file must be self-contained (readable in search results, git log, or flat listings without needing the parent path for context)
+- `{file-type}` = the artifact's role (e.g., `analysis`, `todo`, `plan`, `learnings`, `sequence`)
+- Examples (folder: `2605070945-FileCache-scan-optimization/`):
+  - `2605070945-FileCache-scan-optimization-analysis.md`
+  - `2605070945-FileCache-scan-optimization-todo.md`
+  - `2605070945-FileCache-scan-optimization-learnings.md`
 
 **When updating an existing feature:** Add new artifacts to the existing feature directory. Do not create a second directory for the same feature. If the feature scope changes significantly (different component, different problem), create a new directory.
 
