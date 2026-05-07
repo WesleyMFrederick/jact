@@ -202,6 +202,35 @@ The tool supports multiple path resolution strategies (in order):
 - When design-docs files are needed by tests: copy them to fixtures once, then reference only the fixture copy
 - Hardcoded external paths = flaky tests; fixture copies = reliable isolation
 
+### Feature Design-Doc Naming and Persistence
+
+%% *Last Modified: 05/07/26 10:56:31* %%
+
+**ALWAYS create a feature directory in `design-docs/features/` for any new feature or feature update, BECAUSE design artifacts without a persistent home get scattered across `design-docs/` root or lost between sessions.**
+
+**Directory naming:** `YYMMDDHHMM-ComponentName-feature-verb/`
+- `YYMMDDHHMM` = feature kickoff timestamp (24h, local time)
+- `ComponentName` = the primary code module affected (e.g., `FileCache`, `CitationValidator`, `MarkdownParser`)
+- `feature-verb` = kebab-case action describing the work (e.g., `scan-optimization`, `add-wikilink-validation`, `fix-anchor-resolution`)
+- Examples:
+  - `2605070945-FileCache-scan-optimization/`
+  - `2605081400-CitationValidator-add-depth-limiting/`
+  - `2605090830-MarkdownParser-fix-nested-emphasis/`
+
+**File naming inside feature directories:** `YYMMDDHHMM-{purpose}.md`
+- Every file gets its own creation timestamp, BECAUSE features span multiple days and artifact ordering matters for traceability
+- `{purpose}` = kebab-case description of the artifact's role (e.g., `optimization-analysis`, `architecture-evaluation`, `todo`, `tool-selection-learnings`)
+- Examples:
+  - `2605070945-optimization-analysis.md`
+  - `2605071030-tool-selection-learnings.md`
+  - `2605071031-todo.md`
+
+**When updating an existing feature:** Add new artifacts to the existing feature directory. Do not create a second directory for the same feature. If the feature scope changes significantly (different component, different problem), create a new directory.
+
+**NEVER create design-doc artifacts at `design-docs/` root for feature work, BECAUSE rootlevel files have no feature context and become orphaned when the feature completes.**
+
+**Archival:** When a feature ships or is abandoned, move the entire directory to `design-docs/features/.archive/`.
+
 ## graphify
 
 %% *Last Modified: 05/07/26 08:54:41* %%
