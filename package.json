@@ -36,6 +36,7 @@
 	"license": "ISC",
 	"dependencies": {
 		"commander": "^14.0.1",
+		"ignore": "^7.0.5",
 		"marked": "^17.0.1"
 	},
 	"devDependencies": {

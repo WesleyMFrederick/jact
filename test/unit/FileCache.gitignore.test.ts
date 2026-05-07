@@ -106,8 +106,9 @@ describe("FileCache — .gitignore filtering (RED)", () => {
 		expect(entryPaths).toContain("wiki/example.md");
 	});
 
-	it("negate pattern (!) re-includes a file inside an otherwise-excluded dir", () => {
-		// TODO: Negate pattern support - requires recursive pattern matching
+	it("negate pattern inside ignored parent dir follows git spec (excluded)", () => {
+		// Per gitignore spec: "It is not possible to re-include a file if a
+		// parent directory of that file is excluded." Both files stay excluded.
 		writeFile(".claude/tool.md");
 		writeFile(".claude/important.md");
 		writeGitignore(".claude/\n!.claude/important.md");
@@ -117,7 +118,7 @@ describe("FileCache — .gitignore filtering (RED)", () => {
 		const entryPaths = entries.map((e) => e.relativePath);
 
 		expect(entryPaths).not.toContain(".claude/tool.md");
-		expect(entryPaths).toContain(".claude/important.md");
+		expect(entryPaths).not.toContain(".claude/important.md");
 	});
 
 	it("wildcard patterns in .gitignore work correctly", () => {

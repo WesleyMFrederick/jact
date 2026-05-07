@@ -1,10 +1,6 @@
+import ignore, { type Ignore } from "ignore";
 import type { ScopeResolution } from "./core/resolveScope.js";
 import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
-import {
-	type GitignorePattern,
-	isGitignored,
-	parseGitignore,
-} from "./utils/parseGitignore.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 
 interface FileEntry {
@@ -95,19 +91,18 @@ export class FileCache {
 		}
 		this.resolvedScopeFolder = targetScanFolder;
 
-		// Parse .gitignore if respectGitignore is not false
-		let gitignorePatterns: GitignorePattern[] = [];
+		let ig: Ignore | null = null;
 		if (options?.respectGitignore !== false) {
 			const gitignorePath = this.path.join(targetScanFolder, ".gitignore");
 			try {
 				const content = this.fs.readFileSync(gitignorePath, "utf8");
-				gitignorePatterns = parseGitignore(content);
+				ig = ignore().add(content);
 			} catch {
 				// No .gitignore or unreadable — proceed with no filter
 			}
 		}
 
-		this.scanDirectory(targetScanFolder, gitignorePatterns, targetScanFolder);
+		this.scanDirectory(targetScanFolder, ig, targetScanFolder);
 
 		const dupNames = this.duplicateNames();
 
@@ -140,8 +135,8 @@ export class FileCache {
 
 	private scanDirectory(
 		dirPath: string,
-		gitignorePatterns: GitignorePattern[] = [],
-		rootPath: string = dirPath,
+		ig: Ignore | null,
+		rootPath: string,
 	): void {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
@@ -149,19 +144,13 @@ export class FileCache {
 			for (const entry of entries) {
 				const fullPath = this.path.join(dirPath, entry);
 				const stat = this.fs.statSync(fullPath);
-
-				// Compute relative path for gitignore filtering
 				const relativePath = this.path.relative(rootPath, fullPath);
 
 				if (stat.isDirectory()) {
-					// For directories: recurse even if ignored, because negate patterns may re-include files inside
-					this.scanDirectory(fullPath, gitignorePatterns, rootPath);
+					if (ig && ig.ignores(relativePath + "/")) continue;
+					this.scanDirectory(fullPath, ig, rootPath);
 				} else if (entry.endsWith(".md")) {
-					// For files: check if this path should be ignored
-					if (
-						gitignorePatterns.length === 0 ||
-						!isGitignored(gitignorePatterns, relativePath, false)
-					) {
+					if (!ig || !ig.ignores(relativePath)) {
 						this.addToCache(entry, fullPath);
 					}
 				}
