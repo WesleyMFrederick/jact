@@ -424,6 +424,8 @@ function extractCaretLinks(
 	links: LinkObject[],
 	fileCache: FileCache,
 ): void {
+	// fast-path: most lines contain no caret; skip regex engine startup
+	if (!line.includes("^")) return;
 	const caretRegex = /\^([A-Za-z0-9-]+)/g;
 	let match = caretRegex.exec(line);
 	while (match !== null) {
@@ -588,10 +590,14 @@ export function extractLinks(
 		}
 
 		// Citation format: [cite: path] — NOT in CommonMark
-		extractCiteLinks(line, index, sourceAbsolutePath, phase2Links, fileCache);
+		if (line.includes("[cite:")) {
+			extractCiteLinks(line, index, sourceAbsolutePath, phase2Links, fileCache);
+		}
 
 		// Caret syntax references: ^anchor-id — NOT in CommonMark
-		extractCaretLinks(line, index, sourceAbsolutePath, phase2Links, fileCache);
+		if (line.includes("^")) {
+			extractCaretLinks(line, index, sourceAbsolutePath, phase2Links, fileCache);
+		}
 	});
 	phase2Links.sort((a, b) => a.line - b.line);
 	links.push(...phase2Links);
