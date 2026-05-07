@@ -204,12 +204,12 @@ The tool supports multiple path resolution strategies (in order):
 
 ### Feature Design-Doc Naming and Persistence
 
-%% *Last Modified: 05/07/26 11:14:13* %%
+%% *Last Modified: 05/07/26 12:25:06* %%
 
 **ALWAYS create a feature directory in `design-docs/features/` for any new feature or feature update, BECAUSE design artifacts without a persistent home get scattered across `design-docs/` root or lost between sessions.**
 
 **Directory naming:** `YYMMDDHHMM-ComponentName-feature-verb/`
-- `YYMMDDHHMM` = feature kickoff timestamp (24h, local time)
+- `YYMMDDHHMM` = feature kickoff timestamp (24h, local time) — **always run `date '+%y%m%d%H%M'` via Bash to get the real system time. Never approximate.**
 - `ComponentName` = the primary code module affected (e.g., `FileCache`, `CitationValidator`, `MarkdownParser`)
 - `feature-verb` = kebab-case action describing the work (e.g., `scan-optimization`, `add-wikilink-validation`, `fix-anchor-resolution`)
 - Examples:
