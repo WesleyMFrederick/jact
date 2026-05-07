@@ -120,7 +120,14 @@ export class JactCli {
 	private parsedFileCache: ParsedFileCache;
 	private fileCache: FileCache;
 	private validator: CitationValidator;
-	private contentExtractor: ContentExtractor;
+	private _contentExtractor: ContentExtractor | null = null;
+
+	private get contentExtractor(): ContentExtractor {
+		if (!this._contentExtractor) {
+			this._contentExtractor = createContentExtractor(this.parsedFileCache);
+		}
+		return this._contentExtractor;
+	}
 
 	/**
 	 * Initialize jact with all required components
@@ -134,11 +141,6 @@ export class JactCli {
 		this.validator = createCitationValidator(
 			this.parsedFileCache,
 			this.fileCache,
-		);
-
-		// Integration: Add ContentExtractor via factory
-		this.contentExtractor = createContentExtractor(
-			this.parsedFileCache, // Share cache with validator
 		);
 	}
 
