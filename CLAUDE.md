@@ -83,29 +83,10 @@ Core Components:
 
 ### Source Organization
 
-```
-src/
-├── jact.ts           # CLI entry point, command orchestration
-├── CitationValidator.ts          # Link/anchor validation logic
-├── FileCache.ts                  # File path resolution and caching
-├── ParsedDocument.ts             # Facade over MarkdownParser output
-├── ParsedFileCache.ts            # Caches ParsedDocument instances
-├── core/
-│   ├── ContentExtractor/         # Content extraction with strategy pattern
-│   │   ├── ContentExtractor.ts
-│   │   └── eligibilityStrategies/  # Strategy pattern for extraction rules
-│   └── MarkdownParser/           # Markdown parsing to AST
-│       ├── MarkdownParser.ts
-│       ├── extractHeadings.ts
-│       ├── resolvePath.ts
-│       └── determineAnchorType.ts
-├── factories/
-│   ├── componentFactory.ts       # DI factory for components
-│   └── LinkObjectFactory.ts      # Creates LinkObject instances
-└── types/                        # TypeScript type definitions
-    ├── citationTypes.ts
-    ├── validationTypes.ts
-    └── contentExtractorTypes.ts
+%% *Last Modified: 05/07/26 08:43:37* %%
+
+```bash
+find src -type f -not -name '.DS_Store' | sort
 ```
 
 ### Key Design Patterns
