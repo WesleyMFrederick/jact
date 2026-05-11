@@ -1184,5 +1184,5 @@ export function computeValidationSummary(
 			brokenLinks,
 			unrecognized: unrecognizedCount,
 		},
-	};
+	} satisfies ValidationSummary;
 }
