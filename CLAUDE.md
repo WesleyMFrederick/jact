@@ -11,45 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Read `package.json` for all build and development commands
 
 
-### `jact` (Just Another Context Tool) Commands To Validate & Extract Markdown Content
+### `jact` — Markdown Context Tool
 
-%% *Last Modified: 05/01/26 21:23:24* %%
+%% *Last Modified: 05/13/26 08:50:08* %%
 
-```bash
-# Validate citations (CLI output)
-jact validate path/to/file.md
-
-# Validate with JSON output
-jact validate path/to/file.md --format json
-
-# Validate with line filtering
-jact validate path/to/file.md --lines 150-160
-
-# In-repo: scope auto-inferred from cwd (.git or package.json walk-up)
-jact validate path/to/file.md
-
-# Cross-project / explicit override only:
-jact validate path/to/file.md --scope /other/project/docs
-
-# Auto-fix broken citations
-jact validate path/to/file.md --fix
-
-# View AST and extracted data
-jact ast path/to/file.md
-
-# Extract base paths
-jact base-paths path/to/file.md
-
-# Extract content from links
-jact extract path/to/file.md
-
-# Direct CLI usage (after npm link)
-# In-repo: scope auto-inferred from cwd
-jact validate path/to/file.md --lines 157
-
-# Cross-project / explicit override only:
-jact validate path/to/file.md --lines 157 --scope /other/project/docs
-```
+See `~/.claude/CLAUDE.md` → `## jact — Markdown Context Tool` for usage principles, ingestion workflow, and validation automation rules.
 
 ## Architecture Overview
 
