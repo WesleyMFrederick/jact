@@ -47,11 +47,7 @@ import {
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
-import {
-	formatAsJSON,
-	formatForCLI,
-	formatForCLIMinimal,
-} from "./formatValidationResult.js";
+import { formatAsJSON, formatForCLI } from "./formatValidationResult.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type {
@@ -361,17 +357,6 @@ export class JactCli {
 		verbose = false,
 	): string {
 		return formatForCLI(result, nestedCodeblockWarnings, verbose);
-	}
-
-	/**
-	 * Minimal (LLM-optimized) CLI formatter — default output.
-	 * Delegates to {@link formatForCLIMinimal} in formatValidationResult module.
-	 */
-	private formatForCLIMinimal(
-		result: ValidationResult & { lineRange?: string },
-		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
-	): string {
-		return formatForCLIMinimal(result, nestedCodeblockWarnings);
 	}
 
 	/**
