@@ -113,6 +113,8 @@ export interface CliValidateOptions {
 	lines?: string;
 	scope?: string;
 	fix?: boolean;
+	verbose?: boolean;
+	allowGitignore?: boolean;
 }
 
 /**

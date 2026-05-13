@@ -50,6 +50,7 @@ import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type {
 	CliExtractOptions,
+	CliValidateOptions,
 	OutgoingLinksExtractedContent,
 } from "./types/contentExtractorTypes.js";
 import type {
@@ -60,19 +61,7 @@ import type {
 
 const CACHE_DIR = ".jact/claude-cache";
 
-/**
- * Options for validation operations.
- */
-interface CliValidateOptions {
-	scope?: string;
-	lines?: string;
-	format?: string;
-	fix?: boolean;
-	verbose?: boolean;
-	allowGitignore?: boolean;
-}
-
-// D-003: CliExtractOptions imported from ./types/contentExtractorTypes.js (canonical type)
+// D-003: CliExtractOptions and CliValidateOptions imported from ./types/contentExtractorTypes.js (canonical types)
 
 /**
  * Line range parsed from input string.
