@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { CitationValidator } from "../src/CitationValidator.js";
 import { MarkdownParser } from "../src/core/MarkdownParser/index.js";
-import { ParsedFileCache } from "../src/ParsedFileCache.js";
 import { createCitationValidator } from "../src/factories/componentFactory.js";
+import { ParsedFileCache } from "../src/ParsedFileCache.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,7 +50,7 @@ describe("Folder link detection (Issue #46)", () => {
 			);
 
 			expect(result.validation.status).toBe("warning");
-			expect(result.validation.error).toContain("folder");
+			expect(result.validation.message).toContain("folder");
 		});
 
 		it("should emit warning for folder link without trailing slash", async () => {
@@ -81,7 +81,7 @@ describe("Folder link detection (Issue #46)", () => {
 			);
 
 			expect(result.validation.status).toBe("warning");
-			expect(result.validation.error).toContain("folder");
+			expect(result.validation.message).toContain("folder");
 		});
 
 		it("should suggest linking to a specific file or creating index.md", async () => {
@@ -168,7 +168,8 @@ describe("Folder link detection (Issue #46)", () => {
 			const folderWarning = warningLinks.find(
 				(link) =>
 					link.validation.status !== "valid" &&
-					link.validation.error?.toLowerCase().includes("folder"),
+					link.validation.status === "warning" &&
+					link.validation.message?.toLowerCase().includes("folder"),
 			);
 			expect(folderWarning).toBeTruthy();
 		});

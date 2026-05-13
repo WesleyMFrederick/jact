@@ -247,9 +247,16 @@ export class CitationValidator {
 		let validation: ValidationMetadata;
 		if (result.status === "valid") {
 			validation = { status: "valid" };
+		} else if (result.status === "warning") {
+			validation = {
+				status: "warning",
+				message: result.error ?? "Unknown validation warning",
+				...(result.suggestion && { suggestion: result.suggestion }),
+				...(result.pathConversion && { pathConversion: result.pathConversion }),
+			};
 		} else {
 			validation = {
-				status: result.status as "error" | "warning",
+				status: "error",
 				error: result.error ?? "Unknown validation error",
 				...(result.suggestion && { suggestion: result.suggestion }),
 				...(result.pathConversion && { pathConversion: result.pathConversion }),

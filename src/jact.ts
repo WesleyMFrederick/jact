@@ -1107,7 +1107,9 @@ export class JactCli {
 			return citation;
 		}
 
-		const { suggestion, error } = link.validation;
+		const { suggestion } = link.validation;
+		const errorText =
+			link.validation.status === "error" ? link.validation.error : undefined;
 
 		const suggestionMatch = suggestion?.match(
 			/Use raw header format for better Obsidian compatibility: #(.+)$/,
@@ -1123,7 +1125,7 @@ export class JactCli {
 
 		// Handle anchor not found errors
 		if (
-			error.startsWith("Anchor not found") &&
+			errorText?.startsWith("Anchor not found") &&
 			suggestion?.includes("Available headers:")
 		) {
 			const availableHeaders = this.parseAvailableHeaders(suggestion ?? "");
