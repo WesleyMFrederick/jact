@@ -72,14 +72,8 @@ pids/
 # xml
 *.xml
 
-# session tracking
-current-status.json
-
 # archive files
 .archive/
-
-# serena files
-.serena/
 
 # claude-code distribution files
 cli.js
@@ -88,8 +82,6 @@ cli.beautify.js
 # claude-code analysis files
 claude-code-analysis/
 
-# vale styles
-styles/
 
 #critique files
 critique-risks-logs/
@@ -106,3 +98,6 @@ dist
 
 # AppMap
 tmp/appmap/
+
+# Symlinked shared content
+architecture-principles/
