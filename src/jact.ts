@@ -23,6 +23,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { Command, Option } from "commander";
 import type { CitationValidator } from "./CitationValidator.js";
 import {
@@ -159,14 +160,13 @@ export class JactCli {
 	): Promise<ParserOutput> {
 		this.applyScope(options, filePath);
 
-		const { resolve, basename } = await import("node:path");
-		const absolute = resolve(filePath);
+		const absolute = path.resolve(filePath);
 
 		if (existsSync(absolute)) {
 			return this.parser.parseFile(absolute);
 		}
 
-		const cacheResult = this.fileCache.resolveFile(basename(filePath));
+		const cacheResult = this.fileCache.resolveFile(path.basename(filePath));
 		if (cacheResult.found) {
 			return this.parser.parseFile(cacheResult.path);
 		}
@@ -780,8 +780,7 @@ export class JactCli {
 			// Fix(#63): Resolve targetFile to absolute BEFORE creating synthetic link
 			// so target.path.raw is absolute. path.resolve() with an absolute second
 			// arg ignores the first, preventing duplicate segments in resolveTargetPath()
-			const { resolve } = await import("node:path");
-			const absoluteTargetFile = resolve(targetFile);
+			const absoluteTargetFile = path.resolve(targetFile);
 			const factory = new LinkObjectFactory();
 			const syntheticLink = factory.createFileLink(absoluteTargetFile);
 
@@ -801,8 +800,7 @@ export class JactCli {
 				enrichedLink.validation.pathConversion?.recommended
 			) {
 				// Update target path to use cache-resolved absolute path
-				const { resolve } = await import("node:path");
-				const absolutePath = resolve(
+				const absolutePath = path.resolve(
 					enrichedLink.validation.pathConversion.recommended,
 				);
 				syntheticLink.target.path.absolute = absolutePath;
