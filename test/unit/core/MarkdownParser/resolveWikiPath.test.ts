@@ -7,6 +7,7 @@ const SRC_PATH = "/vault/source.md";
 // Minimal FileCache stub — exact key match only; no extension normalization
 function makeTestFileCache(entries: Record<string, string>): {
 	resolveFile(filename: string): ResolveResult;
+	getEntries(): Array<{ basename: string; relativePath: string }>;
 } {
 	return {
 		resolveFile(filename: string): ResolveResult {
@@ -19,6 +20,44 @@ function makeTestFileCache(entries: Record<string, string>): {
 				reason: "not_found",
 				message: `not found: ${filename}`,
 			};
+		},
+		// Existing tests don't exercise Levenshtein scan; return empty so suggestions=[].
+		getEntries() {
+			return [];
+		},
+	};
+}
+
+// Stub that supports D4 Levenshtein scan via getEntries() returning {basename, relativePath}.
+function makeLevTestFileCache(
+	entries: Array<{
+		basename: string;
+		relativePath: string;
+		absolutePath?: string;
+	}>,
+): {
+	resolveFile(filename: string): ResolveResult;
+	getEntries(): Array<{ basename: string; relativePath: string }>;
+} {
+	const map = new Map<string, string>();
+	for (const e of entries) {
+		if (e.absolutePath !== undefined) map.set(e.basename, e.absolutePath);
+	}
+	return {
+		resolveFile(filename: string): ResolveResult {
+			const path = map.get(filename);
+			if (path !== undefined) return { found: true, path };
+			return {
+				found: false,
+				reason: "not_found",
+				message: `not found: ${filename}`,
+			};
+		},
+		getEntries() {
+			return entries.map(({ basename, relativePath }) => ({
+				basename,
+				relativePath,
+			}));
 		},
 	};
 }
@@ -158,5 +197,142 @@ describe("resolveWikiPath — BDD: [H-D4-slug] spike acceptance gate", () => {
 				`${VAULT_BASE}/hardening-principle-open-questions-research.md`,
 			);
 		}
+	});
+});
+
+describe("resolveWikiPath — D4 Levenshtein suggestion layer (P4 — [H-D4-suggestion-threshold])", () => {
+	it("single-typo within threshold: returns single full relative path", () => {
+		// slug+".md" = "filename.md" (11), basename "filenames.md" (12), distance = 1.
+		// relativePath length = 24 → floor(0.2*24)=4 → clamp(3,10,4)=4. 1 ≤ 4 ✓
+		const cache = makeLevTestFileCache([
+			{
+				basename: "filenames.md",
+				relativePath: "wiki/files/filenames.md",
+				absolutePath: "/v/wiki/files/filenames.md",
+			},
+		]);
+		const result = resolveWikiPath("filename", SRC_PATH, cache);
+		expect(result.resolved).toBe(false);
+		if (!result.resolved) {
+			expect(result.suggestions).toEqual(["wiki/files/filenames.md"]);
+		}
+	});
+
+	it("multi-match disambiguation: returns all candidates within threshold (folder context preserved)", () => {
+		// slug+".md" = "the-hardening-principle-concept.md" (33).
+		// All basenames "the-hardening-principle.md" (26), distance 8 (insertion of "-concept").
+		// Thresholds:
+		//  wiki/concepts/.../...md    len 40 → floor(8.0)=8  → clamp 8.  8 ≤ 8 ✓
+		//  wiki/summaries/...md        len 41 → floor(8.2)=8  → clamp 8.  8 ≤ 8 ✓
+		//  raw-sources/.../...md       len 60 → floor(12)=12 → clamp 10. 8 ≤ 10 ✓
+		const cache = makeLevTestFileCache([
+			{
+				basename: "the-hardening-principle.md",
+				relativePath: "wiki/concepts/the-hardening-principle.md",
+				absolutePath: "/v/wiki/concepts/the-hardening-principle.md",
+			},
+			{
+				basename: "the-hardening-principle.md",
+				relativePath: "wiki/summaries/the-hardening-principle.md",
+			},
+			{
+				basename: "the-hardening-principle.md",
+				relativePath:
+					"raw-sources/claude-code-principles/the-hardening-principle.md",
+			},
+		]);
+		const result = resolveWikiPath(
+			"The Hardening Principle (concept)",
+			SRC_PATH,
+			cache,
+		);
+		expect(result.resolved).toBe(false);
+		if (!result.resolved) {
+			expect(result.suggestions).toHaveLength(3);
+			expect(result.suggestions).toContain(
+				"wiki/concepts/the-hardening-principle.md",
+			);
+			expect(result.suggestions).toContain(
+				"wiki/summaries/the-hardening-principle.md",
+			);
+			expect(result.suggestions).toContain(
+				"raw-sources/claude-code-principles/the-hardening-principle.md",
+			);
+		}
+	});
+
+	it("ceiling clamp (≥10): long candidate path doesn't blow up threshold", () => {
+		// relativePath length = 56 → floor(0.2*56)=11 → clamp(3,10,11)=10 (ceiling fires).
+		// slug+".md" = "abcdefghijklmn.md" (17), basename "abc.md" (6), distance = 11.
+		// 11 > 10 (ceiling) → no match. Without ceiling clamp (threshold 11) it WOULD match.
+		const cache = makeLevTestFileCache([
+			{
+				basename: "abc.md",
+				relativePath: "raw-sources/claude-code-principles/research-data/abc.md",
+				absolutePath: "/v/abc.md",
+			},
+		]);
+		const result = resolveWikiPath("abcdefghijklmn", SRC_PATH, cache);
+		expect(result.resolved).toBe(false);
+		if (!result.resolved) {
+			expect(result.suggestions).toEqual([]);
+		}
+	});
+
+	it("floor clamp (≤3): short candidate path doesn't shrink threshold below 3", () => {
+		// relativePath length = 4 → floor(0.2*4)=0 → clamp(3,10,0)=3 (floor fires).
+		// slug+".md" = "abcd.md" (7), basename "a.md" (4), distance = 3.
+		// 3 ≤ 3 → match. Without floor clamp (threshold 0), 3 > 0 → no match.
+		const cache = makeLevTestFileCache([
+			{ basename: "a.md", relativePath: "a.md", absolutePath: "/v/a.md" },
+		]);
+		const result = resolveWikiPath("abcd", SRC_PATH, cache);
+		expect(result.resolved).toBe(false);
+		if (!result.resolved) {
+			expect(result.suggestions).toEqual(["a.md"]);
+		}
+	});
+
+	it("no-match: returns empty suggestions array (no false-positive)", () => {
+		// Distance way exceeds threshold for any candidate.
+		const cache = makeLevTestFileCache([
+			{
+				basename: "completely-different-name.md",
+				relativePath: "wiki/x/completely-different-name.md",
+				absolutePath: "/v/cdn.md",
+			},
+		]);
+		const result = resolveWikiPath("xyz", SRC_PATH, cache);
+		expect(result.resolved).toBe(false);
+		if (!result.resolved) {
+			expect(result.suggestions).toEqual([]);
+		}
+	});
+
+	it("hit-path: Levenshtein scan NOT invoked (cost optimization — fires only on miss)", () => {
+		let getEntriesCalls = 0;
+		const cache = {
+			resolveFile(filename: string): ResolveResult {
+				if (filename === "the-hardening-principle.md") {
+					return {
+						found: true,
+						path: "/v/the-hardening-principle.md",
+					};
+				}
+				return {
+					found: false,
+					reason: "not_found" as const,
+					message: "x",
+				};
+			},
+			getEntries() {
+				getEntriesCalls++;
+				return [];
+			},
+		};
+		// Step-1 raw="the-hardening-principle" misses; Step-2 slug "the-hardening-principle.md" hits.
+		const result = resolveWikiPath("the-hardening-principle", SRC_PATH, cache);
+		expect(result.resolved).toBe(true);
+		expect(getEntriesCalls).toBe(0);
 	});
 });
