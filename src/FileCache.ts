@@ -390,6 +390,36 @@ export class FileCache {
 		return result;
 	}
 
+	/**
+	 * Get entries in the shape expected by `resolveWikiPath` Levenshtein layer.
+	 *
+	 * `basename` is the filename key (matches the wiki page name to fuzzy-match against).
+	 * `relativePath` and `absolutePath` both reflect the cached absolute path — main's
+	 * FileCache does not track scope-relative form separately, but threshold ratios
+	 * clamp to ≤10 so longer absolute strings degrade gracefully.
+	 */
+	getEntries(): Array<{
+		basename: string;
+		relativePath: string;
+		absolutePath?: string;
+	}> {
+		const result: Array<{
+			basename: string;
+			relativePath: string;
+			absolutePath?: string;
+		}> = [];
+		for (const [filename, paths] of this.entries) {
+			for (const p of paths) {
+				result.push({
+					basename: filename,
+					relativePath: p,
+					absolutePath: p,
+				});
+			}
+		}
+		return result;
+	}
+
 	// Get cache statistics (total files, duplicates)
 	getCacheStats(): CacheStatsDetail {
 		const duplicates = this.duplicateNames();
