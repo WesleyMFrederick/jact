@@ -7,7 +7,7 @@
 //   (b) test/idiom-guards.test.ts does not exist → vitest cannot find it.
 //   (c) PostToolUse hook entry does not exist in ~/.claude/settings.json.
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -26,7 +26,7 @@ describe("C1 — D1 named-array ESLint + vitest idiom-guard library", () => {
 		expect(existsSync(ESLINT_CONFIG), "eslint.config.js missing").toBe(true);
 		let exitCode = 0;
 		try {
-			execSync(`npx eslint ${FIXTURE}`, { cwd: REPO_ROOT, stdio: "pipe" });
+			execFileSync("npx", ["eslint", FIXTURE], { cwd: REPO_ROOT, stdio: "pipe" });
 		} catch (err) {
 			exitCode = (err as { status?: number }).status ?? 1;
 		}
@@ -39,7 +39,7 @@ describe("C1 — D1 named-array ESLint + vitest idiom-guard library", () => {
 		);
 		let exitCode = 0;
 		try {
-			execSync(`npx vitest run ${IDIOM_GUARD}`, {
+			execFileSync("npx", ["vitest", "run", IDIOM_GUARD], {
 				cwd: REPO_ROOT,
 				stdio: "pipe",
 			});
