@@ -68,6 +68,7 @@ interface CliValidateOptions {
 	format?: string;
 	fix?: boolean;
 	verbose?: boolean;
+	allowGitignore?: boolean;
 }
 
 // D-003: CliExtractOptions imported from ./types/contentExtractorTypes.js (canonical type)
@@ -147,7 +148,10 @@ export class JactCli {
 	 * builds the file cache against the resolved root. Throws when scope
 	 * cannot be inferred so callers don't silently fall back to no-scope mode.
 	 */
-	private applyScope(options: { scope?: string }, targetFile?: string): void {
+	private applyScope(
+		options: { scope?: string; allowGitignore?: boolean },
+		targetFile?: string,
+	): void {
 		const resolved = resolveScope({
 			...(options.scope !== undefined && { explicit: options.scope }),
 			cwd: process.cwd(),
@@ -159,7 +163,11 @@ export class JactCli {
 				`cannot resolve scope. Tried: ${triedParts.join(", ")}. Pass --scope <dir>.`,
 			);
 		}
-		this.fileCache.buildCache(resolved.scope, false, resolved);
+		// Default: respect `.gitignore`. `--allow-gitignore` opts in to scanning
+		// files that `.gitignore` excludes.
+		this.fileCache.buildCache(resolved.scope, false, resolved, {
+			respectGitignore: !options.allowGitignore,
+		});
 	}
 
 	/**
@@ -244,9 +252,12 @@ export class JactCli {
 
 			// Build file cache if scope is provided
 			if (options.scope) {
+				const respectGitignore = !options.allowGitignore;
 				const cacheStats = this.fileCache.buildCache(
 					options.scope,
 					options.verbose ?? false,
+					undefined,
+					{ respectGitignore },
 				);
 				// Only show cache messages in verbose, non-JSON mode
 				if (options.verbose && options.format !== "json") {
@@ -909,7 +920,13 @@ export class JactCli {
 
 			// Build file cache if scope is provided
 			if (options.scope) {
-				const cacheStats = this.fileCache.buildCache(options.scope);
+				const respectGitignore = !options.allowGitignore;
+				const cacheStats = this.fileCache.buildCache(
+					options.scope,
+					false,
+					undefined,
+					{ respectGitignore },
+				);
 				console.log(
 					`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 				);
@@ -1238,6 +1255,11 @@ program
 	.option(
 		"--verbose",
 		"show full validation report: all valid citations, duplicate-filename warnings, summary block (default: minimal output with only errors/warnings)",
+		false,
+	)
+	.option(
+		"--allow-gitignore",
+		"include files that .gitignore would normally exclude in the scope scan (default: respect .gitignore)",
 		false,
 	)
 	.addHelpText(

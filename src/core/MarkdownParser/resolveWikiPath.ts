@@ -54,6 +54,7 @@ function clamp(value: number, lo: number, hi: number): number {
  * @param sourceAbsolutePath - Absolute path of the source file used to prefer nearby files when fuzzy matching; may be empty.
  * @param fileCache - Cache providing file resolution and entries for fuzzy matching.
  * @returns A ResolvedPath: on success includes `{ resolved: true; absolutePath }`; on failure includes `attempted` (the raw and slugged forms), optional `attemptedPaths` (deduplicated looked-up paths), and `suggestions` (up to three ranked relative paths).
+ */
 export function resolveWikiPath(
 	rawPath: string,
 	sourceAbsolutePath: string,

@@ -1,6 +1,24 @@
+import ignore, { type Ignore } from "ignore";
 import type { ScopeResolution } from "./core/resolveScope.js";
 import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
+
+/**
+ * Default ignore patterns applied to every scan regardless of `.gitignore`
+ * presence. Keeps the cache from indexing VCS metadata, vendored deps, and
+ * build output that are never meaningful as wikilink targets.
+ */
+const DEFAULT_SCAN_IGNORE_PATTERNS: readonly string[] = [
+	".git/",
+	".hg/",
+	".svn/",
+	".venv/",
+	"venv/",
+	"node_modules/",
+	"dist/",
+	"build/",
+	"coverage/",
+];
 
 interface FileEntry {
 	filename: string;
@@ -64,15 +82,23 @@ export class FileCache {
 	 * Scans all subdirectories for .md files and indexes by filename. Warns if duplicate
 	 * filenames are detected (these will require relative path disambiguation).
 	 *
+	 * Filtering: DEFAULT_SCAN_IGNORE_PATTERNS always apply. When
+	 * `options.respectGitignore` is true (default), the root `.gitignore` is also
+	 * loaded and applied. Pass `respectGitignore: false` to disable `.gitignore`
+	 * filtering (default patterns still apply).
+	 *
 	 * @param scopeFolder - Root folder to scan (can be symlink, will be resolved)
 	 * @param verbose - When true, log duplicate filename warnings to stderr
 	 * @param scope - Optional resolution metadata used by resolveFile to enrich error messages
+	 * @param options - Scan options
+	 * @param options.respectGitignore - When true (default), apply root .gitignore patterns during scan
 	 * @returns Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
 	 */
 	buildCache(
 		scopeFolder: string,
 		verbose = false,
 		scope?: ScopeResolution,
+		options: { respectGitignore?: boolean } = {},
 	): CacheStats {
 		this.entries.clear();
 		this.scope = scope;
@@ -86,7 +112,13 @@ export class FileCache {
 			targetScanFolder = absoluteScopeFolder;
 		}
 
-		this.scanDirectory(targetScanFolder);
+		const respectGitignore = options.respectGitignore !== false;
+		const ignoreRules = this.buildIgnoreRules(
+			targetScanFolder,
+			respectGitignore,
+		);
+
+		this.scanDirectory(targetScanFolder, targetScanFolder, ignoreRules);
 
 		const dupNames = this.duplicateNames();
 
@@ -117,16 +149,55 @@ export class FileCache {
 		return dups;
 	}
 
-	private scanDirectory(dirPath: string): void {
+	/**
+	 * Build the Ignore rules object used to filter entries during scan.
+	 *
+	 * Always includes DEFAULT_SCAN_IGNORE_PATTERNS. When `respectGitignore` is
+	 * true and the scope root has a readable `.gitignore`, its patterns are
+	 * loaded first, then DEFAULT_SCAN_IGNORE_PATTERNS are added to ensure
+	 * defaults are authoritative (cannot be negated by .gitignore).
+	 * Missing or unreadable `.gitignore` is non-fatal — defaults still apply.
+	 */
+	private buildIgnoreRules(
+		scanRoot: string,
+		respectGitignore: boolean,
+	): Ignore {
+		const rules = ignore();
+		if (respectGitignore) {
+			const gitignorePath = this.path.join(scanRoot, ".gitignore");
+			try {
+				const content = this.fs.readFileSync(gitignorePath, "utf-8");
+				rules.add(content);
+			} catch (_error) {
+				// No .gitignore or unreadable — defaults still apply.
+			}
+		}
+		rules.add([...DEFAULT_SCAN_IGNORE_PATTERNS]);
+		return rules;
+	}
+
+	private scanDirectory(
+		dirPath: string,
+		scanRoot: string,
+		ignoreRules: Ignore,
+	): void {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
 
 			for (const entry of entries) {
 				const fullPath = this.path.join(dirPath, entry);
 				const stat = this.fs.statSync(fullPath);
+				const isDir = stat.isDirectory();
+				// `ignore` lib expects POSIX-style paths relative to scanRoot;
+				// directory entries must end with "/" to match dir-only patterns.
+				const relative = this.path.relative(scanRoot, fullPath);
+				if (relative === "") continue;
+				const posixRelative = relative.split(this.path.sep).join("/");
+				const testPath = isDir ? `${posixRelative}/` : posixRelative;
+				if (ignoreRules.ignores(testPath)) continue;
 
-				if (stat.isDirectory()) {
-					this.scanDirectory(fullPath);
+				if (isDir) {
+					this.scanDirectory(fullPath, scanRoot, ignoreRules);
 				} else if (entry.endsWith(".md")) {
 					this.addToCache(entry, fullPath);
 				}
