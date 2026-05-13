@@ -66,7 +66,7 @@ export function resolveWikiPath(
 	}
 
 	// Steps 3+4 merged: single pass over FileCache entries.
-	// Local entries (within 2 directory levels of source) get 1.5× threshold headroom;
+	// Local entries (descendants of source directory or its parent) get 1.5× threshold headroom;
 	// a local fuzzy hit returns resolved: true.
 	// Ceiling pre-filter fires before clamp() to eliminate impossible candidates cheaply.
 	const sourceDir = sourceAbsolutePath ? dirname(sourceAbsolutePath) : null;
@@ -85,6 +85,7 @@ export function resolveWikiPath(
 			SUGGESTION_THRESHOLD_CEIL,
 		);
 
+		// isLocal: descendant of source directory or its parent (2 ancestor levels from source)
 		const isLocal =
 			entry.absolutePath !== undefined &&
 			sourceDir !== null &&
