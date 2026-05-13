@@ -63,7 +63,7 @@
 
 ### Phase 1 — Quick Wins (Fix Now, ≤30 min each)
 
-%% *Last Modified: 05/13/26 12:44:09* %%
+%% *Last Modified: 05/13/26 13:05:17* %%
 
 **Total estimated time: ~3 hours. Zero behavioral risk. No coordination needed.**
 
@@ -135,12 +135,12 @@
     **Cost:** 20 min  
     **Source:** Core FN-5
 
-14. **Issue:** Some `.test.ts` files may re-assert what `tsc --noEmit` already proves — type-level tests with no behavioral signal  
+14. **Issue:** Some `.test.ts` files may re-assert what `tsc --noEmit` already proves — type-level tests with no behavioral signal (**GH [#59](https://github.com/WesleyMFrederick/jact/issues/59)**)  
     **Fix:** Anti-test audit — review ~5 type-shape test files; delete redundant assertions or justify each with a comment explaining why they catch something the compiler misses  
     **Cost:** 20 min  
     **Source:** Testing-eval Anti-Targets section
 
-15. **Issue:** No verification that `describe`/`it` blocks stay within 3 nesting levels; no check for `beforeEach` used for input construction (factories preferred)  
+15. **Issue:** No verification that `describe`/`it` blocks stay within 3 nesting levels; no check for `beforeEach` used for input construction (factories preferred) (**GH [#60](https://github.com/WesleyMFrederick/jact/issues/60)**)  
     **Fix:** BDD/AAA style audit — grep for nesting depth and `beforeEach` usage; annotate or fix any violations  
     **Cost:** 15 min  
     **Source:** Testing-eval Authoring Style section
