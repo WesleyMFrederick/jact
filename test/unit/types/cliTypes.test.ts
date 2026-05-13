@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import type {
-	CliValidateOptions,
 	CliExtractOptions,
-	FormattedValidationResult,
+	CliValidateOptions,
 	FixDetail,
+	FormattedValidationResult,
 } from "../../../src/types/contentExtractorTypes.js";
 
 describe("CLI Types", () => {
@@ -13,8 +13,12 @@ describe("CLI Types", () => {
 			lines: "150-160",
 			scope: "/docs",
 			fix: true,
+			verbose: true,
+			allowGitignore: false,
 		};
 		expect(opts.format).toBe("json");
+		expect(opts.verbose).toBe(true);
+		expect(opts.allowGitignore).toBe(false);
 	});
 
 	it("CliValidateOptions allows empty object", () => {
