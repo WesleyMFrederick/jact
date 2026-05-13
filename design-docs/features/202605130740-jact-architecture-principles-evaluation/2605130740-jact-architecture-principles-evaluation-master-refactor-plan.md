@@ -63,7 +63,7 @@
 
 ### Phase 1 — Quick Wins (Fix Now, ≤30 min each)
 
-%% *Last Modified: 05/13/26 13:05:17* %%
+%% *Last Modified: 05/13/26 13:05:42* %%
 
 **Total estimated time: ~3 hours. Zero behavioral risk. No coordination needed.**
 
@@ -145,17 +145,17 @@
     **Cost:** 15 min  
     **Source:** Testing-eval Authoring Style section
 
-16. **Issue:** `vitest.config.ts` contents not fully audited against testing principles; `setup.js` at test root has unclear purpose; `testTimeout` not confirmed at 30000  
+16. **Issue:** `vitest.config.ts` contents not fully audited against testing principles; `setup.js` at test root has unclear purpose; `testTimeout` not confirmed at 30000 (**GH [#62](https://github.com/WesleyMFrederick/jact/issues/62)**)  
     **Fix:** Vitest config audit — read `vitest.config.ts` and `setup.js`; verify or set `testTimeout: 30000`; remove unnecessary blocks  
     **Cost:** 20 min  
     **Source:** Testing-eval Vitest Conventions section
 
-17. **Issue:** No combined `check` script — `type-check` and `test` run as separate scripts with no single gate  
+17. **Issue:** No combined `check` script — `type-check` and `test` run as separate scripts with no single gate (**GH [#63](https://github.com/WesleyMFrederick/jact/issues/63)**)  
     **Fix:** Add `"check": "tsc --noEmit && vitest run"` to `package.json` scripts  
     **Cost:** 5 min  
     **Source:** Testing-eval Quality Gates section
 
-18. **Issue:** Test coverage % is unknown; Open Q4 asks for the baseline; Rework 6 is gated on ≥80%  
+18. **Issue:** Test coverage % is unknown; Open Q4 asks for the baseline; Rework 6 is gated on ≥80% (**GH [#64](https://github.com/WesleyMFrederick/jact/issues/64)**)  
     **Fix:** Run `vitest --coverage`; record baseline output; paste result as answer to Open Q4 below  
     **Cost:** 10 min  
     **Source:** Testing-eval Quality Gates section; Open Q4
