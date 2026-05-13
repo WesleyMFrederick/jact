@@ -10,6 +10,15 @@
 import type { LinkObject } from "./citationTypes.js";
 
 /**
+ * LinkClass - display-layer discriminator (per D3).
+ *
+ * Separate from `LinkObject.linkType` so display/reporting can distinguish
+ * caret-block markdown citations from header markdown citations without
+ * mutating the syntactic linkType field.
+ */
+export type LinkClass = "markdown" | "wiki" | "caret";
+
+/**
  * PathConversion metadata for path auto-fix suggestions
  * Used when validator detects path resolution issues
  */

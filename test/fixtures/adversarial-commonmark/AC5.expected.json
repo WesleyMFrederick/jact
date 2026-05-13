@@ -1,0 +1,8 @@
+{
+  "id": "AC5",
+  "commonMarkSection": "§6.1",
+  "edgeCase": "Backslash before whitespace at end-of-line",
+  "wikilinks": 2,
+  "unrecognizedCount": 0,
+  "notes": "Hard-break backslashes do not disturb adjacent wikilink extraction."
+}
