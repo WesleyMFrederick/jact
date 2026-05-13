@@ -7,6 +7,8 @@ import {
 	writeExtractCache,
 } from "../../src/cache/checkExtractCache.js";
 
+const TEST_FILE_CONTENT = "# Test\n\nSome content with [[links]]";
+
 describe("checkExtractCache", () => {
 	let testDir: string;
 	let cacheDir: string;
@@ -20,7 +22,6 @@ describe("checkExtractCache", () => {
 		cacheDir = join(testDir, "claude-cache");
 		mkdirSync(testDir, { recursive: true });
 		testFile = join(testDir, "test.md");
-		writeFileSync(testFile, "# Test\n\nSome content with [[links]]");
 	});
 
 	afterEach(() => {
@@ -28,12 +29,14 @@ describe("checkExtractCache", () => {
 	});
 
 	it("returns false when no marker file exists (cache miss)", () => {
+		writeFileSync(testFile, TEST_FILE_CONTENT);
 		mkdirSync(cacheDir, { recursive: true });
 		const result = checkExtractCache("session-abc", testFile, cacheDir);
 		expect(result).toBe(false);
 	});
 
 	it("returns true after writeExtractCache creates marker (cache hit)", () => {
+		writeFileSync(testFile, TEST_FILE_CONTENT);
 		mkdirSync(cacheDir, { recursive: true });
 		writeExtractCache("session-abc", testFile, cacheDir);
 		const result = checkExtractCache("session-abc", testFile, cacheDir);
@@ -41,6 +44,7 @@ describe("checkExtractCache", () => {
 	});
 
 	it("returns false when file content changes (invalidation)", () => {
+		writeFileSync(testFile, TEST_FILE_CONTENT);
 		mkdirSync(cacheDir, { recursive: true });
 		writeExtractCache("session-abc", testFile, cacheDir);
 
@@ -52,6 +56,7 @@ describe("checkExtractCache", () => {
 	});
 
 	it("works when cache directory does not exist yet (auto-creation)", () => {
+		writeFileSync(testFile, TEST_FILE_CONTENT);
 		// cacheDir not created — functions should auto-create
 		const result = checkExtractCache("session-abc", testFile, cacheDir);
 		expect(result).toBe(false);

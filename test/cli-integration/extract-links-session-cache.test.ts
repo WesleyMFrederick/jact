@@ -6,6 +6,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const CLI_PATH = join(__dirname, "../../dist/jact.js");
 
+const SOURCE_MD_CONTENT =
+	"# Source\n\nSee [[target.md#Section One|Section One]] for details.\n";
+const TARGET_MD_CONTENT =
+	"# Target\n\n## Section One\n\nThis is section one content.\n";
+
+function writeFixtures(testDir: string): void {
+	writeFileSync(join(testDir, "source.md"), SOURCE_MD_CONTENT);
+	writeFileSync(join(testDir, "target.md"), TARGET_MD_CONTENT);
+}
+
 describe("extract links --session (cache integration)", () => {
 	let testDir: string;
 
@@ -15,18 +25,6 @@ describe("extract links --session (cache integration)", () => {
 			`session-cache-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
 		);
 		mkdirSync(testDir, { recursive: true });
-
-		// Create source markdown with a citation (wiki links require |displayText)
-		writeFileSync(
-			join(testDir, "source.md"),
-			"# Source\n\nSee [[target.md#Section One|Section One]] for details.\n",
-		);
-
-		// Create target markdown with the referenced section
-		writeFileSync(
-			join(testDir, "target.md"),
-			"# Target\n\n## Section One\n\nThis is section one content.\n",
-		);
 	});
 
 	afterEach(() => {
@@ -34,6 +32,7 @@ describe("extract links --session (cache integration)", () => {
 	});
 
 	it("first call with --session produces JSON output (cache miss)", () => {
+		writeFixtures(testDir);
 		const sourcePath = join(testDir, "source.md");
 		const output = execSync(
 			`node "${CLI_PATH}" extract links "${sourcePath}" --scope "${testDir}" --session test-session-1 --verbose`,
@@ -46,6 +45,7 @@ describe("extract links --session (cache integration)", () => {
 	});
 
 	it("second call with same --session produces no output (cache hit)", () => {
+		writeFixtures(testDir);
 		const sourcePath = join(testDir, "source.md");
 
 		// First call — cache miss
@@ -64,6 +64,7 @@ describe("extract links --session (cache integration)", () => {
 	});
 
 	it("no-links file with --session does not write cache (allows retry)", () => {
+		writeFileSync(join(testDir, "target.md"), TARGET_MD_CONTENT);
 		// Create a file with no extractable links
 		const noLinksPath = join(testDir, "no-links.md");
 		writeFileSync(
