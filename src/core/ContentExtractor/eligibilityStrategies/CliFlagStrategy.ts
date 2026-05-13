@@ -11,7 +11,7 @@ import type {
  */
 export class CliFlagStrategy implements ExtractionEligibilityStrategy {
 	getDecision(
-		link: LinkObject,
+		_link: LinkObject,
 		cliFlags: CliFlags,
 	): EligibilityDecision | null {
 		if (cliFlags.fullFiles === true) {

@@ -12,7 +12,7 @@ import type {
 export class ForceMarkerStrategy implements ExtractionEligibilityStrategy {
 	getDecision(
 		link: LinkObject,
-		cliFlags: CliFlags,
+		_cliFlags: CliFlags,
 	): EligibilityDecision | null {
 		if (link.extractionMarker?.innerText === "force-extract") {
 			return {

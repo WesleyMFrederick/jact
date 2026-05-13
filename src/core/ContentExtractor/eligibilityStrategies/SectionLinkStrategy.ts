@@ -12,7 +12,7 @@ import type {
 export class SectionLinkStrategy implements ExtractionEligibilityStrategy {
 	getDecision(
 		link: LinkObject,
-		cliFlags: CliFlags,
+		_cliFlags: CliFlags,
 	): EligibilityDecision | null {
 		if (link.anchorType !== null) {
 			return {
