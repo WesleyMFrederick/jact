@@ -1101,9 +1101,17 @@ export class JactCli {
 	 * @param link - Link object with validation metadata
 	 * @returns Citation with corrected anchor or original
 	 */
-	// biome-ignore lint/suspicious/noExplicitAny: pre-existing untyped method, tracked in #97
-	private applyAnchorFix(citation: string, link: any): string {
-		const suggestionMatch = link.validation.suggestion.match(
+	private applyAnchorFix(citation: string, link: EnrichedLinkObject): string {
+		if (
+			link.validation.status !== "error" &&
+			link.validation.status !== "warning"
+		) {
+			return citation;
+		}
+
+		const { suggestion, error } = link.validation;
+
+		const suggestionMatch = suggestion?.match(
 			/Use raw header format for better Obsidian compatibility: #(.+)$/,
 		);
 		if (suggestionMatch) {
@@ -1117,12 +1125,10 @@ export class JactCli {
 
 		// Handle anchor not found errors
 		if (
-			link.validation.error.startsWith("Anchor not found") &&
-			link.validation.suggestion.includes("Available headers:")
+			error.startsWith("Anchor not found") &&
+			suggestion?.includes("Available headers:")
 		) {
-			const availableHeaders = this.parseAvailableHeaders(
-				link.validation.suggestion,
-			);
+			const availableHeaders = this.parseAvailableHeaders(suggestion ?? "");
 			const citationMatch = citation.match(/\[([^\]]+)\]\(([^)]+)#([^)]+)\)/);
 
 			if (citationMatch && availableHeaders.length > 0) {
