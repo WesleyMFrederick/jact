@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "consumer_repo": "jact",
+  "docs_repo_env": "DOCS_REPO_PATH",
+  "docs_repo_default": "../0-documents/markdown-documents",
+  "mappings": [
+    {
+      "source": "architecture-principles/",
+      "alias": "architecture-principles/",
+      "description": "Shared architecture principles"
+    }
+  ]
+}

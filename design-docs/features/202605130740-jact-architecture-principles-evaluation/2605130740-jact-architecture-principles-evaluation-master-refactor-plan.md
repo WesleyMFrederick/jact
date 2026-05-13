@@ -63,7 +63,7 @@
 
 ### Phase 1 — Quick Wins (Fix Now, ≤30 min each)
 
-%% *Last Modified: 05/13/26 08:17:50* %%
+%% *Last Modified: 05/13/26 13:05:42* %%
 
 **Total estimated time: ~3 hours. Zero behavioral risk. No coordination needed.**
 
@@ -135,11 +135,39 @@
     **Cost:** 20 min  
     **Source:** Core FN-5
 
+14. **Issue:** Some `.test.ts` files may re-assert what `tsc --noEmit` already proves — type-level tests with no behavioral signal (**GH [#59](https://github.com/WesleyMFrederick/jact/issues/59)**)  
+    **Fix:** Anti-test audit — review ~5 type-shape test files; delete redundant assertions or justify each with a comment explaining why they catch something the compiler misses  
+    **Cost:** 20 min  
+    **Source:** Testing-eval Anti-Targets section
+
+15. **Issue:** No verification that `describe`/`it` blocks stay within 3 nesting levels; no check for `beforeEach` used for input construction (factories preferred) (**GH [#60](https://github.com/WesleyMFrederick/jact/issues/60)**)  
+    **Fix:** BDD/AAA style audit — grep for nesting depth and `beforeEach` usage; annotate or fix any violations  
+    **Cost:** 15 min  
+    **Source:** Testing-eval Authoring Style section
+
+16. **Issue:** `vitest.config.ts` contents not fully audited against testing principles; `setup.js` at test root has unclear purpose; `testTimeout` not confirmed at 30000 (**GH [#62](https://github.com/WesleyMFrederick/jact/issues/62)**)  
+    **Fix:** Vitest config audit — read `vitest.config.ts` and `setup.js`; verify or set `testTimeout: 30000`; remove unnecessary blocks  
+    **Cost:** 20 min  
+    **Source:** Testing-eval Vitest Conventions section
+
+17. **Issue:** No combined `check` script — `type-check` and `test` run as separate scripts with no single gate (**GH [#63](https://github.com/WesleyMFrederick/jact/issues/63)**)  
+    **Fix:** Add `"check": "tsc --noEmit && vitest run"` to `package.json` scripts  
+    **Cost:** 5 min  
+    **Source:** Testing-eval Quality Gates section
+
+18. **Issue:** Test coverage % is unknown; Open Q4 asks for the baseline; Rework 6 is gated on ≥80% (**GH [#64](https://github.com/WesleyMFrederick/jact/issues/64)**)  
+    **Fix:** Run `vitest --coverage`; record baseline output; paste result as answer to Open Q4 below  
+    **Cost:** 10 min  
+    **Source:** Testing-eval Quality Gates section; Open Q4
+
+19. **Standing policy:** Opportunistic `.js` → `.ts` test file migration — migrate any test file in `test/` that is touched during other Phase 1 or Phase 2 work. Do not batch. Confirm suite green before and after each migration.  
+    **Source:** Testing-eval Organization section
+
 ---
 
 ### Phase 2 — Architectural Reworks (≥30 min, named scope, trigger)
 
-%% *Last Modified: 05/13/26 08:17:50* %%
+%% *Last Modified: 05/13/26 13:09:18* %%
 
 **Ranked by impact. Items 1 and 2 are independent; Item 3 depends on Item 2.**
 
@@ -160,6 +188,7 @@
    - Items 12+13 from Phase 1 become the full extraction: formatting → `src/formatValidationResult.ts`; fix engine → `src/core/CitationFixer.ts` (class with `applyFixes(content, fixes, { dryRun: boolean })`)  
    - Commander command registration moves from `src/jact.ts:1263–1611` → `src/cli.ts` (entry point); `JactCli` becomes programmatically importable without activating Commander  
    - After extraction: `JactCli` is orchestration + scope management only (~400 lines) at [`src/jact.ts`](/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts)  
+   - Ship `InMemoryFileCache` adapter implementing `FileCacheInterface` as test-default; refactor `CitationValidator` and `ContentExtractor` to accept the interface rather than concrete classes. **TDD sequence:** Write `InMemoryFileCache` + one passing test first → then refactor callers. **(#35 extended)**  
    **Effort:** 2–3 hours  
    **Trigger:** Any unit test that needs to test `JactCli` methods without spawning a CLI process. Also gates Rework 3 (dry-run implementation requires `CitationFixer` class to exist).  
    **Source:** Core FN-3+FN-5+AR-3, OO REWORK-2, TS A-01  
@@ -206,11 +235,34 @@
    **Source:** Core AR-4/CI-4, TS CI-01/A-06  
    **Sequencing:** Must come after Rework 1 (CitationValidator split simplifies the scope of the mutation change).
 
+7. **Rework:** Contract Test Convention + Regressions Directory (**GH [#58](https://github.com/WesleyMFrederick/jact/issues/58)**)  
+   **Scope:**  
+   - Create `test/regressions/` directory; add a placeholder `README.md` documenting the promotion convention (`regressions/<issue>-<slug>.test.ts`)  
+   - Define `FileSystemInterface` — minimal injectable interface for file-system I/O (read, exists, list); implement `InMemoryFileSystemAdapter` as first-party fake for E2E tests  
+   - Write first `Contract:` test for the `CitationValidator` public API: one test per TSDoc `Contract:` block; establish the naming pattern so future contributors follow it automatically  
+   - Codify convention: whenever a TSDoc `Contract:` block is added to an exported function, a failing `Contract:` test must be written first (TDD)  
+   **Effort:** 1.5–2 hours  
+   **Trigger:** Any new E2E test that currently couples to the real filesystem, or any bug fix that benefits from a promoted regression test.  
+   **TDD sequence:** Write `FileSystemInterface` faux + one test using it first → then refactor production callers.  
+   **Source:** Testing-eval Scope and Targets section
+
+8. **Rework:** Test Suite Reorganization (**GH [#61](https://github.com/WesleyMFrederick/jact/issues/61)**)  
+   **Scope:**  
+   - Migrate flat `test/` layout to mirror `src/` structure — one test file per source module  
+   - Rename `helpers/` utilities to the `*-test-utils.ts` naming pattern  
+   - Create `test/scratch/` directory for disposable smoke scripts; relocate `poc-block-extraction.test.js` there  
+   - Delete `auto-fix.test.js.archive`  
+   - One commit per component group (unit/, integration/, etc.); confirm suite green before starting the next group  
+   **Effort:** 2–3 hours  
+   **Trigger:** When the opportunistic `.js` → `.ts` standing policy (Phase 1 item 19) has touched ≥50% of test files, or when a new component test is added and the flat layout creates naming ambiguity.  
+   **Sequencing:** Independent of all other Reworks. Do not block on it.  
+   **Source:** Testing-eval Organization section
+
 ---
 
 ### Phase 3 — Defer (with trigger)
 
-%% *Last Modified: 05/13/26 08:17:50* %%
+%% *Last Modified: 05/13/26 12:45:16* %%
 
 | Item | Trigger to Revisit |
 |---|---|
@@ -218,6 +270,7 @@
 | **Public barrel `src/index.ts`** — no defined public API surface; consumers must import internal paths — TS A-05 | First programmatic consumer of `jact` as a library (not the CLI). |
 | **`Contract:` blocks on all exported async functions** — zero coverage currently; behavioral obligations (mutation, non-throw guarantees) are undocumented — TS H2 | Add incrementally during each Phase 2 rework; not blocking any code change. |
 | **Eliminate in-place `LinkObject` mutation** (Rework 6 above) | Test coverage ≥80%. Currently deferred due to high regression risk without test backing. |
+| **Centralize cleanup helpers** — `afterEach` cleanup patterns currently duplicated per-file in test suite | When ≥3 test files duplicate the same `afterEach` pattern; extract to a shared `*-test-utils.ts` helper. |
 
 ---
 
@@ -256,7 +309,7 @@ These are working well. Do not refactor them.
 
 ## Open Questions for the User
 
-%% *Last Modified: 05/13/26 08:17:50* %%
+%% *Last Modified: 05/13/26 12:45:32* %%
 
 Decisions needed before Phase 2 work begins:
 
@@ -267,5 +320,7 @@ Decisions needed before Phase 2 work begins:
 3. **Kebab-case naming timeline**: Is a v2.0 major version bump on the roadmap? If not, kebab-case renaming can be skipped indefinitely. If yes, it should be bundled with the barrel file work (TS A-04 + A-05) to minimize the number of import-path changes to one event.
 
 4. **Test coverage baseline**: What is the current test coverage %? The LinkObject mutation elimination (Rework 6) is deferred until ≥80% — knowing the current number sets the timeline for when that rework becomes unblocked.
+
+   **Answered by:** Phase 1 item 18 — run `vitest --coverage` and record the baseline output. Paste the result here to unblock the Rework 6 timeline.
 
 5. **`ValidationMetadata.warning.error → message` rename** (Phase 1 item 8): This is a type-level breaking change for any external caller reading `.error` on a warning result. If there are known downstream consumers of the `jact` API (not the CLI), this needs a deprecation path. If CLI-only, ship it.

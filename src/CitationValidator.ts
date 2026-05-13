@@ -1,6 +1,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { computeValidationSummary } from "./core/computeValidationSummary.js";
 import type ParsedDocument from "./ParsedDocument.js";
 import type { AnchorObject, LinkObject } from "./types/citationTypes.js";
 import type {
@@ -8,7 +9,6 @@ import type {
 	PathConversion,
 	ValidationMetadata,
 	ValidationResult,
-	ValidationSummary,
 } from "./types/validationTypes.js";
 
 // Dependency Injection Interfaces (inline pattern per MarkdownParser.ts)
@@ -217,16 +217,7 @@ export class CitationValidator {
 
 		// 4. Generate summary from enriched links
 		const enrichedLinks = links as unknown as ValidationResult["links"];
-		const summary: ValidationSummary = {
-			total: enrichedLinks.length,
-			valid: enrichedLinks.filter((link) => link.validation.status === "valid")
-				.length,
-			warnings: enrichedLinks.filter(
-				(link) => link.validation.status === "warning",
-			).length,
-			errors: enrichedLinks.filter((link) => link.validation.status === "error")
-				.length,
-		};
+		const summary = computeValidationSummary(enrichedLinks);
 
 		// 5. Return enriched links + summary (no separate results array)
 		return {

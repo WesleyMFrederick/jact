@@ -1,6 +1,6 @@
 # jact Phase 1 Quick-Win Issues
 
-%% *Last Modified: 05/13/26 09:07:09* %%
+%% *Last Modified: 05/13/26 13:04:46* %%
 
 Created: 2026-05-13
 
@@ -19,3 +19,14 @@ Created: 2026-05-13
 | #44 | refactor(citation-validator): replace forced status cast with narrowing conditionals | https://github.com/WesleyMFrederick/jact/issues/44 |
 | #45 | refactor(jact-cli): extract formatting methods out of JactCli into formatValidationResult module | https://github.com/WesleyMFrederick/jact/issues/45 |
 | #46 | refactor(jact-cli): extract fix-application helpers from JactCli into citationFixer module | https://github.com/WesleyMFrederick/jact/issues/46 |
+| #59 | test(audit): identify and delete anti-test assertions that duplicate tsc type-checking — Source: Testing Principles §Anti-Test Targets | https://github.com/WesleyMFrederick/jact/issues/59 |
+| #60 | test(audit): verify BDD/AAA style conformance — nesting depth and beforeEach usage — Source: Testing Principles §Authoring Style | https://github.com/WesleyMFrederick/jact/issues/60 |
+| #62 | test(config): audit vitest.config.ts and setup.js for minimal-config conformance — Source: Testing Principles §Vitest Conventions | https://github.com/WesleyMFrederick/jact/issues/62 |
+| #63 | test(scripts): add combined check script that runs type-check then test in sequence — Source: Testing Principles §Quality Gates | https://github.com/WesleyMFrederick/jact/issues/63 |
+| #64 | test(coverage): measure and record coverage baseline to unblock Phase 2 Rework 6 — Source: Testing Principles §Quality Gates | https://github.com/WesleyMFrederick/jact/issues/64 |
+
+## Standing Policy
+
+%% *Last Modified: 05/13/26 13:04:46* %%
+
+**Opportunistic `.js` → `.ts` test migration:** Each PR that touches a `.js` test file migrates it to `.test.ts`. Do not batch. Confirm suite green before and after each migration.
