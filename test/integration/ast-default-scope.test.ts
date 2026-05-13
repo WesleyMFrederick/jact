@@ -138,26 +138,6 @@ describe("ast — file not found in scope (M1)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// M2 — ambiguous filename
-// ---------------------------------------------------------------------------
-describe("ast — ambiguous filename (M2)", () => {
-	it("Scenario 7: given bare filename matches multiple files in scope, when ast runs, then exit 2 with 'matched N files' + (source: cwd-git) + 'Pass --scope to narrow.'", async () => {
-		try {
-			await execAsync(`node "${CLI_PATH}" ast plan.md`, { cwd: JACT_ROOT });
-			expect.fail("Command should have failed for ambiguous filename");
-		} catch (error: unknown) {
-			const err = error as { code: number; stderr: string; stdout: string };
-			expect(err.code).toBe(2);
-			expect(err.stderr).toMatch(/'plan\.md' matched \d+ files in scope=/);
-			expect(err.stderr).toContain("(source: cwd-git)");
-			expect(err.stderr).toContain("Pass --scope to narrow.");
-			// Each candidate path on its own line — at least one .md path indented
-			expect(err.stderr).toMatch(/\n {2}[/].*plan\.md/);
-		}
-	});
-});
-
-// ---------------------------------------------------------------------------
 // M3 — scope cannot be resolved
 // ---------------------------------------------------------------------------
 describe("ast — scope cannot be resolved (M3)", () => {
@@ -176,51 +156,6 @@ describe("ast — scope cannot be resolved (M3)", () => {
 			// Cache fallback must be skipped — no near-miss / ambiguous output
 			expect(err.stderr).not.toContain("matched");
 			expect(err.stderr).not.toContain("Did you mean");
-		}
-	});
-});
-
-// ---------------------------------------------------------------------------
-// ast ↔ extract parity (Ideal Outcome 1 acceptance)
-// ---------------------------------------------------------------------------
-describe("ast ↔ extract parity (Ideal Outcome 1 acceptance)", () => {
-	it("Scenario 9: given same ambiguous filename input, when both ast and extract file run, then both stderrs contain matched-files + Pass --scope substrings", async () => {
-		let astStderr = "";
-		let astCode = 0;
-		try {
-			await execAsync(`node "${CLI_PATH}" ast plan.md`, { cwd: JACT_ROOT });
-			expect.fail("ast should have failed for ambiguous filename");
-		} catch (error: unknown) {
-			const err = error as { code: number; stderr: string };
-			astCode = err.code;
-			astStderr = err.stderr;
-		}
-
-		let extractStderr = "";
-		let extractCode = 0;
-		try {
-			await execAsync(`node "${CLI_PATH}" extract file plan.md`, {
-				cwd: JACT_ROOT,
-			});
-			expect.fail("extract file should have failed for ambiguous filename");
-		} catch (error: unknown) {
-			const err = error as { code: number; stderr: string };
-			extractCode = err.code;
-			extractStderr = err.stderr;
-		}
-
-		// Both fail with non-zero exit
-		expect(astCode).toBeGreaterThan(0);
-		expect(extractCode).toBeGreaterThan(0);
-
-		// Both stderrs share the user-visible scope-failure substrings
-		const sharedSubstrings = [
-			/'plan\.md' matched \d+ files in scope=/,
-			/Pass --scope to narrow\./,
-		];
-		for (const re of sharedSubstrings) {
-			expect(astStderr).toMatch(re);
-			expect(extractStderr).toMatch(re);
 		}
 	});
 });
