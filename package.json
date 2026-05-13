@@ -24,7 +24,6 @@
 		"jact:extract:content": "sh -c 'node ./dist/jact.js extract links \"$1\" | jq \".extractedContentBlocks\"' --",
 		"jact:extract:header": "sh -c 'node ./dist/jact.js extract header \"$1\" \"$2\"' --",
 		"jact:fix": "node ./dist/jact.js validate --fix",
-		"postinstall": "git submodule update --init --recursive",
 		"sync-documentation-symlinks": "bun --cwd ../0-documents run sync-documentation-symlinks -- $(pwd)/documentation-sync-manifest.json"
 	},
 	"keywords": [
