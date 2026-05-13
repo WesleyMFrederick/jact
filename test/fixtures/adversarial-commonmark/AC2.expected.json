@@ -1,0 +1,8 @@
+{
+  "id": "AC2",
+  "commonMarkSection": "§4.5",
+  "edgeCase": "Fence opened with N backticks, closed with M > N",
+  "wikilinks": 2,
+  "unrecognizedCount": 0,
+  "notes": "Only [[BeforeFence]] and [[AfterFence]] extracted; in-fence wikilinks suppressed."
+}

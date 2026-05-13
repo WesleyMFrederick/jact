@@ -1,0 +1,8 @@
+{
+  "id": "AC4",
+  "commonMarkSection": "§6.1",
+  "edgeCase": "Escaped backtick inside potential code span",
+  "wikilinks": 2,
+  "unrecognizedCount": 0,
+  "notes": "Both wikilinks extracted; escaped backticks must not open phantom code spans that would mask wikilinks."
+}
