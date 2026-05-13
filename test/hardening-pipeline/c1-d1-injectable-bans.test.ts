@@ -26,7 +26,7 @@ describe("C1 — D1 named-array ESLint + vitest idiom-guard library", () => {
 		expect(existsSync(ESLINT_CONFIG), "eslint.config.js missing").toBe(true);
 		let exitCode = 0;
 		try {
-			execSync(`bun eslint ${FIXTURE}`, { cwd: REPO_ROOT, stdio: "pipe" });
+			execSync(`npx eslint ${FIXTURE}`, { cwd: REPO_ROOT, stdio: "pipe" });
 		} catch (err) {
 			exitCode = (err as { status?: number }).status ?? 1;
 		}
@@ -39,7 +39,7 @@ describe("C1 — D1 named-array ESLint + vitest idiom-guard library", () => {
 		);
 		let exitCode = 0;
 		try {
-			execSync(`bun vitest run ${IDIOM_GUARD}`, {
+			execSync(`npx vitest run ${IDIOM_GUARD}`, {
 				cwd: REPO_ROOT,
 				stdio: "pipe",
 			});

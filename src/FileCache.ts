@@ -154,14 +154,15 @@ export class FileCache {
 	 *
 	 * Always includes DEFAULT_SCAN_IGNORE_PATTERNS. When `respectGitignore` is
 	 * true and the scope root has a readable `.gitignore`, its patterns are
-	 * appended. Missing or unreadable `.gitignore` is non-fatal — defaults still
-	 * apply.
+	 * loaded first, then DEFAULT_SCAN_IGNORE_PATTERNS are added to ensure
+	 * defaults are authoritative (cannot be negated by .gitignore).
+	 * Missing or unreadable `.gitignore` is non-fatal — defaults still apply.
 	 */
 	private buildIgnoreRules(
 		scanRoot: string,
 		respectGitignore: boolean,
 	): Ignore {
-		const rules = ignore().add([...DEFAULT_SCAN_IGNORE_PATTERNS]);
+		const rules = ignore();
 		if (respectGitignore) {
 			const gitignorePath = this.path.join(scanRoot, ".gitignore");
 			try {
@@ -171,6 +172,7 @@ export class FileCache {
 				// No .gitignore or unreadable — defaults still apply.
 			}
 		}
+		rules.add([...DEFAULT_SCAN_IGNORE_PATTERNS]);
 		return rules;
 	}
 

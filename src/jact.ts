@@ -252,9 +252,12 @@ export class JactCli {
 
 			// Build file cache if scope is provided
 			if (options.scope) {
+				const respectGitignore = !options.allowGitignore;
 				const cacheStats = this.fileCache.buildCache(
 					options.scope,
 					options.verbose ?? false,
+					undefined,
+					{ respectGitignore },
 				);
 				// Only show cache messages in verbose, non-JSON mode
 				if (options.verbose && options.format !== "json") {
@@ -917,7 +920,13 @@ export class JactCli {
 
 			// Build file cache if scope is provided
 			if (options.scope) {
-				const cacheStats = this.fileCache.buildCache(options.scope);
+				const respectGitignore = !options.allowGitignore;
+				const cacheStats = this.fileCache.buildCache(
+					options.scope,
+					false,
+					undefined,
+					{ respectGitignore },
+				);
 				console.log(
 					`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 				);

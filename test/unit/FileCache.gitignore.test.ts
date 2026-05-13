@@ -111,4 +111,16 @@ describe("FileCache — .gitignore respect", () => {
 		const stats = cache.buildCache(tmpDir);
 		expect(stats.totalFiles).toBe(1);
 	});
+
+	it("gitignore negation patterns cannot override DEFAULT_SCAN_IGNORE_PATTERNS", () => {
+		// Attempt to re-include node_modules/ via negation pattern
+		writeFile(".gitignore", "!node_modules/\n");
+		writeFile("public.md");
+		writeFile("node_modules/some-pkg/readme.md");
+		const stats = cache.buildCache(tmpDir);
+		// node_modules/ should still be excluded (default patterns are authoritative)
+		expect(stats.totalFiles).toBe(1);
+		expect(cache.resolveFile("public.md").found).toBe(true);
+		expect(cache.resolveFile("readme.md").found).toBe(false);
+	});
 });
