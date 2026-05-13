@@ -5,5 +5,18 @@ export default defineConfig({
 		environment: "node",
 		globals: true,
 		testTimeout: 30000,
+		coverage: {
+			provider: "v8",
+			reporter: ["text", "json", "html"],
+			reportsDirectory: "./coverage",
+			reportOnFailure: true,
+			exclude: [
+				"node_modules/**",
+				"test/**",
+				"coverage/**",
+				"dist/**",
+				"*.config.js",
+			],
+		},
 	},
 });
