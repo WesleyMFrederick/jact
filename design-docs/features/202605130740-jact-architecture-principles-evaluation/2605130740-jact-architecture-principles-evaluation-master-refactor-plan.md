@@ -167,7 +167,7 @@
 
 ### Phase 2 — Architectural Reworks (≥30 min, named scope, trigger)
 
-%% *Last Modified: 05/13/26 12:44:56* %%
+%% *Last Modified: 05/13/26 13:09:18* %%
 
 **Ranked by impact. Items 1 and 2 are independent; Item 3 depends on Item 2.**
 
@@ -188,7 +188,7 @@
    - Items 12+13 from Phase 1 become the full extraction: formatting → `src/formatValidationResult.ts`; fix engine → `src/core/CitationFixer.ts` (class with `applyFixes(content, fixes, { dryRun: boolean })`)  
    - Commander command registration moves from `src/jact.ts:1263–1611` → `src/cli.ts` (entry point); `JactCli` becomes programmatically importable without activating Commander  
    - After extraction: `JactCli` is orchestration + scope management only (~400 lines) at [`src/jact.ts`](/Users/wesleyfrederick/Documents/ObsidianVault/0_SoftwareDevelopment/jact/src/jact.ts)  
-   - Ship `InMemoryFileCache` adapter implementing `FileCacheInterface` as test-default; refactor `CitationValidator` and `ContentExtractor` to accept the interface rather than concrete classes. **TDD sequence:** Write `InMemoryFileCache` + one passing test first → then refactor callers.  
+   - Ship `InMemoryFileCache` adapter implementing `FileCacheInterface` as test-default; refactor `CitationValidator` and `ContentExtractor` to accept the interface rather than concrete classes. **TDD sequence:** Write `InMemoryFileCache` + one passing test first → then refactor callers. **(#35 extended)**  
    **Effort:** 2–3 hours  
    **Trigger:** Any unit test that needs to test `JactCli` methods without spawning a CLI process. Also gates Rework 3 (dry-run implementation requires `CitationFixer` class to exist).  
    **Source:** Core FN-3+FN-5+AR-3, OO REWORK-2, TS A-01  
@@ -235,7 +235,7 @@
    **Source:** Core AR-4/CI-4, TS CI-01/A-06  
    **Sequencing:** Must come after Rework 1 (CitationValidator split simplifies the scope of the mutation change).
 
-7. **Rework:** Contract Test Convention + Regressions Directory  
+7. **Rework:** Contract Test Convention + Regressions Directory (**GH [#58](https://github.com/WesleyMFrederick/jact/issues/58)**)  
    **Scope:**  
    - Create `test/regressions/` directory; add a placeholder `README.md` documenting the promotion convention (`regressions/<issue>-<slug>.test.ts`)  
    - Define `FileSystemInterface` — minimal injectable interface for file-system I/O (read, exists, list); implement `InMemoryFileSystemAdapter` as first-party fake for E2E tests  
@@ -246,7 +246,7 @@
    **TDD sequence:** Write `FileSystemInterface` faux + one test using it first → then refactor production callers.  
    **Source:** Testing-eval Scope and Targets section
 
-8. **Rework:** Test Suite Reorganization  
+8. **Rework:** Test Suite Reorganization (**GH [#61](https://github.com/WesleyMFrederick/jact/issues/61)**)  
    **Scope:**  
    - Migrate flat `test/` layout to mirror `src/` structure — one test file per source module  
    - Rename `helpers/` utilities to the `*-test-utils.ts` naming pattern  
