@@ -33,22 +33,27 @@ const SUGGESTION_THRESHOLD_FLOOR = 3;
 const SUGGESTION_THRESHOLD_CEIL = 10;
 const SUGGESTION_THRESHOLD_RATIO = 0.2;
 
+/**
+ * Constrain a number to the inclusive range [lo, hi].
+ *
+ * If `value` is less than `lo`, returns `lo`; if greater than `hi`, returns `hi`; otherwise returns `value`.
+ *
+ * @param value - The number to clamp
+ * @param lo - Lower bound of the range (inclusive)
+ * @param hi - Upper bound of the range (inclusive)
+ * @returns The input value constrained to the range `[lo, hi]`
+ */
 function clamp(value: number, lo: number, hi: number): number {
 	return Math.min(hi, Math.max(lo, value));
 }
 
 /**
- * Wiki page name resolver with local-first fuzzy resolution.
+ * Resolve a wiki page reference to an absolute file path using direct lookup, slug-normalization, and a local-first fuzzy match.
  *
- * Step 1: fileCache.resolveFile(rawPath)              — handles already-slugged or .md forms
- * Step 2: fileCache.resolveFile(slug + ".md")         — handles Title Case / em dash page names
- * Step 3: local-biased Levenshtein — files within 2 directory levels get 1.5× threshold;
- *         a local fuzzy hit returns resolved: true (not just a suggestion).
- * Step 4: global Levenshtein fallback → suggestions[] only, resolved: false.
- *         Cost optimization: scan only fires when steps 1–3 all miss.
- *
- * Note: relative paths (./  ../) are routed via resolvePath in createLinkObject, not here.
- */
+ * @param rawPath - The page reference as written in the wiki link.
+ * @param sourceAbsolutePath - Absolute path of the source file used to prefer nearby files when fuzzy matching; may be empty.
+ * @param fileCache - Cache providing file resolution and entries for fuzzy matching.
+ * @returns A ResolvedPath: on success includes `{ resolved: true; absolutePath }`; on failure includes `attempted` (the raw and slugged forms), optional `attemptedPaths` (deduplicated looked-up paths), and `suggestions` (up to three ranked relative paths).
 export function resolveWikiPath(
 	rawPath: string,
 	sourceAbsolutePath: string,
