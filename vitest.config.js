@@ -28,8 +28,10 @@ export default defineConfig({
 
 		// Coverage configuration
 		coverage: {
-			provider: "c8",
+			provider: "v8",
 			reporter: ["text", "json", "html"],
+			reportsDirectory: "./coverage",
+			reportOnFailure: true,
 			exclude: [
 				"node_modules/**",
 				"test/**",
