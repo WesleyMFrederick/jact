@@ -54,6 +54,7 @@ import type {
 } from "./types/contentExtractorTypes.js";
 import type {
 	EnrichedLinkObject,
+	PathConversion,
 	ValidationResult,
 } from "./types/validationTypes.js";
 
@@ -97,14 +98,6 @@ interface FixRecord {
 	old: string;
 	new: string;
 	type: string;
-}
-
-/**
- * Path conversion object from validator.
- */
-interface PathConversion {
-	original: string;
-	recommended: string;
 }
 
 /**
