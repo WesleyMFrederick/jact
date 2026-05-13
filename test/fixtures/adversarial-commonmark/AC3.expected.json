@@ -1,0 +1,8 @@
+{
+  "id": "AC3",
+  "commonMarkSection": "§4.5",
+  "edgeCase": "Indented code block adjacent to fenced block",
+  "wikilinks": 3,
+  "unrecognizedCount": 0,
+  "notes": "Fence boundaries unaffected by adjacent indented block. Indented-code wikilink IS extracted (current D1 behavior — no silent drop)."
+}

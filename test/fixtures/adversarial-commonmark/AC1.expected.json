@@ -1,0 +1,8 @@
+{
+  "id": "AC1",
+  "commonMarkSection": "§4.5",
+  "edgeCase": "Triple-backtick on same line as inline single-backtick span",
+  "wikilinks": 3,
+  "unrecognizedCount": 0,
+  "notes": "D1 grammar must extract all 3 wikilinks; mid-line ``` must not open a fence."
+}
