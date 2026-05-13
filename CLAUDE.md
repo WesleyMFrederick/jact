@@ -8,20 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build and Development Commands
 
-### Essential Commands
-```bash
-# Install dependencies and build
-npm install
-npm run build          # Compile TypeScript to dist/
-npm link               # Make jact CLI globally available
+- Read `package.json` for all build and development commands
 
-# After modifying TypeScript files, always rebuild
-npm run build
-
-# Run tests
-npm test              # Run all Vitest tests
-npm run test:watch    # Run tests in watch mode
-```
 
 ### `jact` (Just Another Context Tool) Commands To Validate & Extract Markdown Content
 
