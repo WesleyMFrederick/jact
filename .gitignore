@@ -96,4 +96,5 @@ critique-risks-logs/
 claude-code-transcripts/
 
 # Symlinked shared content
+design-docs/
 architecture-principles/
