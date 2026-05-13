@@ -15,6 +15,7 @@
 		"test:ui": "vitest --ui",
 		"test:coverage": "vitest run --coverage",
 		"type-check": "tsc --noEmit",
+		"check": "npm run type-check && npm test",
 		"start": "node dist/jact.js",
 		"validate:ts-conversion": "node --loader ts-node/esm scripts/validate-typescript-conversion.ts",
 		"jact:validate": "node ./dist/jact.js validate",
