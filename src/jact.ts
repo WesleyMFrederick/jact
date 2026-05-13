@@ -55,6 +55,8 @@ import type {
 } from "./types/contentExtractorTypes.js";
 import type {
 	EnrichedLinkObject,
+	FixRecord,
+	HeaderObject,
 	PathConversion,
 	ValidationResult,
 } from "./types/validationTypes.js";
@@ -69,24 +71,6 @@ const CACHE_DIR = ".jact/claude-cache";
 interface LineRange {
 	startLine: number;
 	endLine: number;
-}
-
-/**
- * Header object with text and anchor.
- */
-interface HeaderObject {
-	text: string;
-	anchor: string;
-}
-
-/**
- * Fix record tracking applied fixes.
- */
-interface FixRecord {
-	line: number;
-	old: string;
-	new: string;
-	type: string;
 }
 
 /**
