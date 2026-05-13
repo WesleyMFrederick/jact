@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const CLI_PATH = join(__dirname, "../../dist/jact.js");
 
+const SOURCE_MD_CONTENT =
+	"# Doc\n\n## Overview\n\nThis is the overview content.\n\nWith multiple lines.\n\n## Other\n\nUnrelated section.\n";
+
 /**
  * D-001: extract header default output format changed from JSON to markdown.
  * Verifies --format flag behavior and default output.
@@ -19,11 +22,6 @@ describe("extract header --format flag", () => {
 			`format-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
 		);
 		mkdirSync(testDir, { recursive: true });
-
-		writeFileSync(
-			join(testDir, "source.md"),
-			"# Doc\n\n## Overview\n\nThis is the overview content.\n\nWith multiple lines.\n\n## Other\n\nUnrelated section.\n",
-		);
 	});
 
 	afterEach(() => {
@@ -31,6 +29,7 @@ describe("extract header --format flag", () => {
 	});
 
 	it("default output (no --format flag) is raw markdown, NOT JSON", () => {
+		writeFileSync(join(testDir, "source.md"), SOURCE_MD_CONTENT);
 		const output = execSync(
 			`node "${CLI_PATH}" extract header "${join(testDir, "source.md")}" "Overview" --scope "${testDir}"`,
 			{ encoding: "utf8" },
@@ -43,6 +42,7 @@ describe("extract header --format flag", () => {
 	});
 
 	it("--format json returns valid JSON with OutgoingLinksExtractedContent structure", () => {
+		writeFileSync(join(testDir, "source.md"), SOURCE_MD_CONTENT);
 		const output = execSync(
 			`node "${CLI_PATH}" extract header "${join(testDir, "source.md")}" "Overview" --scope "${testDir}" --format json --verbose`,
 			{ encoding: "utf8" },
@@ -58,6 +58,7 @@ describe("extract header --format flag", () => {
 	});
 
 	it("--format markdown explicitly returns same as default", () => {
+		writeFileSync(join(testDir, "source.md"), SOURCE_MD_CONTENT);
 		const defaultOutput = execSync(
 			`node "${CLI_PATH}" extract header "${join(testDir, "source.md")}" "Overview" --scope "${testDir}"`,
 			{ encoding: "utf8" },
@@ -72,6 +73,7 @@ describe("extract header --format flag", () => {
 	});
 
 	it("markdown content matches what JSON extractedContentBlocks[id].content would return", () => {
+		writeFileSync(join(testDir, "source.md"), SOURCE_MD_CONTENT);
 		const jsonOutput = execSync(
 			`node "${CLI_PATH}" extract header "${join(testDir, "source.md")}" "Overview" --scope "${testDir}" --format json`,
 			{ encoding: "utf8" },
