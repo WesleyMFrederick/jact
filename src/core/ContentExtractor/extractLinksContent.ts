@@ -1,15 +1,18 @@
-import type { EnrichedLinkObject, ValidationResult } from '../../types/validationTypes.js';
 import type {
 	CliFlags,
+	ExtractedContentBlock,
 	ExtractionEligibilityStrategy,
 	ExtractionStats,
 	OutgoingLinksExtractedContent,
 	ProcessedLinkEntry,
-	ExtractedContentBlock,
-} from '../../types/contentExtractorTypes.js';
-import { analyzeEligibility } from './analyzeEligibility.js';
-import { generateContentId } from './generateContentId.js';
-import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.js';
+} from "../../types/contentExtractorTypes.js";
+import type {
+	EnrichedLinkObject,
+	ValidationResult,
+} from "../../types/validationTypes.js";
+import { analyzeEligibility } from "./analyzeEligibility.js";
+import { generateContentId } from "./generateContentId.js";
+import { decodeUrlAnchor, normalizeBlockId } from "./normalizeAnchor.js";
 
 /**
  * Consumer-defined interface for ParsedFileCache dependency.
@@ -57,16 +60,21 @@ interface ExtractLinksContentDeps {
 export async function extractLinksContent(
 	sourceFilePath: string,
 	cliFlags: CliFlags,
-	{ parsedFileCache, citationValidator, eligibilityStrategies }: ExtractLinksContentDeps,
+	{
+		parsedFileCache,
+		citationValidator,
+		eligibilityStrategies,
+	}: ExtractLinksContentDeps,
 ): Promise<OutgoingLinksExtractedContent> {
 	// PHASE 1: Validation (AC3)
 	// Call citationValidator to get enriched links
-	const validationResult: ValidationResult = await citationValidator.validateFile(sourceFilePath);
+	const validationResult: ValidationResult =
+		await citationValidator.validateFile(sourceFilePath);
 	const enrichedLinks: EnrichedLinkObject[] = validationResult.links; // Array with validation metadata
 
 	// AC15: Filter out internal links before processing
 	const crossDocumentLinks = enrichedLinks.filter(
-		(link) => link.scope !== 'internal',
+		(link) => link.scope !== "internal",
 	);
 
 	// PHASE 2: Initialize Deduplicated Structure
@@ -86,11 +94,11 @@ export async function extractLinksContent(
 		stats.totalLinks++;
 
 		// AC4: Skip validation errors
-		if (link.validation.status === 'error') {
+		if (link.validation.status === "error") {
 			processedLinks.push({
 				sourceLink: link,
 				contentId: null,
-				status: 'skipped',
+				status: "skipped",
 				failureDetails: {
 					reason: `Link failed validation: ${link.validation.error}`,
 				},
@@ -108,7 +116,7 @@ export async function extractLinksContent(
 			processedLinks.push({
 				sourceLink: link,
 				contentId: null,
-				status: 'skipped',
+				status: "skipped",
 				failureDetails: {
 					reason: `Link not eligible: ${eligibilityDecision.reason}`,
 				},
@@ -119,21 +127,22 @@ export async function extractLinksContent(
 		// PHASE 4: Content Retrieval with Deduplication (AC5-AC7)
 		try {
 			// Determine target document (all links are cross-document after AC15 filter)
-			const decodedPath = decodeURIComponent(link.target.path.absolute as string);
+			if (link.target.path.absolute == null) continue;
+			const decodedPath = decodeURIComponent(link.target.path.absolute);
 			const targetDoc = await parsedFileCache.resolveParsedFile(decodedPath);
 
 			// Extract content based on anchor type
 			let extractedContent: string;
-			if (link.anchorType === 'header') {
+			if (link.anchorType === "header") {
 				// AC5: Section
 				const decodedAnchor = decodeUrlAnchor(link.target.anchor);
 				// extractSection handles heading level lookup internally (Phase 0)
-				const result = targetDoc.extractSection(decodedAnchor ?? '');
+				const result = targetDoc.extractSection(decodedAnchor ?? "");
 				if (!result) {
 					throw new Error(`Heading not found: ${decodedAnchor}`);
 				}
 				extractedContent = result;
-			} else if (link.anchorType === 'block') {
+			} else if (link.anchorType === "block") {
 				// AC6: Block
 				const normalizedAnchor = normalizeBlockId(link.target.anchor);
 				const blockResult = targetDoc.extractBlock(normalizedAnchor);
@@ -168,7 +177,7 @@ export async function extractLinksContent(
 			processedLinks.push({
 				sourceLink: link,
 				contentId: contentId,
-				status: 'success',
+				status: "success",
 				eligibilityReason: eligibilityDecision.reason,
 			});
 		} catch (error) {
@@ -176,27 +185,27 @@ export async function extractLinksContent(
 			processedLinks.push({
 				sourceLink: link,
 				contentId: null,
-				status: 'error',
-				failureDetails: { reason: `Extraction failed: ${(error as Error).message}` },
+				status: "error",
+				failureDetails: {
+					reason: `Extraction failed: ${(error as Error).message}`,
+				},
 			});
 		}
 	}
 
 	// PHASE 5: Calculate Final Statistics
 	// Pattern: Compression ratio = saved / (total + saved)
-	const totalContentSize = Object.values(
-		extractedContentBlocks,
-	).reduce((sum, block) => sum + block.contentLength, 0);
+	const totalContentSize = Object.values(extractedContentBlocks).reduce(
+		(sum, block) => sum + block.contentLength,
+		0,
+	);
 	stats.compressionRatio =
 		totalContentSize + stats.tokensSaved === 0
 			? 0
-			: stats.tokensSaved /
-				(totalContentSize + stats.tokensSaved);
+			: stats.tokensSaved / (totalContentSize + stats.tokensSaved);
 
 	// Add JSON size metadata for output length checking (AC3: metadata first for diagnostic visibility)
-	const jsonSize = JSON.stringify(
-		extractedContentBlocks,
-	).length;
+	const jsonSize = JSON.stringify(extractedContentBlocks).length;
 
 	// Decision: Return deduplicated output as only public contract (AC9)
 	return {
