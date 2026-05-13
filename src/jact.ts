@@ -47,6 +47,11 @@ import {
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
+import {
+	formatAsJSON,
+	formatForCLI,
+	formatForCLIMinimal,
+} from "./formatValidationResult.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type {
