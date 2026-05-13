@@ -8,6 +8,11 @@
       "source": "architecture-principles/",
       "alias": "architecture-principles/",
       "description": "Shared architecture principles"
+    },
+    {
+      "source": "repository-documents/jact/design-docs/",
+      "alias": "design-docs/",
+      "description": "jact design documentation (component guides, feature plans, research)"
     }
   ]
 }
