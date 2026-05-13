@@ -15,7 +15,8 @@
  * scanner-only delta plan must be re-scoped to also patch D1.
  */
 import fs from "node:fs";
-import path, { resolve } from "node:path";
+import path, { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { extractLinks } from "../../../src/core/MarkdownParser/extractLinks.js";
 import { FileCache } from "../../../src/FileCache.js";
@@ -55,7 +56,7 @@ function callExtractLinks(
 	return { links: obj.links, unrecognized: obj.unrecognized ?? [] };
 }
 
-const FIXTURE_DIR = import.meta.dirname ?? resolve(__dirname);
+const FIXTURE_DIR = import.meta.dirname ?? dirname(fileURLToPath(import.meta.url));
 
 function loadFixture(id: string): {
 	mdPath: string;
