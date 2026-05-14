@@ -6,15 +6,7 @@
  * new object via spread rather than mutating the input in-place.
  */
 
-/**
- * Unit tests for CitationValidator — enrichLinkObject factory (issue #37)
- *
- * TDD: RED test first — verifies original LinkObject is NOT mutated after
- * validateFile/validateSingleCitation returns. Proves the factory creates a
- * new object via spread rather than mutating the input in-place.
- */
-
-import fs, { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import fs, { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
 import { describe, expect, it } from "vitest";
