@@ -12,7 +12,7 @@
  * Tests assert observable contract (stdout shape, stderr substrings, exit
  * code) only — not internal call sequences.
  *
- * CLI invocations spawn `node dist/jact.js ast …` (requires prior build).
+ * CLI invocations spawn `node dist/cli.js ast …` (requires prior build).
  */
 
 import { exec } from "node:child_process";
@@ -26,7 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const CLI_PATH = join(__dirname, "../../dist/jact.js");
+const CLI_PATH = join(__dirname, "../../dist/cli.js");
 const JACT_ROOT = join(__dirname, "../..");
 const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");
 

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-const CLI_PATH = join(__dirname, "../../dist/jact.js");
+const CLI_PATH = join(__dirname, "../../dist/cli.js");
 
 /**
  * H-002 Falsification: Does extract header ever return multiple content blocks?

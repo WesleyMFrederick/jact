@@ -5,7 +5,7 @@ import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "dist", "jact.js");
+const citationManagerPath = join(__dirname, "..", "dist", "cli.js");
 
 describe("CLI Warning Output Display Tests", () => {
 	it("should display warnings section with proper formatting and tree structure", async () => {

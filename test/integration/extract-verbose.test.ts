@@ -2,7 +2,7 @@
  * D4 integration tests: --verbose flag on extract file/header/links.
  * Phase 3 — §8e assertions (10 total).
  *
- * CLI invocations use node dist/jact.js (requires prior build).
+ * CLI invocations use node dist/cli.js (requires prior build).
  */
 
 import { exec } from "node:child_process";
@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const CLI_PATH = join(__dirname, "../../dist/jact.js");
+const CLI_PATH = join(__dirname, "../../dist/cli.js");
 const JACT_ROOT = join(__dirname, "../..");
 const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");
 // Stable fixture (not a transient feature doc) — file under test/fixtures/ is

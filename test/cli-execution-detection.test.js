@@ -7,7 +7,7 @@ import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "dist", "jact.js");
+const citationManagerPath = join(__dirname, "..", "dist", "cli.js");
 
 describe("CLI Execution Detection via Symlink", () => {
 	let symlinkPath;

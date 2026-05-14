@@ -12,7 +12,7 @@ describe("Extract Command - Infrastructure", () => {
 		// Given: jact CLI
 
 		// When: Request help for extract links command
-		const output = execSync("node dist/jact.js extract links --help", {
+		const output = execSync("node dist/cli.js extract links --help", {
 			encoding: "utf8",
 		});
 
@@ -31,7 +31,7 @@ describe("Extract Links Subcommand - Registration", () => {
 		// Given: jact CLI with extract command
 
 		// When: Request help for extract links
-		const output = execSync("node dist/jact.js extract links --help", {
+		const output = execSync("node dist/cli.js extract links --help", {
 			encoding: "utf8",
 		});
 
@@ -51,7 +51,7 @@ describe("Extract Links - CLI Orchestration", () => {
 
 		// When: Execute extract links command
 		const output = execSync(
-			`node dist/jact.js extract links ${fixtureFile} --verbose`,
+			`node dist/cli.js extract links ${fixtureFile} --verbose`,
 			{ encoding: "utf8" },
 		);
 
@@ -75,7 +75,7 @@ describe("Extract Links - Validation Error Reporting", () => {
 		let output;
 		try {
 			output = execSync(
-				`node dist/jact.js extract links "${fixtureFile}" 2>&1`,
+				`node dist/cli.js extract links "${fixtureFile}" 2>&1`,
 				{ encoding: "utf8" },
 			);
 		} catch (error) {
@@ -98,7 +98,7 @@ describe("Extract Links - Full Files Flag", () => {
 
 		// When: Execute with --full-files flag
 		const output = execSync(
-			`node dist/jact.js extract links "${fixtureFile}" --full-files --verbose`,
+			`node dist/cli.js extract links "${fixtureFile}" --full-files --verbose`,
 			{ encoding: "utf8" },
 		);
 
@@ -119,7 +119,7 @@ describe("Extract Links - Full Files Flag", () => {
 		let output;
 		try {
 			output = execSync(
-				`node dist/jact.js extract links "${fixtureFile}" --verbose`,
+				`node dist/cli.js extract links "${fixtureFile}" --verbose`,
 				{ encoding: "utf8" },
 			);
 		} catch (error) {
@@ -140,7 +140,7 @@ describe("Extract Links - Exit Codes", () => {
 
 		// When: Execute extract links command and check exit code
 		const result = execSync(
-			`node dist/jact.js extract links "${fixtureFile}" > /dev/null 2>&1; echo $?`,
+			`node dist/cli.js extract links "${fixtureFile}" > /dev/null 2>&1; echo $?`,
 			{ encoding: "utf8" },
 		);
 
@@ -155,7 +155,7 @@ describe("Extract Links - Exit Codes", () => {
 
 		// When: Execute extract links command without --full-files flag
 		const result = execSync(
-			`node dist/jact.js extract links "${fixtureFile}" > /dev/null 2>&1; echo $?`,
+			`node dist/cli.js extract links "${fixtureFile}" > /dev/null 2>&1; echo $?`,
 			{ encoding: "utf8" },
 		);
 
@@ -170,7 +170,7 @@ describe("Extract Command - Help Documentation", () => {
 		// Given: jact CLI
 
 		// When: Request help for extract command
-		const output = execSync("node dist/jact.js extract --help", {
+		const output = execSync("node dist/cli.js extract --help", {
 			encoding: "utf8",
 		});
 
@@ -187,7 +187,7 @@ describe("Extract Links - Help Documentation", () => {
 		// Given: jact CLI
 
 		// When: Request help for extract links
-		const output = execSync("node dist/jact.js extract links --help", {
+		const output = execSync("node dist/cli.js extract links --help", {
 			encoding: "utf8",
 		});
 
