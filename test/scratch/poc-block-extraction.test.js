@@ -1,10 +1,11 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createMarkdownParser } from "../src/factories/componentFactory.js";
+import { createMarkdownParser } from "../../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const fixturesDir = join(__dirname, "..", "fixtures");
 
 /**
  * POC: Block Extraction by Anchor ID
@@ -73,12 +74,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should extract a paragraph block by anchor ID", async () => {
 		// Given: A markdown file with block anchors on paragraphs
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Parse file and extract block by anchor ID
 		const result = await parser.parseFile(testFile);
@@ -103,12 +99,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should extract a different paragraph block in the same section", async () => {
 		// Given: A markdown file with multiple block anchors
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Parse file and extract second paragraph block
 		const result = await parser.parseFile(testFile);
@@ -132,12 +123,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should extract a heading block with anchor", async () => {
 		// Given: A markdown file with block anchor on heading
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Parse file and extract heading block
 		const result = await parser.parseFile(testFile);
@@ -156,12 +142,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should extract a list item block by anchor ID", async () => {
 		// Given: A markdown file with block anchors on list items
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Parse file and extract first list item
 		const result = await parser.parseFile(testFile);
@@ -181,12 +162,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should extract a different list item in the same list", async () => {
 		// Given: A markdown file with multiple list items with anchors
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Parse file and extract third list item
 		const result = await parser.parseFile(testFile);
@@ -206,12 +182,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should extract a paragraph block in the middle of a section", async () => {
 		// Given: A markdown file with block anchor in middle of section
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Parse file and extract mid-section paragraph
 		const result = await parser.parseFile(testFile);
@@ -233,12 +204,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should return null when block anchor not found", async () => {
 		// Given: A markdown file with block anchors
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Try to extract non-existent block
 		const result = await parser.parseFile(testFile);
@@ -255,12 +221,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should validate anchor object structure from parser", async () => {
 		// Given: A markdown file with block anchors
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Parse file and extract any block
 		const result = await parser.parseFile(testFile);
@@ -290,12 +251,7 @@ describe("POC: Block Extraction by Anchor ID", () => {
 	it("should extract blocks from different sections independently", async () => {
 		// Given: A markdown file with block anchors in different sections
 		const parser = createMarkdownParser();
-		const testFile = join(
-			__dirname,
-			"fixtures",
-			"section-extraction",
-			"source.md",
-		);
+		const testFile = join(fixturesDir, "section-extraction", "source.md");
 
 		// When: Parse file and extract blocks from different sections
 		const result = await parser.parseFile(testFile);
