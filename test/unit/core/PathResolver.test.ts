@@ -4,7 +4,7 @@
  * Verifies PathResolver can be instantiated and called without CitationValidator.
  * These tests use a minimal file-system stub so no real FS access is needed.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // Dynamic import so the test fails gracefully with "module not found" in RED phase
 describe("PathResolver — isolated unit", () => {

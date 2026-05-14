@@ -25,11 +25,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { Command, Option } from "commander";
-import type { CitationValidator } from "./CitationValidator.js";
 import {
 	checkExtractCache,
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
+import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
 import { applyAnchorFix, applyPathConversion } from "./core/citationFixer.js";
 import {

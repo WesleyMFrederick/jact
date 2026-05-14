@@ -1,10 +1,11 @@
 // tools/jact/test/integration/us2.2-acceptance-criteria.test.js
-import { describe, it, expect } from "vitest";
-import { createContentExtractor } from "../../src/factories/componentFactory.js";
-import { ContentExtractor } from "../../src/core/ContentExtractor/ContentExtractor.js";
-import { ParsedFileCache } from "../../src/ParsedFileCache.js";
-import { CitationValidator } from "../../src/CitationValidator.js";
+
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
+import { ContentExtractor } from "../../src/core/ContentExtractor/ContentExtractor.js";
+import { createContentExtractor } from "../../src/factories/componentFactory.js";
+import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 
 /**
  * US2.2 Acceptance Criteria Validation Tests

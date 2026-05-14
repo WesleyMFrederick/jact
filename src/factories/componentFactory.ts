@@ -16,7 +16,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { CitationValidator } from "../CitationValidator.js";
+import { CitationValidator } from "../core/CitationValidator/CitationValidator.js";
 import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.js";
 import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
 import { ForceMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
