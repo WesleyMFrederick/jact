@@ -7,7 +7,7 @@
  * @module jact
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";

@@ -24,6 +24,8 @@ export interface CliValidateOptions {
 	lines?: string;
 	scope?: string;
 	fix?: boolean;
+	/** When true, preview fixes without writing files. Prints a diff to stdout. Requires fix: true. */
+	dryRun?: boolean;
 	verbose?: boolean;
 	allowGitignore?: boolean;
 }
