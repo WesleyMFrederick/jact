@@ -102,6 +102,10 @@ program
 		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections",
 	)
 	.option(
+		"--dry-run",
+		"preview fixes without writing files; prints a diff of what would change (use with --fix)",
+	)
+	.option(
 		"--verbose",
 		"show full validation report: all valid citations, duplicate-filename warnings, summary block (default: minimal output with only errors/warnings)",
 		false,
@@ -124,6 +128,7 @@ Examples:
     $ jact validate file.md --format json            # JSON output (unchanged)
     $ jact validate file.md --lines 100-200
     $ jact validate file.md --fix --scope ./docs
+    $ jact validate file.md --fix --dry-run          # preview fixes without writing files
 
 Exit Codes:
   0  All citations valid
