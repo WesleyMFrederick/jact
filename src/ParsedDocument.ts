@@ -290,7 +290,7 @@ class ParsedDocument {
 	 * @param tokenType - Token type from marked.js
 	 * @returns True if token.raw includes all child content
 	 */
-	_tokenIncludesChildrenInRaw(tokenType: string): boolean {
+	private _tokenIncludesChildrenInRaw(tokenType: string): boolean {
 		// Token types where .raw includes full content (skip recursion)
 		const inclusiveTypes = new Set([
 			"heading", // "## Title\n" includes inline text

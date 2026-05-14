@@ -44,7 +44,7 @@ export type ValidationMetadata =
 	  }
 	| {
 			status: "warning";
-			error: string;
+			message: string;
 			suggestion?: string;
 			pathConversion?: PathConversion;
 	  };

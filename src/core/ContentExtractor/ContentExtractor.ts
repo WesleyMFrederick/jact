@@ -1,18 +1,21 @@
-import type { LinkObject } from '../../types/citationTypes.js';
-import type { EnrichedLinkObject, ValidationResult } from '../../types/validationTypes.js';
+import type { LinkObject } from "../../types/citationTypes.js";
 import type {
 	CliFlags,
 	EligibilityDecision,
-	ExtractionEligibilityStrategy,
 	ExtractedContentBlock,
+	ExtractionEligibilityStrategy,
 	ExtractionStats,
 	OutgoingLinksExtractedContent,
 	ProcessedLinkEntry,
-} from '../../types/contentExtractorTypes.js';
-import { analyzeEligibility } from './analyzeEligibility.js';
-import { extractLinksContent as extractLinksContentOp } from './extractLinksContent.js';
-import { generateContentId } from './generateContentId.js';
-import { decodeUrlAnchor, normalizeBlockId } from './normalizeAnchor.js';
+} from "../../types/contentExtractorTypes.js";
+import type {
+	EnrichedLinkObject,
+	ValidationResult,
+} from "../../types/validationTypes.js";
+import { analyzeEligibility } from "./analyzeEligibility.js";
+import { extractLinksContent as extractLinksContentOp } from "./extractLinksContent.js";
+import { generateContentId } from "./generateContentId.js";
+import { decodeUrlAnchor, normalizeBlockId } from "./normalizeAnchor.js";
 
 /**
  * Consumer-defined interface for ParsedFileCache dependency.
@@ -62,7 +65,10 @@ export class ContentExtractor {
 	/**
 	 * Analyze link eligibility using strategy chain.
 	 */
-	analyzeEligibility(link: LinkObject, cliFlags: CliFlags): EligibilityDecision {
+	analyzeEligibility(
+		link: LinkObject,
+		cliFlags: CliFlags,
+	): EligibilityDecision {
 		return analyzeEligibility(link, cliFlags, this.eligibilityStrategies);
 	}
 
@@ -91,7 +97,7 @@ export class ContentExtractor {
 	): Promise<OutgoingLinksExtractedContent> {
 		// AC15: Filter out internal links before processing
 		const crossDocumentLinks = enrichedLinks.filter(
-			(link) => link.scope !== 'internal',
+			(link) => link.scope !== "internal",
 		);
 
 		// Initialize Deduplicated Structure
@@ -110,11 +116,11 @@ export class ContentExtractor {
 			stats.totalLinks++;
 
 			// AC4: Skip validation errors
-			if (link.validation.status === 'error') {
+			if (link.validation.status === "error") {
 				processedLinks.push({
 					sourceLink: link,
 					contentId: null,
-					status: 'skipped',
+					status: "skipped",
 					failureDetails: {
 						reason: `Link failed validation: ${link.validation.error}`,
 					},
@@ -132,7 +138,7 @@ export class ContentExtractor {
 				processedLinks.push({
 					sourceLink: link,
 					contentId: null,
-					status: 'skipped',
+					status: "skipped",
 					failureDetails: {
 						reason: `Link not eligible: ${eligibilityDecision.reason}`,
 					},
@@ -142,18 +148,30 @@ export class ContentExtractor {
 
 			// Content Retrieval with Deduplication (AC5-AC7)
 			try {
-				const decodedPath = decodeURIComponent(link.target.path.absolute as string);
-				const targetDoc = await this.parsedFileCache.resolveParsedFile(decodedPath);
+				if (link.target.path.absolute == null) {
+					processedLinks.push({
+						sourceLink: link,
+						contentId: null,
+						status: "skipped",
+						failureDetails: {
+							reason: "Link has no resolved absolute path",
+						},
+					});
+					continue;
+				}
+				const decodedPath = decodeURIComponent(link.target.path.absolute);
+				const targetDoc =
+					await this.parsedFileCache.resolveParsedFile(decodedPath);
 
 				let extractedContent: string;
-				if (link.anchorType === 'header') {
+				if (link.anchorType === "header") {
 					const decodedAnchor = decodeUrlAnchor(link.target.anchor);
-					const result = targetDoc.extractSection(decodedAnchor ?? '');
+					const result = targetDoc.extractSection(decodedAnchor ?? "");
 					if (!result) {
 						throw new Error(`Heading not found: ${decodedAnchor}`);
 					}
 					extractedContent = result;
-				} else if (link.anchorType === 'block') {
+				} else if (link.anchorType === "block") {
 					const blockId = normalizeBlockId(link.target.anchor);
 					const blockResult = targetDoc.extractBlock(blockId);
 					if (!blockResult) {
@@ -180,8 +198,9 @@ export class ContentExtractor {
 					stats.tokensSaved += contentLength;
 				}
 
-				// Add source link traceability (type system guarantees sourceLinks exists)
-				const block = extractedContentBlocks[contentId] as ExtractedContentBlock;
+				// Add source link traceability
+				const block = extractedContentBlocks[contentId];
+				if (!block) throw new Error(`Missing content block: ${contentId}`);
 				block.sourceLinks = block.sourceLinks || [];
 				block.sourceLinks.push({
 					rawSourceLink: link.fullMatch,
@@ -191,13 +210,13 @@ export class ContentExtractor {
 				processedLinks.push({
 					sourceLink: link,
 					contentId,
-					status: 'extracted',
+					status: "extracted",
 				});
 			} catch (error) {
 				processedLinks.push({
 					sourceLink: link,
 					contentId: null,
-					status: 'failed',
+					status: "failed",
 					failureDetails: {
 						reason: (error as Error).message,
 					},

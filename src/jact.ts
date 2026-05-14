@@ -23,6 +23,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { Command, Option } from "commander";
 import type { CitationValidator } from "./CitationValidator.js";
 import {
@@ -30,6 +31,7 @@ import {
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
+import { applyAnchorFix, applyPathConversion } from "./core/citationFixer.js";
 import {
 	detectNestedCodeblocks,
 	type NestedCodeblockWarning,
@@ -46,6 +48,7 @@ import {
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
+import { formatAsJSON, formatForCLI } from "./formatValidationResult.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type {
@@ -56,8 +59,6 @@ import type {
 import type {
 	EnrichedLinkObject,
 	FixRecord,
-	HeaderObject,
-	PathConversion,
 	ValidationResult,
 } from "./types/validationTypes.js";
 
@@ -159,14 +160,13 @@ export class JactCli {
 	): Promise<ParserOutput> {
 		this.applyScope(options, filePath);
 
-		const { resolve, basename } = await import("node:path");
-		const absolute = resolve(filePath);
+		const absolute = path.resolve(filePath);
 
 		if (existsSync(absolute)) {
 			return this.parser.parseFile(absolute);
 		}
 
-		const cacheResult = this.fileCache.resolveFile(basename(filePath));
+		const cacheResult = this.fileCache.resolveFile(path.basename(filePath));
 		if (cacheResult.found) {
 			return this.parser.parseFile(cacheResult.path);
 		}
@@ -347,214 +347,23 @@ export class JactCli {
 	}
 
 	/**
-	 * Format validation results for CLI output
-	 *
-	 * Generates human-readable tree-style output with sections for errors,
-	 * warnings, and valid citations. Includes summary statistics and validation time.
-	 *
-	 * @param result - Validation result object
-	 * @returns Formatted CLI output
+	 * Format validation results for CLI output.
+	 * Delegates to {@link formatForCLI} in formatValidationResult module.
 	 */
 	private formatForCLI(
 		result: ValidationResult & { lineRange?: string },
 		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
 		verbose = false,
 	): string {
-		if (!verbose) {
-			return this.formatForCLIMinimal(result, nestedCodeblockWarnings);
-		}
-
-		const lines: string[] = [];
-		lines.push("Citation Validation Report");
-		lines.push("==========================");
-		lines.push("");
-		if (result.lineRange) {
-			lines.push(`Line Range: ${result.lineRange}`);
-		}
-		lines.push(`Processed: ${result.summary.total} citations found`);
-		lines.push("");
-
-		if (result.summary.errors > 0) {
-			lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
-			const errorLinks = result.links.filter(
-				(link) => link.validation.status === "error",
-			);
-			for (const [index, link] of errorLinks.entries()) {
-				const isLast = index === errorLinks.length - 1;
-				const prefix = isLast ? "└─" : "├─";
-				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-				if (link.validation.status === "error") {
-					lines.push(`│  └─ ${link.validation.error}`);
-					if (link.validation.suggestion) {
-						lines.push(`│  └─ Suggestion: ${link.validation.suggestion}`);
-					}
-				}
-				if (!isLast) lines.push("│");
-			}
-			lines.push("");
-		}
-
-		if (result.summary.warnings > 0) {
-			lines.push(`WARNINGS (${result.summary.warnings})`);
-			const warnLinks = result.links.filter(
-				(link) => link.validation.status === "warning",
-			);
-			for (const [index, link] of warnLinks.entries()) {
-				const isLast = index === warnLinks.length - 1;
-				const prefix = isLast ? "└─" : "├─";
-				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-				if (
-					link.validation.status === "warning" &&
-					link.validation.suggestion
-				) {
-					lines.push(`│  └─ ${link.validation.suggestion}`);
-				}
-				if (!isLast) lines.push("│");
-			}
-			lines.push("");
-		}
-
-		if (result.summary.valid > 0) {
-			lines.push(`VALID CITATIONS (${result.summary.valid})`);
-			const validLinks = result.links.filter(
-				(link) => link.validation.status === "valid",
-			);
-			for (const [index, link] of validLinks.entries()) {
-				const isLast = index === validLinks.length - 1;
-				const prefix = isLast ? "└─" : "├─";
-				lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-			}
-			lines.push("");
-		}
-
-		if (nestedCodeblockWarnings.length > 0) {
-			lines.push(
-				`NESTED CODEBLOCK WARNINGS (${nestedCodeblockWarnings.length})`,
-			);
-			nestedCodeblockWarnings.forEach((warning, index) => {
-				const isLast = index === nestedCodeblockWarnings.length - 1;
-				const prefix = isLast ? "└─" : "├─";
-				lines.push(`${prefix} Line ${warning.line}: ${warning.message}`);
-				if (!isLast) lines.push("│");
-			});
-			lines.push("");
-		}
-
-		lines.push("SUMMARY:");
-		lines.push(`- Total citations: ${result.summary.total}`);
-		lines.push(`- Valid: ${result.summary.valid}`);
-		lines.push(`- Warnings: ${result.summary.warnings}`);
-		lines.push(`- Critical errors: ${result.summary.errors}`);
-		if (nestedCodeblockWarnings.length > 0) {
-			lines.push(
-				`- Nested codeblock warnings: ${nestedCodeblockWarnings.length}`,
-			);
-		}
-		lines.push(`- Validation time: ${result.validationTime}`);
-		lines.push("");
-
-		if (result.summary.errors > 0) {
-			lines.push(
-				`VALIDATION FAILED - Fix ${result.summary.errors} critical errors`,
-			);
-		} else if (
-			result.summary.warnings > 0 ||
-			nestedCodeblockWarnings.length > 0
-		) {
-			const totalWarnings =
-				result.summary.warnings + nestedCodeblockWarnings.length;
-			lines.push(
-				`VALIDATION PASSED WITH WARNINGS - ${totalWarnings} issues to review`,
-			);
-		} else {
-			lines.push("ALL CITATIONS VALID");
-		}
-
-		return lines.join("\n");
+		return formatForCLI(result, nestedCodeblockWarnings, verbose);
 	}
 
 	/**
-	 * Minimal (LLM-optimized) CLI formatter — default output.
-	 *
-	 * Emits only errors and warnings. Clean files produce a single "OK:" line.
-	 * Designed to minimize token consumption for LLM-driven repair workflows.
-	 */
-	private formatForCLIMinimal(
-		result: ValidationResult & { lineRange?: string },
-		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
-	): string {
-		const lines: string[] = [];
-
-		if (result.summary.errors > 0) {
-			lines.push(`ERRORS (${result.summary.errors})`);
-			const errorLinks = result.links.filter(
-				(link) => link.validation.status === "error",
-			);
-			for (const link of errorLinks) {
-				lines.push(`- Line ${link.line}: ${link.fullMatch}`);
-				if (link.validation.status === "error") {
-					lines.push(`  error: ${link.validation.error}`);
-					if (link.validation.suggestion) {
-						lines.push(`  suggestion: ${link.validation.suggestion}`);
-					}
-				}
-			}
-			lines.push("");
-		}
-
-		const totalWarnings =
-			result.summary.warnings + nestedCodeblockWarnings.length;
-
-		if (totalWarnings > 0) {
-			lines.push(`WARNINGS (${totalWarnings})`);
-			const warnLinks = result.links.filter(
-				(link) => link.validation.status === "warning",
-			);
-			for (const link of warnLinks) {
-				lines.push(`- Line ${link.line}: ${link.fullMatch}`);
-				if (
-					link.validation.status === "warning" &&
-					link.validation.suggestion
-				) {
-					lines.push(`  suggestion: ${link.validation.suggestion}`);
-				}
-			}
-			for (const w of nestedCodeblockWarnings) {
-				lines.push(`- Line ${w.line}: ${w.message}`);
-			}
-			lines.push("");
-		}
-
-		if (result.summary.errors > 0) {
-			// Errors → FAILED (exit 1)
-			const parts = [
-				`${result.summary.errors} ${result.summary.errors === 1 ? "error" : "errors"}`,
-			];
-			if (totalWarnings > 0) {
-				parts.push(
-					`${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"}`,
-				);
-			}
-			lines.push(`FAILED: ${parts.join(", ")}`);
-		} else if (totalWarnings > 0) {
-			// Warnings only → OK with note (exit 0, preserves exit code contract)
-			lines.push(
-				`OK: ${result.summary.total} citations valid (${totalWarnings} ${totalWarnings === 1 ? "warning" : "warnings"})`,
-			);
-		} else {
-			lines.push(`OK: ${result.summary.total} citations valid`);
-		}
-
-		return lines.join("\n");
-	}
-
-	/**
-	 * Format validation results as JSON
-	 * @param result - Result object to format
-	 * @returns JSON string representation
+	 * Format validation results as JSON.
+	 * Delegates to {@link formatAsJSON} in formatValidationResult module.
 	 */
 	private formatAsJSON(result: ValidationResult): string {
-		return JSON.stringify(result, null, 2);
+		return formatAsJSON(result);
 	}
 
 	/**
@@ -780,8 +589,7 @@ export class JactCli {
 			// Fix(#63): Resolve targetFile to absolute BEFORE creating synthetic link
 			// so target.path.raw is absolute. path.resolve() with an absolute second
 			// arg ignores the first, preventing duplicate segments in resolveTargetPath()
-			const { resolve } = await import("node:path");
-			const absoluteTargetFile = resolve(targetFile);
+			const absoluteTargetFile = path.resolve(targetFile);
 			const factory = new LinkObjectFactory();
 			const syntheticLink = factory.createFileLink(absoluteTargetFile);
 
@@ -801,8 +609,7 @@ export class JactCli {
 				enrichedLink.validation.pathConversion?.recommended
 			) {
 				// Update target path to use cache-resolved absolute path
-				const { resolve } = await import("node:path");
-				const absolutePath = resolve(
+				const absolutePath = path.resolve(
 					enrichedLink.validation.pathConversion.recommended,
 				);
 				syntheticLink.target.path.absolute = absolutePath;
@@ -942,7 +749,7 @@ export class JactCli {
 					link.validation.status !== "valid" &&
 					link.validation.pathConversion
 				) {
-					newCitation = this.applyPathConversion(
+					newCitation = applyPathConversion(
 						newCitation,
 						link.validation.pathConversion,
 					);
@@ -960,7 +767,7 @@ export class JactCli {
 						(link.validation.error.startsWith("Anchor not found") &&
 							link.validation.suggestion.includes("Available headers:")))
 				) {
-					newCitation = this.applyAnchorFix(newCitation, link);
+					newCitation = applyAnchorFix(newCitation, link);
 					anchorFixesApplied++;
 					fixType = fixType ? "path+anchor" : "anchor";
 				}
@@ -1014,132 +821,6 @@ export class JactCli {
 				error instanceof Error ? error.message : String(error);
 			return `ERROR: ${errorMessage}`;
 		}
-	}
-
-	/**
-	 * Apply path conversion to citation
-	 * @param citation - Citation text to modify
-	 * @param pathConversion - Path conversion object
-	 * @returns Citation with converted path
-	 */
-	private applyPathConversion(
-		citation: string,
-		pathConversion: PathConversion,
-	): string {
-		return citation.replace(
-			pathConversion.original,
-			pathConversion.recommended,
-		);
-	}
-
-	/**
-	 * Parse available headers from suggestion message
-	 *
-	 * Extracts header mappings from validator suggestion string.
-	 * Format: "Available headers: \"Vision Statement\" → #Vision Statement, ..."
-	 *
-	 * @param suggestion - Suggestion message from validator
-	 * @returns Array of header objects with text and anchor
-	 */
-	private parseAvailableHeaders(suggestion: string): HeaderObject[] {
-		const headerRegex = /"([^"]+)"\s*→\s*#([^,]+)/g;
-		return [...suggestion.matchAll(headerRegex)].map((match) => ({
-			text: (match[1] || "").trim(),
-			anchor: `#${(match[2] || "").trim()}`,
-		}));
-	}
-
-	/**
-	 * Normalize anchor for fuzzy matching (removes # and hyphens)
-	 * @param anchor - Anchor text to normalize
-	 * @returns Normalized anchor
-	 */
-	private normalizeAnchorForMatching(anchor: string): string {
-		return anchor.replace("#", "").replace(/-/g, " ").toLowerCase();
-	}
-
-	/**
-	 * Find best header match using fuzzy logic
-	 *
-	 * Matches normalized broken anchor against available headers using exact
-	 * or punctuation-stripped comparison.
-	 *
-	 * @param brokenAnchor - Anchor that wasn't found
-	 * @param availableHeaders - Available headers
-	 * @returns Best matching header or undefined
-	 */
-	private findBestHeaderMatch(
-		brokenAnchor: string,
-		availableHeaders: HeaderObject[],
-	): HeaderObject | undefined {
-		const searchText = this.normalizeAnchorForMatching(brokenAnchor);
-		return availableHeaders.find(
-			(header) =>
-				header.text.toLowerCase() === searchText ||
-				header.text.toLowerCase().replace(/[.\s]/g, "") ===
-					searchText.replace(/\s/g, ""),
-		);
-	}
-
-	/**
-	 * URL-encode anchor text (spaces to %20, periods to %2E)
-	 * @param headerText - Header text to encode
-	 * @returns URL-encoded anchor
-	 */
-	private urlEncodeAnchor(headerText: string): string {
-		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
-	}
-
-	/**
-	 * Apply anchor fix to citation
-	 *
-	 * Handles two fix types:
-	 * - Obsidian compatibility: kebab-case to raw header format
-	 * - Missing anchors: fuzzy match to available headers
-	 *
-	 * @param citation - Original citation text
-	 * @param link - Link object with validation metadata
-	 * @returns Citation with corrected anchor or original
-	 */
-	// biome-ignore lint/suspicious/noExplicitAny: pre-existing untyped method, tracked in #97
-	private applyAnchorFix(citation: string, link: any): string {
-		const suggestionMatch = link.validation.suggestion.match(
-			/Use raw header format for better Obsidian compatibility: #(.+)$/,
-		);
-		if (suggestionMatch) {
-			const newAnchor = suggestionMatch[1];
-			const citationMatch = citation.match(/\[([^\]]+)\]\(([^)]+)#([^)]+)\)/);
-			if (citationMatch) {
-				const [, linkText, filePath] = citationMatch;
-				return `[${linkText}](${filePath}#${newAnchor})`;
-			}
-		}
-
-		// Handle anchor not found errors
-		if (
-			link.validation.error.startsWith("Anchor not found") &&
-			link.validation.suggestion.includes("Available headers:")
-		) {
-			const availableHeaders = this.parseAvailableHeaders(
-				link.validation.suggestion,
-			);
-			const citationMatch = citation.match(/\[([^\]]+)\]\(([^)]+)#([^)]+)\)/);
-
-			if (citationMatch && availableHeaders.length > 0) {
-				const [, linkText, filePath, brokenAnchor] = citationMatch;
-				const bestMatch = this.findBestHeaderMatch(
-					`#${brokenAnchor}`,
-					availableHeaders,
-				);
-
-				if (bestMatch) {
-					const encodedAnchor = this.urlEncodeAnchor(bestMatch.text);
-					return `[${linkText}](${filePath}#${encodedAnchor})`;
-				}
-			}
-		}
-
-		return citation;
 	}
 }
 
