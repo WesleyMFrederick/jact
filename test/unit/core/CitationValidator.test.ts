@@ -4,6 +4,10 @@
  * TDD: RED test first — verifies original LinkObject is NOT mutated after
  * validateFile/validateSingleCitation returns. Proves the factory creates a
  * new object via spread rather than mutating the input in-place.
+ *
+ * Contract tests: validate the TSDoc Contract: blocks on enrichLinkObject,
+ * validateFile, and validateSingleCitation. These tests will fail if those
+ * contracts are broken — they are the enforcement layer for the TSDoc obligations.
  */
 
 import fs, { mkdtempSync, writeFileSync } from "node:fs";
@@ -42,7 +46,7 @@ function makeInternalLink(overrides: Partial<LinkObject> = {}): LinkObject {
 	};
 }
 
-describe("CitationValidator — enrichLinkObject factory (issue #37)", () => {
+describe("Contract: enrichLinkObject — immutability and spread (issue #37)", () => {
 	it("validateSingleCitation does NOT mutate the original LinkObject", async () => {
 		const validator = makeValidator();
 		const original = makeInternalLink();
@@ -126,5 +130,52 @@ describe("CitationValidator — enrichLinkObject factory (issue #37)", () => {
 		expect(enriched.linkType).toBe("markdown");
 		expect(enriched.scope).toBe("internal");
 		expect(enriched.anchorType).toBe("block");
+	});
+});
+
+describe("Contract: validateFile — throws on missing file", () => {
+	it("throws Error('File not found: …') when filePath does not exist", async () => {
+		// Given: a validator and a path that does not exist on disk
+		const validator = makeValidator();
+
+		// When / Then: validateFile rejects with "File not found" contract
+		await expect(
+			validator.validateFile("/non-existent-path-jact-test.md"),
+		).rejects.toThrow("File not found");
+	});
+});
+
+describe("Contract: validateSingleCitation — status values are exhaustive", () => {
+	it("returns validation.status of 'valid', 'warning', or 'error' — no other values", async () => {
+		// Given: a validator and a minimal internal-link citation
+		const validator = makeValidator();
+		const citation = makeInternalLink();
+
+		// When: validateSingleCitation is called
+		const enriched = await validator.validateSingleCitation(
+			citation,
+			"/tmp/source.md",
+		);
+
+		// Then: status is one of the three allowed values (contract exhaustiveness)
+		expect(["valid", "warning", "error"]).toContain(enriched.validation.status);
+	});
+
+	it("returns a NEW object reference — original citation not mutated", async () => {
+		// Given: validator and a link with no validation property
+		const validator = makeValidator();
+		const citation = makeInternalLink();
+
+		// When: validateSingleCitation is called
+		const enriched = await validator.validateSingleCitation(
+			citation,
+			"/tmp/source.md",
+		);
+
+		// Then: returned object is a new reference (contract: no mutation)
+		expect(enriched).not.toBe(citation);
+		expect(
+			(citation as typeof citation & { validation?: unknown }).validation,
+		).toBeUndefined();
 	});
 });

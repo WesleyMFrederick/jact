@@ -42,6 +42,11 @@ type SingleCitationValidationResult = PathResolutionResult;
  *
  * Replaces the previous in-place mutation pattern:
  *   `(citation as EnrichedLinkObject).validation = validation`
+ *
+ * Contract:
+ * - The returned object is a NEW reference (not the same object as `link`).
+ * - The original `link` is NOT mutated: no properties are added, changed, or deleted.
+ * - The returned object contains all fields from `link` plus `validation: meta`.
  */
 export function enrichLinkObject(
 	link: LinkObject,
@@ -90,6 +95,14 @@ export class CitationValidator {
 
 	// ── Public API ────────────────────────────────────────────────────────────
 
+	/**
+	 * Contract:
+	 * - Throws `Error("File not found: …")` when `filePath` does not exist on disk.
+	 * - Returns a `ValidationResult` with `links` array where every element is an
+	 *   `EnrichedLinkObject` (original parser `LinkObject` fields preserved, plus
+	 *   `validation` added via spread — original objects never mutated).
+	 * - `summary` reflects the aggregate status of all links in `links`.
+	 */
 	async validateFile(filePath: string): Promise<ValidationResult> {
 		if (!existsSync(filePath)) {
 			throw new Error(`File not found: ${filePath}`);
@@ -110,6 +123,14 @@ export class CitationValidator {
 		return { summary, links: enrichedLinks };
 	}
 
+	/**
+	 * Contract:
+	 * - Returns an `EnrichedLinkObject` whose `validation.status` is `"valid"`,
+	 *   `"warning"`, or `"error"` — never a fourth value.
+	 * - The returned object is a NEW reference; the original `citation` is not mutated.
+	 * - `validation.error` is present when `status === "error"`.
+	 * - `validation.suggestion` is present when a suggestion exists.
+	 */
 	async validateSingleCitation(
 		citation: LinkObject,
 		contextFile?: string,

@@ -2,11 +2,15 @@
  * AnchorMatcher unit tests — RED phase for issue #28
  *
  * Verifies AnchorMatcher can be instantiated and called without CitationValidator.
+ *
+ * Contract tests: validate the public surface of AnchorMatcher's pure matching
+ * helpers. These describe blocks are the enforcement layer for the observable
+ * behavioral obligations of the class.
  */
 import { describe, expect, it } from "vitest";
 import type { AnchorObject } from "../../../src/types/citationTypes.js";
 
-describe("AnchorMatcher — isolated unit", () => {
+describe("Contract: AnchorMatcher — pure matching helpers (no I/O)", () => {
 	it("cleanMarkdownForComparison removes markdown markers", async () => {
 		const { AnchorMatcher } = await import(
 			"../../../src/core/CitationValidator/AnchorMatcher.js"
