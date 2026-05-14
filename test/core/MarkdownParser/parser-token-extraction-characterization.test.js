@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it, beforeAll } from "vitest";
-import { createMarkdownParser } from "../src/factories/componentFactory.js";
+import { beforeAll, describe, expect, it } from "vitest";
+import { createMarkdownParser } from "../../../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,7 +21,7 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should produce exact link count for valid-citations.md", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
 		// Baseline: capture actual count from current implementation
@@ -34,7 +34,7 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should produce exact link count for enhanced-citations.md", async () => {
-		const testFile = join(__dirname, "fixtures", "enhanced-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "enhanced-citations.md");
 		const result = await parser.parseFile(testFile);
 
 		// Baseline: capture actual count from current implementation
@@ -49,10 +49,12 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve cross-document link path resolution", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
-		const crossDocLinks = result.links.filter(l => l.scope === "cross-document");
+		const crossDocLinks = result.links.filter(
+			(l) => l.scope === "cross-document",
+		);
 		expect(crossDocLinks.length).toBeGreaterThan(0);
 
 		for (const link of crossDocLinks) {
@@ -64,10 +66,10 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve internal link properties", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
-		const internalLinks = result.links.filter(l => l.scope === "internal");
+		const internalLinks = result.links.filter((l) => l.scope === "internal");
 		expect(internalLinks.length).toBeGreaterThan(0);
 
 		for (const link of internalLinks) {
@@ -79,7 +81,7 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve line and column positions", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
 		for (const link of result.links) {
@@ -91,7 +93,7 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve extraction marker detection", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
 		// extractionMarker should be present on all links (null or object)
@@ -105,7 +107,7 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve all link object properties", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
 		for (const link of result.links) {
@@ -123,10 +125,10 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve markdown link type detection", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
-		const markdownLinks = result.links.filter(l => l.linkType === "markdown");
+		const markdownLinks = result.links.filter((l) => l.linkType === "markdown");
 		expect(markdownLinks.length).toBeGreaterThan(0);
 
 		// All markdown links should have valid properties
@@ -136,10 +138,10 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve wiki link type detection", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
-		const wikiLinks = result.links.filter(l => l.linkType === "wiki");
+		const wikiLinks = result.links.filter((l) => l.linkType === "wiki");
 		expect(wikiLinks.length).toBeGreaterThan(0);
 
 		for (const link of wikiLinks) {
@@ -148,10 +150,12 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve anchor type classification", async () => {
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
-		const linksWithAnchors = result.links.filter(l => l.target.anchor !== null);
+		const linksWithAnchors = result.links.filter(
+			(l) => l.target.anchor !== null,
+		);
 		expect(linksWithAnchors.length).toBeGreaterThan(0);
 
 		for (const link of linksWithAnchors) {
@@ -160,11 +164,11 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 	});
 
 	it("should preserve cite format link extraction", async () => {
-		const testFile = join(__dirname, "fixtures", "enhanced-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "enhanced-citations.md");
 		const result = await parser.parseFile(testFile);
 
 		const citeLinks = result.links.filter(
-			l => l.text && l.text.startsWith("cite:")
+			(l) => l.text && l.text.startsWith("cite:"),
 		);
 		expect(citeLinks.length).toBeGreaterThan(0);
 

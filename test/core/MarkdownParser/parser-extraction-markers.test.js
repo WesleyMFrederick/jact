@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { MarkdownParser } from "../src/core/MarkdownParser/index.js";
 import fs from "node:fs";
 import path from "node:path";
+import { beforeEach, describe, expect, it } from "vitest";
+import { MarkdownParser } from "../../../src/core/MarkdownParser/index.js";
 
 describe("MarkdownParser - Extraction Markers", () => {
 	let parser;
@@ -14,7 +14,7 @@ describe("MarkdownParser - Extraction Markers", () => {
 		// Given: Static fixture with force-extract marker
 		const fixturePath = path.join(
 			__dirname,
-			"fixtures/us2.1/parser-markers-force-extract.md",
+			"../../fixtures/us2.1/parser-markers-force-extract.md",
 		);
 
 		// When: Parser processes file
@@ -32,7 +32,7 @@ describe("MarkdownParser - Extraction Markers", () => {
 		// Given: Static fixture with stop marker
 		const fixturePath = path.join(
 			__dirname,
-			"fixtures/us2.1/parser-markers-stop-extract.md",
+			"../../fixtures/us2.1/parser-markers-stop-extract.md",
 		);
 
 		// When: Parser processes file
@@ -49,7 +49,7 @@ describe("MarkdownParser - Extraction Markers", () => {
 		// Given: Static fixture with HTML comment
 		const fixturePath = path.join(
 			__dirname,
-			"fixtures/us2.1/parser-markers-html-comment.md",
+			"../../fixtures/us2.1/parser-markers-html-comment.md",
 		);
 
 		// When: Parser processes file
@@ -66,7 +66,7 @@ describe("MarkdownParser - Extraction Markers", () => {
 		// Given: Static fixture without markers
 		const fixturePath = path.join(
 			__dirname,
-			"fixtures/us2.1/parser-markers-no-marker.md",
+			"../../fixtures/us2.1/parser-markers-no-marker.md",
 		);
 
 		// When: Parser processes file
@@ -80,7 +80,7 @@ describe("MarkdownParser - Extraction Markers", () => {
 		// Given: Static fixture with spaces before marker
 		const fixturePath = path.join(
 			__dirname,
-			"fixtures/us2.1/parser-markers-whitespace.md",
+			"../../fixtures/us2.1/parser-markers-whitespace.md",
 		);
 
 		// When: Parser processes file

@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createMarkdownParser } from "../src/factories/componentFactory.js";
+import { createMarkdownParser } from "../../../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -10,7 +10,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should return complete MarkdownParser.Output.DataContract with all fields", async () => {
 		// Given: Factory-created parser with test fixture
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 
 		// When: Parsing file
 		const result = await parser.parseFile(testFile);
@@ -34,7 +34,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should populate headings array with level, text, raw properties", async () => {
 		// Given: Parser with fixture containing headings
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -57,7 +57,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should populate anchors array with documented AnchorObject schema", async () => {
 		// Given: Parser with fixture containing anchors
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -93,7 +93,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should populate links array with documented LinkObject schema", async () => {
 		// Given: Parser with fixture containing cross-document links
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -137,7 +137,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should correctly populate path variations (raw, absolute, relative)", async () => {
 		// Given: Parser with fixture containing cross-document links
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 
 		// When: Parse file with links to other documents
 		const result = await parser.parseFile(testFile);
@@ -168,7 +168,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should validate enum constraints for linkType, scope, anchorType", async () => {
 		// Given: Parser with fixture containing various link types
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -193,7 +193,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should validate headings extracted from complex header fixture", async () => {
 		// Given: Parser with complex headers fixture
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+		const testFile = join(__dirname, "../../fixtures", "complex-headers.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -219,7 +219,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should validate parser output matches documented contract schema", async () => {
 		// Given: Parser with any valid fixture
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -243,7 +243,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 		expect(actualFields.sort()).toEqual(requiredFields.sort());
 
 		// Verify filePath is absolute
-		expect(result.filePath).toContain(__dirname);
+		expect(result.filePath).toContain("test/fixtures");
 
 		// Verify content is non-empty string
 		expect(result.content.length).toBeGreaterThan(0);
@@ -252,7 +252,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should populate anchors array with single anchor per header", async () => {
 		// Given: Parser with fixture containing headers with special characters
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+		const testFile = join(__dirname, "../../fixtures", "complex-headers.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -276,7 +276,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should populate urlEncodedId for all header anchors", async () => {
 		// Given: Parser with headers (both simple and complex)
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+		const testFile = join(__dirname, "../../fixtures", "complex-headers.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -296,7 +296,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should omit urlEncodedId for block anchors", async () => {
 		// Given: Parser with block anchors
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+		const testFile = join(__dirname, "../../fixtures", "complex-headers.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -314,7 +314,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should prevent duplicate anchor entries for headers with special characters", async () => {
 		// Given: Header "## Story 1.5: Implement Cache"
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "complex-headers.md");
+		const testFile = join(__dirname, "../../fixtures", "complex-headers.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -335,14 +335,16 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should parse cross-document links with parentheses in anchor fragments", async () => {
 		// Given: Parser and test file with parens in anchor
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "parens-in-anchors.md");
+		const testFile = join(__dirname, "../../fixtures", "parens-in-anchors.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
 
 		// Then: Full anchor with parentheses captured
 		const link = result.links.find(
-			(l) => l.target.anchor === "ValidationMetadata%20Type%20(Discriminated%20Union)",
+			(l) =>
+				l.target.anchor ===
+				"ValidationMetadata%20Type%20(Discriminated%20Union)",
 		);
 		expect(link).toBeDefined();
 		expect(link.fullMatch).toBe(
@@ -353,23 +355,27 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should parse internal anchor links with parentheses correctly", async () => {
 		// Given: Parser and test file with internal anchor containing parens
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "parens-in-anchors.md");
+		const testFile = join(__dirname, "../../fixtures", "parens-in-anchors.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
 
 		// Then: Full anchor with parentheses captured
 		const link = result.links.find(
-			(l) => l.scope === "internal" && l.target.anchor === "Heading%20(With%20Parens)",
+			(l) =>
+				l.scope === "internal" &&
+				l.target.anchor === "Heading%20(With%20Parens)",
 		);
 		expect(link).toBeDefined();
-		expect(link.fullMatch).toBe("[heading with parens](#Heading%20(With%20Parens))");
+		expect(link.fullMatch).toBe(
+			"[heading with parens](#Heading%20(With%20Parens))",
+		);
 	});
 
 	it("should not regress on standard links without parentheses in anchors", async () => {
 		// Given: Parser and existing test file
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "valid-citations.md");
+		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -385,7 +391,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 	it("should parse multiple links on same line with mixed parens/no-parens correctly", async () => {
 		// Given: Parser and test file with multiple links on one line
 		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "fixtures", "parens-in-anchors.md");
+		const testFile = join(__dirname, "../../fixtures", "parens-in-anchors.md");
 
 		// When: Parse file
 		const result = await parser.parseFile(testFile);
@@ -395,7 +401,9 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 		expect(line4Links.length).toBe(2);
 
 		const withParens = line4Links.find((l) => l.target.anchor?.includes("("));
-		const withoutParens = line4Links.find((l) => l.target.anchor === "Normal%20Anchor");
+		const withoutParens = line4Links.find(
+			(l) => l.target.anchor === "Normal%20Anchor",
+		);
 
 		expect(withParens).toBeDefined();
 		expect(withParens.target.anchor).toBe("Section%20(Notes)");
