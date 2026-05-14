@@ -6,9 +6,9 @@
  *
  * Moved from src/CitationValidator.ts (issue #33).
  * Extraction of PathResolver and AnchorMatcher per issue #28.
+ * Path-resolution waterfall replaced by strategy array (issue #28).
  */
 
-import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { LinkObject } from "../../types/citationTypes.js";
 import type {
@@ -22,6 +22,11 @@ import type { ParsedFileCacheLike } from "./AnchorMatcher.js";
 import { AnchorMatcher } from "./AnchorMatcher.js";
 import type { FileCacheLike } from "./PathResolver.js";
 import { PathResolver } from "./PathResolver.js";
+import {
+	defaultPathResolutionStrategies,
+	type PathResolutionResult,
+	type PathResolutionStrategy,
+} from "./pathResolutionStrategies/index.js";
 
 // ── Dependency injection interfaces ──────────────────────────────────────────
 
@@ -31,22 +36,14 @@ type ParsedFileCacheInterface = ParsedFileCacheLike;
 type FileCacheInterface = FileCacheLike;
 
 // SingleCitationValidationResult — internal shape only
-interface SingleCitationValidationResult {
-	line: number;
-	citation: string;
-	status: "valid" | "error" | "warning";
-	linkType: string;
-	scope: string;
-	error?: string;
-	suggestion?: string;
-	pathConversion?: PathConversion;
-}
+type SingleCitationValidationResult = PathResolutionResult;
 
 export class CitationValidator {
 	private parsedFileCache: ParsedFileCacheInterface;
 	private fileCache: FileCacheInterface;
 	private pathResolver: PathResolver;
 	private anchorMatcher: AnchorMatcher;
+	private pathResolutionStrategies: PathResolutionStrategy[];
 	private patterns: {
 		CARET_SYNTAX: { regex: RegExp; examples: string[]; description: string };
 		EMPHASIS_MARKED: { regex: RegExp; examples: string[]; description: string };
@@ -56,11 +53,14 @@ export class CitationValidator {
 	constructor(
 		parsedFileCache: ParsedFileCacheInterface,
 		fileCache: FileCacheInterface,
+		pathResolutionStrategies?: PathResolutionStrategy[],
 	) {
 		this.parsedFileCache = parsedFileCache;
 		this.fileCache = fileCache;
 		this.pathResolver = new PathResolver(fileCache);
 		this.anchorMatcher = new AnchorMatcher(parsedFileCache);
+		this.pathResolutionStrategies =
+			pathResolutionStrategies ?? defaultPathResolutionStrategies;
 
 		this.patterns = {
 			CARET_SYNTAX: {
@@ -99,6 +99,7 @@ export class CitationValidator {
 	// ── Public API ────────────────────────────────────────────────────────────
 
 	async validateFile(filePath: string): Promise<ValidationResult> {
+		const { existsSync } = await import("node:fs");
 		if (!existsSync(filePath)) {
 			throw new Error(`File not found: ${filePath}`);
 		}
@@ -299,272 +300,40 @@ export class CitationValidator {
 		citation: LinkObject,
 		sourceFile?: string,
 	): Promise<SingleCitationValidationResult> {
-		// Wiki fast-path (success): trust parser-resolved absolute path
-		if (
-			citation.linkType === "wiki" &&
-			citation.target.path.absolute !== null &&
-			this.pathResolver.isFile(citation.target.path.absolute)
-		) {
-			const targetPath = citation.target.path.absolute;
-			if (citation.target.anchor) {
-				const anchorExists = await this.anchorMatcher.validateAnchorExists(
-					citation.target.anchor,
-					targetPath,
-				);
-				if (!anchorExists.valid) {
-					return this.createValidationResult(
-						citation,
-						"error",
-						`Anchor not found: #${citation.target.anchor}`,
-						anchorExists.suggestion,
-					);
-				}
-				if (anchorExists.matchedAs === "block-ref-missing-caret") {
-					return this.createValidationResult(
-						citation,
-						"warning",
-						null,
-						anchorExists.suggestion,
-					);
-				}
-			}
-			return this.createValidationResult(citation, "valid");
-		}
-
-		// Wiki fail-loud path
-		if (
-			citation.linkType === "wiki" &&
-			citation.target.path.absolute === null &&
-			citation.target.path.attempted !== undefined &&
-			citation.target.path.attempted.length > 0
-		) {
-			const tried = citation.target.path.attempted.join(", ");
-			return this.createValidationResult(
-				citation,
-				"error",
-				`Wiki page not found: ${citation.target.path.raw}`,
-				`Tried: ${tried}`,
-			);
-		}
-
+		const resolvedSourceFile = sourceFile ?? "";
 		const decodedRelativePath = decodeURIComponent(
 			citation.target.path.raw ?? "",
 		);
-		const sourceDir = dirname(sourceFile ?? "");
+		const sourceDir = dirname(resolvedSourceFile);
 		const standardPath = resolve(sourceDir, decodedRelativePath);
-
 		const targetPath = this.pathResolver.resolveTargetPath(
 			citation.target.path.raw ?? "",
-			sourceFile ?? "",
+			resolvedSourceFile,
 		);
 
-		// Folder link detection
-		const directoryCheckPath = existsSync(targetPath)
-			? targetPath
-			: standardPath;
-		if (this.pathResolver.isDirectory(directoryCheckPath)) {
-			return this.createValidationResult(
-				citation,
-				"warning",
-				`Link points to a folder, not a file: ${citation.target.path.raw}`,
-				"Link to a specific file inside the folder (e.g., folder/index.md) or create an index.md in the target folder",
-			);
-		}
+		const ctx = {
+			citation,
+			sourceFile: resolvedSourceFile,
+			targetPath,
+			standardPath,
+			pathResolver: this.pathResolver,
+			anchorMatcher: this.anchorMatcher,
+			fileCache: this.fileCache,
+		};
 
-		// File not found
-		if (!existsSync(targetPath)) {
-			const debugInfo = this.pathResolver.generatePathResolutionDebugInfo(
-				citation.target.path.raw ?? "",
-				sourceFile ?? "",
-			);
-
-			if (this.fileCache) {
-				const filename =
-					(citation.target.path.raw ?? "").split("/").pop() ?? "";
-				const cacheResult = this.fileCache.resolveFile(filename);
-
-				if (cacheResult.found && cacheResult.fuzzyMatch) {
-					if (cacheResult.path && existsSync(cacheResult.path)) {
-						if (citation.target.anchor) {
-							const anchorExists =
-								await this.anchorMatcher.validateAnchorExists(
-									citation.target.anchor,
-									cacheResult.path ?? "",
-								);
-							if (!anchorExists.valid) {
-								return this.createValidationResult(
-									citation,
-									"error",
-									`Anchor not found: #${citation.target.anchor}`,
-									`${anchorExists.suggestion} (Note: ${cacheResult.message})`,
-								);
-							}
-							if (anchorExists.matchedAs === "block-ref-missing-caret") {
-								return this.createValidationResult(
-									citation,
-									"warning",
-									null,
-									anchorExists.suggestion,
-								);
-							}
-						}
-						return this.createValidationResult(
-							citation,
-							"valid",
-							null,
-							cacheResult.message ?? undefined,
-						);
-					}
-				} else if (cacheResult.found && !cacheResult.fuzzyMatch) {
-					if (cacheResult.path && existsSync(cacheResult.path)) {
-						const isDirectoryMatch = this.pathResolver.isDirectoryMatch(
-							sourceFile ?? "",
-							cacheResult.path ?? "",
-						);
-						const baseStatus = isDirectoryMatch ? "valid" : "warning";
-						const crossDirMessage = isDirectoryMatch
-							? null
-							: `Found via file cache in different directory: ${cacheResult.path}`;
-
-						if (citation.target.anchor) {
-							const anchorExists =
-								await this.anchorMatcher.validateAnchorExists(
-									citation.target.anchor,
-									cacheResult.path ?? "",
-								);
-							if (!anchorExists.valid) {
-								const anchorMessage = `Anchor not found: #${citation.target.anchor}`;
-								const combinedMessage = crossDirMessage
-									? `${crossDirMessage}. ${anchorMessage}`
-									: anchorMessage;
-								return this.createValidationResult(
-									citation,
-									"error",
-									combinedMessage,
-									anchorExists.suggestion,
-								);
-							}
-							if (anchorExists.matchedAs === "block-ref-missing-caret") {
-								return this.createValidationResult(
-									citation,
-									"warning",
-									null,
-									anchorExists.suggestion,
-								);
-							}
-						}
-
-						if (!isDirectoryMatch) {
-							const originalCitation = citation.target.anchor
-								? `${citation.target.path.raw ?? ""}#${citation.target.anchor}`
-								: (citation.target.path.raw ?? "");
-							const suggestion =
-								this.pathResolver.generatePathConversionSuggestion(
-									originalCitation,
-									sourceFile ?? "",
-									cacheResult.path ?? "",
-								);
-							return this.createValidationResult(
-								citation,
-								baseStatus,
-								null,
-								crossDirMessage,
-								suggestion,
-							);
-						}
-
-						return this.createValidationResult(
-							citation,
-							baseStatus,
-							null,
-							crossDirMessage,
-						);
-					}
-				}
-
-				if (
-					cacheResult.reason === "duplicate" ||
-					cacheResult.reason === "duplicate_fuzzy"
-				) {
-					return this.createValidationResult(
-						citation,
-						"error",
-						`File not found: ${citation.target.path.raw}`,
-						`${cacheResult.message ?? ""} ${debugInfo}`,
-					);
-				}
-				if (cacheResult.reason === "not_found") {
-					return this.createValidationResult(
-						citation,
-						"error",
-						`File not found: ${citation.target.path.raw}`,
-						`${cacheResult.message ?? ""} ${debugInfo}`,
-					);
-				}
-			}
-
-			return this.createValidationResult(
-				citation,
-				"error",
-				`File not found: ${citation.target.path.raw}`,
-				`Check if file exists or fix path. ${debugInfo}`,
-			);
-		}
-
-		// File found — check cross-directory
-		const isCrossDirectory = standardPath !== targetPath;
-		const crossDirMessage = isCrossDirectory
-			? `Found via file cache in different directory: ${targetPath}`
-			: null;
-
-		if (citation.target.anchor) {
-			const anchorExists = await this.anchorMatcher.validateAnchorExists(
-				citation.target.anchor,
-				targetPath,
-			);
-			if (!anchorExists.valid) {
-				const anchorMessage = `Anchor not found: #${citation.target.anchor}`;
-				const combinedMessage = crossDirMessage
-					? `${crossDirMessage}. ${anchorMessage}`
-					: anchorMessage;
-				const status = isCrossDirectory ? "warning" : "error";
-				return this.createValidationResult(
-					citation,
-					status,
-					combinedMessage,
-					anchorExists.suggestion,
-				);
-			}
-
-			if (anchorExists.matchedAs === "block-ref-missing-caret") {
-				return this.createValidationResult(
-					citation,
-					"warning",
-					null,
-					anchorExists.suggestion,
-				);
+		for (const strategy of this.pathResolutionStrategies) {
+			const result = await strategy.resolve(ctx);
+			if (result !== null) {
+				return result;
 			}
 		}
 
-		if (isCrossDirectory) {
-			const originalCitation = citation.target.anchor
-				? `${citation.target.path.raw}#${citation.target.anchor}`
-				: (citation.target.path.raw ?? "");
-			const suggestion = this.pathResolver.generatePathConversionSuggestion(
-				originalCitation,
-				sourceFile ?? "",
-				targetPath,
-			);
-			return this.createValidationResult(
-				citation,
-				"warning",
-				null,
-				crossDirMessage,
-				suggestion,
-			);
-		}
-
-		return this.createValidationResult(citation, "valid");
+		// Should not reach here — CacheFallbackStrategy always returns a result
+		return this.createValidationResult(
+			citation,
+			"error",
+			"Path resolution failed: no strategy matched",
+		);
 	}
 
 	private validateWikiStyleLink(
