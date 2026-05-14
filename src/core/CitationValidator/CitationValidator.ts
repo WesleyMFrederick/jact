@@ -33,6 +33,23 @@ type ParsedFileCacheInterface = ParsedFileCacheLike;
 type FileCacheInterface = FileCacheLike;
 type SingleCitationValidationResult = PathResolutionResult;
 
+// ── enrichLinkObject factory ──────────────────────────────────────────────────
+
+/**
+ * Constructs a new EnrichedLinkObject from a LinkObject and ValidationMetadata
+ * via object spread. The original `link` is never mutated — callers holding a
+ * reference to the original see no change after enrichment.
+ *
+ * Replaces the previous in-place mutation pattern:
+ *   `(citation as EnrichedLinkObject).validation = validation`
+ */
+export function enrichLinkObject(
+	link: LinkObject,
+	meta: ValidationMetadata,
+): EnrichedLinkObject {
+	return { ...link, validation: meta };
+}
+
 // ── Pattern constants ─────────────────────────────────────────────────────────
 
 const CARET_SYNTAX_REGEX =
@@ -82,13 +99,12 @@ export class CitationValidator {
 			await this.parsedFileCache.resolveParsedFile(filePath);
 		const links = sourceParsedDoc.getLinks();
 
-		await Promise.all(
-			links.map(async (link: LinkObject) => {
-				await this.validateSingleCitation(link, filePath);
-			}),
+		const enrichedLinks: EnrichedLinkObject[] = await Promise.all(
+			links.map((link: LinkObject) =>
+				this.validateSingleCitation(link, filePath),
+			),
 		);
 
-		const enrichedLinks = links as unknown as ValidationResult["links"];
 		const summary = computeValidationSummary(enrichedLinks);
 
 		return { summary, links: enrichedLinks };
@@ -123,8 +139,7 @@ export class CitationValidator {
 			};
 		}
 
-		(citation as EnrichedLinkObject).validation = validation;
-		return citation as EnrichedLinkObject;
+		return enrichLinkObject(citation, validation);
 	}
 
 	// ── Public delegates (for consumers that previously called CitationValidator directly) ──

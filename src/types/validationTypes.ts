@@ -1,8 +1,9 @@
 /**
  * ValidationTypes - CitationValidator output contracts
  *
- * CRITICAL: These types match the enrichment pattern where LinkObjects
- * get a `validation` property added in-place. DO NOT create wrapper objects.
+ * Enrichment pattern: CitationValidator.validateSingleCitation returns a new
+ * EnrichedLinkObject via enrichLinkObject factory (object spread). The original
+ * LinkObject is never mutated. See issue #37.
  *
  * Reference: CitationValidator Component Guide - Output Contract
  */
@@ -50,10 +51,11 @@ export type ValidationMetadata =
 	  };
 
 /**
- * EnrichedLinkObject - LinkObject with validation property added in-place
+ * EnrichedLinkObject - new object constructed from a LinkObject plus validation
  *
- * ENRICHMENT PATTERN: CitationValidator adds `validation` property to
- * existing LinkObjects from parser. No wrapper objects created.
+ * ENRICHMENT PATTERN: enrichLinkObject factory creates a new object via
+ * object spread: { ...link, validation: meta }. The original LinkObject
+ * is never mutated. See issue #37.
  */
 export interface EnrichedLinkObject extends LinkObject {
 	validation: ValidationMetadata;
