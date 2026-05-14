@@ -148,7 +148,17 @@ export class ContentExtractor {
 
 			// Content Retrieval with Deduplication (AC5-AC7)
 			try {
-				if (link.target.path.absolute == null) continue;
+				if (link.target.path.absolute == null) {
+					processedLinks.push({
+						sourceLink: link,
+						contentId: null,
+						status: "skipped",
+						failureDetails: {
+							reason: "Link has no resolved absolute path",
+						},
+					});
+					continue;
+				}
 				const decodedPath = decodeURIComponent(link.target.path.absolute);
 				const targetDoc =
 					await this.parsedFileCache.resolveParsedFile(decodedPath);

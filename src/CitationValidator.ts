@@ -250,7 +250,7 @@ export class CitationValidator {
 		} else if (result.status === "warning") {
 			validation = {
 				status: "warning",
-				message: result.error ?? "Unknown validation warning",
+				message: result.error ?? result.suggestion ?? "Unknown validation warning",
 				...(result.suggestion && { suggestion: result.suggestion }),
 				...(result.pathConversion && { pathConversion: result.pathConversion }),
 			};

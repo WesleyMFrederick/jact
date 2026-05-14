@@ -127,7 +127,17 @@ export async function extractLinksContent(
 		// PHASE 4: Content Retrieval with Deduplication (AC5-AC7)
 		try {
 			// Determine target document (all links are cross-document after AC15 filter)
-			if (link.target.path.absolute == null) continue;
+			if (link.target.path.absolute == null) {
+				processedLinks.push({
+					sourceLink: link,
+					contentId: null,
+					status: "skipped",
+					failureDetails: {
+						reason: "Link has no resolved absolute path",
+					},
+				});
+				continue;
+			}
 			const decodedPath = decodeURIComponent(link.target.path.absolute);
 			const targetDoc = await parsedFileCache.resolveParsedFile(decodedPath);
 

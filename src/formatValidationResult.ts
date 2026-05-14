@@ -64,8 +64,13 @@ export function formatForCLI(
 			const isLast = index === warnLinks.length - 1;
 			const prefix = isLast ? "└─" : "├─";
 			lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
-			if (link.validation.status === "warning" && link.validation.suggestion) {
-				lines.push(`│  └─ ${link.validation.suggestion}`);
+			if (link.validation.status === "warning") {
+				if (link.validation.message) {
+					lines.push(`│  └─ ${link.validation.message}`);
+				}
+				if (link.validation.suggestion) {
+					lines.push(`│  └─ ${link.validation.suggestion}`);
+				}
 			}
 			if (!isLast) lines.push("│");
 		}
@@ -172,8 +177,13 @@ export function formatForCLIMinimal(
 		);
 		for (const link of warnLinks) {
 			lines.push(`- Line ${link.line}: ${link.fullMatch}`);
-			if (link.validation.status === "warning" && link.validation.suggestion) {
-				lines.push(`  suggestion: ${link.validation.suggestion}`);
+			if (link.validation.status === "warning") {
+				if (link.validation.message) {
+					lines.push(`  message: ${link.validation.message}`);
+				}
+				if (link.validation.suggestion) {
+					lines.push(`  suggestion: ${link.validation.suggestion}`);
+				}
 			}
 		}
 		for (const w of nestedCodeblockWarnings) {
