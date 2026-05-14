@@ -36,13 +36,23 @@ export class CacheFallbackStrategy implements PathResolutionStrategy {
 			return null;
 		}
 
-		const filename = (citation.target.path.raw ?? "").split("/").pop() ?? "";
-		const cacheResult = fileCache.resolveFile(filename);
-
 		const debugInfo = pathResolver.generatePathResolutionDebugInfo(
 			citation.target.path.raw ?? "",
 			sourceFile,
 		);
+
+		// No cache available — surface generic not-found error
+		if (!fileCache) {
+			return buildResult(
+				citation,
+				"error",
+				`File not found: ${citation.target.path.raw}`,
+				`Check if file exists or fix path. ${debugInfo}`,
+			);
+		}
+
+		const filename = (citation.target.path.raw ?? "").split("/").pop() ?? "";
+		const cacheResult = fileCache.resolveFile(filename);
 
 		// Case 1: fuzzy match
 		if (cacheResult.found && cacheResult.fuzzyMatch) {

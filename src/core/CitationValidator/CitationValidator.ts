@@ -29,15 +29,27 @@ import {
 	type PathResolutionStrategy,
 } from "./pathResolutionStrategies/index.js";
 
-// ── Dependency injection interfaces ──────────────────────────────────────────
-
-// ParsedFileCacheLike and FileCacheLike are imported from sub-modules.
-// Local aliases kept for readability.
 type ParsedFileCacheInterface = ParsedFileCacheLike;
 type FileCacheInterface = FileCacheLike;
-
-// SingleCitationValidationResult — internal shape only
 type SingleCitationValidationResult = PathResolutionResult;
+
+// ── Pattern constants ─────────────────────────────────────────────────────────
+
+const CARET_SYNTAX_REGEX =
+	/^\^([A-Za-z]{2,3}\d+(?:-\d+[a-z]?(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Za-z]+\d+|MVP-P\d+|[a-zA-Z][a-zA-Z0-9-]+[a-zA-Z0-9])$/;
+const CARET_SYNTAX_EXAMPLES = [
+	"^FR1",
+	"^US1-1AC1",
+	"^NFR2",
+	"^MVP-P1",
+	"^black-box-interfaces",
+	"^F-LK-003",
+];
+const EMPHASIS_MARKED_REGEX = /^==\*\*[^*]+\*\*==$/;
+const EMPHASIS_MARKED_EXAMPLES = [
+	"==**Component**==",
+	"==**Code Processing Application.SetupOrchestrator**==",
+];
 
 export class CitationValidator {
 	private parsedFileCache: ParsedFileCacheInterface;
@@ -45,10 +57,6 @@ export class CitationValidator {
 	private pathResolver: PathResolver;
 	private anchorMatcher: AnchorMatcher;
 	private pathResolutionStrategies: PathResolutionStrategy[];
-	private patterns: {
-		CARET_SYNTAX: { regex: RegExp; examples: string[]; description: string };
-		EMPHASIS_MARKED: { regex: RegExp; examples: string[]; description: string };
-	};
 
 	constructor(
 		parsedFileCache: ParsedFileCacheInterface,
@@ -61,35 +69,6 @@ export class CitationValidator {
 		this.anchorMatcher = new AnchorMatcher(parsedFileCache);
 		this.pathResolutionStrategies =
 			pathResolutionStrategies ?? defaultPathResolutionStrategies;
-
-		this.patterns = {
-			CARET_SYNTAX: {
-				regex:
-					/^\^([A-Za-z]{2,3}\d+(?:-\d+[a-z]?(?:AC\d+|T\d+(?:-\d+)?)?)?|[A-Za-z]+\d+|MVP-P\d+|[a-zA-Z][a-zA-Z0-9-]+[a-zA-Z0-9])$/,
-				examples: [
-					"^FR1",
-					"^US1-1AC1",
-					"^US1-4bT1-1",
-					"^NFR2",
-					"^MVP-P1",
-					"^black-box-interfaces",
-					"^first-section-intro",
-					"^deep-heading",
-					"^F-LK-003",
-					"^A-004",
-				],
-				description:
-					"Caret syntax for requirements/criteria (numbered) and Obsidian block references (text-based)",
-			},
-			EMPHASIS_MARKED: {
-				regex: /^==\*\*[^*]+\*\*==$/,
-				examples: [
-					"==**Component**==",
-					"==**Code Processing Application.SetupOrchestrator**==",
-				],
-				description: "Emphasis-marked headers with double asterisks",
-			},
-		};
 	}
 
 	// ── Public API ────────────────────────────────────────────────────────────
@@ -246,14 +225,14 @@ export class CitationValidator {
 		const anchor = citation.target.anchor || citation.fullMatch.substring(1);
 		const anchorToTest = anchor.startsWith("^") ? anchor : `^${anchor}`;
 
-		if (this.patterns.CARET_SYNTAX.regex.test(anchorToTest)) {
+		if (CARET_SYNTAX_REGEX.test(anchorToTest)) {
 			return this.createValidationResult(citation, "valid");
 		}
 		return this.createValidationResult(
 			citation,
 			"error",
 			`Invalid caret pattern: ${anchorToTest}`,
-			`Use format: ${this.patterns.CARET_SYNTAX.examples.join(", ")}`,
+			`Use format: ${CARET_SYNTAX_EXAMPLES.join(", ")}`,
 		);
 	}
 
@@ -262,7 +241,7 @@ export class CitationValidator {
 	): SingleCitationValidationResult {
 		const anchor = citation.target.anchor ?? "";
 
-		if (this.patterns.EMPHASIS_MARKED.regex.test(anchor)) {
+		if (EMPHASIS_MARKED_REGEX.test(anchor)) {
 			return this.createValidationResult(citation, "valid");
 		}
 		if (anchor.includes("==") && anchor.includes("**")) {
@@ -287,7 +266,7 @@ export class CitationValidator {
 			citation,
 			"error",
 			"Invalid emphasis pattern",
-			`Use format: ${this.patterns.EMPHASIS_MARKED.examples.join(", ")}`,
+			`Use format: ${EMPHASIS_MARKED_EXAMPLES.join(", ")}`,
 		);
 	}
 

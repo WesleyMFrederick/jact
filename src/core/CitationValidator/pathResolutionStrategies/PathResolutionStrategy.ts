@@ -34,7 +34,7 @@ export interface PathResolutionContext {
 	standardPath: string;
 	pathResolver: PathResolver;
 	anchorMatcher: AnchorMatcher;
-	fileCache: FileCacheLike;
+	fileCache: FileCacheLike | null;
 }
 
 // ── Strategy interface ─────────────────────────────────────────────────────────
