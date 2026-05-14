@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StopMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { StopMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
 
 describe("StopMarkerStrategy", () => {
 	it("should return ineligible when stop-extract-link marker is present", () => {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { CliFlagStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
-import { ForceMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
-import { SectionLinkStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
-import { StopMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { CliFlagStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
+import { ForceMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
+import { SectionLinkStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
+import { StopMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
 
 describe("ExtractionEligibilityStrategy interface compliance", () => {
 	it("StopMarkerStrategy implements ExtractionEligibilityStrategy directly", () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	normalizeBlockId,
 	decodeUrlAnchor,
-} from "../src/core/ContentExtractor/normalizeAnchor.js";
+} from "../../../src/core/ContentExtractor/normalizeAnchor.js";
 
 describe("Anchor Normalization Utilities", () => {
 	it("should remove caret prefix from block anchor", () => {

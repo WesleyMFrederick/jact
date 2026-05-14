@@ -3,11 +3,11 @@ import { describe, it, expect } from "vitest";
 import {
 	analyzeEligibility,
 	createEligibilityAnalyzer,
-} from "../src/core/ContentExtractor/analyzeEligibility.js";
-import { StopMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
-import { ForceMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
-import { SectionLinkStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
-import { CliFlagStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
+} from "../../../src/core/ContentExtractor/analyzeEligibility.js";
+import { StopMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { ForceMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
+import { SectionLinkStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
+import { CliFlagStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
 
 describe("analyzeEligibility", () => {
 	it("should return first non-null decision from strategy chain", () => {

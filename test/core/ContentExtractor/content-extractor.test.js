@@ -2,10 +2,10 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { ContentExtractor } from "../src/core/ContentExtractor/ContentExtractor.js";
-import { SectionLinkStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
-import { StopMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
-import { createContentExtractor } from "../src/factories/componentFactory.js";
+import { ContentExtractor } from "../../../src/core/ContentExtractor/ContentExtractor.js";
+import { SectionLinkStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
+import { StopMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { createContentExtractor } from "../../../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -102,7 +102,7 @@ describe("ContentExtractor", () => {
 		// Given: Source file with multiple link types (section, block, full-file)
 		const sourceFile = path.join(
 			__dirname,
-			"fixtures/us2.2/mixed-links-source.md",
+			"../../fixtures/us2.2/mixed-links-source.md",
 		);
 		const extractor = createContentExtractor();
 
@@ -163,7 +163,7 @@ describe("ContentExtractor", () => {
 		// Given: Source file with full-file link
 		const sourceFile = path.join(
 			__dirname,
-			"fixtures/us2.2/mixed-links-source.md",
+			"../../fixtures/us2.2/mixed-links-source.md",
 		);
 		const extractor = createContentExtractor();
 
@@ -192,7 +192,7 @@ describe("ContentExtractor", () => {
 			// Given: Source file with content links
 			const sourceFile = path.join(
 				__dirname,
-				"fixtures/us2.2/mixed-links-source.md",
+				"../../fixtures/us2.2/mixed-links-source.md",
 			);
 			const extractor = createContentExtractor();
 
@@ -211,7 +211,7 @@ describe("ContentExtractor", () => {
 			// Given: Source file with content links
 			const sourceFile = path.join(
 				__dirname,
-				"fixtures/us2.2/mixed-links-source.md",
+				"../../fixtures/us2.2/mixed-links-source.md",
 			);
 			const extractor = createContentExtractor();
 
@@ -232,7 +232,7 @@ describe("ContentExtractor", () => {
 			// Given: Source file with content links
 			const sourceFile = path.join(
 				__dirname,
-				"fixtures/us2.2/mixed-links-source.md",
+				"../../fixtures/us2.2/mixed-links-source.md",
 			);
 			const extractor = createContentExtractor();
 
@@ -353,7 +353,7 @@ describe("ContentExtractor", () => {
 			// Given: Source file with content links
 			const sourceFile = path.join(
 				__dirname,
-				"fixtures/us2.2/mixed-links-source.md",
+				"../../fixtures/us2.2/mixed-links-source.md",
 			);
 			const extractor = createContentExtractor();
 

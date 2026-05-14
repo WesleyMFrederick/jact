@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SectionLinkStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
+import { SectionLinkStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
 
 describe("SectionLinkStrategy", () => {
 	it("should return eligible when link has header anchor", () => {

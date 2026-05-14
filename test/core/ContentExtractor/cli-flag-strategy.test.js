@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CliFlagStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
+import { CliFlagStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
 
 describe("CliFlagStrategy", () => {
 	it("should return eligible when --full-files flag is present", () => {

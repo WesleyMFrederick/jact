@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ForceMarkerStrategy } from "../src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
+import { ForceMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
 
 describe("ForceMarkerStrategy", () => {
 	it("should return eligible when force-extract marker is present", () => {
