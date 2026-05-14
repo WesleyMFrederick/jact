@@ -15,7 +15,7 @@ import type {
 	PathResolutionResult,
 	PathResolutionStrategy,
 } from "./PathResolutionStrategy.js";
-import { buildResult, checkAnchor } from "./strategyHelpers.js";
+import { buildResult } from "./strategyHelpers.js";
 
 export class FileFoundStrategy implements PathResolutionStrategy {
 	async resolve(

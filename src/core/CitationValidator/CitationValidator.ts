@@ -9,6 +9,7 @@
  * Path-resolution waterfall replaced by strategy array (issue #28).
  */
 
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { LinkObject } from "../../types/citationTypes.js";
 import type {
@@ -47,7 +48,6 @@ export class CitationValidator {
 	private patterns: {
 		CARET_SYNTAX: { regex: RegExp; examples: string[]; description: string };
 		EMPHASIS_MARKED: { regex: RegExp; examples: string[]; description: string };
-		CROSS_DOCUMENT: { regex: RegExp; description: string };
 	};
 
 	constructor(
@@ -89,17 +89,12 @@ export class CitationValidator {
 				],
 				description: "Emphasis-marked headers with double asterisks",
 			},
-			CROSS_DOCUMENT: {
-				regex: /\.md$/,
-				description: "Cross-document markdown file references",
-			},
 		};
 	}
 
 	// ── Public API ────────────────────────────────────────────────────────────
 
 	async validateFile(filePath: string): Promise<ValidationResult> {
-		const { existsSync } = await import("node:fs");
 		if (!existsSync(filePath)) {
 			throw new Error(`File not found: ${filePath}`);
 		}
