@@ -186,7 +186,17 @@ export class FileCache {
 
 			for (const entry of entries) {
 				const fullPath = this.path.join(dirPath, entry);
-				const stat = this.fs.statSync(fullPath);
+				let stat: ReturnType<typeof this.fs.statSync>;
+				try {
+					stat = this.fs.statSync(fullPath);
+				} catch (error) {
+					// A dangling symlink (or an entry deleted mid-scan) makes
+					// statSync throw ENOENT. Skip it silently and keep scanning
+					// the rest of the directory — one bad entry must not abort
+					// the whole scan or emit noise.
+					if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+					throw error;
+				}
 				const isDir = stat.isDirectory();
 				// `ignore` lib expects POSIX-style paths relative to scanRoot;
 				// directory entries must end with "/" to match dir-only patterns.

@@ -1,14 +1,14 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { CitationValidator } from "../src/CitationValidator.js";
+import { CitationValidator } from "../src/core/CitationValidator/CitationValidator.js";
 import { MarkdownParser } from "../src/core/MarkdownParser/index.js";
-import { ParsedFileCache } from "../src/ParsedFileCache.js";
-import ParsedDocument from "../src/ParsedDocument.js";
 import {
 	createCitationValidator,
 	createParsedFileCache,
 } from "../src/factories/componentFactory.js";
+import ParsedDocument from "../src/ParsedDocument.js";
+import { ParsedFileCache } from "../src/ParsedFileCache.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

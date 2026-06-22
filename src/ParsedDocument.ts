@@ -1,4 +1,6 @@
-import type { Token } from "marked";
+import type { Heading } from "mdast";
+import { visit } from "unist-util-visit";
+import { headingText as getHeadingText } from "./core/MarkdownParser/extractHeadings.js";
 import type { LinkObject, ParserOutput } from "./types/citationTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 
@@ -18,7 +20,7 @@ class ParsedDocument {
 
 	/**
 	 * Create a ParsedDocument facade wrapping parser output
-	 * @param parserOutput - MarkdownParser.Output.DataContract with filePath, content, tokens, links, headings, anchors
+	 * @param parserOutput - MarkdownParser.Output.DataContract with filePath, content, ast, links, headings, anchors
 	 */
 	constructor(parserOutput: ParserOutput) {
 		// Store parser output privately for encapsulation
@@ -163,63 +165,44 @@ class ParsedDocument {
 			targetLevel = headingMeta.level;
 		}
 
-		// Phase 1: Flatten token tree and locate target heading
-		const orderedTokens: Token[] = [];
-		let targetIndex = -1;
+		// Phase 1: Collect heading nodes from the mdast tree, locate the target.
+		// Defensive: the facade is also constructed from hand-built ParserOutput
+		// objects in JS (e.g. block-only fixtures) that omit `ast`; section
+		// extraction has no tree to walk in that case.
+		const ast = this._data.ast;
+		if (!ast) return null;
 
-		// Normalize heading text once for comparison
 		const normalizedHeadingText = this._normalizeObsidianHeading(headingText);
+		const headingNodes: Heading[] = [];
+		visit(ast, "heading", (node) => {
+			headingNodes.push(node);
+		});
 
-		const walkTokens = (tokenList: Token[]) => {
-			for (const token of tokenList) {
-				const currentIndex = orderedTokens.length;
-				orderedTokens.push(token);
-
-				// Found our target heading? Use normalized comparison for Obsidian characters
-				if (
-					token.type === "heading" &&
-					this._normalizeObsidianHeading(token.text) ===
-						normalizedHeadingText &&
-					token.depth === targetLevel
-				) {
-					targetIndex = currentIndex;
-				}
-
-				// Recurse into nested tokens ONLY if token.raw doesn't already include child content
-				// Skip for: heading, paragraph (their .raw includes full content with inline formatting)
-				// Recurse for: list, list_item, blockquote, table (structural tokens where .raw is minimal)
-				if (
-					"tokens" in token &&
-					token.tokens &&
-					!this._tokenIncludesChildrenInRaw(token.type)
-				) {
-					walkTokens(token.tokens);
-				}
-			}
-		};
-
-		walkTokens(this._data.tokens);
-
-		// Not found? Return null
+		const targetIndex = headingNodes.findIndex(
+			(node) =>
+				node.depth === targetLevel &&
+				this._normalizeObsidianHeading(
+					getHeadingText(node, this._data.content),
+				) === normalizedHeadingText,
+		);
 		if (targetIndex === -1) return null;
 
-		// Phase 2: Find section boundary (next same-or-higher level heading)
-		const targetToken = orderedTokens[targetIndex];
-		const targetHeadingLevel =
-			targetToken?.type === "heading" ? targetToken.depth : 1;
-		let endIndex = orderedTokens.length; // Default: to end of file
-
-		for (let i = targetIndex + 1; i < orderedTokens.length; i++) {
-			const token = orderedTokens[i];
-			if (token?.type === "heading" && token.depth <= targetHeadingLevel) {
-				endIndex = i;
+		// Phase 2: Find the section boundary (next same-or-higher level heading).
+		let boundaryNode: Heading | null = null;
+		for (let i = targetIndex + 1; i < headingNodes.length; i++) {
+			const node = headingNodes[i];
+			if (node && node.depth <= targetLevel) {
+				boundaryNode = node;
 				break;
 			}
 		}
 
-		// Phase 3: Reconstruct content from token.raw properties
-		const sectionTokens = orderedTokens.slice(targetIndex, endIndex);
-		return sectionTokens.map((t) => t.raw).join("");
+		// Phase 3: Slice the original content between the heading and the boundary.
+		const startOffset = headingNodes[targetIndex]?.position?.start.offset;
+		if (startOffset === undefined) return null;
+		const endOffset =
+			boundaryNode?.position?.start.offset ?? this._data.content.length;
+		return this._data.content.slice(startOffset, endOffset);
 	}
 
 	/**
@@ -274,33 +257,6 @@ class ParsedDocument {
 			.replace(/\]\]/g, "") // Remove wiki close
 			.replace(/\s+/g, " ") // Collapse whitespace (matches URL-encoded anchor generation)
 			.trim();
-	}
-
-	/**
-	 * Check if token type includes children content in its raw property
-	 *
-	 * For some token types (heading, paragraph), the .raw property includes
-	 * the full content including nested inline formatting. For these types,
-	 * we should NOT recurse into .tokens to avoid duplication.
-	 *
-	 * For structural tokens (list, blockquote, table), .raw is minimal and
-	 * we MUST recurse into .tokens to capture nested content.
-	 *
-	 * @private
-	 * @param tokenType - Token type from marked.js
-	 * @returns True if token.raw includes all child content
-	 */
-	private _tokenIncludesChildrenInRaw(tokenType: string): boolean {
-		// Token types where .raw includes full content (skip recursion)
-		const inclusiveTypes = new Set([
-			"heading", // "## Title\n" includes inline text
-			"paragraph", // "Text with **bold**\n" includes inline formatting
-			"text", // Inline text tokens
-			"code", // Code blocks include full content
-			"html", // HTML blocks include full content
-		]);
-
-		return inclusiveTypes.has(tokenType);
 	}
 
 	/**

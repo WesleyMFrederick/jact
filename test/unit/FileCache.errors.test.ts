@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScopeResolution } from "../../src/core/resolveScope.js";
 import { FileCache } from "../../src/FileCache.js";
 
@@ -121,5 +121,42 @@ describe("M2 — duplicate error format", () => {
 		if (!result.found) {
 			expect(result.message).toContain("source: cwd-git");
 		}
+	});
+});
+
+describe("M3 — dangling symlink resilience", () => {
+	it("given a dead symlink in scope, when buildCache scans, then no warning is printed", () => {
+		writeFile("alpha.md");
+		fs.symlinkSync(
+			path.join(tmpDir, "nonexistent-target.md"),
+			path.join(tmpDir, "dead.md"),
+		);
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		let warnCalls: unknown[][] = [];
+		try {
+			cache.buildCache(tmpDir, false, mockScope);
+		} finally {
+			// Snapshot BEFORE restore — mockRestore() clears call history.
+			warnCalls = [...warnSpy.mock.calls];
+			warnSpy.mockRestore();
+		}
+		expect(warnCalls).toEqual([]);
+	});
+
+	it("given a dead symlink beside real files, when buildCache scans, then sibling .md files are still cached", () => {
+		writeFile("before.md");
+		writeFile("after.md");
+		fs.symlinkSync(
+			path.join(tmpDir, "nonexistent-target.md"),
+			path.join(tmpDir, "dead.md"),
+		);
+		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		try {
+			cache.buildCache(tmpDir, false, mockScope);
+		} finally {
+			warnSpy.mockRestore();
+		}
+		expect(cache.resolveFile("before.md").found).toBe(true);
+		expect(cache.resolveFile("after.md").found).toBe(true);
 	});
 });

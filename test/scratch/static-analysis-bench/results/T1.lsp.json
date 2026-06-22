@@ -1,0 +1,12 @@
+{
+  "symbol": "extractHeadings",
+  "position": "src/core/MarkdownParser/extractHeadings.ts:21",
+  "references": [
+    "src/core/MarkdownParser/MarkdownParser.ts:122",
+    "src/core/MarkdownParser/MarkdownParser.ts:13",
+    "src/core/MarkdownParser/extractHeadings.ts:21"
+  ],
+  "implementations": [
+    "src/core/MarkdownParser/extractHeadings.ts:21"
+  ]
+}

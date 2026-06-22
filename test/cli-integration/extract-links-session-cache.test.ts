@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-const CLI_PATH = join(__dirname, "../../dist/jact.js");
+const CLI_PATH = join(__dirname, "../../dist/cli.js");
 
 const SOURCE_MD_CONTENT =
 	"# Source\n\nSee [[target.md#Section One|Section One]] for details.\n";

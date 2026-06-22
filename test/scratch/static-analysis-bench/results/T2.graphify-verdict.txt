@@ -1,0 +1,23 @@
+=== NODE PRESENCE ===
+analyzeEligibility -> 4 node(s): ['contentextractor_contentextractor_contentextractor_analyzeeligibility', 'analyzeeligibility_ts', 'contentextractor_analyzeeligibility_analyzeeligibility', 'contentextractor_analyzeeligibility_createeligibilityanalyzer']
+getDecision        -> 4 node(s): ['eligibilitystrategies_cliflagstrategy_cliflagstrategy_getdecision', 'eligibilitystrategies_forcemarkerstrategy_forcemarkerstrategy_getdecision', 'eligibilitystrategies_sectionlinkstrategy_sectionlinkstrategy_getdecision', 'eligibilitystrategies_stopmarkerstrategy_stopmarkerstrategy_getdecision']
+CliFlag            -> 3 node(s): ['cliflagstrategy_ts', 'eligibilitystrategies_cliflagstrategy_cliflagstrategy', 'eligibilitystrategies_cliflagstrategy_cliflagstrategy_getdecision']
+ForceMarker        -> 3 node(s): ['forcemarkerstrategy_ts', 'eligibilitystrategies_forcemarkerstrategy_forcemarkerstrategy', 'eligibilitystrategies_forcemarkerstrategy_forcemarkerstrategy_getdecision']
+SectionLink        -> 3 node(s): ['sectionlinkstrategy_ts', 'eligibilitystrategies_sectionlinkstrategy_sectionlinkstrategy', 'eligibilitystrategies_sectionlinkstrategy_sectionlinkstrategy_getdecision']
+StopMarker         -> 3 node(s): ['stopmarkerstrategy_ts', 'eligibilitystrategies_stopmarkerstrategy_stopmarkerstrategy', 'eligibilitystrategies_stopmarkerstrategy_stopmarkerstrategy_getdecision']
+
+=== EDGES TOUCHING analyzeEligibility ===
+  contentextractor_ts  --imports-->  contentextractor_analyzeeligibility_analyzeeligibility
+  contentextractor_contentextractor_contentextractor  --method-->  contentextractor_contentextractor_contentextractor_analyzeeligibility
+  contentextractor_contentextractor_contentextractor_extractcontent  --calls-->  contentextractor_contentextractor_contentextractor_analyzeeligibility
+  analyzeeligibility_ts  --contains-->  contentextractor_analyzeeligibility_analyzeeligibility
+  analyzeeligibility_ts  --contains-->  contentextractor_analyzeeligibility_createeligibilityanalyzer
+  extractlinkscontent_ts  --imports-->  contentextractor_analyzeeligibility_analyzeeligibility
+
+=== DISPATCHER -> CONCRETE STRATEGY LINKS ===
+direct dispatcher<->strategy edges: 0
+
+=== 2-HOP BRIDGE (dispatcher -> X -> strategy) ===
+2-hop bridges: 0
+
+VERDICT: graphify does NOT bridge dispatch (LSP wins T2)

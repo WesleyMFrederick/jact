@@ -2,7 +2,7 @@
  * D3 integration tests: applyScope helper + smart default scope inference.
  * Phase 2 — §8d assertions (8 total).
  *
- * CLI invocations use node dist/jact.js (requires prior build).
+ * CLI invocations use node dist/cli.js (requires prior build).
  * Source-inspection assertions read src/jact.ts directly.
  */
 
@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const CLI_PATH = join(__dirname, "../../dist/jact.js");
+const CLI_PATH = join(__dirname, "../../dist/cli.js");
 const JACT_ROOT = join(__dirname, "../..");
 const JACT_SRC = join(JACT_ROOT, "src/jact.ts");
 const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");

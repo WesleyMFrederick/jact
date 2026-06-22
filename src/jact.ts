@@ -1,35 +1,15 @@
-#!/usr/bin/env node
-
 /**
- * JACT CLI - Command-line tool for markdown citation validation
+ * JactCli — orchestration and scope management for citation operations.
  *
- * Main CLI application providing citation validation, fixing, AST inspection,
- * and base path extraction for markdown files. Integrates MarkdownParser,
- * CitationValidator, FileCache, and ParsedFileCache components.
- *
- * Commands:
- * - validate: Validate citations in markdown file (with optional --fix)
- * - ast: Display parsed AST and extracted metadata
- * - base-paths: Extract distinct base paths from citations
- *
- * Features:
- * - File cache for smart filename resolution (--scope option)
- * - Line range filtering (--lines option)
- * - JSON and CLI output formats
- * - Automatic path and anchor fixing (--fix flag)
- * - Exit codes for CI/CD integration (0=success, 1=validation errors, 2=file not found)
+ * This module exports the JactCli class only. Commander CLI wiring lives in
+ * cli.ts so JactCli can be imported programmatically without activating Commander.
  *
  * @module jact
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { Command, Option } from "commander";
-import type { CitationValidator } from "./CitationValidator.js";
-import {
-	checkExtractCache,
-	writeExtractCache,
-} from "./cache/checkExtractCache.js";
+import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
 import { applyAnchorFix, applyPathConversion } from "./core/citationFixer.js";
 import {
@@ -62,24 +42,14 @@ import type {
 	ValidationResult,
 } from "./types/validationTypes.js";
 
-const CACHE_DIR = ".jact/claude-cache";
-
-// D-003: CliExtractOptions and CliValidateOptions imported from ./types/contentExtractorTypes.js (canonical types)
-
-/**
- * Line range parsed from input string.
- */
 interface LineRange {
 	startLine: number;
 	endLine: number;
 }
 
 /**
- * Main application class for citation management operations
- *
- * Wires together all components and provides high-level operations for validation,
- * fixing, AST inspection, and path extraction. Handles CLI output formatting and
- * error reporting.
+ * Main application class: orchestration + scope management for citation operations.
+ * Importable programmatically without activating Commander (wiring is in cli.ts).
  */
 export class JactCli {
 	private parser: MarkdownParser;
@@ -88,11 +58,6 @@ export class JactCli {
 	private validator: CitationValidator;
 	private contentExtractor: ContentExtractor;
 
-	/**
-	 * Initialize jact with all required components
-	 *
-	 * Creates and wires together parser, caches, and validator using factory functions.
-	 */
 	constructor() {
 		this.parser = createMarkdownParser();
 		this.parsedFileCache = createParsedFileCache(this.parser);
@@ -101,20 +66,10 @@ export class JactCli {
 			this.parsedFileCache,
 			this.fileCache,
 		);
-
-		// Integration: Add ContentExtractor via factory
-		this.contentExtractor = createContentExtractor(
-			this.parsedFileCache, // Share cache with validator
-		);
+		this.contentExtractor = createContentExtractor(this.parsedFileCache);
 	}
 
-	/**
-	 * Centralized scope resolution + cache build.
-	 *
-	 * Resolves scope from explicit option / cwd / target file ancestors, then
-	 * builds the file cache against the resolved root. Throws when scope
-	 * cannot be inferred so callers don't silently fall back to no-scope mode.
-	 */
+	/** Resolve scope and build the file cache. Throws if scope cannot be inferred. */
 	private applyScope(
 		options: { scope?: string; allowGitignore?: boolean },
 		targetFile?: string,
@@ -130,8 +85,7 @@ export class JactCli {
 				`cannot resolve scope. Tried: ${triedParts.join(", ")}. Pass --scope <dir>.`,
 			);
 		}
-		// Default: respect `.gitignore`. `--allow-gitignore` opts in to scanning
-		// files that `.gitignore` excludes.
+		// Default: respect .gitignore. --allow-gitignore opts in to scanning excluded files.
 		this.fileCache.buildCache(resolved.scope, false, resolved, {
 			respectGitignore: !options.allowGitignore,
 		});
@@ -139,93 +93,41 @@ export class JactCli {
 
 	/**
 	 * Parse a markdown file and return its full AST with extracted metadata.
-	 * Used by the `ast` CLI command to expose parser internals for debugging.
-	 *
-	 * Applies smart-default-scope resolution (cwd-git → cwd-pkg → target-git
-	 * → target-pkg → none) so the same `--scope` ergonomics from the extract
-	 * subcommands work here. Bare filenames that don't exist as a literal
-	 * path are resolved via FileCache; M1 (not-found + Did-you-mean), M2
-	 * (ambiguous), and M3 (no scope) failures surface through the same
-	 * `cacheResult.message` text the extract commands emit.
-	 *
-	 * @param filePath - Path to markdown file (absolute, relative, or bare filename)
-	 * @param options - Resolution options
-	 * @param options.scope - Explicit scope override (skips inference)
-	 * @returns Parsed file AST + metadata
-	 * @throws Error with optional `.suggestion` property when file cannot be resolved
+	 * Resolves scope via smart defaults (cwd-git → cwd-pkg → target-git → target-pkg → none).
+	 * Bare filenames are resolved via FileCache. Throws with a `.suggestion` property on failure.
 	 */
 	async getAst(
 		filePath: string,
 		options: { scope?: string } = {},
 	): Promise<ParserOutput> {
 		this.applyScope(options, filePath);
-
 		const absolute = path.resolve(filePath);
-
 		if (existsSync(absolute)) {
 			return this.parser.parseFile(absolute);
 		}
-
 		const cacheResult = this.fileCache.resolveFile(path.basename(filePath));
 		if (cacheResult.found) {
 			return this.parser.parseFile(cacheResult.path);
 		}
-
-		// M1/M2: cacheResult.message already contains "matched N files… Pass --scope to narrow."
-		// or "not found in scope=… Did you mean: X?" text built by FileCache.
 		const err = new Error(`File not found: ${absolute}`);
 		(err as Error & { suggestion?: string }).suggestion = cacheResult.message;
 		throw err;
 	}
 
-	/**
-	 * Validate citations in markdown file and generate a formatted report
-	 *
-	 * Validates all wiki-style citations in the specified markdown file, checking for
-	 * broken links, missing files, invalid anchors, and path conversion opportunities.
-	 * Optionally builds a file cache when scope is provided for more accurate validation.
-	 * Supports line range filtering and multiple output formats (CLI or JSON).
-	 *
-	 * @param filePath - Path to markdown file (absolute or relative to current directory)
-	 * @param options - Validation configuration options
-	 * @param options.format - Output format: "cli" (default) for human-readable or "json" for structured data
-	 * @param options.lines - Line range filter in format "start-end" (e.g., "10-50") to validate specific sections
-	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
-	 * @param options.fix - Not used by validate (reserved for fix command)
-	 * @returns Formatted validation report - CLI format with colors/symbols or JSON with structured data
-	 *
-	 * @example
-	 * ```typescript
-	 * // Basic validation with CLI output
-	 * const report = await manager.validate("docs/readme.md");
-	 *
-	 * // JSON output for programmatic use
-	 * const jsonReport = await manager.validate("docs/readme.md", { format: "json" });
-	 *
-	 * // Validate specific line range with file cache
-	 * const filtered = await manager.validate("docs/readme.md", {
-	 *   lines: "50-100",
-	 *   scope: "/path/to/docs"
-	 * });
-	 * ```
-	 */
+	/** Validate citations in a markdown file and return a formatted report. */
 	async validate(
 		filePath: string,
 		options: CliValidateOptions = {},
 	): Promise<string> {
 		try {
 			const startTime = Date.now();
-
-			// Build file cache if scope is provided
 			if (options.scope) {
-				const respectGitignore = !options.allowGitignore;
 				const cacheStats = this.fileCache.buildCache(
 					options.scope,
 					options.verbose ?? false,
 					undefined,
-					{ respectGitignore },
+					{ respectGitignore: !options.allowGitignore },
 				);
-				// Only show cache messages in verbose, non-JSON mode
 				if (options.verbose && options.format !== "json") {
 					console.log(
 						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
@@ -237,35 +139,23 @@ export class JactCli {
 					}
 				}
 			}
-
 			const result = await this.validator.validateFile(filePath);
-			const endTime = Date.now();
-
-			result.validationTime = `${((endTime - startTime) / 1000).toFixed(1)}s`;
-
-			// Detect nested backtick codeblocks (CLI-only diagnostic)
+			result.validationTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
 			const fileContent = readFileSync(filePath, "utf8");
 			const nestedCodeblockWarnings = detectNestedCodeblocks(fileContent);
-
-			// Apply line range filtering if specified
 			if (options.lines) {
 				const filteredResult = this.filterResultsByLineRange(
 					result,
 					options.lines,
 				);
-				if (options.format === "json") {
-					return this.formatAsJSON(filteredResult);
-				}
+				if (options.format === "json") return this.formatAsJSON(filteredResult);
 				return this.formatForCLI(
 					filteredResult,
 					nestedCodeblockWarnings,
 					options.verbose ?? false,
 				);
 			}
-
-			if (options.format === "json") {
-				return this.formatAsJSON(result);
-			}
+			if (options.format === "json") return this.formatAsJSON(result);
 			return this.formatForCLI(
 				result,
 				nestedCodeblockWarnings,
@@ -276,11 +166,7 @@ export class JactCli {
 				error instanceof Error ? error.message : String(error);
 			if (options.format === "json") {
 				return JSON.stringify(
-					{
-						error: errorMessage,
-						file: filePath,
-						success: false,
-					},
+					{ error: errorMessage, file: filePath, success: false },
 					null,
 					2,
 				);
@@ -289,39 +175,28 @@ export class JactCli {
 		}
 	}
 
-	/**
-	 * Filter validation results by line range
-	 *
-	 * Filters citation results to only include those within specified line range.
-	 * Recalculates summary statistics for filtered results.
-	 *
-	 * @param result - Full validation result object
-	 * @param lineRange - Line range string
-	 * @returns Filtered result with updated summary and lineRange property
-	 */
+	/** Filter links to those within lineRange and recompute summary stats. */
 	private filterResultsByLineRange(
 		result: ValidationResult,
 		lineRange: string,
 	): ValidationResult & { lineRange: string } {
 		const { startLine, endLine } = this.parseLineRange(lineRange);
-
-		const filteredLinks = result.links.filter((link: EnrichedLinkObject) => {
-			return link.line >= startLine && link.line <= endLine;
-		});
-
+		const filteredLinks = result.links.filter(
+			(link: EnrichedLinkObject) =>
+				link.line >= startLine && link.line <= endLine,
+		);
 		const filteredSummary = {
 			total: filteredLinks.length,
 			valid: filteredLinks.filter(
-				(link: EnrichedLinkObject) => link.validation.status === "valid",
+				(l: EnrichedLinkObject) => l.validation.status === "valid",
 			).length,
 			errors: filteredLinks.filter(
-				(link: EnrichedLinkObject) => link.validation.status === "error",
+				(l: EnrichedLinkObject) => l.validation.status === "error",
 			).length,
 			warnings: filteredLinks.filter(
-				(link: EnrichedLinkObject) => link.validation.status === "warning",
+				(l: EnrichedLinkObject) => l.validation.status === "warning",
 			).length,
 		};
-
 		return {
 			...result,
 			links: filteredLinks,
@@ -330,11 +205,7 @@ export class JactCli {
 		};
 	}
 
-	/**
-	 * Parse line range string
-	 * @param lineRange - Line range string to parse
-	 * @returns Parsed line range
-	 */
+	/** Parse "start-end" or single-line range string to LineRange. */
 	private parseLineRange(lineRange: string): LineRange {
 		if (lineRange.includes("-")) {
 			const [start, end] = lineRange
@@ -346,10 +217,7 @@ export class JactCli {
 		return { startLine: line, endLine: line };
 	}
 
-	/**
-	 * Format validation results for CLI output.
-	 * Delegates to {@link formatForCLI} in formatValidationResult module.
-	 */
+	/** Delegate to formatValidationResult.formatForCLI. */
 	private formatForCLI(
 		result: ValidationResult & { lineRange?: string },
 		nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
@@ -358,76 +226,34 @@ export class JactCli {
 		return formatForCLI(result, nestedCodeblockWarnings, verbose);
 	}
 
-	/**
-	 * Format validation results as JSON.
-	 * Delegates to {@link formatAsJSON} in formatValidationResult module.
-	 */
+	/** Delegate to formatValidationResult.formatAsJSON. */
 	private formatAsJSON(result: ValidationResult): string {
 		return formatAsJSON(result);
 	}
 
-	/**
-	 * Extract content from all citations found in a markdown file
-	 *
-	 * Discovers all wiki-style citations in the source file, validates each link,
-	 * and extracts the referenced content. Outputs a structured JSON result to stdout
-	 * containing the extracted content with metadata. Reports validation errors to stderr.
-	 *
-	 * Pattern: Three-phase orchestration workflow
-	 * Integration: Coordinates validator → extractor → output
-	 *
-	 * @param sourceFile - Path to markdown file containing wiki-style citations (e.g., [[file#header]])
-	 * @param options - Extraction configuration options
-	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
-	 * @param options.format - Output format (currently only "json" is supported)
-	 * @param options.fullFiles - If true, extract entire file content instead of just header sections
-	 * @returns Promise that resolves when extraction completes (outputs to stdout, sets process.exitCode)
-	 *
-	 * @example
-	 * ```typescript
-	 * // Extract header sections from all citations
-	 * await manager.extractLinks("source.md", { scope: "/docs" });
-	 *
-	 * // Extract full file content for each citation
-	 * await manager.extractLinks("source.md", {
-	 *   scope: "/docs",
-	 *   fullFiles: true
-	 * });
-	 * ```
-	 */
+	/** Validate all citations in sourceFile and extract referenced content to stdout. */
 	async extractLinks(
 		sourceFile: string,
 		options: CliExtractOptions,
 	): Promise<void> {
 		try {
 			this.applyScope(options, sourceFile);
-
-			// Phase 1: Link Discovery & Validation
-			// Pattern: Delegate to validator for link discovery and enrichment
 			const validationResult = await this.validator.validateFile(sourceFile);
 			const enrichedLinks = validationResult.links;
-
-			// Decision: Report validation errors to stderr
 			if (validationResult.summary.errors > 0) {
 				console.error("Validation errors found:");
-				const errors = enrichedLinks.filter(
+				for (const link of enrichedLinks.filter(
 					(l: EnrichedLinkObject) => l.validation.status === "error",
-				);
-				for (const link of errors) {
+				)) {
 					if (link.validation.status === "error") {
 						console.error(`  Line ${link.line}: ${link.validation.error}`);
 					}
 				}
 			}
-
-			// Phase 2: Content Extraction
-			// Pattern: Pass pre-validated enriched links to extractor
 			const extractionResult = await this.contentExtractor.extractContent(
 				enrichedLinks,
-				{ fullFiles: options.fullFiles ?? false }, // Pass CLI flags to strategies
+				{ fullFiles: options.fullFiles ?? false },
 			);
-
-			// Phase 3: Output — minimal payload by default; --verbose adds report + stats
 			console.log(
 				formatExtractResult(
 					extractionResult,
@@ -435,58 +261,17 @@ export class JactCli {
 					options.verbose ? "verbose" : "minimal",
 				),
 			);
-
-			// Decision: Exit code based on extraction success
-			if (extractionResult.stats.uniqueContent > 0) {
-				process.exitCode = 0;
-			} else {
-				process.exitCode = 1;
-			}
+			process.exitCode = extractionResult.stats.uniqueContent > 0 ? 0 : 1;
 		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			console.error("ERROR:", errorMessage);
+			console.error(
+				"ERROR:",
+				error instanceof Error ? error.message : String(error),
+			);
 			process.exitCode = 2;
 		}
 	}
 
-	/**
-	 * Extract a specific header section from a markdown file
-	 *
-	 * Creates a synthetic citation targeting the specified header, validates it exists,
-	 * and extracts the header section content including any nested citations. Returns
-	 * structured JSON output to stdout. Useful for extracting specific sections on-demand
-	 * without needing to add citations to a source file.
-	 *
-	 * Pattern: Four-phase orchestration workflow
-	 * 1. Create synthetic LinkObject via factory
-	 * 2. Validate synthetic link via validator
-	 * 3. Extract content via extractor (if valid)
-	 * 4. Return OutgoingLinksExtractedContent structure
-	 *
-	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
-	 *
-	 * @param targetFile - Path to markdown file containing the header to extract
-	 * @param headerName - Exact header text to extract (e.g., "Installation" for ## Installation)
-	 * @param options - Extraction configuration options
-	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
-	 * @param options.format - Output format (currently only "json" is supported)
-	 * @param options.fullFiles - Not used by extractHeader (applies to nested citations only)
-	 * @returns Promise resolving to OutgoingLinksExtractedContent structure, or undefined on error
-	 *
-	 * @example
-	 * ```typescript
-	 * // Extract specific section
-	 * const content = await manager.extractHeader(
-	 *   "docs/api.md",
-	 *   "Authentication",
-	 *   { scope: "/docs" }
-	 * );
-	 *
-	 * // Output contains extracted header content with metadata
-	 * console.log(JSON.stringify(content, null, 2));
-	 * ```
-	 */
+	/** Create a synthetic header citation, validate it, and extract the section content. */
 	async extractHeader(
 		targetFile: string,
 		headerName: string,
@@ -494,211 +279,116 @@ export class JactCli {
 	): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
 			this.applyScope(options, targetFile);
-
-			// --- Phase 1: Synthetic Link Creation ---
-			// Pattern: Use factory to create unvalidated LinkObject from CLI parameters
-			const factory = new LinkObjectFactory();
-			const syntheticLink = factory.createHeaderLink(targetFile, headerName);
-
-			// --- Phase 2: Validation ---
-			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
-			// Integration: CitationValidator enriches link in-place with validation metadata
+			const syntheticLink = new LinkObjectFactory().createHeaderLink(
+				targetFile,
+				headerName,
+			);
 			const enrichedLink = await this.validator.validateSingleCitation(
 				syntheticLink,
 				targetFile,
 			);
-
-			// Decision: Check validation status before extraction (error handling)
 			if (enrichedLink.validation.status === "error") {
-				// Boundary: Error output to stderr
-				// Type narrowing allows accessing error property
-				const errorMsg = enrichedLink.validation.error;
-				console.error("Validation failed:", errorMsg);
+				console.error("Validation failed:", enrichedLink.validation.error);
 				if (enrichedLink.validation.suggestion) {
 					console.error("Suggestion:", enrichedLink.validation.suggestion);
 				}
 				process.exitCode = 1;
 				return;
 			}
-
-			// --- Phase 3: Extraction ---
-			// Pattern: Extract content from validated link
-			// Integration: ContentExtractor processes single-link array
-			const result = await this.contentExtractor.extractContent(
+			return await this.contentExtractor.extractContent(
 				[enrichedLink],
 				options,
 			);
-
-			// --- Phase 4: Return ---
-			// Decision: Return result for CLI to output (CLI handles stdout)
-			return result;
 		} catch (error) {
-			// Decision: System errors use exit code 2
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			console.error("ERROR:", errorMessage);
+			console.error(
+				"ERROR:",
+				error instanceof Error ? error.message : String(error),
+			);
 			process.exitCode = 2;
 			return undefined;
 		}
 	}
 
-	/**
-	 * Extract entire content from a markdown file
-	 *
-	 * Creates a synthetic citation targeting the entire file, validates the file exists,
-	 * and extracts all content including any nested citations. Returns structured JSON
-	 * output to stdout. Useful for programmatically retrieving complete file content
-	 * with citation metadata without manual file operations.
-	 *
-	 * Pattern: Four-phase orchestration workflow
-	 * 1. Create synthetic LinkObject via factory (anchorType: null)
-	 * 2. Validate synthetic link via validator
-	 * 3. Extract content via extractor with fullFiles flag
-	 * 4. Return OutgoingLinksExtractedContent structure
-	 *
-	 * Integration: Coordinates LinkObjectFactory → CitationValidator → ContentExtractor.
-	 *
-	 * @param targetFile - Path to markdown file to extract in full
-	 * @param options - Extraction configuration options
-	 * @param options.scope - Base directory to scan for building file cache (enables relative path resolution)
-	 * @param options.format - Output format (currently only "json" is supported)
-	 * @param options.fullFiles - Not used by extractFile (entire file is always extracted)
-	 * @returns Promise resolving to OutgoingLinksExtractedContent structure, or undefined on error
-	 *
-	 * @example
-	 * ```typescript
-	 * // Extract complete file content
-	 * const content = await manager.extractFile(
-	 *   "docs/guide.md",
-	 *   { scope: "/docs" }
-	 * );
-	 *
-	 * // Output contains full file content with all nested citations
-	 * console.log(JSON.stringify(content, null, 2));
-	 * ```
-	 */
+	/** Create a synthetic whole-file citation, validate it, and extract the full file content. */
 	async extractFile(
 		targetFile: string,
 		options: CliExtractOptions,
 	): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
 			this.applyScope(options, targetFile);
-
-			// --- Phase 1: Synthetic Link Creation ---
-			// Pattern: Use factory to create unvalidated LinkObject for full file
-			// Fix(#63): Resolve targetFile to absolute BEFORE creating synthetic link
-			// so target.path.raw is absolute. path.resolve() with an absolute second
-			// arg ignores the first, preventing duplicate segments in resolveTargetPath()
+			// Fix(#63): Resolve to absolute before factory so target.path.raw is absolute.
 			const absoluteTargetFile = path.resolve(targetFile);
-			const factory = new LinkObjectFactory();
-			const syntheticLink = factory.createFileLink(absoluteTargetFile);
-
-			// --- Phase 2: Validation ---
-			// Pattern: Validate synthetic link before extraction (fail-fast on errors)
-			// Integration: CitationValidator enriches link in-place with validation metadata
+			const syntheticLink = new LinkObjectFactory().createFileLink(
+				absoluteTargetFile,
+			);
 			const enrichedLink = await this.validator.validateSingleCitation(
 				syntheticLink,
 				absoluteTargetFile,
 			);
-
-			// Decision: Apply path conversion if validator found file via cache
-			// Pattern: Validator suggests recommended path when file found in different location
+			// Apply cache-resolved path if validator found file via a different location.
 			if (
 				enrichedLink.validation.status !== "valid" &&
 				"pathConversion" in enrichedLink.validation &&
 				enrichedLink.validation.pathConversion?.recommended
 			) {
-				// Update target path to use cache-resolved absolute path
-				const absolutePath = path.resolve(
+				syntheticLink.target.path.absolute = path.resolve(
 					enrichedLink.validation.pathConversion.recommended,
 				);
-				syntheticLink.target.path.absolute = absolutePath;
 			}
-
-			// Decision: Check validation status before extraction (error handling)
 			if (enrichedLink.validation.status === "error") {
-				// Boundary: Error output to stderr
-				// Type narrowing allows accessing error property
-				const errorMsg = enrichedLink.validation.error;
-				console.error("Validation failed:", errorMsg);
+				console.error("Validation failed:", enrichedLink.validation.error);
 				if (enrichedLink.validation.suggestion) {
 					console.error("Suggestion:", enrichedLink.validation.suggestion);
 				}
 				process.exitCode = 1;
 				return;
 			}
-
-			// --- Phase 3: Extraction ---
-			// Decision: Force fullFiles flag for full-file extraction
-			// Pattern: ContentExtractor uses CliFlagStrategy to make link eligible
-			const result = await this.contentExtractor.extractContent(
-				[enrichedLink],
-				{ ...options, fullFiles: true },
-			);
-
-			// --- Phase 4: Return ---
-			// Decision: Return result for CLI to output (CLI handles stdout)
-			return result;
+			return await this.contentExtractor.extractContent([enrichedLink], {
+				...options,
+				fullFiles: true,
+			});
 		} catch (error) {
-			// Decision: System errors use exit code 2
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			console.error("ERROR:", errorMessage);
+			console.error(
+				"ERROR:",
+				error instanceof Error ? error.message : String(error),
+			);
 			process.exitCode = 2;
 			return undefined;
 		}
 	}
 
 	/**
-	 * Auto-fix fixable citation issues in a markdown file
+	 * Validate citations in filePath, auto-fix path/anchor issues, write in-place.
 	 *
-	 * Validates citations and automatically applies fixes for correctable issues including
-	 * path conversions (relative to absolute paths) and anchor format corrections (GitHub
-	 * to Obsidian format). Modifies the file in-place and returns a detailed report of
-	 * changes made. Only fixes issues where automated correction is safe and unambiguous.
+	 * Safety features:
+	 * - Writes a timestamped `.bak` backup before any file mutation.
+	 * - When `options.dryRun` is true, returns a diff without writing any files.
+	 * - Fails fast with a clear error if path corrections are needed but `options.scope` is absent.
 	 *
-	 * Applies automatic fixes for:
-	 * - Path corrections (cross-directory warnings with pathConversion suggestions)
-	 * - Anchor corrections (kebab-case to raw header format, missing anchor fixes)
-	 *
-	 * Modifies file in-place. Builds file cache if scope provided.
-	 *
-	 * @param filePath - Path to markdown file to fix (will be modified in-place)
-	 * @param options - Fix configuration options
-	 * @param options.scope - Base directory to scan for building file cache (enables path conversion fixes)
-	 * @param options.format - Not used by fix (always returns CLI format)
-	 * @param options.lines - Not used by fix (always processes entire file)
-	 * @param options.fix - Not used by fix (reserved for future fix modes)
-	 * @returns Promise resolving to fix report describing changes made and statistics
-	 *
-	 * @example
-	 * ```typescript
-	 * // Auto-fix with file cache for path conversions
-	 * const report = await manager.fix("docs/readme.md", {
-	 *   scope: "/path/to/docs"
-	 * });
-	 * console.log(report); // "Applied 3 fixes to docs/readme.md..."
-	 *
-	 * // Fix without cache (only anchor format fixes)
-	 * const report = await manager.fix("docs/readme.md");
-	 * ```
+	 * @param filePath - Path to the markdown file to fix
+	 * @param options - Fix options (scope, dryRun, etc.)
+	 * @param _fs - Optional fs overrides for testing (read/write functions)
+	 * @returns Fix report string, dry-run diff string, or error string
 	 */
 	async fix(
 		filePath: string,
 		options: CliValidateOptions = {},
+		_fs?: {
+			readFileSync?: (p: string, enc: BufferEncoding) => string;
+			writeFileSync?: (p: string, data: string, enc: BufferEncoding) => void;
+		},
 	): Promise<string> {
+		const fsRead = _fs?.readFileSync ?? readFileSync;
+		const fsWrite = _fs?.writeFileSync ?? writeFileSync;
 		try {
-			// Import fs for file operations
-			const { readFileSync, writeFileSync } = await import("node:fs");
-
-			// Build file cache if scope is provided
 			if (options.scope) {
-				const respectGitignore = !options.allowGitignore;
 				const cacheStats = this.fileCache.buildCache(
 					options.scope,
 					false,
 					undefined,
-					{ respectGitignore },
+					{
+						respectGitignore: !options.allowGitignore,
+					},
 				);
 				console.log(
 					`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
@@ -709,11 +399,7 @@ export class JactCli {
 					);
 				}
 			}
-
-			// First, validate to find fixable issues
 			const validationResults = await this.validator.validateFile(filePath);
-
-			// Find all fixable issues: warnings (path conversion) and errors (anchor fixes)
 			const fixableLinks = validationResults.links.filter(
 				(link: EnrichedLinkObject) =>
 					(link.validation.status === "warning" &&
@@ -726,25 +412,29 @@ export class JactCli {
 							(link.validation.error.startsWith("Anchor not found") &&
 								link.validation.suggestion.includes("Available headers:")))),
 			);
-
 			if (fixableLinks.length === 0) {
 				return `No auto-fixable citations found in ${filePath}`;
 			}
 
-			// Read the file content
-			let fileContent = readFileSync(filePath, "utf8");
+			// Scope boundary check: path corrections require scope to resolve filenames.
+			// Anchor-only fixes are safe without scope.
+			const needsPathFix = fixableLinks.some(
+				(link) =>
+					link.validation.status !== "valid" && link.validation.pathConversion,
+			);
+			if (needsPathFix && !options.scope) {
+				return `ERROR: Path corrections require --scope. Re-run with --scope <folder> to enable filename resolution.`;
+			}
 
+			const originalContent = fsRead(filePath, "utf8");
+			let fileContent = originalContent;
 			let fixesApplied = 0;
 			let pathFixesApplied = 0;
 			let anchorFixesApplied = 0;
 			const fixes: FixRecord[] = [];
-
-			// Process all fixable links
 			for (const link of fixableLinks) {
 				let newCitation = link.fullMatch;
 				let fixType = "";
-
-				// Apply path conversion if available
 				if (
 					link.validation.status !== "valid" &&
 					link.validation.pathConversion
@@ -756,8 +446,6 @@ export class JactCli {
 					pathFixesApplied++;
 					fixType = "path";
 				}
-
-				// Apply anchor fix if needed (expanded logic for all anchor errors)
 				if (
 					link.validation.status === "error" &&
 					link.validation.suggestion &&
@@ -771,10 +459,7 @@ export class JactCli {
 					anchorFixesApplied++;
 					fixType = fixType ? "path+anchor" : "anchor";
 				}
-
-				// Replace citation in file content
 				fileContent = fileContent.replace(link.fullMatch, newCitation);
-
 				fixes.push({
 					line: link.line,
 					old: link.fullMatch,
@@ -783,419 +468,54 @@ export class JactCli {
 				});
 				fixesApplied++;
 			}
-
-			// Write the fixed content back to the file
 			if (fixesApplied > 0) {
-				writeFileSync(filePath, fileContent, "utf8");
+				if (options.dryRun) {
+					// Dry-run: print diff, do not write any files
+					const output = [
+						`DRY RUN — ${fixesApplied} fix${fixesApplied === 1 ? "" : "es"} would be applied to ${filePath}:`,
+						"",
+					];
+					for (const fix of fixes) {
+						output.push(`  Line ${fix.line} (${fix.type}):`);
+						output.push(`    - ${fix.old}`);
+						output.push(`    + ${fix.new}`);
+						output.push("");
+					}
+					output.push("No files were written (--dry-run).");
+					return output.join("\n");
+				}
 
-				// Enhanced reporting with breakdown
+				// Write backup before mutating the file
+				const backupPath = `${filePath}.${Date.now()}.bak`;
+				fsWrite(backupPath, originalContent, "utf8");
+
+				// Apply fix
+				fsWrite(filePath, fileContent, "utf8");
+
 				const output = [
 					`Fixed ${fixesApplied} citation${fixesApplied === 1 ? "" : "s"} in ${filePath}:`,
+					`  Backup written to: ${backupPath}`,
 				];
-
-				if (pathFixesApplied > 0) {
+				if (pathFixesApplied > 0)
 					output.push(
 						`   - ${pathFixesApplied} path correction${pathFixesApplied === 1 ? "" : "s"}`,
 					);
-				}
-				if (anchorFixesApplied > 0) {
+				if (anchorFixesApplied > 0)
 					output.push(
 						`   - ${anchorFixesApplied} anchor correction${anchorFixesApplied === 1 ? "" : "s"}`,
 					);
-				}
-
 				output.push("", "Changes made:");
-
 				for (const fix of fixes) {
 					output.push(`  Line ${fix.line} (${fix.type}):`);
 					output.push(`    - ${fix.old}`);
 					output.push(`    + ${fix.new}`);
 					output.push("");
 				}
-
 				return output.join("\n");
 			}
 			return `WARNING: Found ${fixableLinks.length} fixable citations but could not apply fixes`;
 		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			return `ERROR: ${errorMessage}`;
+			return `ERROR: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	}
-}
-
-/**
- * Semantic suggestion map for common user mistakes
- *
- * Maps common synonyms and typos to correct commands/options.
- * Used by custom error handler to provide helpful suggestions.
- */
-const semanticSuggestionMap: Record<string, string[]> = {
-	// Command synonyms
-	check: ["validate"],
-	verify: ["validate"],
-	lint: ["validate"],
-	parse: ["ast"],
-	tree: ["ast"],
-	debug: ["ast"],
-	show: ["ast"],
-
-	// Option synonyms
-	fix: ["--fix"],
-	repair: ["--fix"],
-	correct: ["--fix"],
-	output: ["--format"],
-	json: ["--format json"],
-	range: ["--lines"],
-	folder: ["--scope"],
-	directory: ["--scope"],
-	path: ["--scope"],
-	dir: ["--scope"],
-};
-
-const program: Command = new Command();
-
-program
-	.name("jact")
-	.description("Citation validation and management tool for markdown files")
-	.version("1.0.0");
-
-// Configure custom error output with semantic suggestions
-program.configureOutput({
-	outputError: (str: string, write: (str: string) => void) => {
-		const match = str.match(/unknown (?:command|option) '([^']+)'/);
-		if (match?.[1]) {
-			const input = match[1].replace(/^--?/, "");
-			const suggestions = semanticSuggestionMap[input];
-
-			if (suggestions) {
-				write(
-					`Unknown ${match[0].includes("command") ? "command" : "option"} '${match[1]}'\n`,
-				);
-				write(`Did you mean: ${suggestions.join(", ")}?\n`);
-				return;
-			}
-		}
-		write(str);
-	},
-});
-
-program
-	.command("validate")
-	.description(
-		"Validate citations in a markdown file, checking that target files exist and anchors resolve correctly",
-	)
-	.argument("<file>", "path to markdown file to validate")
-	.option("--format <type>", "output format (cli, json)", "cli")
-	.option(
-		"--lines <range>",
-		'validate specific line range (e.g., "150-160" or "157")',
-	)
-	.option(
-		"--scope <folder>",
-		"limit file resolution to specific folder (enables smart filename matching)",
-	)
-	.option(
-		"--fix",
-		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections",
-	)
-	.option(
-		"--verbose",
-		"show full validation report: all valid citations, duplicate-filename warnings, summary block (default: minimal output with only errors/warnings)",
-		false,
-	)
-	.option(
-		"--allow-gitignore",
-		"include files that .gitignore would normally exclude in the scope scan (default: respect .gitignore)",
-		false,
-	)
-	.addHelpText(
-		"after",
-		`
-Default Output (no --verbose):
-  Clean file:      "OK: <N> citations valid"
-  Errors/warnings: ERRORS (n) and/or WARNINGS (n) blocks with line, link, error, suggestion; ends with "FAILED: X errors, Y warnings"
-
-Examples:
-    $ jact validate docs/design.md                   # minimal output (default)
-    $ jact validate docs/design.md --verbose         # full report with valid-citation tree
-    $ jact validate file.md --format json            # JSON output (unchanged)
-    $ jact validate file.md --lines 100-200
-    $ jact validate file.md --fix --scope ./docs
-
-Exit Codes:
-  0  All citations valid
-  1  Validation errors found
-  2  System error (file not found, permission denied)
-`,
-	)
-	.action(async (file: string, options: CliValidateOptions) => {
-		const manager = new JactCli();
-		let result: string;
-
-		if (options.fix) {
-			result = await manager.fix(file, options);
-			console.log(result);
-		} else {
-			result = await manager.validate(file, options);
-			console.log(result);
-		}
-
-		// Set exit code based on validation result (only for validation, not fix)
-		if (!options.fix) {
-			if (options.format === "json") {
-				const parsed = JSON.parse(result);
-				if (parsed.error) {
-					process.exit(2); // File not found or other errors
-				} else {
-					process.exit(parsed.summary?.errors > 0 ? 1 : 0);
-				}
-			} else {
-				if (result.includes("ERROR:")) {
-					process.exit(2); // File not found or other errors
-				} else {
-					// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
-					process.exit(
-						result.includes("FAILED:") || result.includes("VALIDATION FAILED")
-							? 1
-							: 0,
-					);
-				}
-			}
-		}
-	});
-
-// Shared option descriptions — kept in one place so wording stays consistent across subcommands
-const SCOPE_OPTION_DESCRIPTION =
-	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
-const VERBOSE_OPTION_DESCRIPTION =
-	"Include outgoingLinksReport + stats in output";
-
-program
-	.command("ast")
-	.description("Display markdown AST and citation metadata for debugging")
-	.argument("<file>", "path to markdown file to analyze")
-	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
-	.addHelpText(
-		"after",
-		`
-Examples:
-    $ jact ast docs/design.md
-    $ jact ast file.md | jq '.links'
-    $ jact ast file.md | jq '.anchors | length'
-    $ jact ast plan.md                        # smart default scope (cwd-git/pkg)
-    $ jact ast plan.md --scope ./other-repo   # explicit override
-
-Output includes:
-  - tokens: Markdown AST from marked.js parser
-  - links: Detected citation links with anchor metadata
-  - headings: Parsed heading structure
-  - anchors: Available anchor points (headers and blocks)
-`,
-	)
-	.action(async (file: string, options: { scope?: string }) => {
-		const manager = new JactCli();
-		try {
-			const ast = await manager.getAst(file, options);
-			console.log(JSON.stringify(ast, null, 2));
-		} catch (error) {
-			const e = error as Error & { suggestion?: string };
-			console.error("ERROR:", e.message);
-			if (e.suggestion) {
-				console.error("Suggestion:", e.suggestion);
-			}
-			process.exitCode = 2;
-		}
-	});
-
-// Pattern: Extract command with links subcommand
-const extractCmd = program
-	.command("extract")
-	.description("Extract content from citations");
-
-extractCmd
-	.command("links <source-file>")
-	.description(
-		"Extract content from all links in source document with validation and deduplication",
-	)
-	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
-	.option("--format <type>", "Output format (reserved for future)", "json")
-	.option(
-		"--full-files",
-		"Enable full-file link extraction (default: sections only)",
-	)
-	.option(
-		"--session <id>",
-		"Session ID for cache deduplication (skips extraction on cache hit)",
-	)
-	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
-	.addHelpText(
-		"after",
-		`
-Examples:
-    $ jact extract links docs/design.md
-    $ jact extract links docs/design.md --full-files
-    $ jact extract links docs/design.md --scope ./docs
-    $ jact extract links docs/design.md --session abc123
-    $ jact extract links file.md | jq '.stats.compressionRatio'
-
-Exit Codes:
-  0  At least one link extracted successfully (or cache hit with --session)
-  1  No eligible links or all extractions failed
-  2  System error (file not found, permission denied)
-`,
-	)
-	.action(async (sourceFile: string, options: CliExtractOptions) => {
-		// Session cache short-circuits extraction at the CLI boundary
-		if (options.session) {
-			if (checkExtractCache(options.session, sourceFile, CACHE_DIR)) {
-				process.exitCode = 0;
-				return;
-			}
-		}
-
-		// Pattern: Delegate to JactCli orchestrator
-		const manager = new JactCli();
-
-		try {
-			await manager.extractLinks(sourceFile, options);
-
-			// Write cache only after successful extraction
-			if (options.session && process.exitCode !== 1) {
-				writeExtractCache(options.session, sourceFile, CACHE_DIR);
-			}
-		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			console.error("ERROR:", errorMessage);
-			process.exitCode = 2;
-		}
-	});
-
-extractCmd
-	.command("header")
-	.description("Extract specific header section content from a target file")
-	.argument("<target-file>", "Markdown file to extract from")
-	.argument("<header-name>", "Exact header text to extract")
-	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
-	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
-	.addOption(
-		new Option("--format <type>", "Output format")
-			.choices(["markdown", "json"])
-			.default("markdown"),
-	)
-	.addHelpText(
-		"after",
-		`
-Examples:
-    $ jact extract header plan.md "Task 1: Implementation"
-    $ jact extract header docs/guide.md "Overview" --scope ./docs
-    $ jact extract header file.md "Design" | jq '.extractedContentBlocks'
-
-Exit Codes:
-  0  Header extracted successfully
-  1  Header not found or validation failed
-  2  System error (file not found, permission denied)
-`,
-	)
-	.action(
-		async (
-			targetFile: string,
-			headerName: string,
-			options: CliExtractOptions,
-		) => {
-			// Integration: Create JactCli instance
-			const manager = new JactCli();
-
-			try {
-				// Pattern: Delegate to JactCli orchestration method
-				const result = await manager.extractHeader(
-					targetFile,
-					headerName,
-					options,
-				);
-
-				// Format output based on --format flag (default: markdown); minimal payload by default
-				if (result) {
-					console.log(
-						formatExtractResult(
-							result,
-							options.format ?? "markdown",
-							options.verbose ? "verbose" : "minimal",
-						),
-					);
-					process.exitCode = 0;
-				}
-				// Note: Error exit codes set by extractHeader() method
-			} catch (error) {
-				// Decision: Unexpected errors use exit code 2
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				console.error("ERROR:", errorMessage);
-				process.exitCode = 2;
-			}
-		},
-	);
-
-extractCmd
-	.command("file")
-	.description("Extract entire markdown file content")
-	.argument("<target-file>", "Markdown file to extract")
-	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
-	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
-	.option("--format <type>", "Output format (json)", "json")
-	.addHelpText(
-		"after",
-		`
-Examples:
-    $ jact extract file docs/architecture.md
-    $ jact extract file architecture.md --scope ./docs
-    $ jact extract file file.md | jq '.extractedContentBlocks'
-    $ jact extract file file.md | jq '.stats'
-
-Exit Codes:
-  0  File extracted successfully
-  1  File not found or validation failed
-  2  System error (permission denied, parse error)
-`,
-	)
-	.action(async (targetFile: string, options: CliExtractOptions) => {
-		// Integration: Create JactCli instance
-		const manager = new JactCli();
-
-		try {
-			// Pattern: Delegate to JactCli orchestration method
-			const result = await manager.extractFile(targetFile, options);
-
-			// Output JSON to stdout if extraction succeeded — minimal by default, --verbose adds report + stats
-			if (result) {
-				console.log(
-					formatExtractResult(
-						result,
-						"json",
-						options.verbose ? "verbose" : "minimal",
-					),
-				);
-				process.exitCode = 0;
-			}
-			// Note: Error exit codes set by extractFile() method
-		} catch (error) {
-			// Decision: Unexpected errors use exit code 2
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			console.error("ERROR:", errorMessage);
-			process.exitCode = 2;
-		}
-	});
-
-// Only run CLI if this file is executed directly (not imported)
-// Uses realpathSync to resolve symlinks (e.g., from npm link or node_modules/.bin)
-import { realpathSync } from "node:fs";
-import { pathToFileURL } from "node:url";
-
-const realPath = realpathSync(process.argv[1] || "");
-const realPathAsUrl = pathToFileURL(realPath).href;
-
-if (import.meta.url === realPathAsUrl) {
-	program.parse();
 }

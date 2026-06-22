@@ -1,28 +1,26 @@
-import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { createMarkdownParser } from "../src/factories/componentFactory.js";
 import ParsedDocument from "../src/ParsedDocument.js";
-import { MarkdownParser } from "../src/core/MarkdownParser/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Drive tests from raw markdown through the real parser (with a wired FileCache),
+// so they exercise the actual mdast pipeline rather than hand-built token literals.
+const parser = createMarkdownParser();
+function docFromMarkdown(content) {
+	return new ParsedDocument(parser.parseContent(content));
+}
 
 describe("ParsedDocument Content Extraction", () => {
 	describe("extractSection", () => {
 		it("should extract section content including nested headings", () => {
 			// Given: Document with nested sections
-			const parserOutput = {
-				content: "## First\n\nContent here.\n\n### Sub\n\nNested.\n\n## Second",
-				tokens: [
-					{ type: "heading", depth: 2, text: "First", raw: "## First\n" },
-					{ type: "paragraph", raw: "\nContent here.\n\n" },
-					{ type: "heading", depth: 3, text: "Sub", raw: "### Sub\n" },
-					{ type: "paragraph", raw: "\nNested.\n\n" },
-					{ type: "heading", depth: 2, text: "Second", raw: "## Second" },
-				],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown(
+				"## First\n\nContent here.\n\n### Sub\n\nNested.\n\n## Second",
+			);
 
 			// When: Extract section by heading text
 			const section = doc.extractSection("First", 2);
@@ -37,13 +35,7 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should return null when heading not found", () => {
 			// Given: Document without target heading
-			const parserOutput = {
-				content: "## Existing",
-				tokens: [
-					{ type: "heading", depth: 2, text: "Existing", raw: "## Existing" },
-				],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown("## Existing");
 
 			// When: Extract non-existent section
 			const section = doc.extractSection("Nonexistent", 2);
@@ -54,16 +46,9 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should extract last section to end of document", () => {
 			// Given: Document where target section is last
-			const parserOutput = {
-				content: "## First\n\nText.\n\n## Last\n\nFinal content.",
-				tokens: [
-					{ type: "heading", depth: 2, text: "First", raw: "## First\n" },
-					{ type: "paragraph", raw: "\nText.\n\n" },
-					{ type: "heading", depth: 2, text: "Last", raw: "## Last\n" },
-					{ type: "paragraph", raw: "\nFinal content." },
-				],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown(
+				"## First\n\nText.\n\n## Last\n\nFinal content.",
+			);
 
 			// When: Extract last section
 			const section = doc.extractSection("Last", 2);
@@ -80,7 +65,6 @@ describe("ParsedDocument Content Extraction", () => {
 				"fixtures",
 				"content-aggregation-prd.md",
 			);
-			const parser = new MarkdownParser({ readFileSync });
 			const parserOutput = await parser.parseFile(fixturePath);
 			const doc = new ParsedDocument(parserOutput);
 
@@ -96,25 +80,9 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should match heading with colon when anchor has colon removed (Obsidian normalization)", () => {
 			// Given: Document with heading containing colon (Obsidian invalid character)
-			const parserOutput = {
-				content: "## MEDIUM-IMPLEMENTATION: Implementation-Ready Patterns\n\nContent here.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "MEDIUM-IMPLEMENTATION: Implementation-Ready Patterns",
-						raw: "## MEDIUM-IMPLEMENTATION: Implementation-Ready Patterns\n",
-					},
-					{ type: "paragraph", raw: "\nContent here." },
-				],
-				headings: [
-					{
-						text: "MEDIUM-IMPLEMENTATION: Implementation-Ready Patterns",
-						level: 2,
-					},
-				],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown(
+				"## MEDIUM-IMPLEMENTATION: Implementation-Ready Patterns\n\nContent here.",
+			);
 
 			// When: Extract using Obsidian-normalized anchor (colon removed)
 			const section = doc.extractSection(
@@ -123,26 +91,15 @@ describe("ParsedDocument Content Extraction", () => {
 
 			// Then: Should match and extract section
 			expect(section).not.toBeNull();
-			expect(section).toContain("MEDIUM-IMPLEMENTATION: Implementation-Ready Patterns");
+			expect(section).toContain(
+				"MEDIUM-IMPLEMENTATION: Implementation-Ready Patterns",
+			);
 			expect(section).toContain("Content here");
 		});
 
 		it("should match heading with pipe when anchor has pipe removed (Obsidian normalization)", () => {
 			// Given: Document with heading containing pipe
-			const parserOutput = {
-				content: "## Test | Heading\n\nContent here.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Test | Heading",
-						raw: "## Test | Heading\n",
-					},
-					{ type: "paragraph", raw: "\nContent here." },
-				],
-				headings: [{ text: "Test | Heading", level: 2 }],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown("## Test | Heading\n\nContent here.");
 
 			// When: Extract using Obsidian-normalized anchor (pipe removed)
 			const section = doc.extractSection("Test  Heading");
@@ -154,20 +111,7 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should match heading with caret when anchor has caret removed (Obsidian normalization)", () => {
 			// Given: Document with heading containing caret
-			const parserOutput = {
-				content: "## Test ^ Heading\n\nContent here.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Test ^ Heading",
-						raw: "## Test ^ Heading\n",
-					},
-					{ type: "paragraph", raw: "\nContent here." },
-				],
-				headings: [{ text: "Test ^ Heading", level: 2 }],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown("## Test ^ Heading\n\nContent here.");
 
 			// When: Extract using Obsidian-normalized anchor (caret removed)
 			const section = doc.extractSection("Test  Heading");
@@ -179,20 +123,7 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should match heading with hash when anchor has hash removed (Obsidian normalization)", () => {
 			// Given: Document with heading containing hash
-			const parserOutput = {
-				content: "## Test # Heading\n\nContent here.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Test # Heading",
-						raw: "## Test # Heading\n",
-					},
-					{ type: "paragraph", raw: "\nContent here." },
-				],
-				headings: [{ text: "Test # Heading", level: 2 }],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown("## Test # Heading\n\nContent here.");
 
 			// When: Extract using Obsidian-normalized anchor (hash removed)
 			const section = doc.extractSection("Test  Heading");
@@ -204,20 +135,7 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should match heading with %% when anchor has %% removed (Obsidian normalization)", () => {
 			// Given: Document with heading containing comment markers
-			const parserOutput = {
-				content: "## Test %% Comment\n\nContent here.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Test %% Comment",
-						raw: "## Test %% Comment\n",
-					},
-					{ type: "paragraph", raw: "\nContent here." },
-				],
-				headings: [{ text: "Test %% Comment", level: 2 }],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown("## Test %% Comment\n\nContent here.");
 
 			// When: Extract using Obsidian-normalized anchor (%% removed)
 			const section = doc.extractSection("Test  Comment");
@@ -229,20 +147,7 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should match heading with [[ ]] when anchor has wiki brackets removed (Obsidian normalization)", () => {
 			// Given: Document with heading containing wiki link brackets
-			const parserOutput = {
-				content: "## Test [[Link]] Heading\n\nContent here.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Test [[Link]] Heading",
-						raw: "## Test [[Link]] Heading\n",
-					},
-					{ type: "paragraph", raw: "\nContent here." },
-				],
-				headings: [{ text: "Test [[Link]] Heading", level: 2 }],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown("## Test [[Link]] Heading\n\nContent here.");
 
 			// When: Extract using Obsidian-normalized anchor (wiki brackets removed)
 			const section = doc.extractSection("Test Link Heading");
@@ -254,20 +159,7 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should match heading with multiple Obsidian invalid characters", () => {
 			// Given: Document with heading containing multiple invalid characters
-			const parserOutput = {
-				content: "## Test: A | B ^ C\n\nContent here.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Test: A | B ^ C",
-						raw: "## Test: A | B ^ C\n",
-					},
-					{ type: "paragraph", raw: "\nContent here." },
-				],
-				headings: [{ text: "Test: A | B ^ C", level: 2 }],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown("## Test: A | B ^ C\n\nContent here.");
 
 			// When: Extract using Obsidian-normalized anchor (all invalid chars removed)
 			const section = doc.extractSection("Test A  B  C");
@@ -279,33 +171,9 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should match URL-decoded anchor with collapsed whitespace against heading with colon (Issue #14)", () => {
 			// Given: Document with heading "Level 3: Components"
-			// URL-encoded anchor: "Level%203%20Components" (colon removed, spaces collapsed)
-			// After decodeUrlAnchor: "Level 3 Components" (single space)
-			// Heading after colon removal: "Level 3 Components" (double space from ": " → " ")
-			// Bug: These don't match because normalization doesn't collapse whitespace
-			const parserOutput = {
-				content: "## Level 3: Components\n\nComponent details here.\n\n## Next Section",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Level 3: Components",
-						raw: "## Level 3: Components\n",
-					},
-					{ type: "paragraph", raw: "\nComponent details here.\n\n" },
-					{
-						type: "heading",
-						depth: 2,
-						text: "Next Section",
-						raw: "## Next Section",
-					},
-				],
-				headings: [
-					{ text: "Level 3: Components", level: 2 },
-					{ text: "Next Section", level: 2 },
-				],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown(
+				"## Level 3: Components\n\nComponent details here.\n\n## Next Section",
+			);
 
 			// When: Extract using decoded URL anchor (single space, as ContentExtractor does)
 			const section = doc.extractSection("Level 3 Components");
@@ -319,24 +187,9 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should match URL-decoded anchor with collapsed whitespace for multiple special chars (Issue #14)", () => {
 			// Given: Heading with multiple Obsidian-invalid chars creating whitespace gaps
-			// "Story 1.5: Cache | Design" → remove : and | → "Story 1.5 Cache  Design"
-			// But URL-encoded form collapses: "Story%201.5%20Cache%20Design" → decoded: "Story 1.5 Cache Design"
-			const parserOutput = {
-				content: "## Story 1.5: Cache | Design\n\nDesign content.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Story 1.5: Cache | Design",
-						raw: "## Story 1.5: Cache | Design\n",
-					},
-					{ type: "paragraph", raw: "\nDesign content." },
-				],
-				headings: [
-					{ text: "Story 1.5: Cache | Design", level: 2 },
-				],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown(
+				"## Story 1.5: Cache | Design\n\nDesign content.",
+			);
 
 			// When: Extract using URL-decoded form (whitespace collapsed)
 			const section = doc.extractSection("Story 1.5 Cache Design");
@@ -348,20 +201,7 @@ describe("ParsedDocument Content Extraction", () => {
 
 		it("should still match headings without Obsidian invalid characters (backward compatibility)", () => {
 			// Given: Document with normal heading (no invalid characters)
-			const parserOutput = {
-				content: "## Normal Heading\n\nContent here.",
-				tokens: [
-					{
-						type: "heading",
-						depth: 2,
-						text: "Normal Heading",
-						raw: "## Normal Heading\n",
-					},
-					{ type: "paragraph", raw: "\nContent here." },
-				],
-				headings: [{ text: "Normal Heading", level: 2 }],
-			};
-			const doc = new ParsedDocument(parserOutput);
+			const doc = docFromMarkdown("## Normal Heading\n\nContent here.");
 
 			// When: Extract using exact heading text
 			const section = doc.extractSection("Normal Heading");

@@ -1,0 +1,6 @@
+src/types/strategy-types.ts:16:	getDecision(link: LinkObject, cliFlags: CliFlags): EligibilityDecision | null;
+src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.ts:13:	getDecision(
+src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.ts:13:	getDecision(
+src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.ts:13:	getDecision(
+src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.ts:13:	getDecision(
+src/core/ContentExtractor/analyzeEligibility.ts:23:		const decision = strategy.getDecision(link, cliFlags);

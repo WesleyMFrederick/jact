@@ -1,0 +1,9 @@
+=== graphify T2 bridge evidence ===
+concrete --implements--> ExtractionEligibilityStrategy: 0
+
+dispatcher --references--> interface: 0
+dispatcher --calls--> getDecision:   0
+
+VERDICT: graphify does NOT bridge dispatch
+NOTE: LSP also bridges this dispatch, more precisely and without the node-id
+      collisions / duplicate-edge noise visible in graphify's output.

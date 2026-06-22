@@ -1,0 +1,8 @@
+src/types/citationTypes.ts:136: * Created by MarkdownParser.extractHeadings().
+src/core/MarkdownParser/extractHeadings.ts:21:export function extractHeadings(tokens: Token[]): HeadingObject[] {
+src/core/MarkdownParser/MarkdownParser.ts:13:import { extractHeadings } from "./extractHeadings.js";
+src/core/MarkdownParser/MarkdownParser.ts:87:		const headings = this.extractHeadings(tokens);
+src/core/MarkdownParser/MarkdownParser.ts:121:	extractHeadings(tokens: Token[]): HeadingObject[] {
+src/core/MarkdownParser/MarkdownParser.ts:122:		return extractHeadings(tokens);
+src/core/MarkdownParser/MarkdownParser.ts:135:	 * @param headings - Optional heading objects from extractHeadings
+src/core/MarkdownParser/extractAnchors.ts:19: * @param headings - Optional heading objects from extractHeadings

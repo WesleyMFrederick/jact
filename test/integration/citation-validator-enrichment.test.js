@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
-import { CitationValidator } from "../../src/CitationValidator.js";
+import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
 import { MarkdownParser } from "../../src/core/MarkdownParser/index.js";
 import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 

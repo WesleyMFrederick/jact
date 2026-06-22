@@ -1,0 +1,42 @@
+raw nodes: 232 raw edges: 622
+sample node keys: ['id', 'label', 'file_type', 'source_file', 'source_location']
+
+nodes mentioning Strategy: 28
+  cachefallbackstrategy_ts | CacheFallbackStrategy.ts | CacheFallbackStrategy.ts
+  pathresolutionstrategies_cachefallbackstrategy_cachefallbackstrategy | CacheFallbackStrategy | CacheFallbackStrategy.ts
+  pathresolutionstrategies_cachefallbackstrategy_cachefallbackstrategy_resolve | .resolve() | CacheFallbackStrategy.ts
+  filefoundstrategy_ts | FileFoundStrategy.ts | FileFoundStrategy.ts
+  pathresolutionstrategies_filefoundstrategy_filefoundstrategy | FileFoundStrategy | FileFoundStrategy.ts
+  pathresolutionstrategies_filefoundstrategy_filefoundstrategy_resolve | .resolve() | FileFoundStrategy.ts
+  folderlinkstrategy_ts | FolderLinkStrategy.ts | FolderLinkStrategy.ts
+  pathresolutionstrategies_folderlinkstrategy_folderlinkstrategy | FolderLinkStrategy | FolderLinkStrategy.ts
+  pathresolutionstrategies_folderlinkstrategy_folderlinkstrategy_resolve | .resolve() | FolderLinkStrategy.ts
+  pathresolutionstrategy_ts | PathResolutionStrategy.ts | PathResolutionStrategy.ts
+  wikifailloudstrategy_ts | WikiFailLoudStrategy.ts | WikiFailLoudStrategy.ts
+  pathresolutionstrategies_wikifailloudstrategy_wikifailloudstrategy | WikiFailLoudStrategy | WikiFailLoudStrategy.ts
+  pathresolutionstrategies_wikifailloudstrategy_wikifailloudstrategy_resolve | .resolve() | WikiFailLoudStrategy.ts
+  wikifastpathstrategy_ts | WikiFastPathStrategy.ts | WikiFastPathStrategy.ts
+  pathresolutionstrategies_wikifastpathstrategy_wikifastpathstrategy | WikiFastPathStrategy | WikiFastPathStrategy.ts
+  pathresolutionstrategies_wikifastpathstrategy_wikifastpathstrategy_resolve | .resolve() | WikiFastPathStrategy.ts
+  cliflagstrategy_ts | CliFlagStrategy.ts | CliFlagStrategy.ts
+  eligibilitystrategies_cliflagstrategy_cliflagstrategy | CliFlagStrategy | CliFlagStrategy.ts
+  eligibilitystrategies_cliflagstrategy_cliflagstrategy_getdecision | .getDecision() | CliFlagStrategy.ts
+  forcemarkerstrategy_ts | ForceMarkerStrategy.ts | ForceMarkerStrategy.ts
+  eligibilitystrategies_forcemarkerstrategy_forcemarkerstrategy | ForceMarkerStrategy | ForceMarkerStrategy.ts
+  eligibilitystrategies_forcemarkerstrategy_forcemarkerstrategy_getdecision | .getDecision() | ForceMarkerStrategy.ts
+  sectionlinkstrategy_ts | SectionLinkStrategy.ts | SectionLinkStrategy.ts
+  eligibilitystrategies_sectionlinkstrategy_sectionlinkstrategy | SectionLinkStrategy | SectionLinkStrategy.ts
+  eligibilitystrategies_sectionlinkstrategy_sectionlinkstrategy_getdecision | .getDecision() | SectionLinkStrategy.ts
+  stopmarkerstrategy_ts | StopMarkerStrategy.ts | StopMarkerStrategy.ts
+  eligibilitystrategies_stopmarkerstrategy_stopmarkerstrategy | StopMarkerStrategy | StopMarkerStrategy.ts
+  eligibilitystrategies_stopmarkerstrategy_stopmarkerstrategy_getdecision | .getDecision() | StopMarkerStrategy.ts
+
+getDecision nodes: 4
+  eligibilitystrategies_cliflagstrategy_cliflagstrategy_getdecision | .getDecision()
+  eligibilitystrategies_forcemarkerstrategy_forcemarkerstrategy_getdecision | .getDecision()
+  eligibilitystrategies_sectionlinkstrategy_sectionlinkstrategy_getdecision | .getDecision()
+  eligibilitystrategies_stopmarkerstrategy_stopmarkerstrategy_getdecision | .getDecision()
+
+distinct source files among nodes: 58
+ContentExtractor files present:
+   ContentExtractor.ts

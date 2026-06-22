@@ -1,6 +1,6 @@
 // src/types/citationTypes.ts
 
-import type { Token } from "marked";
+import type { Root } from "mdast";
 import type { ValidationMetadata } from "./validationTypes.js";
 
 /**
@@ -132,7 +132,7 @@ export type AnchorObject =
 	  };
 
 /**
- * Heading object extracted from marked.js token structure.
+ * Heading object extracted from the mdast tree.
  * Created by MarkdownParser.extractHeadings().
  */
 export interface HeadingObject {
@@ -157,8 +157,8 @@ export interface ParserOutput {
 	/** Full raw content string */
 	content: string;
 
-	/** Tokenized markdown AST from marked.js */
-	tokens: Token[];
+	/** Parsed markdown AST (mdast Root) — internal reader for the ParsedDocument facade (D-008) */
+	ast: Root;
 
 	/** All outgoing links found in document */
 	links: LinkObject[];

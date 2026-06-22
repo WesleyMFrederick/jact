@@ -12,7 +12,7 @@
  * Tests assert observable contract (stdout shape, stderr substrings, exit
  * code) only — not internal call sequences.
  *
- * CLI invocations spawn `node dist/jact.js ast …` (requires prior build).
+ * CLI invocations spawn `node dist/cli.js ast …` (requires prior build).
  */
 
 import { exec } from "node:child_process";
@@ -26,7 +26,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const CLI_PATH = join(__dirname, "../../dist/jact.js");
+const CLI_PATH = join(__dirname, "../../dist/cli.js");
 const JACT_ROOT = join(__dirname, "../..");
 const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");
 
@@ -58,13 +58,14 @@ describe("ast — happy paths (parses to JSON)", () => {
 		const result = JSON.parse(stdout);
 		expect(result).toHaveProperty("filePath");
 		expect(result).toHaveProperty("content");
-		expect(result).toHaveProperty("tokens");
+		expect(result).toHaveProperty("ast");
 		expect(result).toHaveProperty("links");
 		expect(result).toHaveProperty("headings");
 		expect(result).toHaveProperty("anchors");
 		expect(result.filePath).toBe(JACT_CLAUDE_MD);
-		expect(Array.isArray(result.tokens)).toBe(true);
-		expect(result.tokens.length).toBeGreaterThan(0);
+		expect(result.ast).toBeTypeOf("object");
+		expect(result.ast.type).toBe("root");
+		expect(Array.isArray(result.ast.children)).toBe(true);
 	});
 
 	it("Scenario 2: given cwd inside jact repo and bare filename unique in scope, when ast runs from subdir, then resolves via cache to absolute path", async () => {
@@ -87,7 +88,7 @@ describe("ast — happy paths (parses to JSON)", () => {
 		expect(stderr).toBe("");
 		const result = JSON.parse(stdout);
 		expect(result).toHaveProperty("filePath");
-		expect(result).toHaveProperty("tokens");
+		expect(result).toHaveProperty("ast");
 	});
 
 	it("Scenario 4: given cwd is /tmp and explicit --scope rescues, when ast runs, then exit 0 with valid AST JSON", async () => {
@@ -98,7 +99,7 @@ describe("ast — happy paths (parses to JSON)", () => {
 		expect(stderr).toBe("");
 		const result = JSON.parse(stdout);
 		expect(result).toHaveProperty("filePath");
-		expect(result).toHaveProperty("tokens");
+		expect(result).toHaveProperty("ast");
 	});
 });
 

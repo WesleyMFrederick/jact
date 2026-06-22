@@ -1,0 +1,18 @@
+{
+  "symbol": "getDecision",
+  "position": "src/core/ContentExtractor/analyzeEligibility.ts:23",
+  "references": [
+    "src/core/ContentExtractor/analyzeEligibility.ts:23",
+    "src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.ts:13",
+    "src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.ts:13",
+    "src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.ts:13",
+    "src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.ts:13",
+    "src/types/strategy-types.ts:16"
+  ],
+  "implementations": [
+    "src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.ts:13",
+    "src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.ts:13",
+    "src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.ts:13",
+    "src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.ts:13"
+  ]
+}

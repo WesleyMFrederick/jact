@@ -1,0 +1,88 @@
+src/ParsedFileCache.ts:9: * Provides async access to parsed markdown data with automatic concurrent request deduplication.
+src/ParsedFileCache.ts:14: * requests during the parsing phase. This prevents duplicate parser.parseFile() calls when multiple
+src/ParsedFileCache.ts:45:	 * Resolve parsed file data with automatic concurrent request deduplication
+src/ParsedFileCache.ts:49:	 * and caches the Promise immediately before awaiting (prevents duplicate parses for concurrent requests).
+src/ParsedFileCache.ts:74:		// 5. Store ParsedDocument Promise IMMEDIATELY (prevents duplicate parses)
+src/ParsedDocument.ts:284:	 * we should NOT recurse into .tokens to avoid duplication.
+src/types/extraction-types.ts:26: * Single extracted content block with deduplication metadata.
+src/types/extraction-types.ts:63: * Extraction statistics for deduplication metrics.
+src/types/extraction-types.ts:68:	duplicateContentDetected: number;
+src/types/extraction-types.ts:75: * Built incrementally during extraction with inline deduplication.
+src/types/fileCacheTypes.ts:5:	duplicates: number;
+src/types/fileCacheTypes.ts:20:	reason: "duplicate" | "not_found" | "duplicate_fuzzy";
+src/types/fileCacheTypes.ts:23:	candidates?: string[]; // reason: 'duplicate' | 'duplicate_fuzzy'
+src/core/CitationValidator/pathResolutionStrategies/index.ts:9: *   5. CacheFallback — file not found; probe FileCache for fuzzy/exact/duplicate
+src/core/CitationValidator/pathResolutionStrategies/CacheFallbackStrategy.ts:8: *   3. duplicate or not_found — surface cache message as error.
+src/core/CitationValidator/pathResolutionStrategies/CacheFallbackStrategy.ts:129:		// Case 3: duplicate or not_found in cache
+src/core/CitationValidator/pathResolutionStrategies/CacheFallbackStrategy.ts:131:			cacheResult.reason === "duplicate" ||
+src/core/CitationValidator/pathResolutionStrategies/CacheFallbackStrategy.ts:132:			cacheResult.reason === "duplicate_fuzzy" ||
+src/core/ContentExtractor/extractLinksContent.ts:52: * Extract content from links in source file with deduplication.
+src/core/ContentExtractor/extractLinksContent.ts:53: * Primary operation orchestrating validation -> eligibility -> content retrieval -> deduplication.
+src/core/ContentExtractor/extractLinksContent.ts:58: * @returns Deduplicated extraction result
+src/core/ContentExtractor/extractLinksContent.ts:80:	// PHASE 2: Initialize Deduplicated Structure
+src/core/ContentExtractor/extractLinksContent.ts:81:	// Pattern: Inline deduplication - build indexed structure during extraction
+src/core/ContentExtractor/extractLinksContent.ts:87:		duplicateContentDetected: 0,
+src/core/ContentExtractor/extractLinksContent.ts:92:	// PHASE 3: Process each link with deduplication
+src/core/ContentExtractor/extractLinksContent.ts:127:		// PHASE 4: Content Retrieval with Deduplication (AC5-AC7)
+src/core/ContentExtractor/extractLinksContent.ts:168:			// --- Deduplication Logic (NEW for US2.2a) ---
+src/core/ContentExtractor/extractLinksContent.ts:181:				// Decision: Duplicate detected - track for statistics
+src/core/ContentExtractor/extractLinksContent.ts:182:				stats.duplicateContentDetected++;
+src/core/ContentExtractor/extractLinksContent.ts:220:	// Decision: Return deduplicated output as only public contract (AC9)
+src/core/ContentExtractor/ContentExtractor.ts:103:		// Initialize Deduplicated Structure
+src/core/ContentExtractor/ContentExtractor.ts:109:			duplicateContentDetected: 0,
+src/core/ContentExtractor/ContentExtractor.ts:114:		// Process each link with deduplication
+src/core/ContentExtractor/ContentExtractor.ts:149:			// Content Retrieval with Deduplication (AC5-AC7)
+src/core/ContentExtractor/ContentExtractor.ts:185:				// Deduplication
+src/core/ContentExtractor/ContentExtractor.ts:197:					stats.duplicateContentDetected++;
+src/core/ContentExtractor/ContentExtractor.ts:230:				(stats.uniqueContent + stats.duplicateContentDetected) *
+src/core/ContentExtractor/ContentExtractor.ts:231:				(stats.tokensSaved / Math.max(stats.duplicateContentDetected, 1));
+src/core/ContentExtractor/ContentExtractor.ts:234:				(stats.tokensSaved / Math.max(stats.duplicateContentDetected, 1));
+src/core/ContentExtractor/ContentExtractor.ts:236:				stats.duplicateContentDetected > 0
+src/core/MarkdownParser/extractLinks.ts:52: * Deduplication helper: check if a link was already extracted.
+src/core/MarkdownParser/extractLinks.ts:53: * Uses position-based matching (line + column) to prevent duplicate extraction
+src/core/MarkdownParser/extractLinks.ts:57:function isDuplicateLink(
+src/core/MarkdownParser/extractLinks.ts:209:		// Skip if already extracted by token parser using robust deduplication
+src/core/MarkdownParser/extractLinks.ts:210:		const alreadyExtracted = isDuplicateLink(
+src/core/MarkdownParser/extractLinks.ts:251:		// Skip if already extracted using robust deduplication
+src/core/MarkdownParser/extractLinks.ts:252:		const alreadyExtracted = isDuplicateLink(
+src/core/MarkdownParser/extractLinks.ts:298:				// Skip if already extracted using robust deduplication
+src/core/MarkdownParser/extractLinks.ts:299:				const alreadyExtracted = isDuplicateLink(
+src/core/MarkdownParser/resolveWikiPath.ts:56: * @returns A ResolvedPath: on success includes `{ resolved: true; absolutePath }`; on failure includes `attempted` (the raw and slugged forms), optional `attemptedPaths` (deduplicated looked-up paths), and `suggestions` (up to three ranked relative paths).
+src/core/MarkdownParser/resolveWikiPath.ts:129:	// Deduplicate attemptedPaths to avoid redundant paths in error output
+src/jact.ts:135:					if (cacheStats.duplicates > 0) {
+src/jact.ts:137:							`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
+src/jact.ts:396:				if (cacheStats.duplicates > 0) {
+src/jact.ts:398:						`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
+src/FileCache.ts:26:	isDuplicate: boolean;
+src/FileCache.ts:31:	duplicateCount: number;
+src/FileCache.ts:32:	duplicates: string[];
+src/FileCache.ts:46: * - Scans only the symlink-resolved directory to avoid duplicate entries
+src/FileCache.ts:47: * - entries Map stores ALL paths per filename so duplicates are tracked as a single source of truth
+src/FileCache.ts:49: * - Warns about duplicates to help users fix ambiguous references
+src/FileCache.ts:81:	 * Resolves symlinks before scanning to prevent duplicate entries from symlink artifacts.
+src/FileCache.ts:82:	 * Scans all subdirectories for .md files and indexes by filename. Warns if duplicate
+src/FileCache.ts:91:	 * @param verbose - When true, log duplicate filename warnings to stderr
+src/FileCache.ts:95:	 * @returns Cache statistics with { totalFiles, duplicates, scopeFolder, realScopeFolder }
+src/FileCache.ts:123:		const dupNames = this.duplicateNames();
+src/FileCache.ts:127:				`WARNING: Found duplicate filenames in scope: ${dupNames.join(", ")}`,
+src/FileCache.ts:133:			duplicates: dupNames.length,
+src/FileCache.ts:141:	 * duplicate detection — used by buildCache, getCacheStats, and any consumer
+src/FileCache.ts:144:	private duplicateNames(): string[] {
+src/FileCache.ts:242:				return this.buildDuplicateFailure(filename, arr);
+src/FileCache.ts:259:				return this.buildDuplicateFailure(withMdExt, arrExt);
+src/FileCache.ts:277:	private buildDuplicateFailure(
+src/FileCache.ts:288:			reason: "duplicate",
+src/FileCache.ts:321:	 * Returns null if no fuzzy match found. Returns duplicate error if corrected filename
+src/FileCache.ts:338:						reason: "duplicate_fuzzy",
+src/FileCache.ts:379:							reason: "duplicate_fuzzy",
+src/FileCache.ts:452:	// Get all cached files with duplicate status
+src/FileCache.ts:456:			const isDuplicate = paths.length > 1;
+src/FileCache.ts:458:				result.push({ filename, path: p, isDuplicate });
+src/FileCache.ts:494:	// Get cache statistics (total files, duplicates)
+src/FileCache.ts:496:		const duplicates = this.duplicateNames();
+src/FileCache.ts:499:			duplicateCount: duplicates.length,
+src/FileCache.ts:500:			duplicates,
+src/cli.ts:110:		"show full validation report: all valid citations, duplicate-filename warnings, summary block (default: minimal output with only errors/warnings)",
+src/cli.ts:226:		"Extract content from all links in source document with validation and deduplication",
+src/cli.ts:236:		"Session ID for cache deduplication (skips extraction on cache hit)",
+src/formatExtractResult.ts:6: * D-002: Shared formatter to avoid triple duplication across extract commands.

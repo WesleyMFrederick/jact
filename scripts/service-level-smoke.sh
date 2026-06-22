@@ -9,7 +9,7 @@ set -u
 PROJECT_ROOT="${1:-$(pwd)}"
 FIXTURE="${2:-$PROJECT_ROOT/test/fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md}"
 MIN_VALID="${3:-7}"
-CLI="$PROJECT_ROOT/dist/jact.js"
+CLI="$PROJECT_ROOT/dist/cli.js"
 
 if [[ ! -f "$CLI" ]]; then
   echo "CLI not built: $CLI (run npm run build)" >&2

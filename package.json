@@ -5,7 +5,7 @@
 	"type": "module",
 	"main": "dist/jact.js",
 	"bin": {
-		"jact": "./dist/jact.js"
+		"jact": "./dist/cli.js"
 	},
 	"scripts": {
 		"build": "tsc",
@@ -16,15 +16,15 @@
 		"test:coverage": "vitest run --coverage",
 		"type-check": "tsc --noEmit",
 		"check": "npm run type-check && npm test",
-		"start": "node dist/jact.js",
+		"start": "node dist/cli.js",
 		"validate:ts-conversion": "node --loader ts-node/esm scripts/validate-typescript-conversion.ts",
-		"jact:validate": "node ./dist/jact.js validate",
-		"jact:ast": "node ./dist/jact.js ast",
-		"jact:base-paths": "sh -c 'node ./dist/jact.js extract links \"$1\" --verbose 2>/dev/null | jq -r \".outgoingLinksReport.processedLinks[] | select(.sourceLink.target.path.absolute) | .sourceLink.target.path.absolute\" | sort -u' --",
-		"jact:extract": "node ./dist/jact.js extract links",
-		"jact:extract:content": "sh -c 'node ./dist/jact.js extract links \"$1\" | jq \".extractedContentBlocks\"' --",
-		"jact:extract:header": "sh -c 'node ./dist/jact.js extract header \"$1\" \"$2\"' --",
-		"jact:fix": "node ./dist/jact.js validate --fix",
+		"jact:validate": "node ./dist/cli.js validate",
+		"jact:ast": "node ./dist/cli.js ast",
+		"jact:base-paths": "sh -c 'node ./dist/cli.js extract links \"$1\" --verbose 2>/dev/null | jq -r \".outgoingLinksReport.processedLinks[] | select(.sourceLink.target.path.absolute) | .sourceLink.target.path.absolute\" | sort -u' --",
+		"jact:extract": "node ./dist/cli.js extract links",
+		"jact:extract:content": "sh -c 'node ./dist/cli.js extract links \"$1\" | jq \".extractedContentBlocks\"' --",
+		"jact:extract:header": "sh -c 'node ./dist/cli.js extract header \"$1\" \"$2\"' --",
+		"jact:fix": "node ./dist/cli.js validate --fix",
 		"sync-documentation-symlinks": "bun run ../0-documents/src/workflows/syncDocumentationSymlinks.ts $(pwd)/documentation-sync-manifest.json"
 	},
 	"keywords": [
@@ -38,7 +38,12 @@
 	"dependencies": {
 		"commander": "^14.0.1",
 		"ignore": "^7.0.5",
-		"marked": "^17.0.1"
+		"mdast-util-from-markdown": "^2.0.3",
+		"mdast-util-to-string": "^4.0.0",
+		"micromark-util-character": "^2.1.1",
+		"micromark-util-combine-extensions": "^2.0.1",
+		"micromark-util-symbol": "^2.0.1",
+		"unist-util-visit": "^5.1.0"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.3",

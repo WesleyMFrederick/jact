@@ -1,0 +1,1 @@
+Ignored error while writing commit hash to /Users/wesleyfrederick/.cache/huggingface/hub/models--minishlab--potion-code-16M/refs/main: [Errno 1] Operation not permitted: '/Users/wesleyfrederick/.cache/huggingface/hub/models--minishlab--potion-code-16M/refs/main'.

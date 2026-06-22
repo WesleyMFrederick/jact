@@ -1,10 +1,11 @@
 // tools/jact/test/integration/us2.2-acceptance-criteria.test.js
-import { describe, it, expect } from "vitest";
-import { createContentExtractor } from "../../src/factories/componentFactory.js";
-import { ContentExtractor } from "../../src/core/ContentExtractor/ContentExtractor.js";
-import { ParsedFileCache } from "../../src/ParsedFileCache.js";
-import { CitationValidator } from "../../src/CitationValidator.js";
+
 import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
+import { ContentExtractor } from "../../src/core/ContentExtractor/ContentExtractor.js";
+import { createContentExtractor } from "../../src/factories/componentFactory.js";
+import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 
 /**
  * US2.2 Acceptance Criteria Validation Tests
@@ -360,22 +361,15 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 	});
 
 	it("AC13: should implement extractSection with 3-phase algorithm", async () => {
-		// Given: ParsedDocument with tokenized sections
-		const parserOutput = {
-			content: "## Test\n\nContent.\n\n### Sub\n\nMore.\n\n## Next",
-			tokens: [
-				{ type: "heading", depth: 2, text: "Test", raw: "## Test\n" },
-				{ type: "paragraph", raw: "\nContent.\n\n" },
-				{ type: "heading", depth: 3, text: "Sub", raw: "### Sub\n" },
-				{ type: "paragraph", raw: "\nMore.\n\n" },
-				{ type: "heading", depth: 2, text: "Next", raw: "## Next" },
-			],
-			anchors: [],
-		};
-
-		// Create ParsedDocument instance directly
+		// Given: ParsedDocument parsed from raw markdown (real mdast pipeline)
+		const { createMarkdownParser } = await import(
+			"../../src/factories/componentFactory.js"
+		);
 		const ParsedDocument = (await import("../../src/ParsedDocument.js"))
 			.default;
+		const parserOutput = createMarkdownParser().parseContent(
+			"## Test\n\nContent.\n\n### Sub\n\nMore.\n\n## Next",
+		);
 		const doc = new ParsedDocument(parserOutput);
 
 		// When: Extract section (should NOT throw "Not implemented")

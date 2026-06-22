@@ -1,0 +1,222 @@
+Search results for: 'where extracted content is deduplicated by hash' (mode=hybrid)
+
+## 1. src/core/ContentExtractor/extractLinksContent.ts:51-92  [score=0.024]
+```
+/**
+ * Extract content from links in source file with deduplication.
+ * Primary operation orchestrating validation -> eligibility -> content retrieval -> deduplication.
+ *
+ * @param sourceFilePath - Path to source file containing links
+ * @param cliFlags - CLI flags (e.g., { fullFiles: boolean })
+ * @param dependencies - Component dependencies
+ * @returns Deduplicated extraction result
+ */
+export async function extractLinksContent(
+	sourceFilePath: string,
+	cliFlags: CliFlags,
+	{
+		parsedFileCache,
+		citationValidator,
+		eligibilityStrategies,
+	}: ExtractLinksContentDeps,
+): Promise<OutgoingLinksExtractedContent> {
+	// PHASE 1: Validation (AC3)
+	// Call citationValidator to get enriched links
+	const validationResult: ValidationResult =
+		await citationValidator.validateFile(sourceFilePath);
+	const enrichedLinks: EnrichedLinkObject[] = validationResult.links; // Array with validation metadata
+
+	// AC15: Filter out internal links before processing
+	const crossDocumentLinks = enrichedLinks.filter(
+		(link) => link.scope !== "internal",
+	);
+
+	// PHASE 2: Initialize Deduplicated Structure
+	// Pattern: Inline deduplication - build indexed structure during extraction
+	const extractedContentBlocks: Record<string, ExtractedContentBlock> = {};
+	const processedLinks: ProcessedLinkEntry[] = [];
+	const stats: ExtractionStats = {
+		totalLinks: 0,
+		uniqueContent: 0,
+		duplicateContentDetected: 0,
+		tokensSaved: 0,
+		compressionRatio: 0,
+	};
+
+	// PHASE 3: Process each link with deduplication
+```
+
+## 2. src/core/ContentExtractor/generateContentId.ts:1-20  [score=0.021]
+```
+import { createHash } from 'crypto';
+
+/**
+ * Generate content-based identifier using SHA-256 hashing.
+ * Integration: Uses Node.js crypto module for deterministic hashing.
+ *
+ * @param content - Content string to hash
+ * @returns 16-character hex hash (truncated SHA-256)
+ */
+export function generateContentId(content: string): string {
+	// Boundary: Use Node crypto for SHA-256 hash generation
+	const hash = createHash('sha256');
+
+	// Pattern: Update hash with content, generate hex digest
+	hash.update(content);
+	const fullHash = hash.digest('hex');
+
+	// Decision: Truncate to 16 chars per AC2 (balance uniqueness vs brevity)
+	return fullHash.substring(0, 16);
+}
+```
+
+## 3. src/cache/checkExtractCache.ts:1-40  [score=0.013]
+```
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+
+function computeCacheKey(sessionId: string, filePath: string): string {
+	const content = readFileSync(filePath);
+	const contentHash = createHash("md5").update(content).digest("hex");
+	return `${sessionId}_${contentHash}`;
+}
+
+/**
+ * Check if extraction results are cached for the given session and file content.
+ *
+ * Cache key: `${sessionId}_${md5(fileContent)}` — content-hash-based invalidation
+ * ensures re-extraction when file changes between reads.
+ *
+ * @param sessionId - Claude Code session identifier
+ * @param filePath - Path to the file being extracted
+ * @param cacheDir - Directory for cache marker files
+ * @returns true if cached (skip extraction), false if cache miss
+ */
+export function checkExtractCache(
+	sessionId: string,
+	filePath: string,
+	cacheDir: string,
+): boolean {
+	mkdirSync(cacheDir, { recursive: true });
+	const cacheKey = computeCacheKey(sessionId, filePath);
+	return existsSync(`${cacheDir}/${cacheKey}`);
+}
+
+/**
+ * Write a cache marker after successful extraction.
+ *
+ * Creates an empty marker file at `${cacheDir}/${sessionId}_${md5(fileContent)}`.
+ * Auto-creates cache directory if missing.
+ *
+ * @param sessionId - Claude Code session identifier
+ * @param filePath - Path to the file that was extracted
+ * @param cacheDir - Directory for cache marker files
+ */
+```
+
+## 4. src/core/ContentExtractor/ContentExtractor.ts:150-199  [score=0.012]
+```
+{
+				if (link.target.path.absolute == null) {
+					processedLinks.push({
+						sourceLink: link,
+						contentId: null,
+						status: "skipped",
+						failureDetails: {
+							reason: "Link has no resolved absolute path",
+						},
+					});
+					continue;
+				}
+				const decodedPath = decodeURIComponent(link.target.path.absolute);
+				const targetDoc =
+					await this.parsedFileCache.resolveParsedFile(decodedPath);
+
+				let extractedContent: string;
+				if (link.anchorType === "header") {
+					const decodedAnchor = decodeUrlAnchor(link.target.anchor);
+					const result = targetDoc.extractSection(decodedAnchor ?? "");
+					if (!result) {
+						throw new Error(`Heading not found: ${decodedAnchor}`);
+					}
+					extractedContent = result;
+				} else if (link.anchorType === "block") {
+					const blockId = normalizeBlockId(link.target.anchor);
+					const blockResult = targetDoc.extractBlock(blockId);
+					if (!blockResult) {
+						throw new Error(`Block not found: ${blockId}`);
+					}
+					extractedContent = blockResult;
+				} else {
+					extractedContent = targetDoc.extractFullContent();
+				}
+
+				// Deduplication
+				const contentId = generateContentId(extractedContent);
+				const contentLength = extractedContent.length;
+
+				if (!extractedContentBlocks[contentId]) {
+					extractedContentBlocks[contentId] = {
+						content: extractedContent,
+						contentLength,
+						sourceLinks: [],
+					};
+					stats.uniqueContent++;
+				} else {
+					stats.duplicateContentDetected++;
+					stats.tokensSaved += contentLength;
+				}
+```
+
+## 5. src/core/MarkdownParser/extractLinks.ts:89-136  [score=0.012]
+```
+{
+				// Strip surrounding backticks from href — footnote reference definitions
+				// like `[^S-001]: `/path/file.md`` produce href with literal backticks.
+				const href =
+					token.href.startsWith("`") && token.href.endsWith("`")
+						? token.href.slice(1, -1)
+						: token.href;
+				const text = token.text;
+				const raw = token.raw;
+
+				// Skip external and protocol links (http/https/vscode/mailto)
+				if (
+					href.startsWith("http://") ||
+					href.startsWith("https://") ||
+					href.startsWith("vscode://") ||
+					href.startsWith("mailto:")
+				) {
+					// Recurse into children regardless
+					if (hasNestedTokens(token)) {
+						walkTokens(token.tokens);
+					}
+					continue;
+				}
+
+				// Determine scope and parse anchor
+				const isInternal = href.startsWith("#");
+				const scope = isInternal
+					? ("internal" as const)
+					: ("cross-document" as const);
+
+				let rawPath: string | null = null;
+				let anchor: string | null = null;
+
+				if (isInternal) {
+					anchor = href.substring(1); // Remove leading #
+				} else {
+					const hashIndex = href.indexOf("#");
+					if (hashIndex !== -1) {
+						rawPath = href.substring(0, hashIndex);
+						anchor = href.substring(hashIndex + 1);
+					} else {
+						// Strip trailing line-reference suffix from footnote paths before resolution.
+						// Supports: ":17", ":17-36", ":L57", ":L57-L61", ":L57,L61", ":L57,L61,L65"
+						rawPath = href.replace(/:L?\d+([,-]L?\d+)*$/, "");
+					}
+				}
+
+				// Find line/column from raw match in content
+```
+

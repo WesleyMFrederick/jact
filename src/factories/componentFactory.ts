@@ -16,7 +16,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { CitationValidator } from "../CitationValidator.js";
+import { CitationValidator } from "../core/CitationValidator/CitationValidator.js";
 import { ContentExtractor } from "../core/ContentExtractor/ContentExtractor.js";
 import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.js";
 import { ForceMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
@@ -25,6 +25,10 @@ import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategi
 import { MarkdownParser } from "../core/MarkdownParser/index.js";
 import { FileCache } from "../FileCache.js";
 import { ParsedFileCache } from "../ParsedFileCache.js";
+import type {
+	FileCacheLike,
+	ParsedFileCacheLike,
+} from "../types/componentInterfaces.js";
 import type { ExtractionEligibilityStrategy } from "../types/contentExtractorTypes.js";
 
 /**
@@ -64,26 +68,20 @@ export function createParsedFileCache(
 /**
  * Create citation validator with optional dependency overrides
  *
- * Wires together ParsedFileCache and FileCache dependencies. If not provided,
- * creates default instances. This is the main entry point for production code
- * while supporting full dependency injection for testing.
+ * Wires together ParsedFileCacheLike and FileCacheLike dependencies. If not
+ * provided, creates default production instances. Accepts interface types so
+ * callers can inject test doubles without importing production classes.
  *
- * @param parsedFileCache - Optional cache for testing
- * @param fileCache - Optional file cache for testing
+ * @param parsedFileCache - Optional cache (production or test double)
+ * @param fileCache - Optional file cache (production or test double)
  * @returns Validator instance with all dependencies wired
  */
 export function createCitationValidator(
-	parsedFileCache: ParsedFileCache | null = null,
-	fileCache: FileCache | null = null,
+	parsedFileCache: ParsedFileCacheLike | null = null,
+	fileCache: FileCacheLike | null = null,
 ): CitationValidator {
 	const _parsedFileCache = parsedFileCache || createParsedFileCache();
 	const _fileCache = fileCache || createFileCache();
-	// Sync: ensures the embedded parser uses the same FileCache instance as the validator.
-	// Critical when jact.ts creates parser + parsedFileCache before the scope-seeded fileCache.
-	// defensive — some test scenarios stub ParsedFileCache without syncParserFileCache
-	if (_parsedFileCache instanceof ParsedFileCache) {
-		_parsedFileCache.syncParserFileCache(_fileCache);
-	}
 	return new CitationValidator(_parsedFileCache, _fileCache);
 }
 

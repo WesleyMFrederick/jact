@@ -2,7 +2,7 @@ import fs, { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { CitationValidator } from "../../src/CitationValidator.js";
+import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
 import { MarkdownParser } from "../../src/core/MarkdownParser/MarkdownParser.js";
 import { FileCache } from "../../src/FileCache.js";
 import { ParsedFileCache } from "../../src/ParsedFileCache.js";
@@ -70,7 +70,7 @@ describe("CitationValidator — wiki link with pre-resolved target.path.absolute
 		const result = await validator.validateSingleCitation(link, sourceFile);
 		const v = result.validation;
 		expect(v.status).toBe("error");
-		if (v.status === "valid") throw new Error("expected error status");
+		if (v.status !== "error") throw new Error("expected error status");
 		// Error suggestion or message must contain BOTH attempted paths
 		const combined = `${v.error} ${v.suggestion ?? ""}`;
 		expect(combined).toContain("The Hardening Principle (concept)");

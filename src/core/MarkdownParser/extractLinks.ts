@@ -1,33 +1,19 @@
-import type { Token, Tokens } from "marked";
-import { marked } from "marked";
+import type { Root } from "mdast";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { toString as mdastToString } from "mdast-util-to-string";
+import type { Position } from "unist";
+import { visit } from "unist-util-visit";
 import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
 import { detectExtractionMarker } from "./detectExtractionMarker.js";
+import {
+	jactMdastExtensions,
+	jactSyntaxExtension,
+} from "./extensions/assemble.js";
 import { extractWikilinks } from "./extractWikilinks.js";
 import { getFencedCodeBlockLineSet } from "./isInsideCodeBlock.js";
 import { isInsideInlineCode } from "./isInsideInlineCode.js";
-
-/**
- * Type guard for tokens with nested token arrays
- */
-function hasNestedTokens(token: Token): token is Token & { tokens: Token[] } {
-	return (
-		"tokens" in token && Array.isArray((token as { tokens?: unknown }).tokens)
-	);
-}
-
-/**
- * Type guard for link tokens from marked.js
- */
-function isLinkToken(token: Token): token is Tokens.Link {
-	return (
-		token.type === "link" &&
-		typeof (token as Tokens.Link).href === "string" &&
-		typeof (token as Tokens.Link).text === "string" &&
-		typeof (token as Tokens.Link).raw === "string"
-	);
-}
 
 /**
  * Find line number and column for a raw match string in content lines.
@@ -51,7 +37,7 @@ function findPosition(
 /**
  * Deduplication helper: check if a link was already extracted.
  * Uses position-based matching (line + column) to prevent duplicate extraction
- * when the token parser and regex fallback extract the same link with different
+ * when the mdast extractor and regex fallback extract the same link with different
  * anchor encodings (e.g., nested parens causing truncation in one extractor).
  */
 function isDuplicateLink(
@@ -69,118 +55,119 @@ function isDuplicateLink(
 }
 
 /**
- * Walk marked.js tokens recursively to extract standard markdown links.
- * Handles: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
+ * Walk the mdast tree to extract standard markdown links.
+ * Handles: [text](file.md#anchor), [text](#anchor), [text](path/to/file).
+ *
+ * `unist-util-visit` descends only into nodes with children, so `link` nodes
+ * inside `code`/`inlineCode` are naturally excluded (those nodes carry no link
+ * children). Line/column come from `findPosition` to keep columns 0-based and
+ * preserve dedup parity with the regex fallback below.
  */
-function extractLinksFromTokens(
-	tokens: Token[],
+function extractLinksFromAst(
+	ast: Root,
+	content: string,
 	lines: string[],
 	sourceAbsolutePath: string,
 	links: LinkObject[],
 	fileCache: FileCache,
 ): void {
-	const walkTokens = (tokenList: Token[]): void => {
-		for (const token of tokenList) {
-			// Skip code blocks and inline code spans - links inside are code examples, not citations
-			if (token.type === "code" || token.type === "codespan") {
-				continue;
-			}
+	const handleHref = (rawHref: string, text: string | null, raw: string) => {
+		// Strip surrounding backticks — footnote reference definitions like
+		// `[^S-001]: `/path/file.md`` carry the dest wrapped in backticks.
+		const href =
+			rawHref.startsWith("`") && rawHref.endsWith("`")
+				? rawHref.slice(1, -1)
+				: rawHref;
 
-			if (isLinkToken(token)) {
-				// Strip surrounding backticks from href — footnote reference definitions
-				// like `[^S-001]: `/path/file.md`` produce href with literal backticks.
-				const href =
-					token.href.startsWith("`") && token.href.endsWith("`")
-						? token.href.slice(1, -1)
-						: token.href;
-				const text = token.text;
-				const raw = token.raw;
+		// Skip external and protocol links (http/https/vscode/mailto)
+		if (
+			href.startsWith("http://") ||
+			href.startsWith("https://") ||
+			href.startsWith("vscode://") ||
+			href.startsWith("mailto:")
+		) {
+			return;
+		}
 
-				// Skip external and protocol links (http/https/vscode/mailto)
-				if (
-					href.startsWith("http://") ||
-					href.startsWith("https://") ||
-					href.startsWith("vscode://") ||
-					href.startsWith("mailto:")
-				) {
-					// Recurse into children regardless
-					if (hasNestedTokens(token)) {
-						walkTokens(token.tokens);
-					}
-					continue;
-				}
+		// Determine scope and parse anchor
+		const isInternal = href.startsWith("#");
+		const scope = isInternal
+			? ("internal" as const)
+			: ("cross-document" as const);
 
-				// Determine scope and parse anchor
-				const isInternal = href.startsWith("#");
-				const scope = isInternal
-					? ("internal" as const)
-					: ("cross-document" as const);
+		let rawPath: string | null = null;
+		let anchor: string | null = null;
 
-				let rawPath: string | null = null;
-				let anchor: string | null = null;
-
-				if (isInternal) {
-					anchor = href.substring(1); // Remove leading #
-				} else {
-					const hashIndex = href.indexOf("#");
-					if (hashIndex !== -1) {
-						rawPath = href.substring(0, hashIndex);
-						anchor = href.substring(hashIndex + 1);
-					} else {
-						// Strip trailing line-reference suffix from footnote paths before resolution.
-						// Supports: ":17", ":17-36", ":L57", ":L57-L61", ":L57,L61", ":L57,L61,L65"
-						rawPath = href.replace(/:L?\d+([,-]L?\d+)*$/, "");
-					}
-				}
-
-				// Find line/column from raw match in content
-				const { line: lineNum, column } = findPosition(raw, lines);
-
-				// Use factory function to create link object
-				const linkObject = createLinkObject({
-					linkType: "markdown",
-					scope,
-					anchor,
-					rawPath,
-					sourceAbsolutePath,
-					text,
-					fullMatch: raw,
-					line: lineNum,
-					column,
-					extractionMarker:
-						lineNum > 0
-							? detectExtractionMarker(
-									lines[lineNum - 1] || "",
-									column + raw.length,
-								)
-							: null,
-					fileCache,
-				});
-				links.push(linkObject);
-			}
-
-			// Recurse into nested tokens
-			if (hasNestedTokens(token)) {
-				walkTokens(token.tokens);
-			}
-			// Also check items (list items have items property)
-			if ("items" in token && Array.isArray((token as Tokens.List).items)) {
-				for (const item of (token as Tokens.List).items) {
-					if (hasNestedTokens(item)) {
-						walkTokens(item.tokens);
-					}
-				}
+		if (isInternal) {
+			anchor = href.substring(1); // Remove leading #
+		} else {
+			const hashIndex = href.indexOf("#");
+			if (hashIndex !== -1) {
+				rawPath = href.substring(0, hashIndex);
+				anchor = href.substring(hashIndex + 1);
+			} else {
+				// Strip trailing line-reference suffix from footnote paths before resolution.
+				// Supports: ":17", ":17-36", ":L57", ":L57-L61", ":L57,L61", ":L57,L61,L65"
+				rawPath = href.replace(/:L?\d+([,-]L?\d+)*$/, "");
 			}
 		}
+
+		// Find line/column from raw match in content
+		const { line: lineNum, column } = findPosition(raw, lines);
+
+		// Use factory function to create link object
+		const linkObject = createLinkObject({
+			linkType: "markdown",
+			scope,
+			anchor,
+			rawPath,
+			sourceAbsolutePath,
+			text,
+			fullMatch: raw,
+			line: lineNum,
+			column,
+			extractionMarker:
+				lineNum > 0
+					? detectExtractionMarker(
+							lines[lineNum - 1] || "",
+							column + raw.length,
+						)
+					: null,
+			fileCache,
+		});
+		links.push(linkObject);
 	};
-	walkTokens(tokens);
+
+	const sliceRaw = (
+		node: { position?: Position | undefined },
+		fallback: string,
+	): string => {
+		const start = node.position?.start.offset;
+		const end = node.position?.end.offset;
+		return start !== undefined && end !== undefined
+			? content.slice(start, end)
+			: fallback;
+	};
+
+	// Inline links: [text](url)
+	visit(ast, "link", (node) => {
+		const text = mdastToString(node);
+		handleHref(node.url, text, sliceRaw(node, text));
+	});
+
+	// Link reference definitions: [label]: dest — micromark stores these as
+	// `definition` nodes (marked previously produced resolved link tokens). The dest carries
+	// the cross-document path (e.g. footnote definitions like `[^S-001]: path`).
+	visit(ast, "definition", (node) => {
+		handleHref(node.url, node.label ?? null, sliceRaw(node, node.url));
+	});
 }
 
 /**
  * Regex fallback for markdown links with non-URL-encoded anchors.
  * CommonMark (marked.js) only recognizes URL-encoded anchors in links,
  * but Obsidian allows raw spaces/colons. This catches those edge cases.
- * Only extracts links NOT already extracted by token parser.
+ * Only extracts links NOT already extracted by the mdast extractor.
  */
 function extractMarkdownLinksRegex(
 	line: string,
@@ -206,7 +193,7 @@ function extractMarkdownLinksRegex(
 			continue;
 		}
 
-		// Skip if already extracted by token parser using robust deduplication
+		// Skip if already extracted by the mdast extractor using robust deduplication
 		const alreadyExtracted = isDuplicateLink(
 			{ rawPath, anchor, line: index + 1, column: match.index },
 			links,
@@ -421,9 +408,9 @@ function extractCaretLinks(
 /**
  * Extract all link references from markdown content
  *
- * Uses token-first extraction for standard markdown links (via marked.lexer tokens),
+ * Uses mdast-based extraction for standard markdown links (via fromMarkdown),
  * retaining regex ONLY for Obsidian-specific syntax not in CommonMark:
- * - Token extraction: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
+ * - mdast extraction: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
  * - Regex extraction: citation format, wiki-links, caret syntax
  *
  * For each link, resolves paths to absolute and relative forms using the
@@ -432,20 +419,38 @@ function extractCaretLinks(
  *
  * @param content - Full markdown file content
  * @param sourcePath - Absolute path to the source file being parsed
+ * @param fileCache - FileCache for path resolution
+ * @param ast - Optional pre-parsed mdast Root for the same content. When omitted
+ *   (standalone callers/tests) the content is parsed with the default jact
+ *   extension set; production callers pass the shared tree to avoid re-parsing.
  * @returns Array of link objects with { linkType, scope, anchorType, source, target, text, fullMatch, line, column }
  */
 export function extractLinks(
 	content: string,
 	sourcePath: string,
 	fileCache: FileCache,
+	ast?: Root,
 ): LinkObject[] {
 	const links: LinkObject[] = [];
 	const lines = content.split("\n");
 	const sourceAbsolutePath = sourcePath;
 
-	// Phase 1: Token-based extraction for standard markdown links
-	const tokens = marked.lexer(content);
-	extractLinksFromTokens(tokens, lines, sourceAbsolutePath, links, fileCache);
+	const tree =
+		ast ??
+		fromMarkdown(content, {
+			extensions: [jactSyntaxExtension()],
+			mdastExtensions: jactMdastExtensions(),
+		});
+
+	// Phase 1: mdast-based extraction for standard markdown links
+	extractLinksFromAst(
+		tree,
+		content,
+		lines,
+		sourceAbsolutePath,
+		links,
+		fileCache,
+	);
 
 	// 0-based line indices inside fenced code blocks. Single source of truth
 	// shared with extractWikilinks (CommonMark §4.5 fence-type tracked).
@@ -454,7 +459,7 @@ export function extractLinks(
 	// Wiki-style links (all forms): [[...]] — NOT in CommonMark
 	links.push(...extractWikilinks(content, sourceAbsolutePath, fileCache));
 
-	// Phase 2: Regex extraction for patterns not in CommonMark or not caught by token parser
+	// Phase 2: Regex extraction for patterns not in CommonMark or not caught by the mdast extractor
 	lines.forEach((line, index) => {
 		// Skip lines inside fenced code blocks - they contain code examples, not real links
 		if (codeBlockLines.has(index)) {

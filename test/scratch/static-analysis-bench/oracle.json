@@ -1,0 +1,68 @@
+{
+  "_about": "Answer key for the static-analysis tool benchmark. Every value here was verified by hand (Read + grep) against the jact source on 2026-05-30. The harness (run-bench.sh) compares each tool's live output against these expected answers. If the source changes, re-verify and update this file.",
+  "_evidence": "[OBS] all positions read directly from src/*.ts in this repo.",
+
+  "T1_exact_references": {
+    "question": "Find every reference to the standalone function `extractHeadings`.",
+    "tests": "Precision. A class METHOD named extractHeadings also exists (MarkdownParser.extractHeadings). A correct tool must NOT conflate the two.",
+    "symbol": "extractHeadings",
+    "definition": "src/core/MarkdownParser/extractHeadings.ts:21",
+    "true_references_to_function": [
+      "src/core/MarkdownParser/extractHeadings.ts:21",
+      "src/core/MarkdownParser/MarkdownParser.ts:13",
+      "src/core/MarkdownParser/MarkdownParser.ts:122"
+    ],
+    "decoys_same_text_different_symbol": [
+      "src/core/MarkdownParser/MarkdownParser.ts:87  (this.extractHeadings — the METHOD, not the function)",
+      "src/core/MarkdownParser/MarkdownParser.ts:121 (method declaration)",
+      "src/types/citationTypes.ts:136 (doc comment)",
+      "src/core/MarkdownParser/extractAnchors.ts:19  (doc comment)"
+    ],
+    "expected_lsp": "exactly the 3 true references (distinguishes function from method)",
+    "expected_grep": "8 textual hits — cannot separate function from method or comments"
+  },
+
+  "T2_polymorphic_dispatch": {
+    "question": "When eligibility is analyzed, which concrete strategy runs, and where is it dispatched?",
+    "tests": "The contested claim: does LSP miss links that a relationship tool finds? Strategies are dependency-injected, NOT imported by the call site.",
+    "interface_method": "src/types/strategy-types.ts:16",
+    "dispatch_call_site": "src/core/ContentExtractor/analyzeEligibility.ts:23",
+    "concrete_implementations": [
+      "src/core/ContentExtractor/eligibilityStrategies/CliFlagStrategy.ts:13",
+      "src/core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.ts:13",
+      "src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.ts:13",
+      "src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.ts:13"
+    ],
+    "wiring_lives_in": "src/factories/componentFactory.ts (builds the strategy array that is injected)",
+    "expected_lsp_findrefs_on_concrete": "MISS — does not return the dispatch call site (call is typed to the interface, not the class)",
+    "expected_lsp_findrefs_on_interface": "finds the call site; TS usually also lists the 4 implementations",
+    "expected_lsp_gotoimpl_on_callsite": "lists the 4 concrete implementations",
+    "expected_grep": "flat list of all 6 (1 call + 1 interface + 4 impls) with NO relationship — cannot say which runs",
+    "expected_graphify": "graph should bridge the call site to the strategies; may be an INFERRED edge since there is no import"
+  },
+
+  "T3_intent_search": {
+    "question": "Where is extracted CONTENT deduplicated?",
+    "tests": "Signal vs noise. The word duplicate/dedup appears all over the repo for unrelated concerns (filename dedup, link dedup, parse dedup). Intent search must surface the CONTENT dedup specifically.",
+    "true_content_dedup": [
+      "src/core/ContentExtractor/extractLinksContent.ts:168",
+      "src/core/ContentExtractor/ContentExtractor.ts:185",
+      "src/core/ContentExtractor/generateContentId.ts:10"
+    ],
+    "unrelated_dedup_noise": [
+      "src/FileCache.ts (filename deduplication)",
+      "src/core/MarkdownParser/extractLinks.ts (link deduplication)",
+      "src/ParsedFileCache.ts (parse-request deduplication)"
+    ],
+    "expected_semble": "ranks the ContentExtractor content-dedup files at/near the top",
+    "expected_grep": "30+ hits across ~12 files — finds everything, ranks nothing",
+    "expected_lsp": "N/A — no symbol name given; LSP cannot search by intent"
+  },
+
+  "T4_jact_on_code": {
+    "question": "Can jact analyze a TypeScript source file?",
+    "tests": "The claim that jact is markdown-only and useless on code.",
+    "command": "jact ast src/jact.ts",
+    "expected": "non-zero exit OR error/empty — jact parses markdown, not TypeScript"
+  }
+}

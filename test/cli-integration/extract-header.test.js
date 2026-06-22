@@ -20,7 +20,7 @@ describe("CLI - extract header command", () => {
 
 		// When: Run extract header command
 		const output = runCLI(
-			`node dist/jact.js extract header "${targetFile}" "${headerName}" --format json --verbose`,
+			`node dist/cli.js extract header "${targetFile}" "${headerName}" --format json --verbose`,
 			{ captureStderr: true },
 		);
 
@@ -48,7 +48,7 @@ describe("CLI - extract header command", () => {
 		let exitCode;
 		try {
 			runCLI(
-				`node dist/jact.js extract header "${targetFile}" "${invalidHeader}"`,
+				`node dist/cli.js extract header "${targetFile}" "${invalidHeader}"`,
 			);
 		} catch (error) {
 			// Pattern: Capture exit code from error
@@ -74,7 +74,7 @@ describe("CLI - extract header command", () => {
 		let stdout;
 		try {
 			runCLI(
-				`node dist/jact.js extract header "${targetFile}" "${similarHeader}"`,
+				`node dist/cli.js extract header "${targetFile}" "${similarHeader}"`,
 			);
 		} catch (error) {
 			stdout = error.stdout;
@@ -90,7 +90,7 @@ describe("CLI - extract header command", () => {
 describe("CLI Help Documentation", () => {
 	it("should show extract header in top-level help", async () => {
 		// When: Request top-level extract help
-		const output = runCLI("node dist/jact.js extract --help");
+		const output = runCLI("node dist/cli.js extract --help");
 
 		// Then: Help lists header subcommand
 		// Verification: US2.4 AC10 top-level help
@@ -100,7 +100,7 @@ describe("CLI Help Documentation", () => {
 
 	it("should show detailed help for extract header subcommand", async () => {
 		// When: Request subcommand help
-		const output = runCLI("node dist/jact.js extract header --help");
+		const output = runCLI("node dist/cli.js extract header --help");
 
 		// Then: Detailed usage and examples shown
 		// Verification: US2.4 AC10 subcommand help

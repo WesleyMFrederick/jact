@@ -1,17 +1,96 @@
 /**
  * citationFixer — domain logic for applying citation fixes
  *
- * Extracted from JactCli: these five helpers operate on citation strings and
- * validation metadata only — no JactCli instance state required.
+ * Exported from this module:
+ * - Functional helpers: applyPathConversion, applyAnchorFix, etc.
+ * - CitationFixer class: wraps the string-replacement loop with dry-run support.
+ *
+ * Extracted from JactCli as part of issue #29.
  *
  * @module citationFixer
  */
 
 import type {
 	EnrichedLinkObject,
+	FixRecord,
 	HeaderObject,
 	PathConversion,
 } from "../types/validationTypes.js";
+
+// ---------------------------------------------------------------------------
+// CitationFixer class
+// ---------------------------------------------------------------------------
+
+/**
+ * Result returned by CitationFixer.applyFixes().
+ */
+export interface ApplyFixesResult {
+	/** Modified file content (original content when dryRun is true) */
+	content: string;
+	/** Number of fixes applied (or that would be applied in dry-run mode) */
+	fixesApplied: number;
+	/** Whether this was a dry-run (no file writes performed) */
+	dryRun: boolean;
+}
+
+/**
+ * CitationFixer applies a list of pre-computed FixRecord entries to file content.
+ *
+ * Responsibilities:
+ * - String replacement loop over FixRecord entries
+ * - Dry-run gate (returns original content unchanged when dryRun is true)
+ * - Fix count tracking
+ *
+ * Does NOT perform file I/O — callers are responsible for reading and writing
+ * the file. This keeps the class independently unit-testable without spawning
+ * a CLI process.
+ */
+export class CitationFixer {
+	/**
+	 * Apply a list of fix records to file content.
+	 *
+	 * Each FixRecord's `old` string is replaced with its `new` string using
+	 * String.prototype.replace (replaces first occurrence).
+	 *
+	 * When `dryRun` is true, the content is NOT modified but fixesApplied
+	 * reflects how many replacements would have been made.
+	 *
+	 * @param content - Full file content as a string
+	 * @param fixes - Ordered list of fix records to apply
+	 * @param options - Fix options
+	 * @param options.dryRun - When true, report fixes but do not modify content
+	 * @returns ApplyFixesResult with modified content, fix count, and dryRun flag
+	 */
+	applyFixes(
+		content: string,
+		fixes: FixRecord[],
+		options: { dryRun: boolean },
+	): ApplyFixesResult {
+		const { dryRun } = options;
+
+		if (fixes.length === 0) {
+			return { content, fixesApplied: 0, dryRun };
+		}
+
+		let modified = content;
+		let fixesApplied = 0;
+
+		for (const fix of fixes) {
+			if (modified.includes(fix.old)) {
+				if (!dryRun) {
+					modified = modified.replace(fix.old, fix.new);
+				}
+				fixesApplied++;
+			}
+		}
+
+		return {
+			content: dryRun ? content : modified,
+			fixesApplied,
+			dryRun,
+		};
+	}
+}
 
 /**
  * Apply path conversion to citation

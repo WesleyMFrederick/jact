@@ -6,7 +6,7 @@ import { runCLI } from "./helpers/cli-runner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const citationManagerPath = join(__dirname, "..", "dist", "jact.js");
+const citationManagerPath = join(__dirname, "..", "dist", "cli.js");
 
 describe("JACT Integration Tests", () => {
 	it("should validate citations in valid-citations.md successfully", async () => {
@@ -80,7 +80,7 @@ describe("JACT Integration Tests", () => {
 			expect(ast.filePath).toBeTruthy();
 			expect(ast.links).toBeTruthy();
 			expect(ast.anchors).toBeTruthy();
-			expect(Array.isArray(ast.tokens)).toBe(true);
+			expect(ast.ast.type).toBe("root");
 		} catch (error) {
 			expect.fail(`AST command should work: ${error.stdout || error.message}`);
 		}

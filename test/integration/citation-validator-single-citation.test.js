@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
-import { CitationValidator } from "../../src/CitationValidator.js";
+import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
 import { MarkdownParser } from "../../src/core/MarkdownParser/index.js";
-import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 import { LinkObjectFactory } from "../../src/factories/LinkObjectFactory.js";
+import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,7 +23,7 @@ describe("validateSingleCitation returns EnrichedLinkObject", () => {
 		factory = new LinkObjectFactory();
 	});
 
-	it("should return the same link reference enriched with validation (valid case)", async () => {
+	it("should return a new enriched object without mutating the original (valid case)", async () => {
 		// Given: A synthetic link pointing to an existing fixture file
 		const targetPath = resolve(fixturesDir, "enrichment/valid-links-target.md");
 		const syntheticLink = factory.createFileLink(targetPath);
@@ -31,27 +31,37 @@ describe("validateSingleCitation returns EnrichedLinkObject", () => {
 		// When: validateSingleCitation is called
 		const result = await validator.validateSingleCitation(syntheticLink);
 
-		// Then: Returns the SAME object (enrichment pattern, not wrapper)
-		expect(result).toBe(syntheticLink); // Same reference = enrichment
+		// Then: Returns a NEW object (non-mutation contract per issue #37)
+		expect(result).not.toBe(syntheticLink); // New reference — original NOT mutated
+		expect(syntheticLink.validation).toBeUndefined(); // Original unchanged
 		expect(result.validation).toBeDefined();
 		expect(result.validation.status).toBe("valid");
+
+		// Enriched object preserves all original fields
+		expect(result.linkType).toBe(syntheticLink.linkType);
+		expect(result.fullMatch).toBe(syntheticLink.fullMatch);
 
 		// Should NOT have flat wrapper properties from SingleCitationValidationResult
 		expect(result).not.toHaveProperty("citation");
 	});
 
-	it("should return the same link reference enriched with error metadata (error case)", async () => {
+	it("should return a new enriched object without mutating the original (error case)", async () => {
 		// Given: A synthetic link pointing to a nonexistent file
 		const syntheticLink = factory.createFileLink("/nonexistent/file.md");
 
 		// When: validateSingleCitation is called
 		const result = await validator.validateSingleCitation(syntheticLink);
 
-		// Then: Returns the SAME object enriched with error
-		expect(result).toBe(syntheticLink); // Same reference = enrichment
+		// Then: Returns a NEW object (non-mutation contract per issue #37)
+		expect(result).not.toBe(syntheticLink); // New reference — original NOT mutated
+		expect(syntheticLink.validation).toBeUndefined(); // Original unchanged
 		expect(result.validation).toBeDefined();
 		expect(result.validation.status).toBe("error");
 		expect(result.validation.error).toBeDefined();
 		expect(typeof result.validation.error).toBe("string");
+
+		// Enriched object preserves all original fields
+		expect(result.linkType).toBe(syntheticLink.linkType);
+		expect(result.fullMatch).toBe(syntheticLink.fullMatch);
 	});
 });

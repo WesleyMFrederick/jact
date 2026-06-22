@@ -1,10 +1,16 @@
-import { describe, it, expect } from "vitest";
-import { marked } from "marked";
+import { describe, expect, it } from "vitest";
+import { createMarkdownParser } from "../src/factories/componentFactory.js";
 import ParsedDocument from "../src/ParsedDocument.js";
+
+// Drive from raw markdown through the real parser (mdast pipeline).
+const parser = createMarkdownParser();
+function docFromMarkdown(content) {
+	return new ParsedDocument(parser.parseContent(content));
+}
 
 describe("ParsedDocument - No Heading Duplication", () => {
 	it("should not duplicate heading text in extracted sections", () => {
-		// Given: Markdown with heading that has inline text tokens
+		// Given: Markdown with heading that has inline text
 		const markdown = `# Main Title
 
 ## Data Contracts
@@ -13,17 +19,7 @@ The component's output is strictly defined...
 
 ## Next Section`;
 
-		// When: Using real marked tokens (which have nested text tokens)
-		const tokens = marked.lexer(markdown);
-		const parserOutput = {
-			filePath: "/test/file.md",
-			content: markdown,
-			tokens: tokens,
-			links: [],
-			headings: [],
-			anchors: [],
-		};
-		const doc = new ParsedDocument(parserOutput);
+		const doc = docFromMarkdown(markdown);
 
 		// When: Extract section
 		const section = doc.extractSection("Data Contracts", 2);
@@ -41,18 +37,9 @@ The component's output is strictly defined...
 
 Content here.`;
 
-		// When: Parse and extract
-		const tokens = marked.lexer(markdown);
-		const parserOutput = {
-			filePath: "/test/file.md",
-			content: markdown,
-			tokens: tokens,
-			links: [],
-			headings: [],
-			anchors: [],
-		};
-		const doc = new ParsedDocument(parserOutput);
-		// Note: marked preserves ** in heading text, so we search for "**Important** Section"
+		const doc = docFromMarkdown(markdown);
+		// Heading text preserves inline markdown markers (parity with the prior
+		// marked contract), so the heading text is "**Important** Section".
 		const section = doc.extractSection("**Important** Section", 2);
 
 		// Then: Should extract cleanly without duplication
@@ -71,17 +58,7 @@ This is **bold text** in a paragraph.
 
 ## Next`;
 
-		// When: Parse and extract
-		const tokens = marked.lexer(markdown);
-		const parserOutput = {
-			filePath: "/test/file.md",
-			content: markdown,
-			tokens: tokens,
-			links: [],
-			headings: [],
-			anchors: [],
-		};
-		const doc = new ParsedDocument(parserOutput);
+		const doc = docFromMarkdown(markdown);
 		const section = doc.extractSection("Test Section", 2);
 
 		// Then: Should extract paragraph once, not duplicate inline content
