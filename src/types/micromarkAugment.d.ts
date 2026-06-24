@@ -17,6 +17,8 @@ declare module "micromark-util-types" {
 		citationData: "citationData";
 		caretAnchor: "caretAnchor";
 		caretAnchorData: "caretAnchorData";
+		wikilink: "wikilink";
+		wikilinkData: "wikilinkData";
 	}
 }
 
@@ -37,12 +39,17 @@ declare module "mdast" {
 	interface CaretAnchor extends Literal {
 		type: "caretAnchor";
 	}
+	/** Obsidian wikilink `[[target#anchor|alias]]`; `value` is the raw inner text. */
+	interface Wikilink extends Literal {
+		type: "wikilink";
+	}
 
 	interface PhrasingContentMap {
 		highlight: Highlight;
 		obsidianComment: ObsidianComment;
 		citation: Citation;
 		caretAnchor: CaretAnchor;
+		wikilink: Wikilink;
 	}
 
 	interface RootContentMap {
@@ -50,5 +57,6 @@ declare module "mdast" {
 		obsidianComment: ObsidianComment;
 		citation: Citation;
 		caretAnchor: CaretAnchor;
+		wikilink: Wikilink;
 	}
 }

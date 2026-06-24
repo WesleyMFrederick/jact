@@ -18,6 +18,7 @@ import {
 	obsidianCommentFromMarkdown,
 	obsidianCommentSyntax,
 } from "./obsidianComment.js";
+import { wikilinkFromMarkdown, wikilinkSyntax } from "./wikilink.js";
 
 /** Combined micromark syntax extension for all jact Obsidian-style plugins. */
 export function jactSyntaxExtension(): Extension {
@@ -26,6 +27,7 @@ export function jactSyntaxExtension(): Extension {
 		obsidianCommentSyntax,
 		citationSyntax,
 		caretAnchorSyntax,
+		wikilinkSyntax,
 	]);
 }
 
@@ -36,5 +38,6 @@ export function jactMdastExtensions(): MdastExtension[] {
 		obsidianCommentFromMarkdown,
 		citationFromMarkdown,
 		caretAnchorFromMarkdown,
+		wikilinkFromMarkdown,
 	];
 }
