@@ -181,11 +181,10 @@ export class MarkdownParser {
 	 * - Header anchors: Auto-generated from headings or explicit {#id}
 	 *
 	 * @param content - Full markdown file content
-	 * @param headings - Optional heading objects from extractHeadings
 	 * @returns Array of { anchorType, id, rawText, fullMatch, line, column } anchor objects
 	 */
-	extractAnchors(content: string, headings?: HeadingObject[]): AnchorObject[] {
-		return extractAnchors(content, headings);
+	extractAnchors(content: string): AnchorObject[] {
+		return extractAnchors(this.parse(content), content);
 	}
 
 	/**

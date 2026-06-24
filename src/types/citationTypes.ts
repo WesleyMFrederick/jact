@@ -1,6 +1,7 @@
 // src/types/citationTypes.ts
 
 import type { Root } from "mdast";
+import type { Position } from "unist";
 import type { ValidationMetadata } from "./validationTypes.js";
 
 /**
@@ -131,6 +132,9 @@ export interface HeadingObject {
 
 	/** raw markdown including # symbols */
 	raw: string;
+
+	/** source position from the mdast heading node (D3 — line numbers come from the tree, not a regex re-find) */
+	position?: Position | undefined;
 }
 
 /**

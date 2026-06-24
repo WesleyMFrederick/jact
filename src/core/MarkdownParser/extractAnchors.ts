@@ -1,7 +1,10 @@
-import type { HeadingObject, AnchorObject } from "../../types/citationTypes.js";
+import type { Root } from "mdast";
+import { visit } from "unist-util-visit";
+import type { AnchorObject } from "../../types/citationTypes.js";
+import { headingRaw, headingText } from "./extractHeadings.js";
 
 /**
- * Extract all anchor definitions from markdown content
+ * Extract all anchor definitions from markdown content.
  *
  * Detects multiple anchor types:
  * - Obsidian block references: ^anchor-id at end of line
@@ -13,13 +16,15 @@ import type { HeadingObject, AnchorObject } from "../../types/citationTypes.js";
  * - Raw text anchor (exact heading text)
  * - Obsidian-compatible anchor (URL-encoded with spaces as %20, colons removed)
  *
- * This dual anchor approach supports both standard markdown and Obsidian linking.
+ * Header anchors are derived from the parsed mdast tree (D3 — heading line
+ * numbers come from node.position, not a regex re-find). Block/caret/emphasis
+ * anchors still scan raw lines pending their own node migration (Phase 3).
  *
+ * @param ast - mdast Root produced by fromMarkdown over `content`
  * @param content - Full markdown file content
- * @param headings - Optional heading objects from extractHeadings
- * @returns Array of { anchorType, id, rawText, fullMatch, line, column } anchor objects
+ * @returns Array of AnchorObject (block + header anchors)
  */
-export function extractAnchors(content: string, headings?: HeadingObject[]): AnchorObject[] {
+export function extractAnchors(ast: Root, content: string): AnchorObject[] {
 	const anchors: AnchorObject[] = [];
 	const lines = content.split("\n");
 
@@ -80,51 +85,43 @@ export function extractAnchors(content: string, headings?: HeadingObject[]): Anc
 		}
 	});
 
-	// Derive header anchors from headings array (if provided)
-	if (headings) {
-		// Find line numbers for each heading in content
-		for (const heading of headings) {
-			const lineIndex = lines.findIndex(l => {
-				const headerRegex = /^(#+)\s+(.+)$/;
-				const match = l.match(headerRegex);
-				return match && match[2] && (match[2] === heading.text) && match[1] && (match[1].length === heading.level);
+	// Header anchors from the mdast tree. Only ATX headings (`# …`) produce a
+	// header anchor — matching the prior contract, where setext headings were
+	// skipped by the `^#+\s` line probe.
+	visit(ast, "heading", (node) => {
+		const raw = headingRaw(node, content);
+		if (!/^#{1,6}[ \t]/.test(raw)) return;
+
+		const text = headingText(node, content);
+		const lineNum = node.position?.start.line ?? 0;
+		const fullMatch = lines[lineNum - 1] ?? "";
+
+		// Check for explicit anchor ID: `Heading {#custom-id}`
+		const explicitMatch = text.match(/^(.+?)\s*\{#([^}]+)\}$/);
+		if (explicitMatch) {
+			const explicitId = explicitMatch[2] ?? "";
+			anchors.push({
+				anchorType: "header",
+				id: explicitId,
+				urlEncodedId: explicitId,
+				rawText: (explicitMatch[1] ?? "").trim(),
+				fullMatch,
+				line: lineNum,
+				column: 0,
 			});
-
-			if (lineIndex === -1) continue;
-			const line = lines[lineIndex];
-
-			// Check for explicit anchor ID
-			const explicitAnchorRegex = /^(.+?)\s*\{#([^}]+)\}$/;
-			const explicitMatch = heading.text.match(explicitAnchorRegex);
-
-			if (explicitMatch) {
-				const explicitId = explicitMatch[2] ?? "";
-				anchors.push({
-					anchorType: "header",
-					id: explicitId,
-					urlEncodedId: explicitId,
-					rawText: (explicitMatch[1] ?? "").trim(),
-					fullMatch: line ?? "",
-					line: lineIndex + 1,
-					column: 0,
-				});
-			} else {
-				const urlEncodedId = heading.text
-					.replace(/:/g, "")
-					.replace(/\s+/g, "%20");
-
-				anchors.push({
-					anchorType: "header",
-					id: heading.text,
-					urlEncodedId,
-					rawText: heading.text,
-					fullMatch: line ?? "",
-					line: lineIndex + 1,
-					column: 0,
-				});
-			}
+		} else {
+			const urlEncodedId = text.replace(/:/g, "").replace(/\s+/g, "%20");
+			anchors.push({
+				anchorType: "header",
+				id: text,
+				urlEncodedId,
+				rawText: text,
+				fullMatch,
+				line: lineNum,
+				column: 0,
+			});
 		}
-	}
+	});
 
 	return anchors;
 }
