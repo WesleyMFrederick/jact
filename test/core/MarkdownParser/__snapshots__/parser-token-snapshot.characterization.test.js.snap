@@ -656,14 +656,6 @@ exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captu
       "rawText": null,
     },
     {
-      "anchorType": "block",
-      "column": 56,
-      "fullMatch": "==**Bold%20Highlighted**==",
-      "id": "Bold%20Highlighted",
-      "line": 49,
-      "rawText": null,
-    },
-    {
       "anchorType": "header",
       "column": 0,
       "fullMatch": "# Complex Markdown Headers Test File",
@@ -2157,22 +2149,6 @@ exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captu
 {
   "anchors": [
     {
-      "anchorType": "block",
-      "column": 51,
-      "fullMatch": "^decision-observe-jq",
-      "id": "decision-observe-jq",
-      "line": 3,
-      "rawText": null,
-    },
-    {
-      "anchorType": "block",
-      "column": 50,
-      "fullMatch": "^decision-skills",
-      "id": "decision-skills",
-      "line": 7,
-      "rawText": null,
-    },
-    {
       "anchorType": "header",
       "column": 0,
       "fullMatch": "# Block Anchor References",
@@ -2592,14 +2568,6 @@ exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captu
       "fullMatch": "^MVP-P1",
       "id": "MVP-P1",
       "line": 17,
-      "rawText": null,
-    },
-    {
-      "anchorType": "block",
-      "column": 23,
-      "fullMatch": "^FR1",
-      "id": "FR1",
-      "line": 21,
       "rawText": null,
     },
     {
@@ -3048,14 +3016,6 @@ exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captu
 exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for wiki-cross-doc.md 1`] = `
 {
   "anchors": [
-    {
-      "anchorType": "block",
-      "column": 19,
-      "fullMatch": "^FR1",
-      "id": "FR1",
-      "line": 12,
-      "rawText": null,
-    },
     {
       "anchorType": "header",
       "column": 0,
