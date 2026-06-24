@@ -13,26 +13,12 @@ import {
 } from "./extensions/assemble.js";
 import { extractObsidianLinks } from "./extractObsidianLinks.js";
 import { extractWikilinks } from "./extractWikilinks.js";
-import { getFencedCodeBlockLineSet } from "./isInsideCodeBlock.js";
-import { isInsideInlineCode } from "./isInsideInlineCode.js";
 
-/**
- * Find line number and column for a raw match string in content lines.
- * Returns 1-based line, 0-based column.
- */
-function findPosition(
-	raw: string,
-	lines: string[],
-): { line: number; column: number } {
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		if (line === undefined) continue;
-		const col = line.indexOf(raw);
-		if (col !== -1) {
-			return { line: i + 1, column: col };
-		}
-	}
-	return { line: 0, column: 0 };
+/** Minimal shape of a value-bearing custom node (citation, caretAnchor). */
+interface PositionedNode {
+	type: string;
+	value?: string;
+	position?: Position;
 }
 
 /**
@@ -41,8 +27,8 @@ function findPosition(
  *
  * `unist-util-visit` descends only into nodes with children, so `link` nodes
  * inside `code`/`inlineCode` are naturally excluded (those nodes carry no link
- * children). Line/column come from `findPosition` to keep columns 0-based and
- * preserve dedup parity with the regex fallback below.
+ * children). Line/column come from `node.position` (D1) — micromark already
+ * tracked the source span, so no `indexOf` re-find is needed.
  */
 function extractLinksFromAst(
 	ast: Root,
@@ -52,7 +38,12 @@ function extractLinksFromAst(
 	links: LinkObject[],
 	fileCache: FileCache,
 ): void {
-	const handleHref = (rawHref: string, text: string | null, raw: string) => {
+	const handleHref = (
+		rawHref: string,
+		text: string | null,
+		raw: string,
+		position: Position | undefined,
+	) => {
 		// Strip surrounding backticks — footnote reference definitions like
 		// `[^S-001]: `/path/file.md`` carry the dest wrapped in backticks.
 		const href =
@@ -93,8 +84,9 @@ function extractLinksFromAst(
 			}
 		}
 
-		// Find line/column from raw match in content
-		const { line: lineNum, column } = findPosition(raw, lines);
+		// Line/column come from the node's source position (1-based line, 0-based column).
+		const lineNum = position?.start.line ?? 0;
+		const column = (position?.start.column ?? 1) - 1;
 
 		// Use factory function to create link object
 		const linkObject = createLinkObject({
@@ -133,117 +125,154 @@ function extractLinksFromAst(
 	// Inline links: [text](url)
 	visit(ast, "link", (node) => {
 		const text = mdastToString(node);
-		handleHref(node.url, text, sliceRaw(node, text));
+		handleHref(node.url, text, sliceRaw(node, text), node.position);
 	});
 
 	// Link reference definitions: [label]: dest — micromark stores these as
 	// `definition` nodes (marked previously produced resolved link tokens). The dest carries
 	// the cross-document path (e.g. footnote definitions like `[^S-001]: path`).
 	visit(ast, "definition", (node) => {
-		handleHref(node.url, node.label ?? null, sliceRaw(node, node.url));
+		handleHref(
+			node.url,
+			node.label ?? null,
+			sliceRaw(node, node.url),
+			node.position,
+		);
 	});
 }
 
 /**
- * Extract citation format links: [cite: path]
- * NOT in CommonMark — Obsidian specific
+ * Extract Obsidian-specific link forms from mdast tokens micromark already
+ * produced (D4): `citation` (`[cite: path]`) and `caretAnchor` (`^id`).
+ *
+ * These constructs are `text` constructs, so they are never tokenized inside
+ * fenced code, inline code, or wikilink spans — the prior hand-rolled fence /
+ * backtick guards and the phantom `#^anchor`-inside-wikilink matches are gone
+ * for free. Nodes are bucketed by 1-based start line and emitted per line as
+ * citations (left→right) then carets (left→right), preserving the order of the
+ * prior line-by-line regex passes.
  */
-function extractCiteLinks(
-	line: string,
-	index: number,
+function extractCiteAndCaretLinks(
+	ast: Root,
+	content: string,
+	lines: string[],
 	sourceAbsolutePath: string,
 	links: LinkObject[],
 	fileCache: FileCache,
 ): void {
-	const citePattern = /\[cite:\s*([^\]]+)\]/g;
-	let match = citePattern.exec(line);
-	while (match !== null) {
-		// Skip if inside inline code (backticks)
-		if (isInsideInlineCode(line, match.index)) {
-			match = citePattern.exec(line);
-			continue;
+	const citeByLine = new Map<number, PositionedNode[]>();
+	const caretByLine = new Map<number, PositionedNode[]>();
+
+	const pushByLine = (
+		map: Map<number, PositionedNode[]>,
+		line: number,
+		node: PositionedNode,
+	): void => {
+		const bucket = map.get(line);
+		if (bucket) bucket.push(node);
+		else map.set(line, [node]);
+	};
+
+	visit(ast, (node) => {
+		const positioned = node as unknown as PositionedNode;
+		const startLine = positioned.position?.start.line;
+		if (startLine === undefined) return;
+		if (positioned.type === "citation") {
+			pushByLine(citeByLine, startLine, positioned);
+		} else if (positioned.type === "caretAnchor") {
+			pushByLine(caretByLine, startLine, positioned);
+		}
+	});
+
+	const startColumn = (node: PositionedNode): number =>
+		(node.position?.start.column ?? 1) - 1;
+	const endColumn = (node: PositionedNode): number =>
+		(node.position?.end.column ?? 1) - 1;
+	const rawOf = (node: PositionedNode, fallback: string): string => {
+		const start = node.position?.start.offset;
+		const end = node.position?.end.offset;
+		return start !== undefined && end !== undefined
+			? content.slice(start, end)
+			: fallback;
+	};
+
+	lines.forEach((line, index) => {
+		const lineNum = index + 1;
+
+		// Citation format: [cite: path] — NOT in CommonMark.
+		const cites = (citeByLine.get(lineNum) ?? [])
+			.slice()
+			.sort((a, b) => startColumn(a) - startColumn(b));
+		for (const node of cites) {
+			const rawPath = node.value ?? "";
+			const raw = rawOf(node, `[cite: ${rawPath}]`);
+			const column = startColumn(node);
+			links.push(
+				createLinkObject({
+					linkType: "markdown",
+					scope: "cross-document",
+					anchor: null,
+					rawPath,
+					sourceAbsolutePath,
+					text: `cite: ${rawPath}`,
+					fullMatch: raw,
+					line: lineNum,
+					column,
+					extractionMarker: detectExtractionMarker(line, column + raw.length),
+					fileCache,
+				}),
+			);
 		}
 
-		const rawPath = (match[1] ?? "").trim();
-		const text = `cite: ${rawPath}`;
+		// Caret syntax references: ^anchor-id — NOT in CommonMark.
+		const carets = (caretByLine.get(lineNum) ?? [])
+			.slice()
+			.sort((a, b) => startColumn(a) - startColumn(b));
+		for (const node of carets) {
+			// Skip semantic-version suffixes (`^14.0.1`): a `.` immediately followed
+			// by a digit after the caret token. Char check, not a source re-scan.
+			const after = line.substring(endColumn(node));
+			if (
+				after.length >= 2 &&
+				after[0] === "." &&
+				after[1] !== undefined &&
+				after[1] >= "0" &&
+				after[1] <= "9"
+			)
+				continue;
 
-		const linkObject = createLinkObject({
-			linkType: "markdown",
-			scope: "cross-document",
-			anchor: null,
-			rawPath,
-			sourceAbsolutePath,
-			text,
-			fullMatch: match[0],
-			line: index + 1,
-			column: match.index,
-			extractionMarker: detectExtractionMarker(
-				line,
-				match.index + match[0].length,
-			),
-			fileCache,
-		});
-		links.push(linkObject);
-		match = citePattern.exec(line);
-	}
-}
-
-/**
- * Extract caret syntax references: ^anchor-id
- * NOT in CommonMark — Obsidian specific
- */
-function extractCaretLinks(
-	line: string,
-	index: number,
-	sourceAbsolutePath: string,
-	links: LinkObject[],
-	fileCache: FileCache,
-): void {
-	const caretRegex = /\^([A-Za-z0-9-]+)/g;
-	let match = caretRegex.exec(line);
-	while (match !== null) {
-		// Skip if inside inline code (backticks)
-		if (isInsideInlineCode(line, match.index)) {
-			match = caretRegex.exec(line);
-			continue;
+			const anchor = node.value ?? "";
+			const raw = rawOf(node, `^${anchor}`);
+			const column = startColumn(node);
+			links.push(
+				createLinkObject({
+					linkType: "markdown",
+					scope: "internal",
+					anchor,
+					rawPath: null,
+					sourceAbsolutePath,
+					text: null,
+					fullMatch: raw,
+					line: lineNum,
+					column,
+					extractionMarker: detectExtractionMarker(line, column + raw.length),
+					fileCache,
+				}),
+			);
 		}
-
-		const anchor = match[1] ?? "";
-
-		// Skip semantic version patterns (^14.0.1, ^v1.2.3, etc)
-		const afterMatch = line.substring(match.index + match[0].length);
-		const isSemanticVersion = /^\.\d/.test(afterMatch);
-
-		if (!isSemanticVersion) {
-			const linkObject = createLinkObject({
-				linkType: "markdown",
-				scope: "internal",
-				anchor,
-				rawPath: null,
-				sourceAbsolutePath,
-				text: null,
-				fullMatch: match[0],
-				line: index + 1,
-				column: match.index,
-				extractionMarker: detectExtractionMarker(
-					line,
-					match.index + match[0].length,
-				),
-				fileCache,
-			});
-			links.push(linkObject);
-		}
-		match = caretRegex.exec(line);
-	}
+	});
 }
 
 /**
  * Extract all link references from markdown content
  *
- * Uses mdast-based extraction for standard markdown links (via fromMarkdown),
- * retaining regex ONLY for Obsidian-specific syntax not in CommonMark:
- * - mdast extraction: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
- * - Regex extraction: citation format, wiki-links, caret syntax
+ * Reads links from the mdast tree micromark already produced — no regex
+ * re-extraction (WMF-35):
+ * - Core mdast: [text](file.md#anchor), [text](#anchor), [text](path/to/file)
+ * - `wikilink` tokens: [[...]] (all forms)
+ * - `obsidianLink` tokens: permissive markdown links (raw spaces in anchor)
+ * - `citation` tokens: [cite: path]
+ * - `caretAnchor` tokens: ^anchor-id
  *
  * For each link, resolves paths to absolute and relative forms using the
  * source file path as reference. Determines anchor type (header vs block)
@@ -274,7 +303,7 @@ export function extractLinks(
 			mdastExtensions: jactMdastExtensions(),
 		});
 
-	// Phase 1: mdast-based extraction for standard markdown links
+	// Standard markdown links (core mdast: link + definition nodes).
 	extractLinksFromAst(
 		tree,
 		content,
@@ -284,11 +313,7 @@ export function extractLinks(
 		fileCache,
 	);
 
-	// 0-based line indices inside fenced code blocks. Single source of truth
-	// shared with extractWikilinks (CommonMark §4.5 fence-type tracked).
-	const codeBlockLines = getFencedCodeBlockLineSet(content);
-
-	// Wiki-style links (all forms): [[...]] — read from `wikilink` tokens
+	// Wiki-style links (all forms): [[...]] — read from `wikilink` tokens.
 	links.push(...extractWikilinks(content, sourceAbsolutePath, fileCache, tree));
 
 	// Permissive Obsidian markdown links (raw spaces in anchor that CommonMark
@@ -298,19 +323,17 @@ export function extractLinks(
 		...extractObsidianLinks(content, sourceAbsolutePath, fileCache, tree),
 	);
 
-	// Phase 2: Regex extraction for Obsidian-specific syntax not in CommonMark
-	lines.forEach((line, index) => {
-		// Skip lines inside fenced code blocks - they contain code examples, not real links
-		if (codeBlockLines.has(index)) {
-			return;
-		}
-
-		// Citation format: [cite: path] — NOT in CommonMark
-		extractCiteLinks(line, index, sourceAbsolutePath, links, fileCache);
-
-		// Caret syntax references: ^anchor-id — NOT in CommonMark
-		extractCaretLinks(line, index, sourceAbsolutePath, links, fileCache);
-	});
+	// Obsidian citation + caret references — read from `citation` / `caretAnchor`
+	// tokens. Token constructs already exclude code spans and wikilink interiors,
+	// so no code-block / inline-code guards are needed.
+	extractCiteAndCaretLinks(
+		tree,
+		content,
+		lines,
+		sourceAbsolutePath,
+		links,
+		fileCache,
+	);
 
 	return links;
 }

@@ -2270,52 +2270,6 @@ exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captu
       },
       "text": "D3",
     },
-    {
-      "anchorType": "header",
-      "column": 51,
-      "extractionMarker": null,
-      "fullMatch": "^decision-observe-jq",
-      "line": 3,
-      "linkType": "markdown",
-      "scope": "internal",
-      "source": {
-        "path": {
-          "absolute": "<FIXTURES>/issue-81-block-anchor-source.md",
-        },
-      },
-      "target": {
-        "anchor": "decision-observe-jq",
-        "path": {
-          "absolute": null,
-          "raw": null,
-          "relative": null,
-        },
-      },
-      "text": null,
-    },
-    {
-      "anchorType": "header",
-      "column": 50,
-      "extractionMarker": null,
-      "fullMatch": "^decision-skills",
-      "line": 7,
-      "linkType": "markdown",
-      "scope": "internal",
-      "source": {
-        "path": {
-          "absolute": "<FIXTURES>/issue-81-block-anchor-source.md",
-        },
-      },
-      "target": {
-        "anchor": "decision-skills",
-        "path": {
-          "absolute": null,
-          "raw": null,
-          "relative": null,
-        },
-      },
-      "text": null,
-    },
   ],
 }
 `;
@@ -2986,29 +2940,6 @@ exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captu
       },
       "text": null,
     },
-    {
-      "anchorType": "header",
-      "column": 23,
-      "extractionMarker": null,
-      "fullMatch": "^FR1",
-      "line": 21,
-      "linkType": "markdown",
-      "scope": "internal",
-      "source": {
-        "path": {
-          "absolute": "<FIXTURES>/valid-citations.md",
-        },
-      },
-      "target": {
-        "anchor": "FR1",
-        "path": {
-          "absolute": null,
-          "raw": null,
-          "relative": null,
-        },
-      },
-      "text": null,
-    },
   ],
 }
 `;
@@ -3212,29 +3143,6 @@ exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captu
         },
       },
       "text": "Directory Link",
-    },
-    {
-      "anchorType": "header",
-      "column": 19,
-      "extractionMarker": null,
-      "fullMatch": "^FR1",
-      "line": 12,
-      "linkType": "markdown",
-      "scope": "internal",
-      "source": {
-        "path": {
-          "absolute": "<FIXTURES>/wiki-cross-doc.md",
-        },
-      },
-      "target": {
-        "anchor": "FR1",
-        "path": {
-          "absolute": null,
-          "raw": null,
-          "relative": null,
-        },
-      },
-      "text": null,
     },
   ],
 }
