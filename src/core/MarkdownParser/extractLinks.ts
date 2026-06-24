@@ -456,8 +456,8 @@ export function extractLinks(
 	// shared with extractWikilinks (CommonMark §4.5 fence-type tracked).
 	const codeBlockLines = getFencedCodeBlockLineSet(content);
 
-	// Wiki-style links (all forms): [[...]] — NOT in CommonMark
-	links.push(...extractWikilinks(content, sourceAbsolutePath, fileCache));
+	// Wiki-style links (all forms): [[...]] — read from `wikilink` tokens
+	links.push(...extractWikilinks(content, sourceAbsolutePath, fileCache, tree));
 
 	// Phase 2: Regex extraction for patterns not in CommonMark or not caught by the mdast extractor
 	lines.forEach((line, index) => {
