@@ -11,6 +11,7 @@ import {
 	jactMdastExtensions,
 	jactSyntaxExtension,
 } from "./extensions/assemble.js";
+import { extractObsidianLinks } from "./extractObsidianLinks.js";
 import { extractWikilinks } from "./extractWikilinks.js";
 import { getFencedCodeBlockLineSet } from "./isInsideCodeBlock.js";
 import { isInsideInlineCode } from "./isInsideInlineCode.js";
@@ -32,26 +33,6 @@ function findPosition(
 		}
 	}
 	return { line: 0, column: 0 };
-}
-
-/**
- * Deduplication helper: check if a link was already extracted.
- * Uses position-based matching (line + column) to prevent duplicate extraction
- * when the mdast extractor and regex fallback extract the same link with different
- * anchor encodings (e.g., nested parens causing truncation in one extractor).
- */
-function isDuplicateLink(
-	candidate: {
-		rawPath: string | null;
-		anchor: string | null;
-		line: number;
-		column: number;
-	},
-	existingLinks: LinkObject[],
-): boolean {
-	return existingLinks.some(
-		(l) => l.line === candidate.line && l.column === candidate.column,
-	);
 }
 
 /**
@@ -161,155 +142,6 @@ function extractLinksFromAst(
 	visit(ast, "definition", (node) => {
 		handleHref(node.url, node.label ?? null, sliceRaw(node, node.url));
 	});
-}
-
-/**
- * Regex fallback for markdown links with non-URL-encoded anchors.
- * CommonMark (marked.js) only recognizes URL-encoded anchors in links,
- * but Obsidian allows raw spaces/colons. This catches those edge cases.
- * Only extracts links NOT already extracted by the mdast extractor.
- */
-function extractMarkdownLinksRegex(
-	line: string,
-	index: number,
-	sourceAbsolutePath: string,
-	links: LinkObject[],
-	fileCache: FileCache,
-): void {
-	// Pattern for markdown links: [text](path#anchor)
-	// Permissive anchor pattern allows spaces, colons, parens (supports 2 levels of nesting)
-	const linkPattern =
-		/\[([^\]]+)\]\(([^)#]+\.md)(?:#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+))?\)/g;
-	let match = linkPattern.exec(line);
-	while (match !== null) {
-		const text = match[1] ?? "";
-		const rawPath = match[2] ?? "";
-		const anchor = match[3] ?? null;
-		const fullMatch = match[0];
-
-		// Skip if inside inline code (backticks)
-		if (isInsideInlineCode(line, match.index)) {
-			match = linkPattern.exec(line);
-			continue;
-		}
-
-		// Skip if already extracted by the mdast extractor using robust deduplication
-		const alreadyExtracted = isDuplicateLink(
-			{ rawPath, anchor, line: index + 1, column: match.index },
-			links,
-		);
-		if (!alreadyExtracted) {
-			const linkObject = createLinkObject({
-				linkType: "markdown",
-				scope: "cross-document",
-				anchor,
-				rawPath,
-				sourceAbsolutePath,
-				text,
-				fullMatch,
-				line: index + 1,
-				column: match.index,
-				extractionMarker: detectExtractionMarker(
-					line,
-					match.index + fullMatch.length,
-				),
-				fileCache,
-			});
-			links.push(linkObject);
-		}
-		match = linkPattern.exec(line);
-	}
-
-	// Internal anchor links: [text](#anchor) with permissive anchor (supports 2 levels of nesting)
-	const internalAnchorRegex =
-		/\[([^\]]+)\]\(#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+)\)/g;
-	match = internalAnchorRegex.exec(line);
-	while (match !== null) {
-		const text = match[1] ?? "";
-		const anchor = match[2] ?? "";
-		const fullMatch = match[0];
-
-		// Skip if inside inline code (backticks)
-		if (isInsideInlineCode(line, match.index)) {
-			match = internalAnchorRegex.exec(line);
-			continue;
-		}
-
-		// Skip if already extracted using robust deduplication
-		const alreadyExtracted = isDuplicateLink(
-			{ rawPath: null, anchor, line: index + 1, column: match.index },
-			links,
-		);
-		if (!alreadyExtracted) {
-			const linkObject = createLinkObject({
-				linkType: "markdown",
-				scope: "internal",
-				anchor,
-				rawPath: null,
-				sourceAbsolutePath,
-				text,
-				fullMatch,
-				line: index + 1,
-				column: match.index,
-				extractionMarker: detectExtractionMarker(
-					line,
-					match.index + fullMatch.length,
-				),
-				fileCache,
-			});
-			links.push(linkObject);
-		}
-		match = internalAnchorRegex.exec(line);
-	}
-
-	// Relative doc links without .md extension: [text](path/to/file#anchor)
-	const relativeDocRegex =
-		/\[([^\]]+)\]\(([^)]*\/[^)#]+)(?:#((?:[^()]|\((?:[^()]|\([^)]*\))*\))+))?\)/g;
-	match = relativeDocRegex.exec(line);
-	while (match !== null) {
-		const filepath = match[2] ?? "";
-		if (
-			filepath &&
-			!filepath.endsWith(".md") &&
-			!filepath.startsWith("http") &&
-			!filepath.startsWith("vscode://") &&
-			filepath.includes("/")
-		) {
-			const text = match[1] ?? "";
-			const rawPath = match[2] ?? "";
-			const anchor = match[3] ?? null;
-			const fullMatch = match[0];
-
-			// Skip if inside inline code (backticks)
-			if (!isInsideInlineCode(line, match.index)) {
-				// Skip if already extracted using robust deduplication
-				const alreadyExtracted = isDuplicateLink(
-					{ rawPath, anchor, line: index + 1, column: match.index },
-					links,
-				);
-				if (!alreadyExtracted) {
-					const linkObject = createLinkObject({
-						linkType: "markdown",
-						scope: "cross-document",
-						anchor,
-						rawPath,
-						sourceAbsolutePath,
-						text,
-						fullMatch,
-						line: index + 1,
-						column: match.index,
-						extractionMarker: detectExtractionMarker(
-							line,
-							match.index + fullMatch.length,
-						),
-						fileCache,
-					});
-					links.push(linkObject);
-				}
-			}
-		}
-		match = relativeDocRegex.exec(line);
-	}
 }
 
 /**
@@ -459,22 +291,19 @@ export function extractLinks(
 	// Wiki-style links (all forms): [[...]] — read from `wikilink` tokens
 	links.push(...extractWikilinks(content, sourceAbsolutePath, fileCache, tree));
 
-	// Phase 2: Regex extraction for patterns not in CommonMark or not caught by the mdast extractor
+	// Permissive Obsidian markdown links (raw spaces in anchor that CommonMark
+	// rejects) — read from `obsidianLink` tokens. `%20`-encoded / paren-only
+	// links remain valid CommonMark and are caught on the core mdast path above.
+	links.push(
+		...extractObsidianLinks(content, sourceAbsolutePath, fileCache, tree),
+	);
+
+	// Phase 2: Regex extraction for Obsidian-specific syntax not in CommonMark
 	lines.forEach((line, index) => {
 		// Skip lines inside fenced code blocks - they contain code examples, not real links
 		if (codeBlockLines.has(index)) {
 			return;
 		}
-
-		// Regex fallback for markdown links with non-URL-encoded anchors
-		// (CommonMark only recognizes URL-encoded anchors, but Obsidian allows raw spaces/colons)
-		extractMarkdownLinksRegex(
-			line,
-			index,
-			sourceAbsolutePath,
-			links,
-			fileCache,
-		);
 
 		// Citation format: [cite: path] — NOT in CommonMark
 		extractCiteLinks(line, index, sourceAbsolutePath, links, fileCache);
