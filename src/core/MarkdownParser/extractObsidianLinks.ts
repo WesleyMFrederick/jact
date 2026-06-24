@@ -10,7 +10,10 @@ import { visit } from "unist-util-visit";
 import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
-import { detectExtractionMarker } from "./detectExtractionMarker.js";
+import {
+	collectExtractionMarkers,
+	detectExtractionMarker,
+} from "./detectExtractionMarker.js";
 import {
 	jactMdastExtensions,
 	jactSyntaxExtension,
@@ -52,7 +55,6 @@ export function extractObsidianLinks(
 	fileCache: FileCache,
 	ast?: Root,
 ): LinkObject[] {
-	const lines = source.split("\n");
 	const links: LinkObject[] = [];
 
 	const tree =
@@ -61,6 +63,8 @@ export function extractObsidianLinks(
 			extensions: [jactSyntaxExtension()],
 			mdastExtensions: jactMdastExtensions(),
 		});
+
+	const markers = collectExtractionMarkers(tree, source);
 
 	visit(tree, "obsidianLink", (node) => {
 		const link = node as unknown as ObsidianLinkNode;
@@ -91,7 +95,6 @@ export function extractObsidianLinks(
 
 		const startColumn = (link.position?.start.column ?? 1) - 1;
 		const lineNum = link.position?.start.line ?? 0;
-		const lineText = lines[lineNum - 1] ?? "";
 
 		links.push(
 			createLinkObject({
@@ -105,7 +108,7 @@ export function extractObsidianLinks(
 				line: lineNum,
 				column: startColumn,
 				extractionMarker: detectExtractionMarker(
-					lineText,
+					markers.get(lineNum),
 					startColumn + raw.length,
 				),
 				fileCache,

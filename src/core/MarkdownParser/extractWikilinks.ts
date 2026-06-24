@@ -9,7 +9,10 @@ import { visit } from "unist-util-visit";
 import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
-import { detectExtractionMarker } from "./detectExtractionMarker.js";
+import {
+	collectExtractionMarkers,
+	detectExtractionMarker,
+} from "./detectExtractionMarker.js";
 import {
 	jactMdastExtensions,
 	jactSyntaxExtension,
@@ -44,7 +47,6 @@ export function extractWikilinks(
 	fileCache: FileCache,
 	ast?: Root,
 ): LinkObject[] {
-	const lines = source.split("\n");
 	const links: LinkObject[] = [];
 
 	const tree =
@@ -53,6 +55,8 @@ export function extractWikilinks(
 			extensions: [jactSyntaxExtension()],
 			mdastExtensions: jactMdastExtensions(),
 		});
+
+	const markers = collectExtractionMarkers(tree, source);
 
 	visit(tree, "wikilink", (node) => {
 		const wiki = node as unknown as WikilinkNode;
@@ -87,7 +91,6 @@ export function extractWikilinks(
 			startOffset !== undefined && endOffset !== undefined
 				? source.slice(startOffset, endOffset)
 				: `[[${wiki.value}]]`;
-		const lineText = lines[lineNum - 1] ?? "";
 
 		links.push(
 			createLinkObject({
@@ -101,7 +104,7 @@ export function extractWikilinks(
 				line: lineNum,
 				column: startColumn,
 				extractionMarker: detectExtractionMarker(
-					lineText,
+					markers.get(lineNum),
 					startColumn + fullMatch.length,
 				),
 				fileCache,

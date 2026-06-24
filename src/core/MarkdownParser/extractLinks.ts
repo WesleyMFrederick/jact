@@ -6,13 +6,19 @@ import { visit } from "unist-util-visit";
 import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
-import { detectExtractionMarker } from "./detectExtractionMarker.js";
+import {
+	collectExtractionMarkers,
+	detectExtractionMarker,
+} from "./detectExtractionMarker.js";
 import {
 	jactMdastExtensions,
 	jactSyntaxExtension,
 } from "./extensions/assemble.js";
 import { extractObsidianLinks } from "./extractObsidianLinks.js";
 import { extractWikilinks } from "./extractWikilinks.js";
+
+/** Per-line extraction-marker spans, keyed by 1-based line number. */
+type ExtractionMarkerMap = ReturnType<typeof collectExtractionMarkers>;
 
 /** Minimal shape of a value-bearing custom node (citation, caretAnchor). */
 interface PositionedNode {
@@ -33,7 +39,7 @@ interface PositionedNode {
 function extractLinksFromAst(
 	ast: Root,
 	content: string,
-	lines: string[],
+	markers: ExtractionMarkerMap,
 	sourceAbsolutePath: string,
 	links: LinkObject[],
 	fileCache: FileCache,
@@ -101,10 +107,7 @@ function extractLinksFromAst(
 			column,
 			extractionMarker:
 				lineNum > 0
-					? detectExtractionMarker(
-							lines[lineNum - 1] || "",
-							column + raw.length,
-						)
+					? detectExtractionMarker(markers.get(lineNum), column + raw.length)
 					: null,
 			fileCache,
 		});
@@ -156,6 +159,7 @@ function extractCiteAndCaretLinks(
 	ast: Root,
 	content: string,
 	lines: string[],
+	markers: ExtractionMarkerMap,
 	sourceAbsolutePath: string,
 	links: LinkObject[],
 	fileCache: FileCache,
@@ -218,7 +222,10 @@ function extractCiteAndCaretLinks(
 					fullMatch: raw,
 					line: lineNum,
 					column,
-					extractionMarker: detectExtractionMarker(line, column + raw.length),
+					extractionMarker: detectExtractionMarker(
+						markers.get(lineNum),
+						column + raw.length,
+					),
 					fileCache,
 				}),
 			);
@@ -255,7 +262,10 @@ function extractCiteAndCaretLinks(
 					fullMatch: raw,
 					line: lineNum,
 					column,
-					extractionMarker: detectExtractionMarker(line, column + raw.length),
+					extractionMarker: detectExtractionMarker(
+						markers.get(lineNum),
+						column + raw.length,
+					),
 					fileCache,
 				}),
 			);
@@ -303,11 +313,15 @@ export function extractLinks(
 			mdastExtensions: jactMdastExtensions(),
 		});
 
+	// Extraction markers (`%%…%%` / `<!-- … -->`) resolved from tokens once,
+	// then looked up per link by line — node adjacency, not a raw-line lookahead.
+	const markers = collectExtractionMarkers(tree, content);
+
 	// Standard markdown links (core mdast: link + definition nodes).
 	extractLinksFromAst(
 		tree,
 		content,
-		lines,
+		markers,
 		sourceAbsolutePath,
 		links,
 		fileCache,
@@ -330,6 +344,7 @@ export function extractLinks(
 		tree,
 		content,
 		lines,
+		markers,
 		sourceAbsolutePath,
 		links,
 		fileCache,
