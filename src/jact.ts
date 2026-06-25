@@ -36,6 +36,7 @@ import type {
 	CliValidateOptions,
 	OutgoingLinksExtractedContent,
 } from "./types/contentExtractorTypes.js";
+import type { CacheStats } from "./types/fileCacheTypes.js";
 import type {
 	EnrichedLinkObject,
 	FixRecord,
@@ -69,11 +70,14 @@ export class JactCli {
 		this.contentExtractor = createContentExtractor(this.parsedFileCache);
 	}
 
-	/** Resolve scope and build the file cache. Throws if scope cannot be inferred. */
+	/**
+	 * Resolve scope and build the file cache. Throws if scope cannot be inferred.
+	 * Returns the cache stats so callers (e.g. validate) can emit verbose output.
+	 */
 	private applyScope(
 		options: { scope?: string; allowGitignore?: boolean },
 		targetFile?: string,
-	): void {
+	): CacheStats {
 		const resolved = resolveScope({
 			...(options.scope !== undefined && { explicit: options.scope }),
 			cwd: process.cwd(),
@@ -86,7 +90,9 @@ export class JactCli {
 			);
 		}
 		// Default: respect .gitignore. --allow-gitignore opts in to scanning excluded files.
-		this.fileCache.buildCache(resolved.scope, false, resolved, {
+		// buildCache verbose stays false so JSON callers (ast/extract) keep clean
+		// stdout/stderr; verbose callers (validate) log from the returned stats.
+		return this.fileCache.buildCache(resolved.scope, false, resolved, {
 			respectGitignore: !options.allowGitignore,
 		});
 	}
@@ -121,22 +127,18 @@ export class JactCli {
 	): Promise<string> {
 		try {
 			const startTime = Date.now();
-			if (options.scope) {
-				const cacheStats = this.fileCache.buildCache(
-					options.scope,
-					options.verbose ?? false,
-					undefined,
-					{ respectGitignore: !options.allowGitignore },
+			// Smart-default scope resolution (cwd-git → cwd-pkg → target-git →
+			// target-pkg), same as getAst. Seeds the shared FileCache so bare wiki
+			// page names resolve even when --scope is omitted.
+			const cacheStats = this.applyScope(options, filePath);
+			if (options.verbose && options.format !== "json") {
+				console.log(
+					`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 				);
-				if (options.verbose && options.format !== "json") {
+				if (cacheStats.duplicates > 0) {
 					console.log(
-						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
+						`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
 					);
-					if (cacheStats.duplicates > 0) {
-						console.log(
-							`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
-						);
-					}
 				}
 			}
 			const result = await this.validator.validateFile(filePath);

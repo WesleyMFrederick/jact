@@ -42,4 +42,27 @@ describe("wiki scope resolution — shared FileCache wiring", () => {
 			),
 		).resolves.not.toThrow();
 	});
+
+	// Regression: validate built the FileCache only when --scope was passed
+	// explicitly. With no --scope it never seeded the cache, so bare wiki page
+	// names always failed ("Wiki page not found") even though the target sat in
+	// the same directory. validate now resolves scope via smart defaults
+	// (cwd-git → cwd-pkg → target-git → target-pkg), matching `ast`.
+	it("resolves the wiki link with NO --scope, run from the fixture dir (smart-default scope)", async () => {
+		const { stdout, stderr } = await execAsync(
+			`node "${CLI_PATH}" validate "${SOURCE}"`,
+			{ cwd: FIXTURE_DIR },
+		);
+		expect(stderr).toBe("");
+		expect(stdout).toContain("OK");
+		expect(stdout).toContain("2 citations valid");
+	});
+
+	it("resolves the wiki link with NO --scope using a bare filename from the fixture dir", async () => {
+		const { stdout } = await execAsync(
+			`node "${CLI_PATH}" validate wiki-scope-resolution-source.md`,
+			{ cwd: FIXTURE_DIR },
+		);
+		expect(stdout).toContain("2 citations valid");
+	});
 });
