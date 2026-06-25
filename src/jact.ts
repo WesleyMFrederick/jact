@@ -59,9 +59,9 @@ export class JactCli {
 	private contentExtractor: ContentExtractor;
 
 	constructor() {
-		this.parser = createMarkdownParser();
-		this.parsedFileCache = createParsedFileCache(this.parser);
 		this.fileCache = createFileCache();
+		this.parser = createMarkdownParser(this.fileCache);
+		this.parsedFileCache = createParsedFileCache(this.parser);
 		this.validator = createCitationValidator(
 			this.parsedFileCache,
 			this.fileCache,

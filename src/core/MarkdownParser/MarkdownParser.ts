@@ -94,11 +94,6 @@ export class MarkdownParser {
 		});
 	}
 
-	/** Replace the FileCache reference used for wiki resolution. Called by factories to share the scope-seeded cache. */
-	setFileCache(fc: FileCache): void {
-		this.fileCache = fc;
-	}
-
 	/**
 	 * Parse markdown file and extract all metadata
 	 *

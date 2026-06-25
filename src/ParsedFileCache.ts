@@ -36,11 +36,6 @@ export class ParsedFileCache {
 		this.cache = new Map<string, Promise<ParsedDocument>>();
 	}
 
-	/** Delegate FileCache update to the embedded parser. Allows factories to share the scope-seeded cache. */
-	syncParserFileCache(fc: import("./FileCache.js").FileCache): void {
-		this.parser.setFileCache(fc);
-	}
-
 	/**
 	 * Resolve parsed file data with automatic concurrent request deduplication
 	 *
