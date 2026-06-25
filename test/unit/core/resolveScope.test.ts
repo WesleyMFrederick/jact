@@ -154,6 +154,53 @@ describe("resolveScope — targetFile fallback", () => {
 	});
 });
 
+describe("resolveScope — .obsidian vault marker + nearest-wins", () => {
+	it("cwd with .obsidian only → source 'cwd-obsidian', marker '.obsidian'", () => {
+		const vault = mkdtemp();
+		fs.mkdirSync(path.join(vault, ".obsidian"));
+		const result = resolveScope({ cwd: vault });
+		expect(result.source).toBe("cwd-obsidian");
+		expect(result.scope).toBe(vault);
+		expect(result.marker).toBe(".obsidian");
+	});
+
+	it("nearest wins: a closer .obsidian beats a higher .git", () => {
+		const repo = mkdtemp();
+		fs.mkdirSync(path.join(repo, ".git"));
+		const vaultSub = path.join(repo, "vault", "sub");
+		fs.mkdirSync(vaultSub, { recursive: true });
+		fs.mkdirSync(path.join(repo, "vault", ".obsidian"));
+		const result = resolveScope({ cwd: vaultSub });
+		// vault/.obsidian is nearer than repo/.git
+		expect(result.source).toBe("cwd-obsidian");
+		expect(result.scope).toBe(path.join(repo, "vault"));
+	});
+
+	it("same level: .git wins over .obsidian (tiebreak order)", () => {
+		const root = mkdtemp();
+		fs.mkdirSync(path.join(root, ".git"));
+		fs.mkdirSync(path.join(root, ".obsidian"));
+		const result = resolveScope({ cwd: root });
+		expect(result.source).toBe("cwd-git");
+		expect(result.marker).toBe(".git");
+	});
+
+	it("targetFile dir .obsidian found when cwd has no markers", () => {
+		const vault = mkdtemp();
+		fs.mkdirSync(path.join(vault, ".obsidian"));
+		const customFs = {
+			existsSync: (p: string) => p === path.join(vault, ".obsidian"),
+		} as unknown as typeof import("fs");
+		const result = resolveScope({
+			cwd: emptyDir,
+			targetFile: path.join(vault, "notes", "page.md"),
+			fs: customFs,
+		});
+		expect(result.source).toBe("target-obsidian");
+		expect(result.scope).toBe(vault);
+	});
+});
+
 describe("resolveScope — fail-fast none", () => {
 	it("no markers anywhere: source is 'none', scope is empty string", () => {
 		const mockFs = {

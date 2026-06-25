@@ -58,6 +58,8 @@ export class JactCli {
 	private fileCache: FileCache;
 	private validator: CitationValidator;
 	private contentExtractor: ContentExtractor;
+	/** Scope/gitignore decisions from the last applyScope, surfaced by validate. */
+	private scopeNotices: string[] = [];
 
 	constructor() {
 		this.fileCache = createFileCache();
@@ -78,6 +80,7 @@ export class JactCli {
 		options: { scope?: string; allowGitignore?: boolean },
 		targetFile?: string,
 	): CacheStats {
+		this.scopeNotices = [];
 		const resolved = resolveScope({
 			...(options.scope !== undefined && { explicit: options.scope }),
 			cwd: process.cwd(),
@@ -89,12 +92,58 @@ export class JactCli {
 				`cannot resolve scope. Tried: ${triedParts.join(", ")}. Pass --scope <dir>.`,
 			);
 		}
+
+		// When a default root is auto-picked (not an explicit --scope) and the
+		// nearest marker is an Obsidian vault, say so — the user may have wanted a
+		// different root. (Core principle: surface defaults, don't hide them.)
+		if (resolved.marker === ".obsidian") {
+			this.scopeNotices.push(
+				`Scoped to ${resolved.scope} (nearest Obsidian vault). Override with --scope <dir>.`,
+			);
+		}
+
 		// Default: respect .gitignore. --allow-gitignore opts in to scanning excluded files.
 		// buildCache verbose stays false so JSON callers (ast/extract) keep clean
 		// stdout/stderr; verbose callers (validate) log from the returned stats.
-		return this.fileCache.buildCache(resolved.scope, false, resolved, {
-			respectGitignore: !options.allowGitignore,
+		const respectGitignore = !options.allowGitignore;
+		let stats = this.fileCache.buildCache(resolved.scope, false, resolved, {
+			respectGitignore,
 		});
+
+		// If the explicitly-targeted file is hidden by .gitignore under this scope,
+		// index its directory branch anyway — pointing jact at a file is an explicit
+		// request to validate it and its siblings (e.g. bare wiki page names).
+		if (targetFile !== undefined && respectGitignore) {
+			const absTarget = path.resolve(targetFile);
+			if (this.fileCache.isIgnored(absTarget)) {
+				const includeDir = path.dirname(absTarget);
+				stats = this.fileCache.buildCache(resolved.scope, false, resolved, {
+					respectGitignore,
+					alwaysIncludeDir: includeDir,
+				});
+				this.scopeNotices.push(
+					`Note: ${includeDir} is gitignored under ${resolved.scope}; indexed it because you targeted a file inside it. Use --allow-gitignore to scan all ignored paths.`,
+				);
+			}
+		}
+
+		return stats;
+	}
+
+	/**
+	 * Part 1: when the CLI report has a "Wiki page not found" error and the scan
+	 * honored an active .gitignore, hint that the target may be hidden by it.
+	 * Wiki links carry only a bare page name (no path), so the hint is scoped to
+	 * "gitignore is active" rather than a per-target path check.
+	 */
+	private appendGitignoreHint(cliOutput: string): string {
+		if (
+			cliOutput.includes("Wiki page not found") &&
+			this.fileCache.scopeHasGitignore()
+		) {
+			return `${cliOutput}\n\nHint: .gitignore is active for this scan. If a wiki target lives in a gitignored folder, re-run with --allow-gitignore.`;
+		}
+		return cliOutput;
 	}
 
 	/**
@@ -131,38 +180,35 @@ export class JactCli {
 			// target-pkg), same as getAst. Seeds the shared FileCache so bare wiki
 			// page names resolve even when --scope is omitted.
 			const cacheStats = this.applyScope(options, filePath);
-			if (options.verbose && options.format !== "json") {
-				console.log(
-					`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
-				);
-				if (cacheStats.duplicates > 0) {
+			if (options.format !== "json") {
+				// Surface scope/gitignore decisions (Obsidian-vault default, gitignore
+				// relax) before the report so the user sees what jact chose.
+				for (const notice of this.scopeNotices) console.log(notice);
+				if (options.verbose) {
 					console.log(
-						`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
+						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 					);
+					if (cacheStats.duplicates > 0) {
+						console.log(
+							`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
+						);
+					}
 				}
 			}
 			const result = await this.validator.validateFile(filePath);
 			result.validationTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
 			const fileContent = readFileSync(filePath, "utf8");
 			const nestedCodeblockWarnings = detectNestedCodeblocks(fileContent);
-			if (options.lines) {
-				const filteredResult = this.filterResultsByLineRange(
-					result,
-					options.lines,
-				);
-				if (options.format === "json") return this.formatAsJSON(filteredResult);
-				return this.formatForCLI(
-					filteredResult,
-					nestedCodeblockWarnings,
-					options.verbose ?? false,
-				);
-			}
-			if (options.format === "json") return this.formatAsJSON(result);
-			return this.formatForCLI(
-				result,
+			const reportResult = options.lines
+				? this.filterResultsByLineRange(result, options.lines)
+				: result;
+			if (options.format === "json") return this.formatAsJSON(reportResult);
+			const cli = this.formatForCLI(
+				reportResult,
 				nestedCodeblockWarnings,
 				options.verbose ?? false,
 			);
+			return this.appendGitignoreHint(cli);
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
