@@ -47,6 +47,9 @@ interface ObsidianLinkNode {
  * @param ast - Optional pre-parsed mdast Root for the same content. When omitted
  *   (standalone callers/tests) the content is parsed with the default jact
  *   extension set; production callers pass the shared tree to avoid re-parsing.
+ * @param sharedMarkers - Optional precomputed extraction-marker map for the same
+ *   tree. When omitted the map is built here; production callers pass the shared
+ *   map so the tree is not re-walked for markers.
  * @returns Array of LinkObject instances with linkType="markdown"
  */
 export function extractObsidianLinks(
@@ -54,6 +57,7 @@ export function extractObsidianLinks(
 	sourceAbsolutePath: string,
 	fileCache: FileCache,
 	ast?: Root,
+	sharedMarkers?: ReturnType<typeof collectExtractionMarkers>,
 ): LinkObject[] {
 	const links: LinkObject[] = [];
 
@@ -64,7 +68,8 @@ export function extractObsidianLinks(
 			mdastExtensions: jactMdastExtensions(),
 		});
 
-	const markers = collectExtractionMarkers(tree, source);
+	const markers = sharedMarkers ?? collectExtractionMarkers(tree, source);
+	const lines = source.split(/\r?\n/);
 
 	visit(tree, "obsidianLink", (node) => {
 		const link = node as unknown as ObsidianLinkNode;
@@ -110,6 +115,7 @@ export function extractObsidianLinks(
 				extractionMarker: detectExtractionMarker(
 					markers.get(lineNum),
 					startColumn + raw.length,
+					lines[lineNum - 1] ?? "",
 				),
 				fileCache,
 			}),

@@ -30,7 +30,7 @@ import type {
 
 const tokenize: Tokenizer = function (this: TokenizeContext, effects, ok, nok) {
 	let parenDepth = 0;
-	let sawSpace = false;
+	let sawSpaceInFragment = false;
 	let sawHash = false;
 
 	const start: State = (code) => {
@@ -86,15 +86,19 @@ const tokenize: Tokenizer = function (this: TokenizeContext, effects, ok, nok) {
 				return dest;
 			}
 			// Closing the link. Only claim it when it is genuinely permissive;
-			// otherwise nok so the core link construct handles it.
-			if (!(sawHash && sawSpace)) return nok(code);
+			// otherwise nok so the core link construct handles it. "Permissive"
+			// means a raw space *inside the `#` fragment* — a space in the path
+			// (before `#`) does not qualify, so titled/spaced-path links fall
+			// through to the core construct.
+			if (!(sawHash && sawSpaceInFragment)) return nok(code);
 			effects.consume(code);
 			effects.exit("obsidianLinkData");
 			effects.exit("obsidianLink");
 			return ok;
 		}
 		if (code === codes.space) {
-			sawSpace = true;
+			// Only a space *after* the `#` makes this a permissive fragment.
+			if (sawHash) sawSpaceInFragment = true;
 			effects.consume(code);
 			return dest;
 		}

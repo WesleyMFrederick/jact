@@ -39,6 +39,9 @@ interface WikilinkNode {
  * @param ast - Optional pre-parsed mdast Root for the same content. When omitted
  *   (standalone callers/tests) the content is parsed with the default jact
  *   extension set; production callers pass the shared tree to avoid re-parsing.
+ * @param sharedMarkers - Optional precomputed extraction-marker map for the same
+ *   tree. When omitted the map is built here; production callers pass the shared
+ *   map so the tree is not re-walked for markers.
  * @returns Array of LinkObject instances with linkType="wiki"
  */
 export function extractWikilinks(
@@ -46,6 +49,7 @@ export function extractWikilinks(
 	sourceAbsolutePath: string,
 	fileCache: FileCache,
 	ast?: Root,
+	sharedMarkers?: ReturnType<typeof collectExtractionMarkers>,
 ): LinkObject[] {
 	const links: LinkObject[] = [];
 
@@ -56,7 +60,8 @@ export function extractWikilinks(
 			mdastExtensions: jactMdastExtensions(),
 		});
 
-	const markers = collectExtractionMarkers(tree, source);
+	const markers = sharedMarkers ?? collectExtractionMarkers(tree, source);
+	const lines = source.split(/\r?\n/);
 
 	visit(tree, "wikilink", (node) => {
 		const wiki = node as unknown as WikilinkNode;
@@ -106,6 +111,7 @@ export function extractWikilinks(
 				extractionMarker: detectExtractionMarker(
 					markers.get(lineNum),
 					startColumn + fullMatch.length,
+					lines[lineNum - 1] ?? "",
 				),
 				fileCache,
 			}),

@@ -158,10 +158,11 @@ export function extractAnchors(ast: Root, content: string): AnchorObject[] {
 		const explicitMatch = text.match(/^(.+?)\s*\{#([^}]+)\}$/);
 		if (explicitMatch) {
 			const explicitId = explicitMatch[2] ?? "";
+			const urlEncodedId = explicitId.replace(/:/g, "").replace(/\s+/g, "%20");
 			anchors.push({
 				anchorType: "header",
 				id: explicitId,
-				urlEncodedId: explicitId,
+				urlEncodedId,
 				rawText: (explicitMatch[1] ?? "").trim(),
 				fullMatch,
 				line: lineNum,

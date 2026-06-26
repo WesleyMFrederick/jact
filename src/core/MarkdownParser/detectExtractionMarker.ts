@@ -9,6 +9,10 @@
  * on the same line" — not a raw-line lookahead regex. Parsing an already-
  * tokenized value with string slicing is a transform on extracted data, not a
  * source re-scan.
+ *
+ * Adjacency is strict: a marker attaches to a link only when nothing but
+ * whitespace separates them on the line. Trailing prose between a link and a
+ * later comment (`[a](b) note <!-- x -->`) does not bind that comment.
  */
 
 import type { Root } from "mdast";
@@ -95,18 +99,31 @@ export function collectExtractionMarkers(
 /**
  * Find the extraction marker following a link on its line.
  *
+ * A marker is attached only when the gap between the link's end and the
+ * marker's start is whitespace-only. Any non-whitespace content in between
+ * (e.g. `[a](b) trailing text <!-- note -->`) means the marker belongs to
+ * something else later on the line, not this link.
+ *
  * @param markersOnLine - Marker spans for the link's line (from collectExtractionMarkers)
  * @param linkEndColumn - 0-based column where the link ends
- * @returns The first marker starting at/after linkEndColumn, or null if none
+ * @param lineText - Raw source text of the link's line (to verify a whitespace-only gap)
+ * @returns The first marker immediately following the link past a whitespace-only gap, or null
  */
 export function detectExtractionMarker(
 	markersOnLine: ExtractionMarkerSpan[] | undefined,
 	linkEndColumn: number,
+	lineText: string,
 ): ExtractionMarker | null {
 	if (!markersOnLine) return null;
 	for (const span of markersOnLine) {
 		if (span.startColumn >= linkEndColumn) {
-			return { fullMatch: span.fullMatch, innerText: span.innerText };
+			// Only attach when nothing but whitespace separates the link from the
+			// marker. Once a candidate fails, every later marker shares the same
+			// non-whitespace prefix, so none qualify — return null immediately.
+			const gap = lineText.slice(linkEndColumn, span.startColumn);
+			return /^\s*$/.test(gap)
+				? { fullMatch: span.fullMatch, innerText: span.innerText }
+				: null;
 		}
 	}
 	return null;

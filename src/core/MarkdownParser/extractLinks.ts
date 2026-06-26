@@ -39,6 +39,7 @@ interface PositionedNode {
 function extractLinksFromAst(
 	ast: Root,
 	content: string,
+	lines: string[],
 	markers: ExtractionMarkerMap,
 	sourceAbsolutePath: string,
 	links: LinkObject[],
@@ -107,7 +108,11 @@ function extractLinksFromAst(
 			column,
 			extractionMarker:
 				lineNum > 0
-					? detectExtractionMarker(markers.get(lineNum), column + raw.length)
+					? detectExtractionMarker(
+							markers.get(lineNum),
+							column + raw.length,
+							lines[lineNum - 1] ?? "",
+						)
 					: null,
 			fileCache,
 		});
@@ -225,6 +230,7 @@ function extractCiteAndCaretLinks(
 					extractionMarker: detectExtractionMarker(
 						markers.get(lineNum),
 						column + raw.length,
+						line,
 					),
 					fileCache,
 				}),
@@ -265,6 +271,7 @@ function extractCiteAndCaretLinks(
 					extractionMarker: detectExtractionMarker(
 						markers.get(lineNum),
 						column + raw.length,
+						line,
 					),
 					fileCache,
 				}),
@@ -321,20 +328,31 @@ export function extractLinks(
 	extractLinksFromAst(
 		tree,
 		content,
+		lines,
 		markers,
 		sourceAbsolutePath,
 		links,
 		fileCache,
 	);
 
-	// Wiki-style links (all forms): [[...]] — read from `wikilink` tokens.
-	links.push(...extractWikilinks(content, sourceAbsolutePath, fileCache, tree));
+	// Wiki-style links (all forms): [[...]] — read from `wikilink` tokens. The
+	// shared marker map is passed through so the helper does not re-walk the tree.
+	links.push(
+		...extractWikilinks(content, sourceAbsolutePath, fileCache, tree, markers),
+	);
 
 	// Permissive Obsidian markdown links (raw spaces in anchor that CommonMark
 	// rejects) — read from `obsidianLink` tokens. `%20`-encoded / paren-only
 	// links remain valid CommonMark and are caught on the core mdast path above.
+	// Shares the same precomputed marker map (no redundant tree walk).
 	links.push(
-		...extractObsidianLinks(content, sourceAbsolutePath, fileCache, tree),
+		...extractObsidianLinks(
+			content,
+			sourceAbsolutePath,
+			fileCache,
+			tree,
+			markers,
+		),
 	);
 
 	// Obsidian citation + caret references — read from `citation` / `caretAnchor`

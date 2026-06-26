@@ -62,6 +62,10 @@ describe("wikilink extension ([[target#anchor|alias]])", () => {
 		expect(collect("[ref]")).toHaveLength(0);
 	});
 
+	it("does not tokenize an empty wikilink [[]]", () => {
+		expect(collect("[[]]")).toHaveLength(0);
+	});
+
 	// D4: micromark handles code context natively, so the hand-rolled
 	// code-guard layer can retire.
 	it("does not tokenize a wikilink inside an inline code span", () => {

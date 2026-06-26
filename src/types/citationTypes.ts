@@ -100,7 +100,7 @@ export type AnchorObject =
 			/** 1-based */
 			line: number;
 
-			/** 1-based */
+			/** 0-based */
 			column: number;
 	  }
 	| {
@@ -116,7 +116,7 @@ export type AnchorObject =
 			/** 1-based */
 			line: number;
 
-			/** 1-based */
+			/** 0-based */
 			column: number;
 	  };
 

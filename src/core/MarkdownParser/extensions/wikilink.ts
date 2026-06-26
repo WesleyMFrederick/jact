@@ -21,6 +21,11 @@ import type {
 } from "micromark-util-types";
 
 const tokenize: Tokenizer = function (this: TokenizeContext, effects, ok, nok) {
+	// Tracks whether any inner content was seen, so an immediate `]]` (empty
+	// `[[]]`) is rejected rather than tokenized as a zero-value wikilink — empty
+	// is outside the documented `[[…]]` forms.
+	let sawContent = false;
+
 	const start: State = (code) => {
 		if (code !== codes.leftSquareBracket) return nok(code);
 		effects.enter("wikilink");
@@ -38,8 +43,12 @@ const tokenize: Tokenizer = function (this: TokenizeContext, effects, ok, nok) {
 
 	const content: State = (code) => {
 		if (code === codes.eof || code === codes.lineFeed) return nok(code);
-		if (code === codes.rightSquareBracket) return close1(code);
+		if (code === codes.rightSquareBracket) {
+			if (!sawContent) return nok(code);
+			return close1(code);
+		}
 		effects.consume(code);
+		sawContent = true;
 		return content;
 	};
 
