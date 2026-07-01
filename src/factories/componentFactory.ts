@@ -34,10 +34,13 @@ import type { ExtractionEligibilityStrategy } from "../types/contentExtractorTyp
 /**
  * Create markdown parser with file system dependency
  *
+ * @param fileCache - Optional shared FileCache instance; creates a fresh one if omitted
  * @returns Parser instance configured with Node.js fs module
  */
-export function createMarkdownParser(): MarkdownParser {
-	return new MarkdownParser(fs, createFileCache());
+export function createMarkdownParser(
+	fileCache: FileCache = createFileCache(),
+): MarkdownParser {
+	return new MarkdownParser(fs, fileCache);
 }
 
 /**

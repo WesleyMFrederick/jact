@@ -1,0 +1,3149 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for backtick-anchors.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Backtick Anchor Test Document",
+      "id": "Backtick Anchor Test Document",
+      "line": 1,
+      "rawText": "Backtick Anchor Test Document",
+      "urlEncodedId": "Backtick%20Anchor%20Test%20Document",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## \`hasAnchor(anchorId: string): boolean\`",
+      "id": "\`hasAnchor(anchorId: string): boolean\`",
+      "line": 3,
+      "rawText": "\`hasAnchor(anchorId: string): boolean\`",
+      "urlEncodedId": "\`hasAnchor(anchorId%20string)%20boolean\`",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## \`findSimilarAnchors(anchorId: string): string[]\`",
+      "id": "\`findSimilarAnchors(anchorId: string): string[]\`",
+      "line": 7,
+      "rawText": "\`findSimilarAnchors(anchorId: string): string[]\`",
+      "urlEncodedId": "\`findSimilarAnchors(anchorId%20string)%20string[]\`",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## \`validateFile(filePath: string): Promise<ValidationResult>\`",
+      "id": "\`validateFile(filePath: string): Promise<ValidationResult>\`",
+      "line": 11,
+      "rawText": "\`validateFile(filePath: string): Promise<ValidationResult>\`",
+      "urlEncodedId": "\`validateFile(filePath%20string)%20Promise<ValidationResult>\`",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## \`transform(input: T, fn: (item: T) => U): U[]\`",
+      "id": "\`transform(input: T, fn: (item: T) => U): U[]\`",
+      "line": 15,
+      "rawText": "\`transform(input: T, fn: (item: T) => U): U[]\`",
+      "urlEncodedId": "\`transform(input%20T,%20fn%20(item%20T)%20=>%20U)%20U[]\`",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Internal Links with Backticks (URL-encoded)",
+      "id": "Internal Links with Backticks (URL-encoded)",
+      "line": 19,
+      "rawText": "Internal Links with Backticks (URL-encoded)",
+      "urlEncodedId": "Internal%20Links%20with%20Backticks%20(URL-encoded)",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Internal Links with Unencoded Special Chars",
+      "id": "Internal Links with Unencoded Special Chars",
+      "line": 25,
+      "rawText": "Internal Links with Unencoded Special Chars",
+      "urlEncodedId": "Internal%20Links%20with%20Unencoded%20Special%20Chars",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Internal Links with %28/%29 Encoded Parens",
+      "id": "Internal Links with %28/%29 Encoded Parens",
+      "line": 31,
+      "rawText": "Internal Links with %28/%29 Encoded Parens",
+      "urlEncodedId": "Internal%20Links%20with%20%28/%29%20Encoded%20Parens",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Internal Links with Nested Parentheses",
+      "id": "Internal Links with Nested Parentheses",
+      "line": 36,
+      "rawText": "Internal Links with Nested Parentheses",
+      "urlEncodedId": "Internal%20Links%20with%20Nested%20Parentheses",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 32,
+          "line": 1,
+          "offset": 31,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Backtick Anchor Test Document",
+      "text": "Backtick Anchor Test Document",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 42,
+          "line": 3,
+          "offset": 74,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+          "offset": 33,
+        },
+      },
+      "raw": "## \`hasAnchor(anchorId: string): boolean\`",
+      "text": "\`hasAnchor(anchorId: string): boolean\`",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 52,
+          "line": 7,
+          "offset": 168,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+          "offset": 117,
+        },
+      },
+      "raw": "## \`findSimilarAnchors(anchorId: string): string[]\`",
+      "text": "\`findSimilarAnchors(anchorId: string): string[]\`",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 63,
+          "line": 11,
+          "offset": 268,
+        },
+        "start": {
+          "column": 1,
+          "line": 11,
+          "offset": 206,
+        },
+      },
+      "raw": "## \`validateFile(filePath: string): Promise<ValidationResult>\`",
+      "text": "\`validateFile(filePath: string): Promise<ValidationResult>\`",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 50,
+          "line": 15,
+          "offset": 350,
+        },
+        "start": {
+          "column": 1,
+          "line": 15,
+          "offset": 301,
+        },
+      },
+      "raw": "## \`transform(input: T, fn: (item: T) => U): U[]\`",
+      "text": "\`transform(input: T, fn: (item: T) => U): U[]\`",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 47,
+          "line": 19,
+          "offset": 439,
+        },
+        "start": {
+          "column": 1,
+          "line": 19,
+          "offset": 393,
+        },
+      },
+      "raw": "## Internal Links with Backticks (URL-encoded)",
+      "text": "Internal Links with Backticks (URL-encoded)",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 47,
+          "line": 25,
+          "offset": 816,
+        },
+        "start": {
+          "column": 1,
+          "line": 25,
+          "offset": 770,
+        },
+      },
+      "raw": "## Internal Links with Unencoded Special Chars",
+      "text": "Internal Links with Unencoded Special Chars",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 46,
+          "line": 31,
+          "offset": 1071,
+        },
+        "start": {
+          "column": 1,
+          "line": 31,
+          "offset": 1026,
+        },
+      },
+      "raw": "## Internal Links with %28/%29 Encoded Parens",
+      "text": "Internal Links with %28/%29 Encoded Parens",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 42,
+          "line": 36,
+          "offset": 1256,
+        },
+        "start": {
+          "column": 1,
+          "line": 36,
+          "offset": 1215,
+        },
+      },
+      "raw": "## Internal Links with Nested Parentheses",
+      "text": "Internal Links with Nested Parentheses",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[**\`hasAnchor(anchorId: string): boolean\`**](#\`hasAnchor(anchorId%20string)%20boolean\`)",
+      "line": 21,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "\`hasAnchor(anchorId%20string)%20boolean\`",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "hasAnchor(anchorId: string): boolean",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[\`findSimilarAnchors(anchorId: string): string[]\`](#\`findSimilarAnchors(anchorId%20string)%20string[]\`)",
+      "line": 22,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "\`findSimilarAnchors(anchorId%20string)%20string[]\`",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "findSimilarAnchors(anchorId: string): string[]",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[\`validateFile(filePath: string): Promise<ValidationResult>\`](#\`validateFile(filePath%20string)%20Promise%3CValidationResult%3E\`)",
+      "line": 23,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "\`validateFile(filePath%20string)%20Promise%3CValidationResult%3E\`",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "validateFile(filePath: string): Promise<ValidationResult>",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[hasAnchor method](#hasAnchor%28anchorId%3A%20string%29%3A%20boolean)",
+      "line": 33,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "hasAnchor%28anchorId%3A%20string%29%3A%20boolean",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "hasAnchor method",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[\`hasAnchor\`](#\`hasAnchor%28anchorId%3A%20string%29%3A%20boolean\`)",
+      "line": 34,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "\`hasAnchor%28anchorId%3A%20string%29%3A%20boolean\`",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "hasAnchor",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[\`transform\`](#\`transform(input%20T,%20fn%20(item%20T)%20%3D>%20U)%20U[]\`)",
+      "line": 38,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "\`transform(input%20T,%20fn%20(item%20T)%20%3D>%20U)%20U[]\`",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "transform",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[hasAnchor](#hasAnchor(anchorId: string): boolean)",
+      "line": 27,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "hasAnchor(anchorId: string): boolean",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "hasAnchor",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[findSimilarAnchors](#findSimilarAnchors(anchorId: string): string[])",
+      "line": 28,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "findSimilarAnchors(anchorId: string): string[]",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "findSimilarAnchors",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[\`hasAnchor(anchorId: string): boolean\`](#hasAnchor(anchorId: string): boolean)",
+      "line": 29,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "hasAnchor(anchorId: string): boolean",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "\`hasAnchor(anchorId: string): boolean\`",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[transform no-encoding](#\`transform(input: T, fn: (item: T) => U): U[]\`)",
+      "line": 39,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/backtick-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "\`transform(input: T, fn: (item: T) => U): U[]\`",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "transform no-encoding",
+    },
+  ],
+}
+`;
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for code-blocks-with-links.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Test Document with Code Blocks",
+      "id": "Test Document with Code Blocks",
+      "line": 1,
+      "rawText": "Test Document with Code Blocks",
+      "urlEncodedId": "Test%20Document%20with%20Code%20Blocks",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Code Example",
+      "id": "Code Example",
+      "line": 7,
+      "rawText": "Code Example",
+      "urlEncodedId": "Code%20Example",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Real Section",
+      "id": "Real Section",
+      "line": 25,
+      "rawText": "Real Section",
+      "urlEncodedId": "Real%20Section",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## More Code Examples",
+      "id": "More Code Examples",
+      "line": 29,
+      "rawText": "More Code Examples",
+      "urlEncodedId": "More%20Code%20Examples",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 33,
+          "line": 1,
+          "offset": 32,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Test Document with Code Blocks",
+      "text": "Test Document with Code Blocks",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 16,
+          "line": 7,
+          "offset": 148,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+          "offset": 133,
+        },
+      },
+      "raw": "## Code Example",
+      "text": "Code Example",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 16,
+          "line": 25,
+          "offset": 478,
+        },
+        "start": {
+          "column": 1,
+          "line": 25,
+          "offset": 463,
+        },
+      },
+      "raw": "## Real Section",
+      "text": "Real Section",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 22,
+          "line": 29,
+          "offset": 533,
+        },
+        "start": {
+          "column": 1,
+          "line": 29,
+          "offset": 512,
+        },
+      },
+      "raw": "## More Code Examples",
+      "text": "More Code Examples",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": null,
+      "column": 0,
+      "extractionMarker": null,
+      "fullMatch": "[Real Link](./real-file.md)",
+      "line": 5,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/code-blocks-with-links.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<FIXTURES>/real-file.md",
+          "raw": "./real-file.md",
+          "relative": "real-file.md",
+        },
+      },
+      "text": "Real Link",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "extractionMarker": null,
+      "fullMatch": "[#real-section](#real-section)",
+      "line": 27,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/code-blocks-with-links.md",
+        },
+      },
+      "target": {
+        "anchor": "real-section",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "#real-section",
+    },
+  ],
+}
+`;
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for complex-headers.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "block",
+      "column": 15,
+      "fullMatch": "==**Bold Highlighted**==",
+      "id": "Bold Highlighted",
+      "line": 17,
+      "rawText": null,
+    },
+    {
+      "anchorType": "block",
+      "column": 19,
+      "fullMatch": "^test-block",
+      "id": "test-block",
+      "line": 39,
+      "rawText": null,
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Complex Markdown Headers Test File",
+      "id": "Complex Markdown Headers Test File",
+      "line": 1,
+      "rawText": "Complex Markdown Headers Test File",
+      "urlEncodedId": "Complex%20Markdown%20Headers%20Test%20File",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Standard Header",
+      "id": "Standard Header",
+      "line": 3,
+      "rawText": "Standard Header",
+      "urlEncodedId": "Standard%20Header",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Header with \`backticks\`",
+      "id": "Header with \`backticks\`",
+      "line": 5,
+      "rawText": "Header with \`backticks\`",
+      "urlEncodedId": "Header%20with%20\`backticks\`",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## \`setupOrchestrator.js\`",
+      "id": "\`setupOrchestrator.js\`",
+      "line": 7,
+      "rawText": "\`setupOrchestrator.js\`",
+      "urlEncodedId": "\`setupOrchestrator.js\`",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## \`directoryManager.js\`",
+      "id": "\`directoryManager.js\`",
+      "line": 9,
+      "rawText": "\`directoryManager.js\`",
+      "urlEncodedId": "\`directoryManager.js\`",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Header with **bold** text",
+      "id": "Header with **bold** text",
+      "line": 11,
+      "rawText": "Header with **bold** text",
+      "urlEncodedId": "Header%20with%20**bold**%20text",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Header with _italic_ text",
+      "id": "Header with _italic_ text",
+      "line": 13,
+      "rawText": "Header with _italic_ text",
+      "urlEncodedId": "Header%20with%20_italic_%20text",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Header with ==highlighted== text",
+      "id": "Header with ==highlighted== text",
+      "line": 15,
+      "rawText": "Header with ==highlighted== text",
+      "urlEncodedId": "Header%20with%20==highlighted==%20text",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Header with ==**Bold Highlighted**== text",
+      "id": "Header with ==**Bold Highlighted**== text",
+      "line": 17,
+      "rawText": "Header with ==**Bold Highlighted**== text",
+      "urlEncodedId": "Header%20with%20==**Bold%20Highlighted**==%20text",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Header with \`code\` and **bold** mixed",
+      "id": "Header with \`code\` and **bold** mixed",
+      "line": 19,
+      "rawText": "Header with \`code\` and **bold** mixed",
+      "urlEncodedId": "Header%20with%20\`code\`%20and%20**bold**%20mixed",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Header with example reference inside",
+      "id": "Header with example reference inside",
+      "line": 21,
+      "rawText": "Header with example reference inside",
+      "urlEncodedId": "Header%20with%20example%20reference%20inside",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Header with \`multiple\` **different** ==formats== combined",
+      "id": "Header with \`multiple\` **different** ==formats== combined",
+      "line": 23,
+      "rawText": "Header with \`multiple\` **different** ==formats== combined",
+      "urlEncodedId": "Header%20with%20\`multiple\`%20**different**%20==formats==%20combined",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "### Nested \`backtick\` header",
+      "id": "Nested \`backtick\` header",
+      "line": 25,
+      "rawText": "Nested \`backtick\` header",
+      "urlEncodedId": "Nested%20\`backtick\`%20header",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "#### Even deeper \`nested.js\` header",
+      "id": "Even deeper \`nested.js\` header",
+      "line": 27,
+      "rawText": "Even deeper \`nested.js\` header",
+      "urlEncodedId": "Even%20deeper%20\`nested.js\`%20header",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Special Characters & Symbols",
+      "id": "Special Characters & Symbols",
+      "line": 29,
+      "rawText": "Special Characters & Symbols",
+      "urlEncodedId": "Special%20Characters%20&%20Symbols",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Unicode 📁 Characters",
+      "id": "Unicode 📁 Characters",
+      "line": 31,
+      "rawText": "Unicode 📁 Characters",
+      "urlEncodedId": "Unicode%20📁%20Characters",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "### ADR-006: Module System Selection (CommonJS vs ES6)",
+      "id": "ADR-006: Module System Selection (CommonJS vs ES6)",
+      "line": 33,
+      "rawText": "ADR-006: Module System Selection (CommonJS vs ES6)",
+      "urlEncodedId": "ADR-006%20Module%20System%20Selection%20(CommonJS%20vs%20ES6)",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Story 1.5: Implement Cache",
+      "id": "Story 1.5: Implement Cache",
+      "line": 35,
+      "rawText": "Story 1.5: Implement Cache",
+      "urlEncodedId": "Story%201.5%20Implement%20Cache",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Introduction",
+      "id": "Introduction",
+      "line": 37,
+      "rawText": "Introduction",
+      "urlEncodedId": "Introduction",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 37,
+          "line": 1,
+          "offset": 36,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Complex Markdown Headers Test File",
+      "text": "Complex Markdown Headers Test File",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 19,
+          "line": 3,
+          "offset": 56,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+          "offset": 38,
+        },
+      },
+      "raw": "## Standard Header",
+      "text": "Standard Header",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 27,
+          "line": 5,
+          "offset": 84,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+          "offset": 58,
+        },
+      },
+      "raw": "## Header with \`backticks\`",
+      "text": "Header with \`backticks\`",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 26,
+          "line": 7,
+          "offset": 111,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+          "offset": 86,
+        },
+      },
+      "raw": "## \`setupOrchestrator.js\`",
+      "text": "\`setupOrchestrator.js\`",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 25,
+          "line": 9,
+          "offset": 137,
+        },
+        "start": {
+          "column": 1,
+          "line": 9,
+          "offset": 113,
+        },
+      },
+      "raw": "## \`directoryManager.js\`",
+      "text": "\`directoryManager.js\`",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 29,
+          "line": 11,
+          "offset": 167,
+        },
+        "start": {
+          "column": 1,
+          "line": 11,
+          "offset": 139,
+        },
+      },
+      "raw": "## Header with **bold** text",
+      "text": "Header with **bold** text",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 29,
+          "line": 13,
+          "offset": 197,
+        },
+        "start": {
+          "column": 1,
+          "line": 13,
+          "offset": 169,
+        },
+      },
+      "raw": "## Header with _italic_ text",
+      "text": "Header with _italic_ text",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 36,
+          "line": 15,
+          "offset": 234,
+        },
+        "start": {
+          "column": 1,
+          "line": 15,
+          "offset": 199,
+        },
+      },
+      "raw": "## Header with ==highlighted== text",
+      "text": "Header with ==highlighted== text",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 45,
+          "line": 17,
+          "offset": 280,
+        },
+        "start": {
+          "column": 1,
+          "line": 17,
+          "offset": 236,
+        },
+      },
+      "raw": "## Header with ==**Bold Highlighted**== text",
+      "text": "Header with ==**Bold Highlighted**== text",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 41,
+          "line": 19,
+          "offset": 322,
+        },
+        "start": {
+          "column": 1,
+          "line": 19,
+          "offset": 282,
+        },
+      },
+      "raw": "## Header with \`code\` and **bold** mixed",
+      "text": "Header with \`code\` and **bold** mixed",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 40,
+          "line": 21,
+          "offset": 363,
+        },
+        "start": {
+          "column": 1,
+          "line": 21,
+          "offset": 324,
+        },
+      },
+      "raw": "## Header with example reference inside",
+      "text": "Header with example reference inside",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 61,
+          "line": 23,
+          "offset": 425,
+        },
+        "start": {
+          "column": 1,
+          "line": 23,
+          "offset": 365,
+        },
+      },
+      "raw": "## Header with \`multiple\` **different** ==formats== combined",
+      "text": "Header with \`multiple\` **different** ==formats== combined",
+    },
+    {
+      "level": 3,
+      "position": {
+        "end": {
+          "column": 29,
+          "line": 25,
+          "offset": 455,
+        },
+        "start": {
+          "column": 1,
+          "line": 25,
+          "offset": 427,
+        },
+      },
+      "raw": "### Nested \`backtick\` header",
+      "text": "Nested \`backtick\` header",
+    },
+    {
+      "level": 4,
+      "position": {
+        "end": {
+          "column": 36,
+          "line": 27,
+          "offset": 492,
+        },
+        "start": {
+          "column": 1,
+          "line": 27,
+          "offset": 457,
+        },
+      },
+      "raw": "#### Even deeper \`nested.js\` header",
+      "text": "Even deeper \`nested.js\` header",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 32,
+          "line": 29,
+          "offset": 525,
+        },
+        "start": {
+          "column": 1,
+          "line": 29,
+          "offset": 494,
+        },
+      },
+      "raw": "## Special Characters & Symbols",
+      "text": "Special Characters & Symbols",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 25,
+          "line": 31,
+          "offset": 551,
+        },
+        "start": {
+          "column": 1,
+          "line": 31,
+          "offset": 527,
+        },
+      },
+      "raw": "## Unicode 📁 Characters",
+      "text": "Unicode 📁 Characters",
+    },
+    {
+      "level": 3,
+      "position": {
+        "end": {
+          "column": 55,
+          "line": 33,
+          "offset": 607,
+        },
+        "start": {
+          "column": 1,
+          "line": 33,
+          "offset": 553,
+        },
+      },
+      "raw": "### ADR-006: Module System Selection (CommonJS vs ES6)",
+      "text": "ADR-006: Module System Selection (CommonJS vs ES6)",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 30,
+          "line": 35,
+          "offset": 638,
+        },
+        "start": {
+          "column": 1,
+          "line": 35,
+          "offset": 609,
+        },
+      },
+      "raw": "## Story 1.5: Implement Cache",
+      "text": "Story 1.5: Implement Cache",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 16,
+          "line": 37,
+          "offset": 655,
+        },
+        "start": {
+          "column": 1,
+          "line": 37,
+          "offset": 640,
+        },
+      },
+      "raw": "## Introduction",
+      "text": "Introduction",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Standard](complex-headers.md#standard-header)",
+      "line": 42,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "standard-header",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Standard",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Backticks](complex-headers.md#Header%20with%20%60backticks%60)",
+      "line": 43,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Header%20with%20%60backticks%60",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Backticks",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Setup File](complex-headers.md#%60setupOrchestrator.js%60)",
+      "line": 44,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "%60setupOrchestrator.js%60",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Setup File",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Directory File](complex-headers.md#%60directoryManager.js%60)",
+      "line": 45,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "%60directoryManager.js%60",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Directory File",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Bold](complex-headers.md#Header%20with%20**bold**%20text)",
+      "line": 46,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Header%20with%20**bold**%20text",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Bold",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Italic](complex-headers.md#Header%20with%20*italic*%20text)",
+      "line": 47,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Header%20with%20*italic*%20text",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Italic",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Highlighted](complex-headers.md#Header%20with%20==highlighted==%20text)",
+      "line": 48,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Header%20with%20==highlighted==%20text",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Highlighted",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Bold Highlighted](complex-headers.md#Header%20with%20==**Bold%20Highlighted**==%20text)",
+      "line": 49,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Header%20with%20==**Bold%20Highlighted**==%20text",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Bold Highlighted",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Mixed](complex-headers.md#Header%20with%20%60code%60%20and%20**bold**%20mixed)",
+      "line": 50,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Header%20with%20%60code%60%20and%20**bold**%20mixed",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Mixed",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Link Inside](complex-headers.md#header-with-example-reference-inside)",
+      "line": 51,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "header-with-example-reference-inside",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Link Inside",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Complex Combined](complex-headers.md#Header%20with%20%60multiple%60%20**different**%20==formats==%20combined)",
+      "line": 52,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Header%20with%20%60multiple%60%20**different**%20==formats==%20combined",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Complex Combined",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Nested Backtick](complex-headers.md#Nested%20%60backtick%60%20header)",
+      "line": 53,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Nested%20%60backtick%60%20header",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Nested Backtick",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Deep Nested](complex-headers.md#Even%20deeper%20%60nested.js%60%20header)",
+      "line": 54,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "Even%20deeper%20%60nested.js%60%20header",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Deep Nested",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Special Chars](complex-headers.md#special-characters-symbols)",
+      "line": 55,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "special-characters-symbols",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Special Chars",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Unicode](complex-headers.md#unicode-characters)",
+      "line": 56,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "unicode-characters",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "Unicode",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[ADR with Colon and Parentheses](complex-headers.md#ADR-006%20Module%20System%20Selection%20(CommonJS%20vs%20ES6))",
+      "line": 57,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "ADR-006%20Module%20System%20Selection%20(CommonJS%20vs%20ES6)",
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+          "raw": "complex-headers.md",
+          "relative": "complex-headers.md",
+        },
+      },
+      "text": "ADR with Colon and Parentheses",
+    },
+    {
+      "anchorType": "header",
+      "column": 19,
+      "extractionMarker": null,
+      "fullMatch": "^test-block",
+      "line": 39,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/complex-headers.md",
+        },
+      },
+      "target": {
+        "anchor": "test-block",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": null,
+    },
+  ],
+}
+`;
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for enhanced-citations.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "block",
+      "column": 25,
+      "fullMatch": "^FR1",
+      "id": "FR1",
+      "line": 28,
+      "rawText": null,
+    },
+    {
+      "anchorType": "block",
+      "column": 28,
+      "fullMatch": "^US1-1AC1",
+      "id": "US1-1AC1",
+      "line": 29,
+      "rawText": null,
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Enhanced Citations Test File",
+      "id": "Enhanced Citations Test File",
+      "line": 1,
+      "rawText": "Enhanced Citations Test File",
+      "urlEncodedId": "Enhanced%20Citations%20Test%20File",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Standard Markdown Links (With Anchors)",
+      "id": "Standard Markdown Links (With Anchors)",
+      "line": 5,
+      "rawText": "Standard Markdown Links (With Anchors)",
+      "urlEncodedId": "Standard%20Markdown%20Links%20(With%20Anchors)",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Standard Markdown Links (Without Anchors)",
+      "id": "Standard Markdown Links (Without Anchors)",
+      "line": 10,
+      "rawText": "Standard Markdown Links (Without Anchors)",
+      "urlEncodedId": "Standard%20Markdown%20Links%20(Without%20Anchors)",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Citation Format",
+      "id": "Citation Format",
+      "line": 16,
+      "rawText": "Citation Format",
+      "urlEncodedId": "Citation%20Format",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Mixed Content Line",
+      "id": "Mixed Content Line",
+      "line": 22,
+      "rawText": "Mixed Content Line",
+      "urlEncodedId": "Mixed%20Content%20Line",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Caret References",
+      "id": "Caret References",
+      "line": 26,
+      "rawText": "Caret References",
+      "urlEncodedId": "Caret%20References",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Headers for Testing",
+      "id": "Headers for Testing",
+      "line": 31,
+      "rawText": "Headers for Testing",
+      "urlEncodedId": "Headers%20for%20Testing",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "### Auth Service {#auth-service}",
+      "id": "auth-service",
+      "line": 33,
+      "rawText": "Auth Service",
+      "urlEncodedId": "auth-service",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "### Integration Tests {#integration-tests}",
+      "id": "integration-tests",
+      "line": 37,
+      "rawText": "Integration Tests",
+      "urlEncodedId": "integration-tests",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 31,
+          "line": 1,
+          "offset": 30,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Enhanced Citations Test File",
+      "text": "Enhanced Citations Test File",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 42,
+          "line": 5,
+          "offset": 161,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+          "offset": 120,
+        },
+      },
+      "raw": "## Standard Markdown Links (With Anchors)",
+      "text": "Standard Markdown Links (With Anchors)",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 45,
+          "line": 10,
+          "offset": 314,
+        },
+        "start": {
+          "column": 1,
+          "line": 10,
+          "offset": 270,
+        },
+      },
+      "raw": "## Standard Markdown Links (Without Anchors)",
+      "text": "Standard Markdown Links (Without Anchors)",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 19,
+          "line": 16,
+          "offset": 460,
+        },
+        "start": {
+          "column": 1,
+          "line": 16,
+          "offset": 442,
+        },
+      },
+      "raw": "## Citation Format",
+      "text": "Citation Format",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 22,
+          "line": 22,
+          "offset": 720,
+        },
+        "start": {
+          "column": 1,
+          "line": 22,
+          "offset": 699,
+        },
+      },
+      "raw": "## Mixed Content Line",
+      "text": "Mixed Content Line",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 20,
+          "line": 26,
+          "offset": 839,
+        },
+        "start": {
+          "column": 1,
+          "line": 26,
+          "offset": 820,
+        },
+      },
+      "raw": "## Caret References",
+      "text": "Caret References",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 23,
+          "line": 31,
+          "offset": 932,
+        },
+        "start": {
+          "column": 1,
+          "line": 31,
+          "offset": 910,
+        },
+      },
+      "raw": "## Headers for Testing",
+      "text": "Headers for Testing",
+    },
+    {
+      "level": 3,
+      "position": {
+        "end": {
+          "column": 33,
+          "line": 33,
+          "offset": 966,
+        },
+        "start": {
+          "column": 1,
+          "line": 33,
+          "offset": 934,
+        },
+      },
+      "raw": "### Auth Service {#auth-service}",
+      "text": "Auth Service {#auth-service}",
+    },
+    {
+      "level": 3,
+      "position": {
+        "end": {
+          "column": 43,
+          "line": 37,
+          "offset": 1050,
+        },
+        "start": {
+          "column": 1,
+          "line": 37,
+          "offset": 1008,
+        },
+      },
+      "raw": "### Integration Tests {#integration-tests}",
+      "text": "Integration Tests {#integration-tests}",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Component Details](test-target.md#auth-service)",
+      "line": 7,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "auth-service",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Component Details",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Testing Strategy](test-target.md#integration-tests)",
+      "line": 8,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "integration-tests",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Testing Strategy",
+    },
+    {
+      "anchorType": null,
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Implementation Guide](test-target.md)",
+      "line": 12,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Implementation Guide",
+    },
+    {
+      "anchorType": null,
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Reference Documentation](another-file.md)",
+      "line": 13,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<FIXTURES>/another-file.md",
+          "raw": "another-file.md",
+          "relative": "another-file.md",
+        },
+      },
+      "text": "Reference Documentation",
+    },
+    {
+      "anchorType": null,
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Setup Instructions](setup-guide.md)",
+      "line": 14,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<FIXTURES>/setup-guide.md",
+          "raw": "setup-guide.md",
+          "relative": "setup-guide.md",
+        },
+      },
+      "text": "Setup Instructions",
+    },
+    {
+      "anchorType": "header",
+      "column": 16,
+      "extractionMarker": null,
+      "fullMatch": "[Standard Link](test-target.md#auth)",
+      "line": 24,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "auth",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Standard Link",
+    },
+    {
+      "anchorType": null,
+      "column": 32,
+      "extractionMarker": null,
+      "fullMatch": "[cite: test-target.md]",
+      "line": 18,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "cite: test-target.md",
+    },
+    {
+      "anchorType": null,
+      "column": 30,
+      "extractionMarker": null,
+      "fullMatch": "[cite: design-principles.md]",
+      "line": 19,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<FIXTURES>/design-principles.md",
+          "raw": "design-principles.md",
+          "relative": "design-principles.md",
+        },
+      },
+      "text": "cite: design-principles.md",
+    },
+    {
+      "anchorType": null,
+      "column": 29,
+      "extractionMarker": null,
+      "fullMatch": "[cite: ../architecture/patterns.md]",
+      "line": 20,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<REPO>/test/architecture/patterns.md",
+          "raw": "../architecture/patterns.md",
+          "relative": "../architecture/patterns.md",
+        },
+      },
+      "text": "cite: ../architecture/patterns.md",
+    },
+    {
+      "anchorType": null,
+      "column": 65,
+      "extractionMarker": null,
+      "fullMatch": "[cite: guidelines.md]",
+      "line": 24,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<FIXTURES>/guidelines.md",
+          "raw": "guidelines.md",
+          "relative": "guidelines.md",
+        },
+      },
+      "text": "cite: guidelines.md",
+    },
+    {
+      "anchorType": "header",
+      "column": 25,
+      "extractionMarker": null,
+      "fullMatch": "^FR1",
+      "line": 28,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "FR1",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": null,
+    },
+    {
+      "anchorType": "header",
+      "column": 28,
+      "extractionMarker": null,
+      "fullMatch": "^US1-1AC1",
+      "line": 29,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/enhanced-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "US1-1AC1",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": null,
+    },
+  ],
+}
+`;
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for inline-code-with-links.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Test Document with Inline Code",
+      "id": "Test Document with Inline Code",
+      "line": 1,
+      "rawText": "Test Document with Inline Code",
+      "urlEncodedId": "Test%20Document%20with%20Inline%20Code",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 33,
+          "line": 1,
+          "offset": 32,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Test Document with Inline Code",
+      "text": "Test Document with Inline Code",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": null,
+      "column": 0,
+      "extractionMarker": null,
+      "fullMatch": "[Valid Link](./actual-file.md)",
+      "line": 7,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/inline-code-with-links.md",
+        },
+      },
+      "target": {
+        "anchor": null,
+        "path": {
+          "absolute": "<FIXTURES>/actual-file.md",
+          "raw": "./actual-file.md",
+          "relative": "actual-file.md",
+        },
+      },
+      "text": "Valid Link",
+    },
+  ],
+}
+`;
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for issue-81-block-anchor-source.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Block Anchor References",
+      "id": "Block Anchor References",
+      "line": 1,
+      "rawText": "Block Anchor References",
+      "urlEncodedId": "Block%20Anchor%20References",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 26,
+          "line": 1,
+          "offset": 25,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Block Anchor References",
+      "text": "Block Anchor References",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": "block",
+      "column": 14,
+      "extractionMarker": null,
+      "fullMatch": "[D1](issue-81-block-anchor-target.md#^decision-observe-jq)",
+      "line": 3,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/issue-81-block-anchor-source.md",
+        },
+      },
+      "target": {
+        "anchor": "^decision-observe-jq",
+        "path": {
+          "absolute": "<FIXTURES>/issue-81-block-anchor-target.md",
+          "raw": "issue-81-block-anchor-target.md",
+          "relative": "issue-81-block-anchor-target.md",
+        },
+      },
+      "text": "D1",
+    },
+    {
+      "anchorType": "header",
+      "column": 14,
+      "extractionMarker": null,
+      "fullMatch": "[D1](issue-81-block-anchor-target.md#decision-observe-jq)",
+      "line": 5,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/issue-81-block-anchor-source.md",
+        },
+      },
+      "target": {
+        "anchor": "decision-observe-jq",
+        "path": {
+          "absolute": "<FIXTURES>/issue-81-block-anchor-target.md",
+          "raw": "issue-81-block-anchor-target.md",
+          "relative": "issue-81-block-anchor-target.md",
+        },
+      },
+      "text": "D1",
+    },
+    {
+      "anchorType": "block",
+      "column": 13,
+      "extractionMarker": null,
+      "fullMatch": "[D3](issue-81-block-anchor-target.md#^decision-skills)",
+      "line": 7,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/issue-81-block-anchor-source.md",
+        },
+      },
+      "target": {
+        "anchor": "^decision-skills",
+        "path": {
+          "absolute": "<FIXTURES>/issue-81-block-anchor-target.md",
+          "raw": "issue-81-block-anchor-target.md",
+          "relative": "issue-81-block-anchor-target.md",
+        },
+      },
+      "text": "D3",
+    },
+    {
+      "anchorType": "header",
+      "column": 19,
+      "extractionMarker": null,
+      "fullMatch": "[D3](issue-81-block-anchor-target.md#decision-skills)",
+      "line": 9,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/issue-81-block-anchor-source.md",
+        },
+      },
+      "target": {
+        "anchor": "decision-skills",
+        "path": {
+          "absolute": "<FIXTURES>/issue-81-block-anchor-target.md",
+          "raw": "issue-81-block-anchor-target.md",
+          "relative": "issue-81-block-anchor-target.md",
+        },
+      },
+      "text": "D3",
+    },
+  ],
+}
+`;
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for parens-in-anchors.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Test File for Parentheses in Anchors",
+      "id": "Test File for Parentheses in Anchors",
+      "line": 1,
+      "rawText": "Test File for Parentheses in Anchors",
+      "urlEncodedId": "Test%20File%20for%20Parentheses%20in%20Anchors",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Section (Notes)",
+      "id": "Section (Notes)",
+      "line": 7,
+      "rawText": "Section (Notes)",
+      "urlEncodedId": "Section%20(Notes)",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Normal Anchor",
+      "id": "Normal Anchor",
+      "line": 9,
+      "rawText": "Normal Anchor",
+      "urlEncodedId": "Normal%20Anchor",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Heading (With Parens)",
+      "id": "Heading (With Parens)",
+      "line": 11,
+      "rawText": "Heading (With Parens)",
+      "urlEncodedId": "Heading%20(With%20Parens)",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 39,
+          "line": 1,
+          "offset": 38,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Test File for Parentheses in Anchors",
+      "text": "Test File for Parentheses in Anchors",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 19,
+          "line": 7,
+          "offset": 354,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+          "offset": 336,
+        },
+      },
+      "raw": "## Section (Notes)",
+      "text": "Section (Notes)",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 17,
+          "line": 9,
+          "offset": 372,
+        },
+        "start": {
+          "column": 1,
+          "line": 9,
+          "offset": 356,
+        },
+      },
+      "raw": "## Normal Anchor",
+      "text": "Normal Anchor",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 25,
+          "line": 11,
+          "offset": 398,
+        },
+        "start": {
+          "column": 1,
+          "line": 11,
+          "offset": 374,
+        },
+      },
+      "raw": "## Heading (With Parens)",
+      "text": "Heading (With Parens)",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": "header",
+      "column": 0,
+      "extractionMarker": null,
+      "fullMatch": "[validation metadata type discriminated union](CitationValidator%20Implementation%20Guide.md#ValidationMetadata%20Type%20(Discriminated%20Union))",
+      "line": 3,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/parens-in-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "ValidationMetadata%20Type%20(Discriminated%20Union)",
+        "path": {
+          "absolute": "<FIXTURES>/CitationValidator%20Implementation%20Guide.md",
+          "raw": "CitationValidator%20Implementation%20Guide.md",
+          "relative": "CitationValidator%20Implementation%20Guide.md",
+        },
+      },
+      "text": "validation metadata type discriminated union",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "extractionMarker": null,
+      "fullMatch": "[section notes](path/to/file#Section%20(Notes))",
+      "line": 4,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/parens-in-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "Section%20(Notes)",
+        "path": {
+          "absolute": "<FIXTURES>/path/to/file",
+          "raw": "path/to/file",
+          "relative": "path/to/file",
+        },
+      },
+      "text": "section notes",
+    },
+    {
+      "anchorType": "header",
+      "column": 52,
+      "extractionMarker": null,
+      "fullMatch": "[normal anchor](path/to/other#Normal%20Anchor)",
+      "line": 4,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/parens-in-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "Normal%20Anchor",
+        "path": {
+          "absolute": "<FIXTURES>/path/to/other",
+          "raw": "path/to/other",
+          "relative": "path/to/other",
+        },
+      },
+      "text": "normal anchor",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "extractionMarker": null,
+      "fullMatch": "[heading with parens](#Heading%20(With%20Parens))",
+      "line": 5,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/parens-in-anchors.md",
+        },
+      },
+      "target": {
+        "anchor": "Heading%20(With%20Parens)",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "heading with parens",
+    },
+  ],
+}
+`;
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for valid-citations.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "block",
+      "column": 54,
+      "fullMatch": "^FR1",
+      "id": "FR1",
+      "line": 13,
+      "rawText": null,
+    },
+    {
+      "anchorType": "block",
+      "column": 56,
+      "fullMatch": "^NFR2",
+      "id": "NFR2",
+      "line": 14,
+      "rawText": null,
+    },
+    {
+      "anchorType": "block",
+      "column": 54,
+      "fullMatch": "^US1-1AC1",
+      "id": "US1-1AC1",
+      "line": 15,
+      "rawText": null,
+    },
+    {
+      "anchorType": "block",
+      "column": 41,
+      "fullMatch": "^US1-1T1",
+      "id": "US1-1T1",
+      "line": 16,
+      "rawText": null,
+    },
+    {
+      "anchorType": "block",
+      "column": 30,
+      "fullMatch": "^MVP-P1",
+      "id": "MVP-P1",
+      "line": 17,
+      "rawText": null,
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Valid Citations Test File",
+      "id": "Valid Citations Test File",
+      "line": 1,
+      "rawText": "Valid Citations Test File",
+      "urlEncodedId": "Valid%20Citations%20Test%20File",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Cross-Document References",
+      "id": "Cross-Document References",
+      "line": 5,
+      "rawText": "Cross-Document References",
+      "urlEncodedId": "Cross-Document%20References",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Caret Syntax Examples",
+      "id": "Caret Syntax Examples",
+      "line": 11,
+      "rawText": "Caret Syntax Examples",
+      "urlEncodedId": "Caret%20Syntax%20Examples",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Wiki-Style Internal References",
+      "id": "Wiki-Style Internal References",
+      "line": 19,
+      "rawText": "Wiki-Style Internal References",
+      "urlEncodedId": "Wiki-Style%20Internal%20References",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Standard Headers (Generate Anchors)",
+      "id": "Standard Headers (Generate Anchors)",
+      "line": 24,
+      "rawText": "Standard Headers (Generate Anchors)",
+      "urlEncodedId": "Standard%20Headers%20(Generate%20Anchors)",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "### User Authentication {#user-authentication}",
+      "id": "user-authentication",
+      "line": 26,
+      "rawText": "User Authentication",
+      "urlEncodedId": "user-authentication",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "### Database Configuration {#database-config}",
+      "id": "database-config",
+      "line": 30,
+      "rawText": "Database Configuration",
+      "urlEncodedId": "database-config",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 28,
+          "line": 1,
+          "offset": 27,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Valid Citations Test File",
+      "text": "Valid Citations Test File",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 29,
+          "line": 5,
+          "offset": 139,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+          "offset": 111,
+        },
+      },
+      "raw": "## Cross-Document References",
+      "text": "Cross-Document References",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 25,
+          "line": 11,
+          "offset": 322,
+        },
+        "start": {
+          "column": 1,
+          "line": 11,
+          "offset": 298,
+        },
+      },
+      "raw": "## Caret Syntax Examples",
+      "text": "Caret Syntax Examples",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 34,
+          "line": 19,
+          "offset": 631,
+        },
+        "start": {
+          "column": 1,
+          "line": 19,
+          "offset": 598,
+        },
+      },
+      "raw": "## Wiki-Style Internal References",
+      "text": "Wiki-Style Internal References",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 39,
+          "line": 24,
+          "offset": 777,
+        },
+        "start": {
+          "column": 1,
+          "line": 24,
+          "offset": 739,
+        },
+      },
+      "raw": "## Standard Headers (Generate Anchors)",
+      "text": "Standard Headers (Generate Anchors)",
+    },
+    {
+      "level": 3,
+      "position": {
+        "end": {
+          "column": 47,
+          "line": 26,
+          "offset": 825,
+        },
+        "start": {
+          "column": 1,
+          "line": 26,
+          "offset": 779,
+        },
+      },
+      "raw": "### User Authentication {#user-authentication}",
+      "text": "User Authentication {#user-authentication}",
+    },
+    {
+      "level": 3,
+      "position": {
+        "end": {
+          "column": 46,
+          "line": 30,
+          "offset": 908,
+        },
+        "start": {
+          "column": 1,
+          "line": 30,
+          "offset": 863,
+        },
+      },
+      "raw": "### Database Configuration {#database-config}",
+      "text": "Database Configuration {#database-config}",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Component Details](test-target.md#auth-service)",
+      "line": 7,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "auth-service",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Component Details",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Testing Strategy](test-target.md#integration-tests)",
+      "line": 8,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "integration-tests",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Testing Strategy",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[Source: architecture](test-target.md#database)",
+      "line": 9,
+      "linkType": "markdown",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "database",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Source: architecture",
+    },
+    {
+      "anchorType": "block",
+      "column": 20,
+      "extractionMarker": null,
+      "fullMatch": "[[#^FR1|FR1]]",
+      "line": 21,
+      "linkType": "wiki",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "^FR1",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "FR1",
+    },
+    {
+      "anchorType": "header",
+      "column": 26,
+      "extractionMarker": null,
+      "fullMatch": "[[#user-authentication|User Authentication]]",
+      "line": 22,
+      "linkType": "wiki",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "user-authentication",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": "User Authentication",
+    },
+    {
+      "anchorType": "header",
+      "column": 54,
+      "extractionMarker": null,
+      "fullMatch": "^FR1",
+      "line": 13,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "FR1",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": null,
+    },
+    {
+      "anchorType": "header",
+      "column": 56,
+      "extractionMarker": null,
+      "fullMatch": "^NFR2",
+      "line": 14,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "NFR2",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": null,
+    },
+    {
+      "anchorType": "header",
+      "column": 54,
+      "extractionMarker": null,
+      "fullMatch": "^US1-1AC1",
+      "line": 15,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "US1-1AC1",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": null,
+    },
+    {
+      "anchorType": "header",
+      "column": 41,
+      "extractionMarker": null,
+      "fullMatch": "^US1-1T1",
+      "line": 16,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "US1-1T1",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": null,
+    },
+    {
+      "anchorType": "header",
+      "column": 30,
+      "extractionMarker": null,
+      "fullMatch": "^MVP-P1",
+      "line": 17,
+      "linkType": "markdown",
+      "scope": "internal",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/valid-citations.md",
+        },
+      },
+      "target": {
+        "anchor": "MVP-P1",
+        "path": {
+          "absolute": null,
+          "raw": null,
+          "relative": null,
+        },
+      },
+      "text": null,
+    },
+  ],
+}
+`;
+
+exports[`Token extraction — Phase 0 characterization snapshot (WMF-35) > captures token output for wiki-cross-doc.md 1`] = `
+{
+  "anchors": [
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "# Wiki-Style Cross-Document Test",
+      "id": "Wiki-Style Cross-Document Test",
+      "line": 1,
+      "rawText": "Wiki-Style Cross-Document Test",
+      "urlEncodedId": "Wiki-Style%20Cross-Document%20Test",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Valid Wiki-Style Cross-Document Links",
+      "id": "Valid Wiki-Style Cross-Document Links",
+      "line": 5,
+      "rawText": "Valid Wiki-Style Cross-Document Links",
+      "urlEncodedId": "Valid%20Wiki-Style%20Cross-Document%20Links",
+    },
+    {
+      "anchorType": "header",
+      "column": 0,
+      "fullMatch": "## Invalid Wiki-Style Cross-Document Links",
+      "id": "Invalid Wiki-Style Cross-Document Links",
+      "line": 14,
+      "rawText": "Invalid Wiki-Style Cross-Document Links",
+      "urlEncodedId": "Invalid%20Wiki-Style%20Cross-Document%20Links",
+    },
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "position": {
+        "end": {
+          "column": 33,
+          "line": 1,
+          "offset": 32,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+          "offset": 0,
+        },
+      },
+      "raw": "# Wiki-Style Cross-Document Test",
+      "text": "Wiki-Style Cross-Document Test",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 41,
+          "line": 5,
+          "offset": 148,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+          "offset": 108,
+        },
+      },
+      "raw": "## Valid Wiki-Style Cross-Document Links",
+      "text": "Valid Wiki-Style Cross-Document Links",
+    },
+    {
+      "level": 2,
+      "position": {
+        "end": {
+          "column": 43,
+          "line": 14,
+          "offset": 406,
+        },
+        "start": {
+          "column": 1,
+          "line": 14,
+          "offset": 364,
+        },
+      },
+      "raw": "## Invalid Wiki-Style Cross-Document Links",
+      "text": "Invalid Wiki-Style Cross-Document Links",
+    },
+  ],
+  "links": [
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[[test-target.md#auth-service|Authentication Details]]",
+      "line": 8,
+      "linkType": "wiki",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/wiki-cross-doc.md",
+        },
+      },
+      "target": {
+        "anchor": "auth-service",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Authentication Details",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[[test-target.md#database|Database Info]]",
+      "line": 9,
+      "linkType": "wiki",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/wiki-cross-doc.md",
+        },
+      },
+      "target": {
+        "anchor": "database",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Database Info",
+    },
+    {
+      "anchorType": "block",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[[test-target.md#^FR1|Requirement FR1]]",
+      "line": 12,
+      "linkType": "wiki",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/wiki-cross-doc.md",
+        },
+      },
+      "target": {
+        "anchor": "^FR1",
+        "path": {
+          "absolute": "<FIXTURES>/test-target.md",
+          "raw": "test-target.md",
+          "relative": "test-target.md",
+        },
+      },
+      "text": "Requirement FR1",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[[nonexistent.md#anchor|Broken Link]]",
+      "line": 17,
+      "linkType": "wiki",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/wiki-cross-doc.md",
+        },
+      },
+      "target": {
+        "anchor": "anchor",
+        "path": {
+          "absolute": "<FIXTURES>/nonexistent.md",
+          "raw": "nonexistent.md",
+          "relative": "nonexistent.md",
+        },
+      },
+      "text": "Broken Link",
+    },
+    {
+      "anchorType": "header",
+      "column": 2,
+      "extractionMarker": null,
+      "fullMatch": "[[../fixtures#anchor|Directory Link]]",
+      "line": 20,
+      "linkType": "wiki",
+      "scope": "cross-document",
+      "source": {
+        "path": {
+          "absolute": "<FIXTURES>/wiki-cross-doc.md",
+        },
+      },
+      "target": {
+        "anchor": "anchor",
+        "path": {
+          "absolute": "<FIXTURES>",
+          "raw": "../fixtures",
+          "relative": "",
+        },
+      },
+      "text": "Directory Link",
+    },
+  ],
+}
+`;

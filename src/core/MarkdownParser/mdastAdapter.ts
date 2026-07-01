@@ -41,6 +41,6 @@ export function adaptMdastToParserOutput(
 ): AdaptedParserFields {
 	const headings = extractHeadings(ast, content);
 	const links = extractLinks(content, filePath, fileCache, ast);
-	const anchors = extractAnchors(content, headings);
+	const anchors = extractAnchors(ast, content);
 	return { links, headings, anchors };
 }

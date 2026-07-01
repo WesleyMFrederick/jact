@@ -1,8 +1,8 @@
 /**
  * Adversarial CommonMark fixtures (AC1-AC6).
  *
- * Verifies the shipped D1 grammar (`extractWikilinks` WIKI_REGEX +
- * `getFencedCodeBlockLineSet` + `isInsideInlineCode`) against CommonMark
+ * Verifies wikilink extraction (now driven by the `wikilink` micromark token,
+ * which never tokenizes inside fenced/inline code) against CommonMark
  * §4.5/§6.1/§6.5 edge cases per `design-docs/hardening-pipeline/fixture-template.md`.
  *
  * AC1-AC5: PASS today against shipped D1 grammar — verifies [H-D1-regex].
@@ -56,7 +56,8 @@ function callExtractLinks(
 	return { links: obj.links, unrecognized: obj.unrecognized ?? [] };
 }
 
-const FIXTURE_DIR = import.meta.dirname ?? dirname(fileURLToPath(import.meta.url));
+const FIXTURE_DIR =
+	import.meta.dirname ?? dirname(fileURLToPath(import.meta.url));
 
 function loadFixture(id: string): {
 	mdPath: string;

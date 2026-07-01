@@ -83,17 +83,11 @@ export interface ValidationResult {
 	validationTime?: string;
 }
 
-/**
- * Header object with text and anchor.
- */
 export interface HeaderObject {
 	text: string;
 	anchor: string;
 }
 
-/**
- * Fix record tracking applied fixes.
- */
 export interface FixRecord {
 	line: number;
 	old: string;

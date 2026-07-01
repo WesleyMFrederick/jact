@@ -36,11 +36,6 @@ export class ParsedFileCache {
 		this.cache = new Map<string, Promise<ParsedDocument>>();
 	}
 
-	/** Delegate FileCache update to the embedded parser. Allows factories to share the scope-seeded cache. */
-	syncParserFileCache(fc: import("./FileCache.js").FileCache): void {
-		this.parser.setFileCache(fc);
-	}
-
 	/**
 	 * Resolve parsed file data with automatic concurrent request deduplication
 	 *
@@ -80,5 +75,17 @@ export class ParsedFileCache {
 		});
 
 		return parsedDocPromise;
+	}
+
+	/**
+	 * Pre-populate the cache with an already-parsed in-memory doc, keyed by absolute path.
+	 * Contract: a later resolveParsedFile(filePath) returns THIS doc without touching disk.
+	 *
+	 * @param filePath - Path to key the cache entry by (need not exist on disk)
+	 * @param parsed - Parser output to wrap in a ParsedDocument facade and cache
+	 */
+	seedParsedFile(filePath: string, parsed: ParserOutput): void {
+		const cacheKey = resolve(normalize(filePath));
+		this.cache.set(cacheKey, Promise.resolve(new ParsedDocument(parsed)));
 	}
 }

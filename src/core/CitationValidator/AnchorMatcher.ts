@@ -11,18 +11,22 @@
  * Extracted from CitationValidator (issue #28).
  */
 
-import type { AnchorObject, LinkObject } from "../../types/citationTypes.js";
+import type {
+	AnchorObject,
+	LinkObject,
+	ParserOutput,
+} from "../../types/citationTypes.js";
 
 /**
  * Minimal interface over ParsedDocument to avoid circular imports.
+ * `data` is the full ParserOutput (not just `anchors`) so callers like
+ * CitationValidator.validateFile can hand it straight to validateParsed.
  */
 export interface ParsedDocumentLike {
 	hasAnchor(anchor: string): boolean;
 	findSimilarAnchors(anchor: string): string[];
 	getLinks(): LinkObject[];
-	data: {
-		anchors: AnchorObject[];
-	};
+	data: ParserOutput;
 }
 
 /**

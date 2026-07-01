@@ -55,6 +55,7 @@ The jact implements a comprehensive validation approach with three distinct stat
 ## Usage
 
 ### Validate Citations
+%% *Last Modified: 06/30/26 16:51:37* %%
 
 ```bash
 # Validate citations in a markdown file (CLI output)
@@ -83,6 +84,9 @@ npm run jact:validate path/to/file.md -- --fix --scope /path/to/project/docs
 
 # Direct CLI usage
 # node utility-scripts/citation-links/jact.js validate path/to/file.md --lines 157 --scope /path/to/docs
+
+# Validate unwritten content from stdin (file_path is the intended path, not read)
+cat draft.md | jact validate <file-path> --stdin
 ```
 
 ### Enhanced Fix Command

@@ -36,6 +36,7 @@ import type {
 	CliValidateOptions,
 	OutgoingLinksExtractedContent,
 } from "./types/contentExtractorTypes.js";
+import type { CacheStats } from "./types/fileCacheTypes.js";
 import type {
 	EnrichedLinkObject,
 	FixRecord,
@@ -57,11 +58,13 @@ export class JactCli {
 	private fileCache: FileCache;
 	private validator: CitationValidator;
 	private contentExtractor: ContentExtractor;
+	/** Scope/gitignore decisions from the last applyScope, surfaced by validate. */
+	private scopeNotices: string[] = [];
 
 	constructor() {
-		this.parser = createMarkdownParser();
-		this.parsedFileCache = createParsedFileCache(this.parser);
 		this.fileCache = createFileCache();
+		this.parser = createMarkdownParser(this.fileCache);
+		this.parsedFileCache = createParsedFileCache(this.parser);
 		this.validator = createCitationValidator(
 			this.parsedFileCache,
 			this.fileCache,
@@ -69,11 +72,15 @@ export class JactCli {
 		this.contentExtractor = createContentExtractor(this.parsedFileCache);
 	}
 
-	/** Resolve scope and build the file cache. Throws if scope cannot be inferred. */
+	/**
+	 * Resolve scope and build the file cache. Throws if scope cannot be inferred.
+	 * Returns the cache stats so callers (e.g. validate) can emit verbose output.
+	 */
 	private applyScope(
 		options: { scope?: string; allowGitignore?: boolean },
 		targetFile?: string,
-	): void {
+	): CacheStats {
+		this.scopeNotices = [];
 		const resolved = resolveScope({
 			...(options.scope !== undefined && { explicit: options.scope }),
 			cwd: process.cwd(),
@@ -85,10 +92,58 @@ export class JactCli {
 				`cannot resolve scope. Tried: ${triedParts.join(", ")}. Pass --scope <dir>.`,
 			);
 		}
+
+		// When a default root is auto-picked (not an explicit --scope) and the
+		// nearest marker is an Obsidian vault, say so — the user may have wanted a
+		// different root. (Core principle: surface defaults, don't hide them.)
+		if (resolved.marker === ".obsidian") {
+			this.scopeNotices.push(
+				`Scoped to ${resolved.scope} (nearest Obsidian vault). Override with --scope <dir>.`,
+			);
+		}
+
 		// Default: respect .gitignore. --allow-gitignore opts in to scanning excluded files.
-		this.fileCache.buildCache(resolved.scope, false, resolved, {
-			respectGitignore: !options.allowGitignore,
+		// buildCache verbose stays false so JSON callers (ast/extract) keep clean
+		// stdout/stderr; verbose callers (validate) log from the returned stats.
+		const respectGitignore = !options.allowGitignore;
+		let stats = this.fileCache.buildCache(resolved.scope, false, resolved, {
+			respectGitignore,
 		});
+
+		// If the explicitly-targeted file is hidden by .gitignore under this scope,
+		// index its directory branch anyway — pointing jact at a file is an explicit
+		// request to validate it and its siblings (e.g. bare wiki page names).
+		if (targetFile !== undefined && respectGitignore) {
+			const absTarget = path.resolve(targetFile);
+			if (this.fileCache.isIgnored(absTarget)) {
+				const includeDir = path.dirname(absTarget);
+				stats = this.fileCache.buildCache(resolved.scope, false, resolved, {
+					respectGitignore,
+					alwaysIncludeDir: includeDir,
+				});
+				this.scopeNotices.push(
+					`Note: ${includeDir} is gitignored under ${resolved.scope}; indexed it because you targeted a file inside it. Use --allow-gitignore to scan all ignored paths.`,
+				);
+			}
+		}
+
+		return stats;
+	}
+
+	/**
+	 * Part 1: when the CLI report has a "Wiki page not found" error and the scan
+	 * honored an active .gitignore, hint that the target may be hidden by it.
+	 * Wiki links carry only a bare page name (no path), so the hint is scoped to
+	 * "gitignore is active" rather than a per-target path check.
+	 */
+	private appendGitignoreHint(cliOutput: string): string {
+		if (
+			cliOutput.includes("Wiki page not found") &&
+			this.fileCache.scopeHasGitignore()
+		) {
+			return `${cliOutput}\n\nHint: .gitignore is active for this scan. If a wiki target lives in a gitignored folder, re-run with --allow-gitignore.`;
+		}
+		return cliOutput;
 	}
 
 	/**
@@ -121,14 +176,15 @@ export class JactCli {
 	): Promise<string> {
 		try {
 			const startTime = Date.now();
-			if (options.scope) {
-				const cacheStats = this.fileCache.buildCache(
-					options.scope,
-					options.verbose ?? false,
-					undefined,
-					{ respectGitignore: !options.allowGitignore },
-				);
-				if (options.verbose && options.format !== "json") {
+			// Smart-default scope resolution (cwd-git → cwd-pkg → target-git →
+			// target-pkg), same as getAst. Seeds the shared FileCache so bare wiki
+			// page names resolve even when --scope is omitted.
+			const cacheStats = this.applyScope(options, filePath);
+			if (options.format !== "json") {
+				// Surface scope/gitignore decisions (Obsidian-vault default, gitignore
+				// relax) before the report so the user sees what jact chose.
+				for (const notice of this.scopeNotices) console.log(notice);
+				if (options.verbose) {
 					console.log(
 						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
 					);
@@ -143,24 +199,77 @@ export class JactCli {
 			result.validationTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
 			const fileContent = readFileSync(filePath, "utf8");
 			const nestedCodeblockWarnings = detectNestedCodeblocks(fileContent);
-			if (options.lines) {
-				const filteredResult = this.filterResultsByLineRange(
-					result,
-					options.lines,
-				);
-				if (options.format === "json") return this.formatAsJSON(filteredResult);
-				return this.formatForCLI(
-					filteredResult,
-					nestedCodeblockWarnings,
-					options.verbose ?? false,
-				);
-			}
-			if (options.format === "json") return this.formatAsJSON(result);
-			return this.formatForCLI(
-				result,
+			const reportResult = options.lines
+				? this.filterResultsByLineRange(result, options.lines)
+				: result;
+			if (options.format === "json") return this.formatAsJSON(reportResult);
+			const cli = this.formatForCLI(
+				reportResult,
 				nestedCodeblockWarnings,
 				options.verbose ?? false,
 			);
+			return this.appendGitignoreHint(cli);
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+			if (options.format === "json") {
+				return JSON.stringify(
+					{ error: errorMessage, file: filePath, success: false },
+					null,
+					2,
+				);
+			}
+			return `ERROR: ${errorMessage}`;
+		}
+	}
+
+	/**
+	 * Validate markdown supplied as a string (file not yet on disk). The in-memory analogue of validate().
+	 * Contract: options.filePath is the INTENDED path — used for scope, relative-link base, self-anchor key.
+	 * Returns the same formatted report string as validate(); same exit-code mapping in the CLI layer.
+	 */
+	async validateContent(
+		content: string,
+		options: CliValidateOptions & { filePath: string },
+	): Promise<string> {
+		const { filePath } = options;
+		try {
+			const startTime = Date.now();
+			// applyScope works without the file existing on disk — it only needs the
+			// intended path for the target-git/target-pkg fallback walk-up.
+			const cacheStats = this.applyScope(options, filePath);
+			if (options.format !== "json") {
+				for (const notice of this.scopeNotices) console.log(notice);
+				if (options.verbose) {
+					console.log(
+						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
+					);
+					if (cacheStats.duplicates > 0) {
+						console.log(
+							`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
+						);
+					}
+				}
+			}
+			const abs = path.resolve(filePath);
+			const parsed = this.parser.parseContent(content, abs);
+			// Seed the cache so self-anchors (`#some-heading`) resolve against this
+			// in-memory content instead of attempting a disk read of an unwritten file.
+			this.parsedFileCache.seedParsedFile(abs, parsed);
+			const result = await this.validator.validateParsed(parsed, abs);
+			result.validationTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
+			// No disk read — feed the in-memory content directly to the nested-codeblock detector.
+			const nestedCodeblockWarnings = detectNestedCodeblocks(content);
+			const reportResult = options.lines
+				? this.filterResultsByLineRange(result, options.lines)
+				: result;
+			if (options.format === "json") return this.formatAsJSON(reportResult);
+			const cli = this.formatForCLI(
+				reportResult,
+				nestedCodeblockWarnings,
+				options.verbose ?? false,
+			);
+			return this.appendGitignoreHint(cli);
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);

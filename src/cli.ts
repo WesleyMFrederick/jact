@@ -30,9 +30,12 @@ import type {
 	CliValidateOptions,
 } from "./types/contentExtractorTypes.js";
 import { runBatch, type ValidateOneFn } from "./validate/batch-runner.js";
-import { NotAGitRepositoryError } from "./validate/resolve-changed-files.js";
-import { NoFilesMatchedError, resolveFileSet } from "./validate/resolve-files.js";
 import { renderHuman, renderJson } from "./validate/renderers.js";
+import { NotAGitRepositoryError } from "./validate/resolve-changed-files.js";
+import {
+	NoFilesMatchedError,
+	resolveFileSet,
+} from "./validate/resolve-files.js";
 
 const CACHE_DIR = ".jact/claude-cache";
 
@@ -92,9 +95,19 @@ program.configureOutput({
 	},
 });
 
+/** Read all of process.stdin to a UTF-8 string (used by `validate --stdin`). */
+async function readAllStdin(): Promise<string> {
+	const chunks: Buffer[] = [];
+	for await (const chunk of process.stdin) {
+		chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+	}
+	return Buffer.concat(chunks).toString("utf8");
+}
+
 interface CliBatchValidateOptions extends CliValidateOptions {
 	changed?: boolean;
 	json?: boolean;
+	stdin?: boolean;
 }
 
 program
@@ -102,9 +115,11 @@ program
 	.description(
 		"Validate citations in a markdown file, checking that target files exist and anchors resolve correctly",
 	)
+	// Optional at the Commander level so --stdin's missing-<file-path> case can exit 2
+	// with our own message (D2) instead of Commander's generic usage error.
 	.argument(
 		"[paths...]",
-		"path(s) to markdown file(s) and/or glob patterns; omit when using --changed alone",
+		"path(s) to markdown file(s) and/or glob patterns; omit when using --changed alone; with --stdin, exactly one path (the intended on-disk path, not read from disk)",
 	)
 	.option("--format <type>", "output format (cli, json)", "cli")
 	.option(
@@ -143,6 +158,10 @@ program
 		"batch mode: emit one compact JSON object per file (JSONL) instead of human-readable lines",
 		false,
 	)
+	.option(
+		"--stdin",
+		"read markdown from stdin; <path> is treated as the intended path (not read from disk); requires exactly one path, incompatible with batch selection",
+	)
 	.addHelpText(
 		"after",
 		`
@@ -165,6 +184,13 @@ Examples:
     $ jact validate a.md b.md c.md                   # explicit multi-path — batch mode
     $ jact validate --changed                        # all markdown you edited
     $ jact validate "**/*.md" --json                 # JSONL for CI/agents
+    $ cat draft.md | jact validate <path> --stdin    # validate unwritten content (single-file only)
+
+With --stdin:
+  <path> is NOT read; it is the intended on-disk path, used to resolve scope,
+  relative links, and self-anchors. <path> is still REQUIRED (D2). Batch
+  selection (multiple paths, glob, --changed, --json) is not supported together
+  with --stdin.
 
 Exit Codes:
   0  All validated files passed (or --changed matched nothing)
@@ -179,6 +205,21 @@ Exit Codes:
 			);
 			process.exitCode = 2;
 			return;
+		}
+
+		if (options.stdin) {
+			const isBatchSelection =
+				paths.length > 1 ||
+				Boolean(options.changed) ||
+				Boolean(options.json) ||
+				paths.some((p) => isDynamicPattern(p));
+			if (paths.length !== 1 || isBatchSelection) {
+				console.error(
+					"ERROR: --stdin requires exactly one <path> (intended path for scope/links); batch selection (multiple paths, glob, --changed, --json) is not supported with --stdin",
+				);
+				process.exitCode = 2;
+				return;
+			}
 		}
 
 		const isBatch =
@@ -198,7 +239,14 @@ Exit Codes:
 			const manager = new JactCli();
 			let result: string;
 
-			if (options.fix) {
+			if (options.stdin) {
+				const content = await readAllStdin();
+				result = await manager.validateContent(content, {
+					...options,
+					filePath: file,
+				});
+				console.log(result);
+			} else if (options.fix) {
 				result = await manager.fix(file, options);
 				console.log(result);
 			} else {

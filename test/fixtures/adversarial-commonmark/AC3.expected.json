@@ -2,7 +2,7 @@
   "id": "AC3",
   "commonMarkSection": "§4.5",
   "edgeCase": "Indented code block adjacent to fenced block",
-  "wikilinks": 3,
+  "wikilinks": 2,
   "unrecognizedCount": 0,
-  "notes": "Fence boundaries unaffected by adjacent indented block. Indented-code wikilink IS extracted (current D1 behavior — no silent drop)."
+  "notes": "Fence boundaries unaffected by adjacent indented block. After WMF-35 the wikilink token is a `text` construct, so wiki-shaped content inside an indented code block is correctly NOT extracted (the prior fence-only guard tracked only fenced blocks and leaked indented-code wikilinks)."
 }

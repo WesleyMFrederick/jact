@@ -11,7 +11,7 @@
 
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { LinkObject } from "../../types/citationTypes.js";
+import type { LinkObject, ParserOutput } from "../../types/citationTypes.js";
 import type {
 	EnrichedLinkObject,
 	PathConversion,
@@ -110,7 +110,19 @@ export class CitationValidator {
 
 		const sourceParsedDoc =
 			await this.parsedFileCache.resolveParsedFile(filePath);
-		const links = sourceParsedDoc.getLinks();
+		return this.validateParsed(sourceParsedDoc.data, filePath);
+	}
+
+	/**
+	 * Validate an already-parsed doc — NO disk read of the source.
+	 * Contract: identical ValidationResult to validateFile for the same content; filePath is the
+	 * relative-link base for cross-document links and the self-anchor key.
+	 */
+	async validateParsed(
+		parsed: ParserOutput,
+		filePath: string,
+	): Promise<ValidationResult> {
+		const links = parsed.links;
 
 		const enrichedLinks: EnrichedLinkObject[] = await Promise.all(
 			links.map((link: LinkObject) =>

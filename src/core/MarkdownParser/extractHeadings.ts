@@ -46,6 +46,7 @@ export function extractHeadings(ast: Root, content: string): HeadingObject[] {
 			level: node.depth,
 			text: headingText(node, content),
 			raw: headingRaw(node, content),
+			position: node.position,
 		});
 	});
 

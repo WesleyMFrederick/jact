@@ -124,3 +124,98 @@ describe("FileCache — .gitignore respect", () => {
 		expect(cache.resolveFile("readme.md").found).toBe(false);
 	});
 });
+
+describe("FileCache — alwaysIncludeDir (targeted branch bypasses .gitignore)", () => {
+	it("indexes a gitignored subtree when it is the always-include branch", () => {
+		writeFile(".gitignore", "private/\n");
+		writeFile("public.md");
+		writeFile("private/sub/target.md");
+		writeFile("private/sub/sibling.md");
+		writeFile("private/other.md"); // ignored, NOT on the include branch
+
+		const stats = cache.buildCache(tmpDir, false, undefined, {
+			alwaysIncludeDir: path.join(tmpDir, "private", "sub"),
+		});
+
+		// public + target + sibling = 3; private/other.md stays excluded
+		expect(stats.totalFiles).toBe(3);
+		expect(cache.resolveFile("target.md").found).toBe(true);
+		expect(cache.resolveFile("sibling.md").found).toBe(true);
+		expect(cache.resolveFile("other.md").found).toBe(false);
+	});
+
+	it("default ignore patterns stay authoritative even on the include branch", () => {
+		writeFile(".gitignore", "private/\n");
+		writeFile("private/sub/target.md");
+		writeFile("private/sub/node_modules/pkg/readme.md");
+
+		const stats = cache.buildCache(tmpDir, false, undefined, {
+			alwaysIncludeDir: path.join(tmpDir, "private", "sub"),
+		});
+
+		expect(cache.resolveFile("target.md").found).toBe(true);
+		expect(cache.resolveFile("readme.md").found).toBe(false); // node_modules still out
+		expect(stats.totalFiles).toBe(1);
+	});
+});
+
+describe("FileCache — isIgnored", () => {
+	it("returns true for a path excluded by the scope .gitignore", () => {
+		writeFile(".gitignore", "private/\n");
+		writeFile("public.md");
+		writeFile("private/notes.md");
+		cache.buildCache(tmpDir);
+		expect(cache.isIgnored(path.join(tmpDir, "private", "notes.md"))).toBe(
+			true,
+		);
+		expect(cache.isIgnored(path.join(tmpDir, "public.md"))).toBe(false);
+	});
+
+	it("returns false when the last scan ignored .gitignore", () => {
+		writeFile(".gitignore", "private/\n");
+		writeFile("private/notes.md");
+		cache.buildCache(tmpDir, false, undefined, { respectGitignore: false });
+		expect(cache.isIgnored(path.join(tmpDir, "private", "notes.md"))).toBe(
+			false,
+		);
+	});
+
+	it("returns false for a path outside the scope", () => {
+		writeFile(".gitignore", "private/\n");
+		cache.buildCache(tmpDir);
+		expect(cache.isIgnored("/some/unrelated/elsewhere.md")).toBe(false);
+	});
+
+	it("returns false before any build", () => {
+		const fresh = new FileCache(fs, path);
+		expect(fresh.isIgnored(path.join(tmpDir, "anything.md"))).toBe(false);
+	});
+});
+
+describe("FileCache — scopeHasGitignore", () => {
+	it("true when scope has a non-empty .gitignore and it was respected", () => {
+		writeFile(".gitignore", "private/\n");
+		writeFile("public.md");
+		cache.buildCache(tmpDir);
+		expect(cache.scopeHasGitignore()).toBe(true);
+	});
+
+	it("false when the scan ignored .gitignore", () => {
+		writeFile(".gitignore", "private/\n");
+		cache.buildCache(tmpDir, false, undefined, { respectGitignore: false });
+		expect(cache.scopeHasGitignore()).toBe(false);
+	});
+
+	it("false when there is no .gitignore", () => {
+		writeFile("public.md");
+		cache.buildCache(tmpDir);
+		expect(cache.scopeHasGitignore()).toBe(false);
+	});
+
+	it("false when .gitignore is empty", () => {
+		writeFile(".gitignore", "   \n");
+		writeFile("public.md");
+		cache.buildCache(tmpDir);
+		expect(cache.scopeHasGitignore()).toBe(false);
+	});
+});

@@ -28,6 +28,8 @@ export interface CliValidateOptions {
 	dryRun?: boolean;
 	verbose?: boolean;
 	allowGitignore?: boolean;
+	/** Read markdown from stdin instead of <file-path>; <file-path> becomes the intended path (D1/D2). */
+	stdin?: boolean;
 }
 
 /**

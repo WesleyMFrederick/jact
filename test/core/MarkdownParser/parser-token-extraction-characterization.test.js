@@ -24,13 +24,16 @@ describe("extractLinks() — Characterization Tests (#28)", () => {
 		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
 		const result = await parser.parseFile(testFile);
 
-		// Baseline: capture actual count from current implementation
+		// Baseline (WMF-35 token migration): links now come from mdast tokens,
+		// so carets inside wikilink spans are no longer re-matched as phantom links.
 		// valid-citations.md has:
 		// - 3 cross-document markdown links (lines 7-9)
-		// - 5 caret syntax references (lines 13-16)
-		// - 3 wiki-style internal references (lines 21-22)
+		// - 5 caret syntax references (lines 13-17)
+		// - 2 wiki-style internal references (lines 21-22)
+		// (Was 11: the prior caret regex also grabbed `^FR1` inside `[[#^FR1|FR1]]`
+		//  on line 21 — a phantom internal link now correctly dropped.)
 		expect(result.links.length).toBeGreaterThan(0);
-		expect(result.links.length).toBe(11);
+		expect(result.links.length).toBe(10);
 	});
 
 	it("should produce exact link count for enhanced-citations.md", async () => {

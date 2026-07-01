@@ -1,5 +1,8 @@
-import type { Ignore } from "ignore";
-import { buildIgnoreRules } from "./core/ignoreRules.js";
+import ignore, { type Ignore } from "ignore";
+import {
+	buildIgnoreRules,
+	DEFAULT_SCAN_IGNORE_PATTERNS,
+} from "./core/ignoreRules.js";
 import type { ScopeResolution } from "./core/resolveScope.js";
 import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
@@ -43,6 +46,8 @@ export class FileCache {
 	private path: typeof import("path");
 	private entries: Map<string, string[]>; // filename -> all paths in scan order
 	private scope: ScopeResolution | undefined = undefined; // set by buildCache; embedded in error messages from resolveFile
+	private lastScanRoot: string | undefined = undefined; // real scan root of the last buildCache, for isIgnored()
+	private lastRespectGitignore = false; // whether the last buildCache honored .gitignore
 
 	/**
 	 * Initialize cache with file system and path dependencies
@@ -82,7 +87,7 @@ export class FileCache {
 		scopeFolder: string,
 		verbose = false,
 		scope?: ScopeResolution,
-		options: { respectGitignore?: boolean } = {},
+		options: { respectGitignore?: boolean; alwaysIncludeDir?: string } = {},
 	): CacheStats {
 		this.entries.clear();
 		this.scope = scope;
@@ -97,6 +102,8 @@ export class FileCache {
 		}
 
 		const respectGitignore = options.respectGitignore !== false;
+		this.lastScanRoot = targetScanFolder;
+		this.lastRespectGitignore = respectGitignore;
 		const ignoreRules = buildIgnoreRules(
 			this.fs,
 			this.path,
@@ -104,7 +111,26 @@ export class FileCache {
 			respectGitignore,
 		);
 
-		this.scanDirectory(targetScanFolder, targetScanFolder, ignoreRules);
+		// alwaysIncludeDir: paths on this branch bypass .gitignore so an
+		// explicitly-targeted file inside an ignored folder is still indexed.
+		// Default ignore patterns (node_modules, etc.) stay authoritative there,
+		// so the include branch is checked against a defaults-only ruleset.
+		const includeDir =
+			options.alwaysIncludeDir !== undefined
+				? this.path.resolve(options.alwaysIncludeDir)
+				: undefined;
+		const defaultRules =
+			includeDir !== undefined
+				? ignore().add([...DEFAULT_SCAN_IGNORE_PATTERNS])
+				: undefined;
+
+		this.scanDirectory(
+			targetScanFolder,
+			targetScanFolder,
+			ignoreRules,
+			includeDir,
+			defaultRules,
+		);
 
 		const dupNames = this.duplicateNames();
 
@@ -135,10 +161,70 @@ export class FileCache {
 		return dups;
 	}
 
+	/**
+	 * True when `fullPath` lies on the always-include branch: it is the include
+	 * dir, an ancestor that leads down to it, or a descendant inside it. Used to
+	 * bypass .gitignore for an explicitly-targeted file's directory subtree.
+	 */
+	private isOnIncludePath(fullPath: string, includeDir: string): boolean {
+		const a = this.path.resolve(fullPath);
+		const b = this.path.resolve(includeDir);
+		if (a === b) return true;
+		const sep = this.path.sep;
+		return a.startsWith(b + sep) || b.startsWith(a + sep);
+	}
+
+	/**
+	 * Contract: returns true only when `absPath` is excluded by the last scan's
+	 * `.gitignore` (not by default ignore patterns), so callers can suggest
+	 * `--allow-gitignore`. Returns false when the last scan ignored .gitignore,
+	 * when there is no readable .gitignore, or when the path is outside scope.
+	 */
+	/**
+	 * True when the last scan honored .gitignore AND the scope root has a
+	 * readable, non-empty .gitignore — i.e. some paths could be hidden by it.
+	 */
+	scopeHasGitignore(): boolean {
+		if (this.lastScanRoot === undefined || !this.lastRespectGitignore) {
+			return false;
+		}
+		const gitignorePath = this.path.join(this.lastScanRoot, ".gitignore");
+		try {
+			const content = this.fs.readFileSync(gitignorePath, "utf-8");
+			return content.trim().length > 0;
+		} catch (_error) {
+			return false;
+		}
+	}
+
+	isIgnored(absPath: string): boolean {
+		if (this.lastScanRoot === undefined || !this.lastRespectGitignore) {
+			return false;
+		}
+		const gitignorePath = this.path.join(this.lastScanRoot, ".gitignore");
+		let rules: Ignore;
+		try {
+			const content = this.fs.readFileSync(gitignorePath, "utf-8");
+			rules = ignore().add(content);
+		} catch (_error) {
+			return false; // no .gitignore → nothing gitignore-excluded
+		}
+		const relative = this.path.relative(
+			this.lastScanRoot,
+			this.path.resolve(absPath),
+		);
+		// Empty (== scanRoot) or "../…" (outside scope) is not a gitignore hit.
+		if (relative === "" || relative.startsWith("..")) return false;
+		const posixRelative = relative.split(this.path.sep).join("/");
+		return rules.ignores(posixRelative);
+	}
+
 	private scanDirectory(
 		dirPath: string,
 		scanRoot: string,
 		ignoreRules: Ignore,
+		alwaysIncludeDir?: string,
+		defaultRules?: Ignore,
 	): void {
 		try {
 			const entries = this.fs.readdirSync(dirPath);
@@ -163,10 +249,26 @@ export class FileCache {
 				if (relative === "") continue;
 				const posixRelative = relative.split(this.path.sep).join("/");
 				const testPath = isDir ? `${posixRelative}/` : posixRelative;
-				if (ignoreRules.ignores(testPath)) continue;
+				// On the always-include branch (ancestors leading to it, and
+				// everything under it), bypass .gitignore but still apply the
+				// authoritative default patterns (node_modules, etc.).
+				const onIncludePath =
+					alwaysIncludeDir !== undefined &&
+					this.isOnIncludePath(fullPath, alwaysIncludeDir);
+				const activeRules =
+					onIncludePath && defaultRules !== undefined
+						? defaultRules
+						: ignoreRules;
+				if (activeRules.ignores(testPath)) continue;
 
 				if (isDir) {
-					this.scanDirectory(fullPath, scanRoot, ignoreRules);
+					this.scanDirectory(
+						fullPath,
+						scanRoot,
+						ignoreRules,
+						alwaysIncludeDir,
+						defaultRules,
+					);
 				} else if (entry.endsWith(".md")) {
 					this.addToCache(entry, fullPath);
 				}
