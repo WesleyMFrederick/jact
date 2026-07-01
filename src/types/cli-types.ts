@@ -65,3 +65,61 @@ export interface FixDetail {
 	new: string;
 	type: "path" | "anchor" | "path+anchor";
 }
+
+/**
+ * Options for one batch `validate` invocation, parsed from argv.
+ *
+ * @property paths   Explicit file paths and/or glob patterns (tinyglobby syntax).
+ * @property changed `--changed`: union git working-tree-modified `.md` into the
+ * selection (adds, never shrinks). See ADR D2.
+ * @property json    `--json`: emit one compact JSON object per file (JSONL). See ADR D3.
+ */
+export interface BatchValidateOptions {
+  paths: string[];
+  changed: boolean;
+  json: boolean;
+}
+
+/**
+ * Result for a single validated file.
+ *
+ * @property path   Absolute or repo-relative file path (as selected).
+ * @property ok     true iff the file's ValidationResult had zero errors
+ * (`summary.errors === 0`).
+ * @property errors Empty when `ok`; one entry per error otherwise.
+ */
+export interface FileResult {
+  path: string;
+  ok: boolean;
+  errors: ValidationError[];
+}
+
+/**
+ * One validation error within a file.
+ *
+ * GOTCHA — `line` is `number | null`, NOT optional (`line?`). Under jact's
+ * `exactOptionalPropertyTypes`, an absent key and an explicit `null` are distinct
+ * types. The JSONL contract always emits the `line` key, so a file-level error
+ * (not tied to a line) is an explicit `null`, never a missing field.
+ */
+export interface ValidationError {
+  line: number | null; // 1-indexed; null = file-level, not tied to a line
+  message: string;
+}
+
+/**
+ * Aggregate over one batch run. Drives the process exit code.
+ *
+ * Exit code (ADR D4/D5): system or usage error → 2; else `failed > 0` → 1; else 0.
+ *
+ * @property total   Files validated.
+ * @property passed  Count with `ok === true`.
+ * @property failed  Count with `ok === false`.
+ * @property results Per-file results, in selection order.
+ */
+export interface BatchSummary {
+  total: number;
+  passed: number;
+  failed: number;
+  results: FileResult[];
+}

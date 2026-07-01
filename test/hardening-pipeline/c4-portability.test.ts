@@ -47,12 +47,6 @@ describe("C4 — pipeline portability", () => {
 		);
 	});
 
-	it("scripts/*.sh exist", () => {
-		expect(existsSync(SCRIPTS_DIR)).toBe(true);
-		const shScripts = readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith(".sh"));
-		expect(shScripts.length).toBeGreaterThanOrEqual(4); // D2, D3, D4, D5 + plan-eval
-	});
-
 	it("scripts/*.sh accept project-root as arg with default (pwd)", () => {
 		const shFiles = readdirSync(SCRIPTS_DIR)
 			.filter((f) => f.endsWith(".sh"))

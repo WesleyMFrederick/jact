@@ -13,16 +13,26 @@
  */
 
 import { Command, Option } from "commander";
+import { isDynamicPattern } from "tinyglobby";
 import {
 	checkExtractCache,
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
+import {
+	createCitationValidator,
+	createFileCache,
+	createParsedFileCache,
+} from "./factories/componentFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
 import { JactCli } from "./jact.js";
 import type {
 	CliExtractOptions,
 	CliValidateOptions,
 } from "./types/contentExtractorTypes.js";
+import { runBatch, type ValidateOneFn } from "./validate/batch-runner.js";
+import { NotAGitRepositoryError } from "./validate/resolve-changed-files.js";
+import { NoFilesMatchedError, resolveFileSet } from "./validate/resolve-files.js";
+import { renderHuman, renderJson } from "./validate/renderers.js";
 
 const CACHE_DIR = ".jact/claude-cache";
 
@@ -82,12 +92,20 @@ program.configureOutput({
 	},
 });
 
+interface CliBatchValidateOptions extends CliValidateOptions {
+	changed?: boolean;
+	json?: boolean;
+}
+
 program
 	.command("validate")
 	.description(
 		"Validate citations in a markdown file, checking that target files exist and anchors resolve correctly",
 	)
-	.argument("<file>", "path to markdown file to validate")
+	.argument(
+		"[paths...]",
+		"path(s) to markdown file(s) and/or glob patterns; omit when using --changed alone",
+	)
 	.option("--format <type>", "output format (cli, json)", "cli")
 	.option(
 		"--lines <range>",
@@ -115,6 +133,16 @@ program
 		"include files that .gitignore would normally exclude in the scope scan (default: respect .gitignore)",
 		false,
 	)
+	.option(
+		"--changed",
+		"add git working-tree-modified markdown to the selection (union with paths, deduped); alone → just the changed markdown",
+		false,
+	)
+	.option(
+		"--json",
+		"batch mode: emit one compact JSON object per file (JSONL) instead of human-readable lines",
+		false,
+	)
 	.addHelpText(
 		"after",
 		`
@@ -122,53 +150,116 @@ Default Output (no --verbose):
   Clean file:      "OK: <N> citations valid"
   Errors/warnings: ERRORS (n) and/or WARNINGS (n) blocks with line, link, error, suggestion; ends with "FAILED: X errors, Y warnings"
 
+Batch mode (multiple paths, a glob, --changed, or --json):
+  ✅/❌ one line per file, plus a "<N> files · <P> passed · <F> failed" summary
+  --json → one JSONL object per file: {"path","ok","errors"}; no summary line
+
 Examples:
-    $ jact validate docs/design.md                   # minimal output (default)
+    $ jact validate docs/design.md                   # minimal output (default, single-file, unchanged)
     $ jact validate docs/design.md --verbose         # full report with valid-citation tree
-    $ jact validate file.md --format json            # JSON output (unchanged)
+    $ jact validate file.md --format json            # JSON output (single-file, unchanged)
     $ jact validate file.md --lines 100-200
     $ jact validate file.md --fix --scope ./docs
     $ jact validate file.md --fix --dry-run          # preview fixes without writing files
+    $ jact validate "concepts/*.md"                  # glob — batch mode, one line per match
+    $ jact validate a.md b.md c.md                   # explicit multi-path — batch mode
+    $ jact validate --changed                        # all markdown you edited
+    $ jact validate "**/*.md" --json                 # JSONL for CI/agents
 
 Exit Codes:
-  0  All citations valid
-  1  Validation errors found
-  2  System error (file not found, permission denied)
+  0  All validated files passed (or --changed matched nothing)
+  1  At least one file failed validation
+  2  A glob/path matched nothing and nothing else was selected, or a system error (missing file, git unavailable, conflicting --json/--format json)
 `,
 	)
-	.action(async (file: string, options: CliValidateOptions) => {
-		const manager = new JactCli();
-		let result: string;
-
-		if (options.fix) {
-			result = await manager.fix(file, options);
-			console.log(result);
-		} else {
-			result = await manager.validate(file, options);
-			console.log(result);
+	.action(async (paths: string[], options: CliBatchValidateOptions) => {
+		if (options.json && options.format === "json") {
+			console.error(
+				"ERROR: --json and --format json cannot both be set; choose one output format.",
+			);
+			process.exitCode = 2;
+			return;
 		}
 
-		// Set exit code based on validation result (only for validation, not fix)
-		if (!options.fix) {
-			if (options.format === "json") {
-				const parsed = JSON.parse(result);
-				if (parsed.error) {
-					process.exit(2); // File not found or other errors
-				} else {
-					process.exit(parsed.summary?.errors > 0 ? 1 : 0);
-				}
+		const isBatch =
+			paths.length > 1 ||
+			Boolean(options.changed) ||
+			Boolean(options.json) ||
+			paths.some((p) => isDynamicPattern(p));
+
+		if (!isBatch) {
+			const file = paths[0];
+			if (file === undefined) {
+				console.error("ERROR: missing required argument 'paths'");
+				process.exitCode = 2;
+				return;
+			}
+
+			const manager = new JactCli();
+			let result: string;
+
+			if (options.fix) {
+				result = await manager.fix(file, options);
+				console.log(result);
 			} else {
-				if (result.includes("ERROR:")) {
-					process.exit(2); // File not found or other errors
+				result = await manager.validate(file, options);
+				console.log(result);
+			}
+
+			// Set exit code based on validation result (only for validation, not fix)
+			if (!options.fix) {
+				if (options.format === "json") {
+					const parsed = JSON.parse(result);
+					if (parsed.error) {
+						process.exit(2); // File not found or other errors
+					} else {
+						process.exit(parsed.summary?.errors > 0 ? 1 : 0);
+					}
 				} else {
-					// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
-					process.exit(
-						result.includes("FAILED:") || result.includes("VALIDATION FAILED")
-							? 1
-							: 0,
-					);
+					if (result.includes("ERROR:")) {
+						process.exit(2); // File not found or other errors
+					} else {
+						// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
+						process.exit(
+							result.includes("FAILED:") || result.includes("VALIDATION FAILED")
+								? 1
+								: 0,
+						);
+					}
 				}
 			}
+			return;
+		}
+
+		// Batch mode (ADR D1–D6): resolve file set, run sequentially over a
+		// fresh CitationValidator, render, exit per D4/D5.
+		try {
+			const files = await resolveFileSet(
+				{ paths, changed: Boolean(options.changed) },
+				process.cwd(),
+			);
+
+			const parsedFileCache = createParsedFileCache();
+			const fileCache = createFileCache();
+			const validator = createCitationValidator(parsedFileCache, fileCache);
+			const validateOne: ValidateOneFn = (f) => validator.validateFile(f);
+
+			const summary = await runBatch(files, validateOne);
+
+			console.log(options.json ? renderJson(summary) : renderHuman(summary));
+			process.exitCode = summary.failed > 0 ? 1 : 0;
+		} catch (error) {
+			if (
+				error instanceof NoFilesMatchedError ||
+				error instanceof NotAGitRepositoryError
+			) {
+				console.error(`ERROR: ${error.message}`);
+				process.exitCode = 2;
+				return;
+			}
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(`ERROR: ${message}`);
+			process.exitCode = 2;
 		}
 	});
 

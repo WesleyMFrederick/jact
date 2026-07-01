@@ -1,24 +1,8 @@
-import ignore, { type Ignore } from "ignore";
+import type { Ignore } from "ignore";
+import { buildIgnoreRules } from "./core/ignoreRules.js";
 import type { ScopeResolution } from "./core/resolveScope.js";
 import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
-
-/**
- * Default ignore patterns applied to every scan regardless of `.gitignore`
- * presence. Keeps the cache from indexing VCS metadata, vendored deps, and
- * build output that are never meaningful as wikilink targets.
- */
-const DEFAULT_SCAN_IGNORE_PATTERNS: readonly string[] = [
-	".git/",
-	".hg/",
-	".svn/",
-	".venv/",
-	"venv/",
-	"node_modules/",
-	"dist/",
-	"build/",
-	"coverage/",
-];
 
 interface FileEntry {
 	filename: string;
@@ -113,7 +97,9 @@ export class FileCache {
 		}
 
 		const respectGitignore = options.respectGitignore !== false;
-		const ignoreRules = this.buildIgnoreRules(
+		const ignoreRules = buildIgnoreRules(
+			this.fs,
+			this.path,
 			targetScanFolder,
 			respectGitignore,
 		);
@@ -147,33 +133,6 @@ export class FileCache {
 			if (paths.length > 1) dups.push(name);
 		}
 		return dups;
-	}
-
-	/**
-	 * Build the Ignore rules object used to filter entries during scan.
-	 *
-	 * Always includes DEFAULT_SCAN_IGNORE_PATTERNS. When `respectGitignore` is
-	 * true and the scope root has a readable `.gitignore`, its patterns are
-	 * loaded first, then DEFAULT_SCAN_IGNORE_PATTERNS are added to ensure
-	 * defaults are authoritative (cannot be negated by .gitignore).
-	 * Missing or unreadable `.gitignore` is non-fatal — defaults still apply.
-	 */
-	private buildIgnoreRules(
-		scanRoot: string,
-		respectGitignore: boolean,
-	): Ignore {
-		const rules = ignore();
-		if (respectGitignore) {
-			const gitignorePath = this.path.join(scanRoot, ".gitignore");
-			try {
-				const content = this.fs.readFileSync(gitignorePath, "utf-8");
-				rules.add(content);
-			} catch (_error) {
-				// No .gitignore or unreadable — defaults still apply.
-			}
-		}
-		rules.add([...DEFAULT_SCAN_IGNORE_PATTERNS]);
-		return rules;
 	}
 
 	private scanDirectory(
