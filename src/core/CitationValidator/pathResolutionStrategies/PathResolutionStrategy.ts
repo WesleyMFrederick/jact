@@ -8,7 +8,10 @@
  */
 
 import type { LinkObject } from "../../../types/citationTypes.js";
-import type { PathConversion } from "../../../types/validationTypes.js";
+import type {
+	AnchorConversion,
+	PathConversion,
+} from "../../../types/validationTypes.js";
 import type { AnchorMatcher } from "../AnchorMatcher.js";
 import type { FileCacheLike, PathResolver } from "../PathResolver.js";
 
@@ -23,6 +26,7 @@ export interface PathResolutionResult {
 	error?: string;
 	suggestion?: string;
 	pathConversion?: PathConversion;
+	anchorConversion?: AnchorConversion;
 }
 
 // ── Context passed to every strategy ──────────────────────────────────────────

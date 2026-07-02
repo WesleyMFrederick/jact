@@ -24,7 +24,7 @@ import {
 	createParsedFileCache,
 } from "./factories/componentFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
-import { JactCli } from "./jact.js";
+import { JactCli } from "./jact-cli.js";
 import type {
 	CliExtractOptions,
 	CliValidateOptions,

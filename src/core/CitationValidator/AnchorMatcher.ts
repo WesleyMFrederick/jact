@@ -16,6 +16,8 @@ import type {
 	LinkObject,
 	ParserOutput,
 } from "../../types/citationTypes.js";
+import type { AnchorConversion } from "../../types/validationTypes.js";
+import { normalizeAnchorText } from "../MarkdownParser/normalizeInlineText.js";
 
 /**
  * Minimal interface over ParsedDocument to avoid circular imports.
@@ -51,17 +53,17 @@ export class AnchorMatcher {
 
 	cleanMarkdownForComparison(text: string): string {
 		if (!text) return "";
-		return text
-			.replace(/`/g, "")
-			.replace(/\*\*/g, "")
-			.replace(/\*/g, "")
-			.replace(/==([^=]+)==/g, "$1")
-			.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-			.replace(/:/g, " ")
-			.replace(/\\/g, "")
-			.replace(/[[\]]/g, "")
-			.replace(/ {2,}/g, " ")
-			.trim();
+		// Formatting removal is tokenizer-backed (flavor extension collection);
+		// what remains here is domain normalization on plain text, not markdown
+		// re-parsing (decision rule 2 — regex as minimal grammar for non-markdown).
+		// whitespacePattern narrower than the shared default (only 2+ literal
+		// spaces collapse) to preserve this call site's original behavior.
+		return normalizeAnchorText(text, {
+			colons: "space",
+			removeBackslash: true,
+			removeBrackets: true,
+			whitespacePattern: / {2,}/g,
+		});
 	}
 
 	findFlexibleAnchorMatch(
@@ -138,13 +140,57 @@ export class AnchorMatcher {
 		return null;
 	}
 
+	/**
+	 * Normalize a broken anchor reference for fuzzy matching against header
+	 * anchors (removes leading `#` and hyphens, lowercases).
+	 */
+	private normalizeAnchorForMatching(anchor: string): string {
+		return anchor.replace("#", "").replace(/-/g, " ").toLowerCase();
+	}
+
+	/**
+	 * Find the best header-anchor match for a broken anchor using fuzzy
+	 * logic (exact or punctuation-stripped comparison against `rawText`).
+	 * Moved from `citationFixer.findBestHeaderMatch` so the fuzzy-match
+	 * computation lives alongside the `AnchorObject[]` data it operates on,
+	 * instead of re-deriving a `HeaderObject[]` by regex-parsing a display
+	 * string.
+	 */
+	private findBestHeaderMatch(
+		brokenAnchor: string,
+		headerAnchors: AnchorObject[],
+	): AnchorObject | undefined {
+		const searchText = this.normalizeAnchorForMatching(brokenAnchor);
+		return headerAnchors.find((header) => {
+			// header.rawText is only null for block anchors; callers pass an
+			// anchorType === "header" filtered list, so this is always a string.
+			const rawText = (header.rawText ?? "").toLowerCase();
+			return (
+				rawText === searchText ||
+				rawText.replace(/[.\s]/g, "") === searchText.replace(/\s/g, "")
+			);
+		});
+	}
+
+	/**
+	 * URL-encode header text for use as an anchor (spaces to %20, periods to %2E).
+	 */
+	private urlEncodeAnchor(headerText: string): string {
+		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
+	}
+
 	// ── Async anchor validation (requires parsedFileCache) ────────────────────
 
 	async validateAnchorExists(
 		anchor: string,
 		targetFile: string,
 		options?: { isBlockRef?: boolean },
-	): Promise<{ valid: boolean; suggestion?: string; matchedAs?: string }> {
+	): Promise<{
+		valid: boolean;
+		suggestion?: string;
+		matchedAs?: string;
+		anchorConversion?: AnchorConversion;
+	}> {
 		if (!this.parsedFileCache) {
 			throw new Error(
 				"AnchorMatcher.validateAnchorExists requires a parsedFileCache. Pass one to the constructor.",
@@ -185,6 +231,11 @@ export class AnchorMatcher {
 					return {
 						valid: false,
 						suggestion: `Use raw header format for better Obsidian compatibility: #${obsidianBetterSuggestion}`,
+						anchorConversion: {
+							type: "anchor-conversion",
+							original: anchor,
+							recommended: obsidianBetterSuggestion,
+						},
 					};
 				}
 				return { valid: true };
@@ -229,16 +280,24 @@ export class AnchorMatcher {
 				return {
 					valid: false,
 					suggestion: `Use raw header format for better Obsidian compatibility: #${obsidianBetterSuggestion}`,
+					anchorConversion: {
+						type: "anchor-conversion",
+						original: anchor,
+						recommended: obsidianBetterSuggestion,
+					},
 				};
 			}
 
 			// Build suggestions from similar anchors
 			const suggestions = targetParsedDoc.findSimilarAnchors(anchor);
 
-			const availableHeaders = targetParsedDoc.data.anchors
+			const headerAnchors = targetParsedDoc.data.anchors
 				.filter((a) => a.anchorType === "header")
-				.map((a) => `"${a.rawText}" → #${a.id}`)
 				.slice(0, 5);
+
+			const availableHeaders = headerAnchors.map(
+				(a) => `"${a.rawText}" → #${a.id}`,
+			);
 
 			const availableBlockRefs = targetParsedDoc.data.anchors
 				.filter((a) => a.anchorType === "block")
@@ -262,12 +321,27 @@ export class AnchorMatcher {
 				);
 			}
 
+			// Structured fuzzy-match data for citationFixer — mirrors the same
+			// `headerAnchors` (top-5) window used in the display string above,
+			// so `--fix` behavior stays identical to the retired regex-parse.
+			const bestHeaderMatch = this.findBestHeaderMatch(
+				`#${anchor}`,
+				headerAnchors,
+			);
+
 			return {
 				valid: false,
 				suggestion:
 					allSuggestions.length > 0
 						? allSuggestions.join("; ")
 						: "No similar anchors found",
+				...(bestHeaderMatch && {
+					anchorConversion: {
+						type: "anchor-conversion" as const,
+						original: anchor,
+						recommended: this.urlEncodeAnchor(bestHeaderMatch.rawText ?? ""),
+					},
+				}),
 			};
 		} catch (error) {
 			const errorMessage =

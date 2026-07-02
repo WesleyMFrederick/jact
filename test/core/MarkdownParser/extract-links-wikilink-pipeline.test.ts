@@ -12,16 +12,16 @@
 import fs from "node:fs";
 import path, { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { extractLinks } from "../../../../src/core/MarkdownParser/extractLinks.js";
-import { FileCache } from "../../../../src/FileCache.js";
+import { extractLinks } from "../../../src/core/MarkdownParser/extractLinks.js";
+import { FileCache } from "../../../src/FileCache.js";
 
 const FIXTURE_PATH = resolve(
 	import.meta.dirname ?? "",
-	"../../../fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md",
+	"../../fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md",
 );
 const WIKI_DIR = resolve(
 	import.meta.dirname ?? "",
-	"../../../fixtures/wikilink-baseline/wiki",
+	"../../fixtures/wikilink-baseline/wiki",
 );
 
 describe("extractLinks — full pipeline with seeded FileCache", () => {

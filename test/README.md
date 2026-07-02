@@ -10,7 +10,7 @@ Tests import from `dist/` (compiled output), not `src/` (TypeScript source).
 
 ```javascript
 // Correct — import compiled output
-import { JactCli } from "../dist/jact.js";
+import { JactCli } from "../dist/jact-cli.js";
 
 // Wrong — TypeScript source not directly executable by test runner
 import { JactCli } from "../src/jact.ts";

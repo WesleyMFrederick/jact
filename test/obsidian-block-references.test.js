@@ -202,4 +202,26 @@ describe("MarkdownParser: Obsidian Block Reference Extraction", () => {
 			"Should find links to text-based block anchors",
 		).toBeGreaterThan(0);
 	});
+
+	it("should not extract a caret inside inline code as a block anchor (WMF-35 AC1 characterization)", () => {
+		// Given: content with a caret-id inside a code span and a real block anchor.
+		// The retired regex pass false-matched `^not-an-anchor` inside inline code;
+		// the caretAnchor token layer skips it because text constructs do not fire
+		// inside inline-code nodes.
+		const parser = createMarkdownParser();
+		const content = "Use `^not-an-anchor` in code.\n\nReal one. ^real-anchor\n";
+
+		// When: Extract anchors
+		const anchors = parser.extractAnchors(content);
+
+		// Then: Only the real block anchor is extracted
+		const ids = anchors.map((a) => a.id);
+		expect(ids).not.toContain("not-an-anchor");
+		expect(anchors).toHaveLength(1);
+		expect(anchors[0]).toMatchObject({
+			anchorType: "block",
+			id: "real-anchor",
+			line: 3,
+		});
+	});
 });

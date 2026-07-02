@@ -69,12 +69,12 @@ jact validate path/to/file.md --lines 157 --scope /other/project/docs
 The tool follows a **layered architecture** with dependency injection via factory pattern:
 
 ```
-CLI Orchestrator (jact.ts)
+CLI Orchestrator (cli.ts → jact-cli.ts)
     ↓
 Component Factories (componentFactory.ts)
     ↓
 Core Components:
-    - MarkdownParser: Parses markdown to AST using marked.js
+    - MarkdownParser: Parses markdown to mdast AST using micromark (Flavor Extension Collection)
     - CitationValidator: Validates links and anchors
     - ContentExtractor: Extracts content from linked documents
     - ParsedFileCache: Caches parsed documents for performance
@@ -82,10 +82,11 @@ Core Components:
 ```
 
 ### Source Organization
+%% *Last Modified: 07/01/26 17:02:05* %%
 
 ```
 src/
-├── jact.ts           # CLI entry point, command orchestration
+├── cli.ts / jact-cli.ts          # Commander entry + JactCli orchestration class
 ├── CitationValidator.ts          # Link/anchor validation logic
 ├── FileCache.ts                  # File path resolution and caching
 ├── ParsedDocument.ts             # Facade over MarkdownParser output
@@ -175,6 +176,7 @@ test/
 - **CLI Orchestrator**: Command routing, output formatting
 
 ## Design Documentation
+%% *Last Modified: 07/01/26 17:02:04* %%
 
 The project includes extensive architecture documentation:
 
@@ -187,7 +189,7 @@ The project includes extensive architecture documentation:
   - ParsedDocument Implementation Guide
   - ParsedFileCache Implementation Guide
 
-**When modifying components**: Review the corresponding implementation guide in `design-docs/component-guides/` before making changes.
+**When modifying components**: Consult the living spec at `design-docs/spec/SPEC.md` — `design-docs/component-guides/` is deprecated (banner-marked 2026-07-01).
 
 ## Path Resolution Strategy
 
@@ -232,3 +234,45 @@ The tool supports multiple path resolution strategies (in order):
 - **ContentExtractor** receives pre-validated links from CLI
 - **ParsedFileCache** ensures single parse per file
 - CLI orchestrates, components do NOT call each other directly (except through injected dependencies)
+
+## Agentic Codebase Navigation
+
+How an LLM/agent session should orient in this codebase. Route by what you already have — no single tool wins all jobs.
+
+### Static analysis
+
+| You have | Use | How |
+|---|---|---|
+| No symbol name — only intent ("where does anchor matching happen?") | **semble** | `semble search "<intent>" .` → hits with file:line. Expand from a hit: `semble find-related <file> <line> .`. Heuristic ranking — confirm exact relationships with LSP. |
+| A TS symbol name | **LSP** | `documentSymbol` (list a file's exports), `workspaceSymbol` (find by name), `findReferences` (every consumer — resolves interface dispatch and DI wiring), `goToDefinition`. Never grep `.ts` for structure; a hook blocks it (append `# grep-ts-ok` only for literal string matches). |
+| A literal string / config value / non-TS file | **grep / Read** | Exact match you already know. |
+
+Parser entry points for orientation: `src/core/MarkdownParser/extensions/flavors.ts` (what jact parses, grouped by flavor), `src/core/MarkdownParser/mdastAdapter.ts` (tree → domain objects), `src/factories/componentFactory.ts` (DI wiring — who gets injected what).
+
+### Runtime analysis (AppMap)
+%% *Last Modified: 07/01/26 16:42:36* %%
+
+Capture real execution traces when static reading is not enough (cache behavior, DI resolution order, which strategy fired):
+
+```bash
+# Instrument any test run; AppMaps land in tmp/appmap/ (gitignored)
+npx appmap-node npx vitest run test/path/to/file.test.ts
+
+# Instrument the CLI itself
+npx appmap-node ./dist/cli.js validate path/to/file.md
+```
+
+Each `.appmap.json` under `tmp/appmap/` is a full call trace. Read it with **`appmap-read`** (global CLI, source: `scripts/appmap-read.mjs`) at three zoom levels — never raw-cat the JSON:
+
+```bash
+appmap-read --zoom L0 tmp/appmap/vitest        # semantic summary per map: entry, hot functions, exceptions
+appmap-read --zoom L1 tmp/appmap/vitest/<map>.appmap.json   # LLM-readable call graph (caller → callees ×count)
+appmap-read --zoom L2 tmp/appmap/vitest/<map>.appmap.json   # verbose call tree with params/returns + file:line
+```
+
+Start at L0 across a directory, zoom to L2 on the one map that matters. Config: `appmap.yml` (repo root).
+
+### Ground rules
+
+- `jact` CLI reads **markdown only** — never point it at `.ts`/`.json` (silently returns garbage).
+- After changing `src/**/*.ts`: tests need no build (Vitest transforms TS), but the `jact` CLI binary runs `dist/` — run `npm run build` before any end-to-end CLI check.

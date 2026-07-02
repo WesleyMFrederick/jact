@@ -1,49 +1,23 @@
 /**
  * Purpose: Assemble jact's micromark syntax + mdast extension sets so the parser
  *   (and factory) inject one combined unit.
- * Responsibilities: Combine the custom Obsidian-style syntax extensions via
- *   `combineExtensions`, and collect their fromMarkdown counterparts in matching
- *   order. Adding a new syntax = drop its triple (syntax + fromMarkdown + node
- *   type) and register it in both functions here.
+ * Responsibilities: Compose the Flavor Extension Collection (`flavors.ts`) into
+ *   one syntax extension + one ordered mdast list. Adding a construct = register
+ *   its triple in the right flavor group in `flavors.ts` — not here.
  * Boundary: No tokenization logic here — only composition.
  */
 
 import type { Extension as MdastExtension } from "mdast-util-from-markdown";
 import { combineExtensions } from "micromark-util-combine-extensions";
 import type { Extension } from "micromark-util-types";
-import { caretAnchorFromMarkdown, caretAnchorSyntax } from "./caretAnchor.js";
-import { citationFromMarkdown, citationSyntax } from "./citation.js";
-import { highlightFromMarkdown, highlightSyntax } from "./highlight.js";
-import {
-	obsidianCommentFromMarkdown,
-	obsidianCommentSyntax,
-} from "./obsidianComment.js";
-import {
-	obsidianLinkFromMarkdown,
-	obsidianLinkSyntax,
-} from "./obsidianLink.js";
-import { wikilinkFromMarkdown, wikilinkSyntax } from "./wikilink.js";
+import { allFlavors } from "./flavors.js";
 
-/** Combined micromark syntax extension for all jact Obsidian-style plugins. */
+/** Combined micromark syntax extension across all jact flavor groups. */
 export function jactSyntaxExtension(): Extension {
-	return combineExtensions([
-		highlightSyntax,
-		obsidianCommentSyntax,
-		citationSyntax,
-		caretAnchorSyntax,
-		wikilinkSyntax,
-		obsidianLinkSyntax,
-	]);
+	return combineExtensions(allFlavors.flatMap((flavor) => flavor.syntax));
 }
 
-/** fromMarkdown extensions for all jact Obsidian-style plugins (order-aligned). */
+/** fromMarkdown extensions across all jact flavor groups (order-aligned). */
 export function jactMdastExtensions(): MdastExtension[] {
-	return [
-		highlightFromMarkdown,
-		obsidianCommentFromMarkdown,
-		citationFromMarkdown,
-		caretAnchorFromMarkdown,
-		wikilinkFromMarkdown,
-		obsidianLinkFromMarkdown,
-	];
+	return allFlavors.flatMap((flavor) => flavor.fromMarkdown);
 }

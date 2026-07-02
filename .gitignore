@@ -98,3 +98,6 @@ claude-code-transcripts/
 # Symlinked shared content
 design-docs
 architecture-principles
+
+# AppMap runtime captures
+tmp/appmap/

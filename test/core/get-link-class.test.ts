@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { getLinkClass } from "../../../src/core/getLinkClass.js";
-import type { LinkObject } from "../../../src/types/citationTypes.js";
-import type { LinkClass } from "../../../src/types/validationTypes.js";
+import { getLinkClass } from "../../src/core/getLinkClass.js";
+import type { LinkObject } from "../../src/types/citationTypes.js";
+import type { LinkClass } from "../../src/types/validationTypes.js";
 
 const baseLink = (
 	overrides: Partial<LinkObject> & Pick<LinkObject, "linkType" | "anchorType">,

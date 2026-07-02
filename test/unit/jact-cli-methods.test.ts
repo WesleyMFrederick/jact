@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { JactCli } from "../../dist/jact.js";
+import { JactCli } from "../../dist/jact-cli.js";
 
 describe("JactCli public methods TypeScript", () => {
   it("validate returns string", async () => {

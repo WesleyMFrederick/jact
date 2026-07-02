@@ -1,8 +1,8 @@
 import fs, { readFileSync } from "node:fs";
 import path, { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { extractWikilinks } from "../../../../src/core/MarkdownParser/extractWikilinks.js";
-import { FileCache } from "../../../../src/FileCache.js";
+import { extractWikilinks } from "../../../src/core/MarkdownParser/extractWikilinks.js";
+import { FileCache } from "../../../src/FileCache.js";
 
 const SRC_PATH = "/vault/source.md";
 // Empty FileCache (no buildCache call) — resolveFile always returns "not found".
@@ -10,7 +10,7 @@ const SRC_PATH = "/vault/source.md";
 const emptyFileCache = new FileCache(fs, path);
 const FIXTURE_PATH = resolve(
 	import.meta.dirname ?? "",
-	"../../../fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md",
+	"../../fixtures/wikilink-baseline/probabilistic-vs-deterministic-systems.md",
 );
 
 describe("extractWikilinks — all 10 wikilink forms (table-driven)", () => {

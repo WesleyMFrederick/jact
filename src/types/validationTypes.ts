@@ -30,10 +30,25 @@ export interface PathConversion {
 }
 
 /**
+ * AnchorConversion metadata for anchor auto-fix suggestions
+ * Used when validator detects an anchor resolution issue (missing anchor with
+ * a fuzzy-matched replacement, or a kebab-case anchor with a raw-header
+ * replacement). Mirrors PathConversion so anchor fixes carry structured
+ * {original, recommended} data instead of `citationFixer` regex-parsing the
+ * human-readable `suggestion` string back into a fix (issue: anchor
+ * suggestion-string round-trip).
+ */
+export interface AnchorConversion {
+	type: "anchor-conversion";
+	original: string;
+	recommended: string;
+}
+
+/**
  * ValidationMetadata - Discriminated union based on status
  *
  * Valid state: No additional fields
- * Error/Warning states: Include error message, optional suggestion, optional path conversion
+ * Error/Warning states: Include error message, optional suggestion, optional path/anchor conversion
  */
 export type ValidationMetadata =
 	| { status: "valid" }
@@ -42,12 +57,14 @@ export type ValidationMetadata =
 			error: string;
 			suggestion?: string;
 			pathConversion?: PathConversion;
+			anchorConversion?: AnchorConversion;
 	  }
 	| {
 			status: "warning";
 			message: string;
 			suggestion?: string;
 			pathConversion?: PathConversion;
+			anchorConversion?: AnchorConversion;
 	  };
 
 /**
@@ -81,11 +98,6 @@ export interface ValidationResult {
 	summary: ValidationSummary;
 	links: EnrichedLinkObject[];
 	validationTime?: string;
-}
-
-export interface HeaderObject {
-	text: string;
-	anchor: string;
 }
 
 export interface FixRecord {

@@ -13,6 +13,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { LinkObject, ParserOutput } from "../../types/citationTypes.js";
 import type {
+	AnchorConversion,
 	EnrichedLinkObject,
 	PathConversion,
 	ValidationMetadata,
@@ -162,6 +163,9 @@ export class CitationValidator {
 					result.error ?? result.suggestion ?? "Unknown validation warning",
 				...(result.suggestion && { suggestion: result.suggestion }),
 				...(result.pathConversion && { pathConversion: result.pathConversion }),
+				...(result.anchorConversion && {
+					anchorConversion: result.anchorConversion,
+				}),
 			};
 		} else {
 			validation = {
@@ -169,6 +173,9 @@ export class CitationValidator {
 				error: result.error ?? "Unknown validation error",
 				...(result.suggestion && { suggestion: result.suggestion }),
 				...(result.pathConversion && { pathConversion: result.pathConversion }),
+				...(result.anchorConversion && {
+					anchorConversion: result.anchorConversion,
+				}),
 			};
 		}
 
@@ -395,6 +402,8 @@ export class CitationValidator {
 				"error",
 				`Anchor not found: #${anchor}`,
 				anchorExists.suggestion,
+				null,
+				anchorExists.anchorConversion ?? null,
 			);
 		}
 
@@ -407,6 +416,8 @@ export class CitationValidator {
 				"warning",
 				null,
 				anchorExists.suggestion,
+				null,
+				anchorExists.anchorConversion ?? null,
 			);
 		}
 
@@ -421,6 +432,7 @@ export class CitationValidator {
 		error: string | null = null,
 		message: string | null = null,
 		suggestion: PathConversion | null = null,
+		anchorConversion: AnchorConversion | null = null,
 	): SingleCitationValidationResult {
 		const result: SingleCitationValidationResult = {
 			line: citation.line,
@@ -438,6 +450,9 @@ export class CitationValidator {
 		}
 		if (suggestion) {
 			result.pathConversion = suggestion;
+		}
+		if (anchorConversion) {
+			result.anchorConversion = anchorConversion;
 		}
 
 		return result;

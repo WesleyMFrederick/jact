@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { extractObsidianLinks } from "../../../../src/core/MarkdownParser/extractObsidianLinks.js";
-import { FileCache } from "../../../../src/FileCache.js";
+import { extractObsidianLinks } from "../../../src/core/MarkdownParser/extractObsidianLinks.js";
+import { FileCache } from "../../../src/FileCache.js";
 
 const SRC_PATH = "/vault/source.md";
 // Empty FileCache (no buildCache call) — resolveFile always returns "not found".

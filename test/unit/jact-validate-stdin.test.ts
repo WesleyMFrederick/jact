@@ -14,7 +14,7 @@ import {
 	createMarkdownParser,
 	createParsedFileCache,
 } from "../../src/factories/componentFactory.js";
-import { JactCli } from "../../src/jact.js";
+import { JactCli } from "../../src/jact-cli.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

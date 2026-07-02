@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { JactCli } from "../../dist/jact.js";
+import { JactCli } from "../../dist/jact-cli.js";
 
 describe("JactCli class property types", () => {
   it("parser property is a MarkdownParser instance", () => {

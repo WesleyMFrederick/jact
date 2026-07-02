@@ -1,6 +1,7 @@
 import type { Heading } from "mdast";
 import { visit } from "unist-util-visit";
 import { headingText as getHeadingText } from "./core/MarkdownParser/extractHeadings.js";
+import { normalizeAnchorText } from "./core/MarkdownParser/normalizeInlineText.js";
 import type { LinkObject, ParserOutput } from "./types/citationTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 
@@ -77,14 +78,17 @@ class ParsedDocument {
 				if (decodedUrlEncodedId === decodedAnchorId) return true;
 
 				// Also try: strip colons from id and compare to decoded anchor
-				const idWithoutColons = a.id
-					.replace(/:/g, "")
-					.replace(/\s+/g, " ")
-					.trim();
-				const decodedWithoutColons = decodedAnchorId
-					.replace(/:/g, "")
-					.replace(/\s+/g, " ")
-					.trim();
+				// stripMarkdown: false — a.id/decodedAnchorId are already-resolved
+				// anchor ids, not markdown text; running the tokenizer over them
+				// would risk misreading literal `_`/`*` characters as formatting.
+				const idWithoutColons = normalizeAnchorText(a.id, {
+					stripMarkdown: false,
+					colons: "strip",
+				});
+				const decodedWithoutColons = normalizeAnchorText(decodedAnchorId, {
+					stripMarkdown: false,
+					colons: "strip",
+				});
 				if (idWithoutColons === decodedWithoutColons) return true;
 			}
 
@@ -247,16 +251,17 @@ class ParsedDocument {
 	 * @returns Normalized text matching Obsidian link anchor format
 	 */
 	private _normalizeObsidianHeading(text: string): string {
-		return text
-			.replace(/:/g, "") // Remove colons
-			.replace(/#/g, "") // Remove hash
-			.replace(/\|/g, "") // Remove pipe
-			.replace(/\^/g, "") // Remove caret
-			.replace(/%%/g, "") // Remove comment markers
-			.replace(/\[\[/g, "") // Remove wiki open
-			.replace(/\]\]/g, "") // Remove wiki close
-			.replace(/\s+/g, " ") // Collapse whitespace (matches URL-encoded anchor generation)
-			.trim();
+		// stripMarkdown: false — raw heading text is compared verbatim against
+		// Obsidian's own anchor-generation rules, not re-tokenized.
+		return normalizeAnchorText(text, {
+			stripMarkdown: false,
+			colons: "strip",
+			removeHash: true,
+			removePipe: true,
+			removeCaret: true,
+			removeCommentMarkers: true,
+			removeWikiBrackets: true,
+		});
 	}
 
 	/**

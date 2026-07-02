@@ -3,7 +3,7 @@
 	"version": "1.0.0",
 	"description": "Just Another Context Tool - Citation link validator and manager for markdown files",
 	"type": "module",
-	"main": "dist/jact.js",
+	"main": "dist/jact-cli.js",
 	"bin": {
 		"jact": "./dist/cli.js"
 	},

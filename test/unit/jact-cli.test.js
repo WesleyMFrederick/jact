@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { JactCli } from "../../dist/jact.js";
+import { JactCli } from "../../dist/jact-cli.js";
 
 describe("JactCli - Component Instantiation", () => {
 	it("should instantiate ContentExtractor via factory", () => {

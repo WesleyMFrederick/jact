@@ -11,7 +11,7 @@
  *   const validator = createCitationValidator(null, cache);
  */
 
-import type { FileCacheLike } from "../types/componentInterfaces.js";
+import type { FileCacheLike } from "../../src/types/componentInterfaces.js";
 
 export class InMemoryFileCache implements FileCacheLike {
 	private entries: Map<string, string>;

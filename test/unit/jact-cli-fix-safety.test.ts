@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { JactCli } from "../../dist/jact.js";
+import { JactCli } from "../../dist/jact-cli.js";
 
 // ---------------------------------------------------------------------------
 // Shared fixture helpers

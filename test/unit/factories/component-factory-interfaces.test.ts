@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { InMemoryFileCache } from "../../../src/cache/InMemoryFileCache.js";
+import { InMemoryFileCache } from "../../helpers/in-memory-file-cache.js";
 import { CitationValidator } from "../../../src/core/CitationValidator/CitationValidator.js";
 import { createCitationValidator } from "../../../src/factories/componentFactory.js";
 import type {

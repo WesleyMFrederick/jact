@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { resolveWikiPath } from "../../../../src/core/MarkdownParser/resolveWikiPath.js";
-import type { ResolveResult } from "../../../../src/types/fileCacheTypes.js";
+import { resolveWikiPath } from "../../../src/core/MarkdownParser/resolveWikiPath.js";
+import type { ResolveResult } from "../../../src/types/fileCacheTypes.js";
 
 const SRC_PATH = "/vault/source.md";
 

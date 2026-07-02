@@ -3,7 +3,7 @@
  * Phase 2 — §8d assertions (8 total).
  *
  * CLI invocations use node dist/cli.js (requires prior build).
- * Source-inspection assertions read src/jact.ts directly.
+ * Source-inspection assertions read src/jact-cli.ts directly.
  */
 
 import { exec } from "node:child_process";
@@ -19,7 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CLI_PATH = join(__dirname, "../../dist/cli.js");
 const JACT_ROOT = join(__dirname, "../..");
-const JACT_SRC = join(JACT_ROOT, "src/jact.ts");
+const JACT_SRC = join(JACT_ROOT, "src/jact-cli.ts");
 const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");
 
 let tmpDir: string;

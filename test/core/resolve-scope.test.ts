@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { resolveScope } from "../../../src/core/resolveScope.js";
+import { resolveScope } from "../../src/core/resolveScope.js";
 
 // All temp dirs are created once and cleaned up after the suite
 const temps: string[] = [];
