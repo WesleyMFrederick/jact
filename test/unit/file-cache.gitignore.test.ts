@@ -32,6 +32,26 @@ function writeFile(relPath: string, content = "# Test"): void {
 	fs.writeFileSync(fullPath, content);
 }
 
+describe("FileCache — .jactignore (per-repo ignore file)", () => {
+	it("excludes .jactignore'd paths from the scope scan", () => {
+		writeFile("alpha.md");
+		writeFile("test/fixtures/broken.md");
+		writeFile(".jactignore", "test/\n");
+		const stats = cache.buildCache(tmpDir);
+		expect(stats.totalFiles).toBe(1);
+		expect(cache.resolveFile("broken.md").found).toBe(false);
+	});
+
+	it("applies .jactignore even when respectGitignore is false", () => {
+		writeFile("alpha.md");
+		writeFile("test/fixtures/broken.md");
+		writeFile(".jactignore", "test/\n");
+		const stats = cache.buildCache(tmpDir, false);
+		expect(stats.totalFiles).toBe(1);
+		expect(cache.resolveFile("broken.md").found).toBe(false);
+	});
+});
+
 describe("FileCache — default ignore patterns", () => {
 	it("excludes node_modules/ by default", () => {
 		writeFile("alpha.md");

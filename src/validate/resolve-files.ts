@@ -38,6 +38,14 @@ export class NoFilesMatchedError extends Error {
 }
 
 /**
+ * True when `input` contains glob magic characters (picomatch syntax), i.e.
+ * must be expanded by tinyglobby rather than treated as a literal path.
+ */
+function isGlobPattern(input: string): boolean {
+	return /[*?[\]{}()!]/.test(input);
+}
+
+/**
  * Expand `inputs` (explicit `.md` paths and/or glob patterns) into a
  * deduplicated, lexicographically sorted list of absolute `.md` file paths.
  *
@@ -63,27 +71,58 @@ export async function resolveFiles(
 		throw new NoFilesMatchedError([]);
 	}
 
-	const matched = await glob(inputs as string[], {
-		absolute: true,
-		cwd,
-		onlyFiles: true,
-	});
+	// Split inputs: an explicitly named existing *file* bypasses ignore
+	// filtering ("you named it, you get it" — mirrors git, where ignore rules
+	// affect sweeps, not directly targeted paths). Globs, directories, and
+	// nonexistent paths are sweeps: expanded via tinyglobby, then filtered.
+	const explicitFiles: string[] = [];
+	const sweepPatterns: string[] = [];
+	for (const input of inputs) {
+		if (!isGlobPattern(input)) {
+			const abs = path.resolve(cwd, input);
+			let isFile = false;
+			try {
+				isFile = fs.statSync(abs).isFile();
+			} catch (_error) {
+				// Nonexistent — falls through to the sweep branch (contributes
+				// nothing there; overall zero-match still throws below).
+			}
+			if (isFile) {
+				explicitFiles.push(abs);
+				continue;
+			}
+		}
+		sweepPatterns.push(input);
+	}
 
-	// Exclude .gitignore'd paths (e.g. node_modules) so broad patterns like
-	// `**` don't sweep up vendored/build output. Same rules FileCache applies
-	// for the single-file validate path (shared via core/ignoreRules.js).
-	// Paths outside `cwd` have no `.gitignore` scope to apply, so they pass
-	// through unfiltered (the `ignore` package throws on a `..`-relative path).
-	const ignoreRules = buildIgnoreRules(fs, path, cwd, true);
-	const notIgnored = matched.filter((f) => {
-		const rel = path.relative(cwd, f);
-		if (rel.startsWith("..")) return true;
-		return !ignoreRules.ignores(rel);
-	});
+	let sweepMatches: string[] = [];
+	if (sweepPatterns.length > 0) {
+		const matched = await glob(sweepPatterns, {
+			absolute: true,
+			cwd,
+			onlyFiles: true,
+		});
+
+		// Exclude .gitignore'd/.jactignore'd paths (e.g. node_modules, test
+		// fixtures) so broad patterns like `**` don't sweep up vendored/build
+		// output. Same rules FileCache applies for the single-file validate
+		// path (shared via core/ignoreRules.js).
+		// Paths outside `cwd` have no ignore scope to apply, so they pass
+		// through unfiltered (the `ignore` package throws on a `..`-relative
+		// path).
+		const ignoreRules = buildIgnoreRules(fs, path, cwd, true);
+		sweepMatches = matched.filter((f) => {
+			const rel = path.relative(cwd, f);
+			if (rel.startsWith("..")) return true;
+			return !ignoreRules.ignores(rel);
+		});
+	}
 
 	// Filter to .md only, deduplicate via Set, then sort for stable order.
 	const mdFiles = [
-		...new Set(notIgnored.filter((f) => f.endsWith(".md"))),
+		...new Set(
+			[...explicitFiles, ...sweepMatches].filter((f) => f.endsWith(".md")),
+		),
 	].sort();
 
 	if (mdFiles.length === 0) {
@@ -135,7 +174,18 @@ export async function resolveFileSet(
 	cwd: string = process.cwd(),
 	runGit: RunGit = defaultRunGit,
 ): Promise<string[]> {
-	const changedFiles = options.changed ? resolveChangedFiles(cwd, runGit) : [];
+	// `--changed` is a sweep, not an explicit ask — filter it through the same
+	// ignore rules (.gitignore + .jactignore + defaults) as glob expansion so
+	// e.g. an edited test fixture doesn't fail an otherwise-clean batch.
+	let changedFiles: string[] = [];
+	if (options.changed) {
+		const ignoreRules = buildIgnoreRules(fs, path, cwd, true);
+		changedFiles = resolveChangedFiles(cwd, runGit).filter((f) => {
+			const rel = path.relative(cwd, f);
+			if (rel.startsWith("..")) return true;
+			return !ignoreRules.ignores(rel);
+		});
+	}
 
 	let pathFiles: string[] = [];
 	let pathError: NoFilesMatchedError | undefined;

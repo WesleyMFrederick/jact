@@ -112,10 +112,12 @@ export class JactCli {
 			respectGitignore,
 		});
 
-		// If the explicitly-targeted file is hidden by .gitignore under this scope,
-		// index its directory branch anyway — pointing jact at a file is an explicit
-		// request to validate it and its siblings (e.g. bare wiki page names).
-		if (targetFile !== undefined && respectGitignore) {
+		// If the explicitly-targeted file is hidden by .gitignore or .jactignore
+		// under this scope, index its directory branch anyway — pointing jact at a
+		// file is an explicit request to validate it and its siblings (e.g. bare
+		// wiki page names). Not gated on respectGitignore: .jactignore applies
+		// even when --allow-gitignore disabled .gitignore.
+		if (targetFile !== undefined) {
 			const absTarget = path.resolve(targetFile);
 			if (this.fileCache.isIgnored(absTarget)) {
 				const includeDir = path.dirname(absTarget);
@@ -124,7 +126,7 @@ export class JactCli {
 					alwaysIncludeDir: includeDir,
 				});
 				this.scopeNotices.push(
-					`Note: ${includeDir} is gitignored under ${resolved.scope}; indexed it because you targeted a file inside it. Use --allow-gitignore to scan all ignored paths.`,
+					`Note: ${includeDir} is gitignored under ${resolved.scope} (via .gitignore or .jactignore); indexed it because you targeted a file inside it. Use --allow-gitignore to scan all gitignored paths.`,
 				);
 			}
 		}

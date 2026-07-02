@@ -6,6 +6,11 @@
 			"source": "writing-living-specs",
 			"alias": ".claude/skills/writing-living-specs",
 			"description": "Living-spec word budgets, ADR template, gold exemplars"
+		},
+		{
+			"source": "runtime-static-code-discovery",
+			"alias": ".claude/skills/runtime-static-code-discovery",
+			"description": "Runtime trace + static expansion to roster every file/class/function a task needs"
 		}
 	]
 }

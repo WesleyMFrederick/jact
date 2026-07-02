@@ -26,6 +26,12 @@ export const DEFAULT_SCAN_IGNORE_PATTERNS: readonly string[] = [
  * be negated by `.gitignore`). Missing or unreadable `.gitignore` is
  * non-fatal — defaults still apply.
  *
+ * A `.jactignore` file at `scanRoot` (gitignore syntax) is loaded
+ * **unconditionally** — it is jact's own per-repo config, independent of the
+ * `respectGitignore` flag. Load order is `.gitignore` → `.jactignore` →
+ * defaults, so `.jactignore` may negate `.gitignore` entries but never the
+ * hardcoded defaults.
+ *
  * Shared by {@link FileCache} (recursive scope scan) and the batch-validate
  * file-set resolver (glob/explicit-path expansion) so gitignore-awareness
  * stays consistent across both entry points.
@@ -50,6 +56,13 @@ export function buildIgnoreRules(
 		} catch (_error) {
 			// No .gitignore or unreadable — defaults still apply.
 		}
+	}
+	const jactignorePath = pathModule.join(scanRoot, ".jactignore");
+	try {
+		const content = fs.readFileSync(jactignorePath, "utf-8");
+		rules.add(content);
+	} catch (_error) {
+		// No .jactignore or unreadable — non-fatal.
 	}
 	rules.add([...DEFAULT_SCAN_IGNORE_PATTERNS]);
 	return rules;

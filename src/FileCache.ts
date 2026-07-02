@@ -198,22 +198,37 @@ export class FileCache {
 	}
 
 	isIgnored(absPath: string): boolean {
-		if (this.lastScanRoot === undefined || !this.lastRespectGitignore) {
+		if (this.lastScanRoot === undefined) {
 			return false;
 		}
-		const gitignorePath = this.path.join(this.lastScanRoot, ".gitignore");
-		let rules: Ignore;
-		try {
-			const content = this.fs.readFileSync(gitignorePath, "utf-8");
-			rules = ignore().add(content);
-		} catch (_error) {
-			return false; // no .gitignore → nothing gitignore-excluded
+		// Configurable rules only (.gitignore when honored, plus .jactignore) —
+		// deliberately NOT the hardcoded defaults, so callers can distinguish
+		// "hidden by repo config" (rescuable via alwaysIncludeDir) from
+		// "never scanned" (node_modules etc.).
+		const rules = ignore();
+		let hasRules = false;
+		if (this.lastRespectGitignore) {
+			const gitignorePath = this.path.join(this.lastScanRoot, ".gitignore");
+			try {
+				rules.add(this.fs.readFileSync(gitignorePath, "utf-8"));
+				hasRules = true;
+			} catch (_error) {
+				// No .gitignore — nothing gitignore-excluded.
+			}
 		}
+		const jactignorePath = this.path.join(this.lastScanRoot, ".jactignore");
+		try {
+			rules.add(this.fs.readFileSync(jactignorePath, "utf-8"));
+			hasRules = true;
+		} catch (_error) {
+			// No .jactignore — non-fatal.
+		}
+		if (!hasRules) return false;
 		const relative = this.path.relative(
 			this.lastScanRoot,
 			this.path.resolve(absPath),
 		);
-		// Empty (== scanRoot) or "../…" (outside scope) is not a gitignore hit.
+		// Empty (== scanRoot) or "../…" (outside scope) is not an ignore hit.
 		if (relative === "" || relative.startsWith("..")) return false;
 		const posixRelative = relative.split(this.path.sep).join("/");
 		return rules.ignores(posixRelative);

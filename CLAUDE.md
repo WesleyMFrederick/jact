@@ -250,7 +250,7 @@ How an LLM/agent session should orient in this codebase. Route by what you alrea
 Parser entry points for orientation: `src/core/MarkdownParser/extensions/flavors.ts` (what jact parses, grouped by flavor), `src/core/MarkdownParser/mdastAdapter.ts` (tree → domain objects), `src/factories/componentFactory.ts` (DI wiring — who gets injected what).
 
 ### Runtime analysis (AppMap)
-%% *Last Modified: 07/01/26 16:42:36* %%
+%% *Last Modified: 07/02/26 08:33:59* %%
 
 Capture real execution traces when static reading is not enough (cache behavior, DI resolution order, which strategy fired):
 
@@ -262,7 +262,7 @@ npx appmap-node npx vitest run test/path/to/file.test.ts
 npx appmap-node ./dist/cli.js validate path/to/file.md
 ```
 
-Each `.appmap.json` under `tmp/appmap/` is a full call trace. Read it with **`appmap-read`** (global CLI, source: `scripts/appmap-read.mjs`) at three zoom levels — never raw-cat the JSON:
+Each `.appmap.json` under `tmp/appmap/` is a full call trace. Read it with **`appmap-read`** (global CLI; canonical source `cc-workflows-plugin/src/runtime-and-static-analysis/appmap-read.mjs` — local `scripts/appmap-read.mjs` is a symlink to it) at three zoom levels — never raw-cat the JSON:
 
 ```bash
 appmap-read --zoom L0 tmp/appmap/vitest        # semantic summary per map: entry, hot functions, exceptions

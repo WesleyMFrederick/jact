@@ -81,6 +81,63 @@ describe("resolveFiles — glob expansion", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Scenario: .jactignore — per-repo ignore file (task 007)
+// ---------------------------------------------------------------------------
+
+describe("resolveFiles — .jactignore", () => {
+	it("excludes glob matches under a .jactignore'd directory", async () => {
+		const a = writeFile("concepts/a.md");
+		writeFile("test/fixtures/broken.md");
+		writeFile(".jactignore", "test/\n");
+
+		const result = await resolveFiles(["**/*.md"], tmpDir);
+
+		expect(result).toEqual([a]);
+	});
+
+	it("validates an explicitly named file even when .jactignore'd", async () => {
+		const broken = writeFile("test/fixtures/broken.md");
+		writeFile(".jactignore", "test/\n");
+
+		const result = await resolveFiles([broken], tmpDir);
+
+		expect(result).toEqual([broken]);
+	});
+
+	it("treats a directory input as a sweep — .jactignore applies", async () => {
+		const a = writeFile("docs/a.md");
+		writeFile("docs/ignored/b.md");
+		writeFile(".jactignore", "docs/ignored/\n");
+
+		const result = await resolveFiles(["docs"], tmpDir);
+
+		expect(result).toEqual([a]);
+	});
+
+	it("cannot re-include default-ignored dirs via .jactignore negation", async () => {
+		writeFile("node_modules/pkg/README.md");
+		writeFile(".jactignore", "!node_modules/\n");
+		const a = writeFile("a.md");
+
+		const result = await resolveFiles(["**/*.md"], tmpDir);
+
+		expect(result).toEqual([a]);
+	});
+
+	it("combines .gitignore and .jactignore exclusions", async () => {
+		const a = writeFile("a.md");
+		writeFile("generated/out.md");
+		writeFile("test/fix.md");
+		writeFile(".gitignore", "generated/\n");
+		writeFile(".jactignore", "test/\n");
+
+		const result = await resolveFiles(["**/*.md"], tmpDir);
+
+		expect(result).toEqual([a]);
+	});
+});
+
+// ---------------------------------------------------------------------------
 // Scenario: Validate multiple explicit paths
 // ---------------------------------------------------------------------------
 

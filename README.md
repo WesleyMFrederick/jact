@@ -89,6 +89,22 @@ npm run jact:validate path/to/file.md -- --fix --scope /path/to/project/docs
 cat draft.md | jact validate <file-path> --stdin
 ```
 
+### Ignoring Files: `.jactignore`
+%% *Last Modified: 07/01/26 22:08:02* %%
+
+A `.jactignore` file at the scan root (gitignore syntax) excludes paths from **sweeps** — glob patterns, directory inputs, `--changed`, and scope scans:
+
+```
+# .jactignore
+test/
+```
+
+Rules:
+
+- **Explicitly named files always validate**, ignore rules or not (`jact validate test/fixtures/broken.md` works). Ignoring affects sweeps, not direct asks — same instinct as git.
+- Load order: `.gitignore` (unless `--allow-gitignore`) → `.jactignore` → built-in defaults (`node_modules/`, `dist/`, `.git/`, …). Defaults are authoritative and cannot be negated.
+- `.jactignore` applies even with `--allow-gitignore` — it is jact's own config, independent of VCS.
+
 ### Enhanced Fix Command
 
 The fix command provides comprehensive citation correction with warning detection and path conversion capabilities:
