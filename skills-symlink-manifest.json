@@ -1,0 +1,11 @@
+{
+	"version": "1.0.0",
+	"source_base": "../cc-workflows-plugin/src-claude/skills",
+	"mappings": [
+		{
+			"source": "writing-living-specs",
+			"alias": ".claude/skills/writing-living-specs",
+			"description": "Living-spec word budgets, ADR template, gold exemplars"
+		}
+	]
+}
