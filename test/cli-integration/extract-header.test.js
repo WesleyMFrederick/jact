@@ -60,30 +60,98 @@ describe("CLI - extract header command", () => {
 		expect(exitCode).toBe(1);
 	});
 
-	it("should display validation error with suggestion", async () => {
-		// Given: Target file with headers
+	it("shows close alternatives when a heading is missing", async () => {
 		const targetFile = path.resolve(
 			__dirname,
 			"..",
 			"fixtures",
 			"us2.3-implement-extract-links-subcommand-implement-plan.md",
 		);
-		const similarHeader = "Task 1: LinkObjectFactory"; // Partial match
+		const similarHeader = "Task 1: LinkObjectFactory";
 
-		// When: Extract header with typo
-		let stdout;
+		let output;
 		try {
 			runCLI(
 				`node dist/cli.js extract header "${targetFile}" "${similarHeader}"`,
 			);
 		} catch (error) {
-			stdout = error.stdout;
+			output = error.stdout;
 		}
 
-		// Then: Error message with suggestion shown
-		// Verification: US2.4 AC5 diagnostic information
-		expect(stdout).toContain("Validation failed");
-		expect(stdout).toContain("Suggestion");
+		expect(output).toContain("was not found");
+		expect(output).toContain("Close alternatives:");
+	});
+
+	it("rejects a duplicate heading without a parent filter", async () => {
+		const targetFile = path.resolve(
+			__dirname,
+			"..",
+			"fixtures",
+			"outline-command.md",
+		);
+
+		let output;
+		let exitCode;
+		try {
+			runCLI(`node dist/cli.js extract header "${targetFile}" "Install"`);
+		} catch (error) {
+			output = error.stdout;
+			exitCode = error.status;
+		}
+
+		expect(exitCode).toBe(1);
+		expect(output).toContain('"Install" is ambiguous');
+		expect(output).toContain('under "Guide"');
+		expect(output).toContain('under "Appendix"');
+		expect(output).toContain('--within "Guide"');
+		expect(output).not.toContain("Install on Linux.");
+	});
+
+	it("extracts only the duplicate heading inside the selected parent", async () => {
+		const targetFile = path.resolve(
+			__dirname,
+			"..",
+			"fixtures",
+			"outline-command.md",
+		);
+
+		const output = runCLI(
+			`node dist/cli.js extract header "${targetFile}" "Install" --within "Guide"`,
+		);
+
+		expect(output).toContain("Install on Linux.");
+		expect(output).not.toContain("Alternate install");
+	});
+
+	it("rejects missing or ambiguous parent filters", async () => {
+		const targetFile = path.resolve(
+			__dirname,
+			"..",
+			"fixtures",
+			"outline-command.md",
+		);
+		let missingOutput;
+		let ambiguousOutput;
+
+		try {
+			runCLI(
+				`node dist/cli.js extract header "${targetFile}" "Install" --within "Gide"`,
+			);
+		} catch (error) {
+			missingOutput = error.stdout;
+		}
+		try {
+			runCLI(
+				`node dist/cli.js extract header "${targetFile}" "macOS" --within "Install"`,
+			);
+		} catch (error) {
+			ambiguousOutput = error.stdout;
+		}
+
+		expect(missingOutput).toContain('"Gide" was not found');
+		expect(missingOutput).toContain('"Guide"');
+		expect(ambiguousOutput).toContain('"Install" is ambiguous');
+		expect(ambiguousOutput).not.toContain("Homebrew");
 	});
 });
 
@@ -108,6 +176,7 @@ describe("CLI Help Documentation", () => {
 		expect(output).toContain("<target-file>");
 		expect(output).toContain("<header-name>");
 		expect(output).toContain("--scope");
+		expect(output).toContain("--within <parent>");
 
 		// Then: Examples section included
 		expect(output).toContain("Examples:");

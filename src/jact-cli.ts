@@ -10,11 +10,17 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
+	checkOutlineReminderCache,
+	resetOutlineReminderCache,
+	writeOutlineReminderCache,
+} from "./cache/check-outline-reminder-cache.js";
+import {
 	applyCitationFixes,
 	type FixFsOverrides,
 } from "./core/apply-citation-fixes.js";
 import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
+import { generateContentId } from "./core/ContentExtractor/generateContentId.js";
 import {
 	detectNestedCodeblocks,
 	type NestedCodeblockWarning,
@@ -32,8 +38,14 @@ import {
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
 import { formatAsJSON, formatForCLI } from "./formatValidationResult.js";
+import { renderOutline } from "./outline/render-outline.js";
+import ParsedDocument, {
+	type HeadingMatch,
+	type HeadingResolution,
+} from "./ParsedDocument.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
+import type { CliOutlineOptions } from "./types/cli-types.js";
 import type {
 	CliExtractOptions,
 	CliValidateOptions,
@@ -48,6 +60,60 @@ import type {
 interface LineRange {
 	startLine: number;
 	endLine: number;
+}
+
+export interface OutlineCommandResult {
+	success: boolean;
+	output: string;
+}
+
+const OUTLINE_CACHE_DIR = ".jact/claude-cache";
+
+function quote(value: string): string {
+	return JSON.stringify(value);
+}
+
+function headingLocation(match: HeadingMatch): string {
+	if (match.ancestors.length === 0) return "at document root";
+	return `under ${match.ancestors.map((heading) => quote(heading.text)).join(" > ")}`;
+}
+
+function formatHeadingResolution(resolution: HeadingResolution): string {
+	if (resolution.status === "unique") return "";
+	if (resolution.status === "ambiguous") {
+		return [
+			`${quote(resolution.query)} is ambiguous:`,
+			...resolution.matches.map((match) => `- ${headingLocation(match)}`),
+		].join("\n");
+	}
+
+	const lines = [`${quote(resolution.query)} was not found.`];
+	if (resolution.alternatives.length > 0) {
+		lines.push(
+			"",
+			"Close alternatives:",
+			...resolution.alternatives.map(
+				(match) => `- ${quote(match.heading.text)} ${headingLocation(match)}`,
+			),
+		);
+	}
+	return lines.join("\n");
+}
+
+function shellFileArgument(filePath: string): string {
+	return /^[A-Za-z0-9_./-]+$/.test(filePath) ? filePath : quote(filePath);
+}
+
+function uniqueParentName(
+	document: ParsedDocument,
+	match: HeadingMatch,
+): string | undefined {
+	for (const ancestor of [...match.ancestors].reverse()) {
+		if (document.resolveHeading(ancestor.text).status === "unique") {
+			return ancestor.text;
+		}
+	}
+	return undefined;
 }
 
 /**
@@ -384,39 +450,196 @@ export class JactCli {
 		}
 	}
 
-	/** Create a synthetic header citation, validate it, and extract the section content. */
+	/** Resolve and render a parser-derived heading outline. */
+	async outline(
+		filePath: string,
+		maxLevel: number,
+		options: CliOutlineOptions = {},
+	): Promise<OutlineCommandResult> {
+		const parsed = await this.getAst(filePath, options);
+		const document = new ParsedDocument(parsed);
+		const headings = document.getHeadings();
+		if (headings.length === 0) {
+			return {
+				success: true,
+				output: "No headings found. Use jact extract file for all content.",
+			};
+		}
+
+		let withinIndex: number | undefined;
+		if (options.within !== undefined) {
+			const withinResolution = document.resolveHeading(options.within);
+			if (withinResolution.status !== "unique") {
+				return {
+					success: false,
+					output: formatHeadingResolution(withinResolution),
+				};
+			}
+			withinIndex = withinResolution.match.index;
+		}
+
+		const expandedIndexes = new Set<number>();
+		if (options.expand !== undefined) {
+			if (options.expand.includes(",")) {
+				const commaHeading = document.resolveHeading(options.expand, {
+					...(options.within !== undefined && { within: options.within }),
+				});
+				if (commaHeading.status !== "missing") {
+					return {
+						success: false,
+						output: `${quote(options.expand)} contains a comma and cannot be selected with --expand because commas separate heading names. Narrow with --within or choose a heading without a comma.`,
+					};
+				}
+			}
+
+			const selectors = options.expand.split(",").map((value) => value.trim());
+			if (selectors.some((selector) => selector.length === 0)) {
+				return {
+					success: false,
+					output:
+						"--expand requires one or more non-empty comma-separated heading names.",
+				};
+			}
+
+			for (const selector of selectors) {
+				const resolution = document.resolveHeading(selector, {
+					...(options.within !== undefined && { within: options.within }),
+				});
+				if (resolution.status !== "unique") {
+					const lines = [formatHeadingResolution(resolution)];
+					const parent =
+						resolution.status === "ambiguous" && resolution.matches[0]
+							? uniqueParentName(document, resolution.matches[0])
+							: undefined;
+					if (parent && options.within === undefined) {
+						lines.push(
+							"",
+							"Retry with a unique parent:",
+							`jact outline ${shellFileArgument(filePath)} H${maxLevel} --expand ${quote(selector)} --within ${quote(parent)}`,
+						);
+					}
+					return { success: false, output: lines.join("\n") };
+				}
+				expandedIndexes.add(resolution.match.index);
+			}
+		}
+
+		const rendered = renderOutline(headings, {
+			maxLevel,
+			expandedIndexes,
+			...(withinIndex !== undefined && { withinIndex }),
+		});
+		let output = rendered.text;
+
+		const sessionId = options.sessionId;
+		if (sessionId && options.cacheReset) {
+			resetOutlineReminderCache(sessionId, parsed.filePath, OUTLINE_CACHE_DIR);
+		}
+		const remindersAlreadyShown = sessionId
+			? checkOutlineReminderCache(sessionId, parsed.filePath, OUTLINE_CACHE_DIR)
+			: false;
+
+		if (!remindersAlreadyShown) {
+			output +=
+				'\n\n[*] To Expand: run `jact outline "{{absolute-or-relative-path-to-file}}" H2 --expand "{{full-header-1-text}},{{full-header-2-text}}"`' +
+				'\nTo Extract: run `jact extract header "{{absolute-or-relative-path-to-file}}" "{{full-header-text}}" --within "{{unique-parent-header-text}}"`';
+			if (sessionId) {
+				writeOutlineReminderCache(
+					sessionId,
+					parsed.filePath,
+					OUTLINE_CACHE_DIR,
+				);
+			}
+		}
+
+		return { success: true, output };
+	}
+
+	/** Resolve one header uniquely and extract that exact section. */
 	async extractHeader(
 		targetFile: string,
 		headerName: string,
 		options: CliExtractOptions,
 	): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
-			this.applyScope(options, targetFile);
-			const syntheticLink = new LinkObjectFactory().createHeaderLink(
+			const parsed = await this.getAst(targetFile, options);
+			const document = new ParsedDocument(parsed);
+			const resolution = document.resolveHeading(headerName, {
+				...(options.within !== undefined && { within: options.within }),
+			});
+			if (resolution.status !== "unique") {
+				console.error(formatHeadingResolution(resolution));
+				if (resolution.status === "ambiguous" && options.within === undefined) {
+					const firstMatch = resolution.matches[0];
+					const parent = firstMatch
+						? uniqueParentName(document, firstMatch)
+						: undefined;
+					if (parent) {
+						console.error("\nRetry with a unique parent:");
+						console.error(
+							`jact extract header ${shellFileArgument(targetFile)} ${quote(headerName)} --within ${quote(parent)}`,
+						);
+					}
+				}
+				process.exitCode = 1;
+				return undefined;
+			}
+
+			const content = document.extractResolvedSection(resolution.match);
+			if (content === null)
+				throw new Error(`Unable to extract heading: ${headerName}`);
+			const contentId = generateContentId(content);
+			const unresolvedLink = new LinkObjectFactory().createHeaderLink(
 				targetFile,
 				headerName,
 			);
-			const enrichedLink = await this.validator.validateSingleCitation(
-				syntheticLink,
-				targetFile,
-			);
-			if (enrichedLink.validation.status === "error") {
-				console.error("Validation failed:", enrichedLink.validation.error);
-				if (enrichedLink.validation.suggestion) {
-					console.error("Suggestion:", enrichedLink.validation.suggestion);
-				}
-				process.exitCode = 1;
-				return;
-			}
-			return await this.contentExtractor.extractContent(
-				[enrichedLink],
-				options,
-			);
+			const syntheticLink = {
+				...unresolvedLink,
+				target: {
+					...unresolvedLink.target,
+					path: {
+						...unresolvedLink.target.path,
+						absolute: parsed.filePath,
+					},
+				},
+			};
+			const enrichedLink = {
+				...syntheticLink,
+				validation: { status: "valid" as const },
+			};
+			const block = {
+				content,
+				contentLength: content.length,
+				sourceLinks: [
+					{
+						rawSourceLink: syntheticLink.fullMatch,
+						sourceLine: syntheticLink.line,
+					},
+				],
+			};
+			return {
+				extractedContentBlocks: {
+					_totalContentCharacterLength: JSON.stringify({ [contentId]: block })
+						.length,
+					[contentId]: block,
+				},
+				outgoingLinksReport: {
+					processedLinks: [
+						{ sourceLink: enrichedLink, contentId, status: "extracted" },
+					],
+				},
+				stats: {
+					totalLinks: 1,
+					uniqueContent: 1,
+					duplicateContentDetected: 0,
+					tokensSaved: 0,
+					compressionRatio: 0,
+				},
+			};
 		} catch (error) {
-			console.error(
-				"ERROR:",
-				error instanceof Error ? error.message : String(error),
-			);
+			const e = error as Error & { suggestion?: string };
+			console.error("ERROR:", e.message);
+			if (e.suggestion) console.error("Suggestion:", e.suggestion);
 			process.exitCode = 2;
 			return undefined;
 		}

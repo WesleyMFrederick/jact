@@ -41,7 +41,18 @@ export interface CliExtractOptions {
 	format?: "markdown" | "json";
 	fullFiles?: boolean;
 	session?: string;
+	within?: string;
 	verbose?: boolean;
+}
+
+/** CLI options for the text-only outline command. */
+export interface CliOutlineOptions {
+	scope?: string;
+	expand?: string;
+	within?: string;
+	cacheReset?: boolean;
+	/** Integration-owned session identity; intentionally not a public CLI option. */
+	sessionId?: string;
 }
 
 /**
@@ -77,9 +88,9 @@ export interface FixDetail {
  * @property json    `--json`: emit one compact JSON object per file (JSONL). See ADR D3.
  */
 export interface BatchValidateOptions {
-  paths: string[];
-  changed: boolean;
-  json: boolean;
+	paths: string[];
+	changed: boolean;
+	json: boolean;
 }
 
 /**
@@ -91,9 +102,9 @@ export interface BatchValidateOptions {
  * @property errors Empty when `ok`; one entry per error otherwise.
  */
 export interface FileResult {
-  path: string;
-  ok: boolean;
-  errors: ValidationError[];
+	path: string;
+	ok: boolean;
+	errors: ValidationError[];
 }
 
 /**
@@ -105,8 +116,8 @@ export interface FileResult {
  * (not tied to a line) is an explicit `null`, never a missing field.
  */
 export interface ValidationError {
-  line: number | null; // 1-indexed; null = file-level, not tied to a line
-  message: string;
+	line: number | null; // 1-indexed; null = file-level, not tied to a line
+	message: string;
 }
 
 /**
@@ -120,8 +131,8 @@ export interface ValidationError {
  * @property results Per-file results, in selection order.
  */
 export interface BatchSummary {
-  total: number;
-  passed: number;
-  failed: number;
-  results: FileResult[];
+	total: number;
+	passed: number;
+	failed: number;
+	results: FileResult[];
 }

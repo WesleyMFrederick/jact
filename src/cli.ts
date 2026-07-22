@@ -12,7 +12,7 @@
  * @module cli
  */
 
-import { Command, Option } from "commander";
+import { Argument, Command, Option } from "commander";
 import { isDynamicPattern } from "tinyglobby";
 import {
 	checkExtractCache,
@@ -51,7 +51,7 @@ const semanticSuggestionMap: Record<string, string[]> = {
 	verify: ["validate"],
 	lint: ["validate"],
 	parse: ["ast"],
-	tree: ["ast"],
+	tree: ["outline"],
 	debug: ["ast"],
 	show: ["ast"],
 
@@ -318,6 +318,84 @@ const VERBOSE_OPTION_DESCRIPTION =
 	"Include outgoingLinksReport + stats in output";
 
 program
+	.command("outline")
+	.description("Display a compact text tree of parsed Markdown headings")
+	.argument("<file>", "path to markdown file to outline")
+	.addArgument(
+		new Argument("[level]", "document-wide heading ceiling")
+			.choices(["H1", "H2", "H3", "H4", "H5", "H6"])
+			.default("H2"),
+	)
+	.option(
+		"--expand <headings>",
+		"fully expand comma-separated heading branches",
+	)
+	.option(
+		"--within <parent>",
+		"limit the outline and heading resolution to one parent branch",
+	)
+	.option(
+		"--cache-reset",
+		"show next-step reminders again for the active session and target",
+		false,
+	)
+	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.addHelpText(
+		"after",
+		`
+Default: H2 shows H1 through H2 across the document. Expanded branches show all descendants.
+
+Examples:
+    $ jact outline docs/guide.md
+    $ jact outline docs/guide.md H1
+    $ jact outline docs/guide.md H3 --expand "Install,Troubleshooting"
+    $ jact outline handbook.md H2 --expand "Install" --within "Guide"
+    $ jact outline docs/guide.md --cache-reset
+
+Exit Codes:
+  0  Outline rendered successfully, including a valid file with no headings
+  1  Heading selector is missing, ambiguous, or unsupported
+  2  File lookup, scope, permission, or parse error
+`,
+	)
+	.action(
+		async (
+			file: string,
+			level: string,
+			options: {
+				expand?: string;
+				within?: string;
+				cacheReset?: boolean;
+				scope?: string;
+			},
+		) => {
+			const manager = new JactCli();
+			try {
+				const result = await manager.outline(
+					file,
+					Number.parseInt(level.slice(1), 10),
+					{
+						...options,
+						...(process.env["JACT_SESSION_ID"] !== undefined
+							? { sessionId: process.env["JACT_SESSION_ID"] }
+							: process.env["CLAUDE_SESSION_ID"] !== undefined
+								? { sessionId: process.env["CLAUDE_SESSION_ID"] }
+								: {}),
+					},
+				);
+				if (result.success) console.log(result.output);
+				else console.error(result.output);
+				process.exitCode = result.success ? 0 : 1;
+			} catch (error) {
+				const e = error as Error & { suggestion?: string };
+				console.error("ERROR:", e.message);
+				if (e.suggestion) console.error("Suggestion:", e.suggestion);
+				process.exitCode = 2;
+			}
+		},
+	);
+
+program
 	.command("ast")
 	.description("Display markdown AST and citation metadata for debugging")
 	.argument("<file>", "path to markdown file to analyze")
@@ -424,6 +502,10 @@ extractCmd
 	.argument("<target-file>", "Markdown file to extract from")
 	.argument("<header-name>", "Exact header text to extract")
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.option(
+		"--within <parent>",
+		"limit heading resolution to descendants of one unique parent",
+	)
 	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
 	.addOption(
 		new Option("--format <type>", "Output format")
@@ -436,6 +518,7 @@ extractCmd
 Examples:
     $ jact extract header plan.md "Task 1: Implementation"
     $ jact extract header docs/guide.md "Overview" --scope ./docs
+    $ jact extract header handbook.md "Install" --within "Guide"
     $ jact extract header file.md "Design" | jq '.extractedContentBlocks'
 
 Exit Codes:

@@ -123,6 +123,35 @@ npm run jact:validate path/to/file.md -- --fix --format json --scope /path/to/pr
 node utility-scripts/citation-links/jact.js validate path/to/file.md --fix --backup --scope /path/to/docs
 ```
 
+### Outline Markdown Headings
+
+Use `outline` to orient to a document before extracting a section. It renders parser-derived headings as a quoted text tree; `H2` is the default document-wide ceiling.
+
+```bash
+# Show H1 and H2 headings
+jact outline docs/guide.md
+
+# Show H1 only, or H1 through H3
+jact outline docs/guide.md H1
+jact outline docs/guide.md H3
+
+# Fully expand selected branches while other branches remain bounded by H2
+jact outline docs/guide.md H2 --expand "Install,Troubleshooting"
+
+# Resolve a duplicate heading within one unique parent
+jact outline handbook.md H2 --expand "Install" --within "Guide"
+jact extract header handbook.md "Install" --within "Guide"
+
+# Show the next-step reminders again for the active integration session
+jact outline docs/guide.md --cache-reset
+```
+
+`[*]` marks a visible heading with deeper hidden descendants. `--expand` accepts comma-separated heading names; headings containing commas cannot be selected through that option. A valid file without headings exits successfully with extraction guidance.
+
+Outline reminder caching is automatic when an agent integration supplies `JACT_SESSION_ID` (or the legacy `CLAUDE_SESSION_ID`) in the process environment. Without session context, reminders are shown on every call and no cross-session marker is written. There is no public `--session` option on `outline`.
+
+`outline` is intentionally text-only. Use `ast` when scripts or debugging need the complete structured parser output; its JSON contract is unchanged.
+
 ### View AST and Extracted Data
 
 ```bash

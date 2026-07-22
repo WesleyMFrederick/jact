@@ -2,8 +2,38 @@ import type { Heading } from "mdast";
 import { visit } from "unist-util-visit";
 import { headingText as getHeadingText } from "./core/MarkdownParser/extractHeadings.js";
 import { normalizeAnchorText } from "./core/MarkdownParser/normalizeInlineText.js";
-import type { LinkObject, ParserOutput } from "./types/citationTypes.js";
+import { buildHeadingTree } from "./outline/render-outline.js";
+import type {
+	HeadingObject,
+	LinkObject,
+	ParserOutput,
+} from "./types/citationTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
+
+export interface HeadingMatch {
+	index: number;
+	heading: HeadingObject;
+	/** Ancestors in root-to-parent order. */
+	ancestors: HeadingObject[];
+}
+
+export type HeadingResolution =
+	| {
+			status: "unique";
+			query: string;
+			match: HeadingMatch;
+			withinMatch?: HeadingMatch;
+	  }
+	| {
+			status: "missing";
+			query: string;
+			alternatives: HeadingMatch[];
+	  }
+	| {
+			status: "ambiguous";
+			query: string;
+			matches: HeadingMatch[];
+	  };
 
 /**
  * Facade providing stable query interface over MarkdownParser.Output.DataContract
@@ -135,6 +165,96 @@ class ParsedDocument {
 		return this._getAnchorIds();
 	}
 
+	/** Return parser-derived headings in document order. */
+	getHeadings(): HeadingObject[] {
+		return this._data.headings;
+	}
+
+	/**
+	 * Resolve a heading to one public outcome: unique, missing, or ambiguous.
+	 * When `within` is supplied, only descendants of that uniquely resolved
+	 * parent are candidates.
+	 */
+	resolveHeading(
+		query: string,
+		options: { within?: string; level?: number } = {},
+	): HeadingResolution {
+		const nodes = buildHeadingTree(this._data.headings);
+		let candidateIndexes = nodes.map((node) => node.index);
+		let withinMatch: HeadingMatch | undefined;
+
+		if (options.within !== undefined) {
+			const parentResolution = this.resolveHeading(options.within);
+			if (parentResolution.status !== "unique") return parentResolution;
+			withinMatch = parentResolution.match;
+			candidateIndexes = candidateIndexes.filter((index) => {
+				let parentIndex = nodes[index]?.parentIndex ?? null;
+				while (parentIndex !== null) {
+					if (parentIndex === withinMatch?.index) return true;
+					parentIndex = nodes[parentIndex]?.parentIndex ?? null;
+				}
+				return false;
+			});
+		}
+
+		if (options.level !== undefined) {
+			candidateIndexes = candidateIndexes.filter(
+				(index) => nodes[index]?.heading.level === options.level,
+			);
+		}
+
+		const normalizedQuery = this._normalizeObsidianHeading(query);
+		const matchingIndexes = candidateIndexes.filter(
+			(index) =>
+				this._normalizeObsidianHeading(nodes[index]?.heading.text ?? "") ===
+				normalizedQuery,
+		);
+		const toMatch = (index: number): HeadingMatch => {
+			const node = nodes[index];
+			if (!node) throw new Error(`Heading index out of range: ${index}`);
+			const ancestors: HeadingObject[] = [];
+			let parentIndex = node.parentIndex;
+			while (parentIndex !== null) {
+				const parent = nodes[parentIndex];
+				if (!parent) break;
+				ancestors.unshift(parent.heading);
+				parentIndex = parent.parentIndex;
+			}
+			return { index, heading: node.heading, ancestors };
+		};
+
+		if (matchingIndexes.length === 1) {
+			const result: HeadingResolution = {
+				status: "unique",
+				query,
+				match: toMatch(matchingIndexes[0] ?? -1),
+				...(withinMatch !== undefined && { withinMatch }),
+			};
+			return result;
+		}
+		if (matchingIndexes.length > 1) {
+			return {
+				status: "ambiguous",
+				query,
+				matches: matchingIndexes.map(toMatch),
+			};
+		}
+
+		const alternatives = candidateIndexes
+			.map((index) => ({
+				index,
+				score: this._calculateSimilarity(
+					query,
+					nodes[index]?.heading.text ?? "",
+				),
+			}))
+			.filter(({ score }) => score > 0.3)
+			.sort((a, b) => b.score - a.score)
+			.slice(0, 5)
+			.map(({ index }) => toMatch(index));
+		return { status: "missing", query, alternatives };
+	}
+
 	/**
 	 * Extract full file content
 	 * @returns Full content of parsed file
@@ -145,64 +265,55 @@ class ParsedDocument {
 	}
 
 	/**
-	 * Extract section content by heading text and optional level
+	 * Extract section content from one uniquely resolved heading.
 	 *
-	 * Uses 3-phase algorithm: (0) look up heading level if not provided,
-	 * (1) flatten token tree and locate target heading,
-	 * (2) find section boundary (next same-or-higher level heading),
-	 * (3) reconstruct content from token.raw properties.
+	 * Matching uses the shared heading resolver, so missing and duplicate names
+	 * return null rather than silently selecting the first heading. The resolved
+	 * document index then determines the next same-or-higher-level boundary.
 	 *
-	 * @param headingText - Exact heading text to find (case-sensitive)
-	 * @param headingLevel - Optional heading level (1-6). If not provided, looked up from headings array
-	 * @returns Section content string or null if not found
+	 * @param headingText - Exact heading text to resolve
+	 * @param headingLevel - Optional heading-level filter (1-6)
+	 * @returns Section content string, or null when resolution/extraction fails
 	 */
 	extractSection(headingText: string, headingLevel?: number): string | null {
-		// Phase 0: Look up heading level if not provided
-		let targetLevel = headingLevel;
-		if (targetLevel === undefined) {
-			// Normalize both input and heading text for Obsidian character comparison
-			const normalizedInput = this._normalizeObsidianHeading(headingText);
-			const headingMeta = this._data.headings.find(
-				(h) => this._normalizeObsidianHeading(h.text) === normalizedInput,
-			);
-			if (!headingMeta) return null;
-			targetLevel = headingMeta.level;
-		}
+		const resolution = this.resolveHeading(headingText, {
+			...(headingLevel !== undefined && { level: headingLevel }),
+		});
+		return resolution.status === "unique"
+			? this.extractResolvedSection(resolution.match)
+			: null;
+	}
 
-		// Phase 1: Collect heading nodes from the mdast tree, locate the target.
-		// Defensive: the facade is also constructed from hand-built ParserOutput
-		// objects in JS (e.g. block-only fixtures) that omit `ast`; section
-		// extraction has no tree to walk in that case.
+	/** Extract one section from an already uniquely resolved heading. */
+	extractResolvedSection(match: HeadingMatch): string | null {
 		const ast = this._data.ast;
 		if (!ast) return null;
 
-		const normalizedHeadingText = this._normalizeObsidianHeading(headingText);
 		const headingNodes: Heading[] = [];
 		visit(ast, "heading", (node) => {
 			headingNodes.push(node);
 		});
+		const targetNode = headingNodes[match.index];
+		if (
+			!targetNode ||
+			targetNode.depth !== match.heading.level ||
+			this._normalizeObsidianHeading(
+				getHeadingText(targetNode, this._data.content),
+			) !== this._normalizeObsidianHeading(match.heading.text)
+		) {
+			return null;
+		}
 
-		const targetIndex = headingNodes.findIndex(
-			(node) =>
-				node.depth === targetLevel &&
-				this._normalizeObsidianHeading(
-					getHeadingText(node, this._data.content),
-				) === normalizedHeadingText,
-		);
-		if (targetIndex === -1) return null;
-
-		// Phase 2: Find the section boundary (next same-or-higher level heading).
 		let boundaryNode: Heading | null = null;
-		for (let i = targetIndex + 1; i < headingNodes.length; i++) {
+		for (let i = match.index + 1; i < headingNodes.length; i++) {
 			const node = headingNodes[i];
-			if (node && node.depth <= targetLevel) {
+			if (node && node.depth <= targetNode.depth) {
 				boundaryNode = node;
 				break;
 			}
 		}
 
-		// Phase 3: Slice the original content between the heading and the boundary.
-		const startOffset = headingNodes[targetIndex]?.position?.start.offset;
+		const startOffset = targetNode.position?.start.offset;
 		if (startOffset === undefined) return null;
 		const endOffset =
 			boundaryNode?.position?.start.offset ?? this._data.content.length;
