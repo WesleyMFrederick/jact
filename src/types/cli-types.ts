@@ -1,7 +1,6 @@
 /**
  * CLI-facing types for jact commands.
- *
- * Split from contentExtractorTypes.ts (issue #28).
+
  */
 
 import type { ValidationResult } from "./validationTypes.js";

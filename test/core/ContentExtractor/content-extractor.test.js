@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ContentExtractor } from "../../../src/core/ContentExtractor/ContentExtractor.js";
 import { SectionLinkStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
 import { StopMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
-import { createContentExtractor } from "../../../src/factories/componentFactory.js";
+import { createExtractionHarness } from "../../helpers/workflow-harness.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,7 +16,7 @@ describe("ContentExtractor", () => {
 		const strategies = [new StopMarkerStrategy(), new SectionLinkStrategy()];
 
 		// When: ContentExtractor created with optional dependencies
-		const extractor = new ContentExtractor(strategies, null, null);
+		const extractor = new ContentExtractor(strategies, null);
 
 		// Then: Instance created successfully
 		expect(extractor).toBeInstanceOf(ContentExtractor);
@@ -25,7 +25,7 @@ describe("ContentExtractor", () => {
 	it("should analyze eligibility using injected strategies", () => {
 		// Given: ContentExtractor with strategies
 		const strategies = [new SectionLinkStrategy()];
-		const extractor = new ContentExtractor(strategies, null, null);
+		const extractor = new ContentExtractor(strategies, null);
 		const link = { anchorType: "header", extractionMarker: null };
 
 		// When: analyzeEligibility called
@@ -40,7 +40,7 @@ describe("ContentExtractor", () => {
 
 	it("should handle empty strategy array gracefully", () => {
 		// Given: ContentExtractor with empty strategies
-		const extractor = new ContentExtractor([], null, null);
+		const extractor = new ContentExtractor([], null);
 		const link = { anchorType: "header" };
 
 		// When: analyzeEligibility called
@@ -53,46 +53,38 @@ describe("ContentExtractor", () => {
 		});
 	});
 
-	it("should accept parsedFileCache and citationValidator dependencies", () => {
-		// Given: Mock dependencies
-		const mockCache = { get: () => null, set: () => {} };
-		const mockValidator = { validate: () => ({ valid: true }) };
-		const mockStrategies = [];
-
-		// When: ContentExtractor instantiated with all dependencies
+	it("uses the injected semantic-document lifecycle", async () => {
+		const resolveDocument = vi.fn().mockResolvedValue({
+			extractFullContent: () => "content",
+		});
 		const extractor = new ContentExtractor(
-			mockStrategies,
-			mockCache,
-			mockValidator,
+			[{ getDecision: () => ({ eligible: true, reason: "test" }) }],
+			{ resolveDocument },
 		);
+		const link = {
+			scope: "cross-document",
+			anchorType: null,
+			validation: { status: "valid" },
+			target: { path: { absolute: "/virtual/target.md" }, anchor: null },
+			fullMatch: "[target](target.md)",
+			line: 1,
+			column: 1,
+		};
 
-		// Then: Dependencies stored correctly
-		expect(extractor.parsedFileCache).toBe(mockCache);
-		expect(extractor.citationValidator).toBe(mockValidator);
-		expect(extractor.eligibilityStrategies).toBe(mockStrategies);
+		const result = await extractor.extractContent([link], { fullFiles: true });
+
+		expect(resolveDocument).toHaveBeenCalledWith({
+			kind: "file",
+			filePath: "/virtual/target.md",
+		});
+		expect(result.stats.uniqueContent).toBe(1);
 	});
 
-	it("should provide extractLinksContent method returning Promise of OutgoingLinksExtractedContent", async () => {
-		// Given: ContentExtractor with mock dependencies
-		const mockCache = {
-			resolveParsedFile: async () => ({
-				extractFullContent: () => "content",
-			}),
-		};
-		const mockValidator = { validateFile: async () => ({ links: [] }) };
-		const strategies = [];
-		const extractor = new ContentExtractor(
-			strategies,
-			mockCache,
-			mockValidator,
-		);
+	it("exposes one extraction operation with the production result contract", async () => {
+		const extractor = new ContentExtractor([], { resolveDocument: vi.fn() });
 
-		// When: extractLinksContent called with source file and flags
-		const result = await extractor.extractLinksContent("source-file.md", {
-			fullFiles: false,
-		});
+		const result = await extractor.extractContent([], { fullFiles: false });
 
-		// Then: Returns OutgoingLinksExtractedContent object
 		expect(result).toHaveProperty("extractedContentBlocks");
 		expect(result).toHaveProperty("outgoingLinksReport");
 		expect(result).toHaveProperty("stats");
@@ -104,10 +96,10 @@ describe("ContentExtractor", () => {
 			__dirname,
 			"../../fixtures/us2.2/mixed-links-source.md",
 		);
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 
-		// When: extractLinksContent executed WITHOUT --full-files flag
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: the extraction operation executes WITHOUT --full-files flag
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -123,7 +115,7 @@ describe("ContentExtractor", () => {
 				r.sourceLink.scope === "cross-document",
 		);
 		expect(sectionResult).toBeDefined();
-		expect(sectionResult.status).toBe("success");
+		expect(sectionResult.status).toBe("extracted");
 		expect(sectionResult.contentId).toBeDefined();
 		const sectionContent =
 			output.extractedContentBlocks[sectionResult.contentId];
@@ -138,7 +130,7 @@ describe("ContentExtractor", () => {
 				r.sourceLink.scope === "cross-document",
 		);
 		expect(blockResult).toBeDefined();
-		expect(blockResult.status).toBe("success");
+		expect(blockResult.status).toBe("extracted");
 		expect(blockResult.contentId).toBeDefined();
 		const blockContent = output.extractedContentBlocks[blockResult.contentId];
 		expect(blockContent.content).toContain(
@@ -165,10 +157,10 @@ describe("ContentExtractor", () => {
 			__dirname,
 			"../../fixtures/us2.2/mixed-links-source.md",
 		);
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 
-		// When: extractLinksContent executed WITH --full-files flag
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: the extraction operation executes WITH --full-files flag
+		const output = await extractFile(sourceFile, {
 			fullFiles: true,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -180,7 +172,7 @@ describe("ContentExtractor", () => {
 				r.sourceLink.scope === "cross-document",
 		);
 		expect(fullFileResult).toBeDefined();
-		expect(fullFileResult.status).toBe("success");
+		expect(fullFileResult.status).toBe("extracted");
 		expect(fullFileResult.contentId).toBeDefined();
 		const fullFileContent =
 			output.extractedContentBlocks[fullFileResult.contentId];
@@ -194,10 +186,10 @@ describe("ContentExtractor", () => {
 				__dirname,
 				"../../fixtures/us2.2/mixed-links-source.md",
 			);
-			const extractor = createContentExtractor();
+			const { extractFile } = createExtractionHarness();
 
-			// When: extractLinksContent executed
-			const output = await extractor.extractLinksContent(sourceFile, {
+			// When: the extraction operation executes
+			const output = await extractFile(sourceFile, {
 				fullFiles: false,
 			});
 
@@ -213,10 +205,10 @@ describe("ContentExtractor", () => {
 				__dirname,
 				"../../fixtures/us2.2/mixed-links-source.md",
 			);
-			const extractor = createContentExtractor();
+			const { extractFile } = createExtractionHarness();
 
-			// When: extractLinksContent executed
-			const output = await extractor.extractLinksContent(sourceFile, {
+			// When: the extraction operation executes
+			const output = await extractFile(sourceFile, {
 				fullFiles: false,
 			});
 
@@ -234,10 +226,10 @@ describe("ContentExtractor", () => {
 				__dirname,
 				"../../fixtures/us2.2/mixed-links-source.md",
 			);
-			const extractor = createContentExtractor();
+			const { extractFile } = createExtractionHarness();
 
-			// When: extractLinksContent executed
-			const output = await extractor.extractLinksContent(sourceFile, {
+			// When: the extraction operation executes
+			const output = await extractFile(sourceFile, {
 				fullFiles: false,
 			});
 
@@ -255,26 +247,10 @@ describe("ContentExtractor", () => {
 		});
 
 		it("should return _totalContentCharacterLength of 2 for empty extraction", async () => {
-			// Given: Source file with no eligible links
-			const mockCache = {
-				resolveParsedFile: async () => ({
-					extractFullContent: () => "content",
-				}),
-			};
-			const mockValidator = { validateFile: async () => ({ links: [] }) };
-			const strategies = [];
-			const extractor = new ContentExtractor(
-				strategies,
-				mockCache,
-				mockValidator,
-			);
+			const extractor = new ContentExtractor([], { resolveDocument: vi.fn() });
 
-			// When: extractLinksContent called with no links
-			const output = await extractor.extractLinksContent("source-file.md", {
-				fullFiles: false,
-			});
+			const output = await extractor.extractContent([], { fullFiles: false });
 
-			// Then: _totalContentCharacterLength equals 2 (empty object "{}")
 			expect(output.extractedContentBlocks._totalContentCharacterLength).toBe(
 				2,
 			);
@@ -310,7 +286,7 @@ describe("ContentExtractor", () => {
 			];
 
 			const mockParsedFileCache = {
-				resolveParsedFile: vi.fn().mockResolvedValue({
+				resolveDocument: vi.fn().mockResolvedValue({
 					extractSection: (anchor) => {
 						if (anchor === "Section One") return "Content for section one";
 						if (anchor === "Section Two") return "Content for section two";
@@ -327,7 +303,6 @@ describe("ContentExtractor", () => {
 			const extractor = new ContentExtractor(
 				mockStrategies,
 				mockParsedFileCache,
-				null,
 			);
 
 			// When: Extract content
@@ -355,10 +330,10 @@ describe("ContentExtractor", () => {
 				__dirname,
 				"../../fixtures/us2.2/mixed-links-source.md",
 			);
-			const extractor = createContentExtractor();
+			const { extractFile } = createExtractionHarness();
 
-			// When: extractLinksContent executed
-			const output = await extractor.extractLinksContent(sourceFile, {
+			// When: the extraction operation executes
+			const output = await extractFile(sourceFile, {
 				fullFiles: false,
 			});
 

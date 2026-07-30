@@ -15,7 +15,14 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import type { LinkObject } from "../../types/citationTypes.js";
 import type { PathConversion } from "../../types/validationTypes.js";
+import { CacheFallbackStrategy } from "./pathResolutionStrategies/CacheFallbackStrategy.js";
+import { FileFoundStrategy } from "./pathResolutionStrategies/FileFoundStrategy.js";
+import { FolderLinkStrategy } from "./pathResolutionStrategies/FolderLinkStrategy.js";
+import type { PathResolutionStrategy } from "./pathResolutionStrategies/PathResolutionStrategy.js";
+import { WikiFailLoudStrategy } from "./pathResolutionStrategies/WikiFailLoudStrategy.js";
+import { WikiFastPathStrategy } from "./pathResolutionStrategies/WikiFastPathStrategy.js";
 
 /**
  * Minimal interface over FileCache to avoid circular imports.
@@ -30,11 +37,31 @@ export interface FileCacheLike {
 	};
 }
 
+export type PathResolutionOutcome =
+	| {
+			kind: "resolved";
+			targetPath: string;
+			anchorFailureStatus: "error" | "warning";
+			anchorFailurePrefix?: string;
+			warning?: string;
+			pathConversion?: PathConversion;
+	  }
+	| { kind: "warning"; error: string; suggestion?: string }
+	| { kind: "error"; error: string; suggestion?: string };
+
 export class PathResolver {
 	private fileCache: FileCacheLike;
+	private strategies: PathResolutionStrategy[];
 
 	constructor(fileCache: FileCacheLike) {
 		this.fileCache = fileCache;
+		this.strategies = [
+			new WikiFastPathStrategy(),
+			new WikiFailLoudStrategy(),
+			new FolderLinkStrategy(),
+			new FileFoundStrategy(),
+			new CacheFallbackStrategy(),
+		];
 	}
 
 	// ── Filesystem primitives ──────────────────────────────────────────────────
@@ -118,9 +145,38 @@ export class PathResolver {
 		return debugParts.join("; ");
 	}
 
-	// ── Strategy-based target resolution ──────────────────────────────────────
+	// ── Complete citation path resolution ─────────────────────────────────────
 
-	resolveTargetPath(relativePath: string, sourceFile: string): string {
+	resolveCitationPath(
+		citation: LinkObject,
+		sourceFile: string,
+	): PathResolutionOutcome {
+		const rawPath = citation.target.path.raw ?? "";
+		const decodedPath = decodeURIComponent(rawPath);
+		const sourceDir = dirname(sourceFile);
+		const standardPath = resolve(sourceDir, decodedPath);
+		const candidatePath = this.findCandidatePath(rawPath, sourceFile);
+		const context = {
+			citation,
+			sourceFile,
+			candidatePath,
+			standardPath,
+			pathResolver: this,
+			fileCache: this.fileCache,
+		};
+
+		for (const strategy of this.strategies) {
+			const outcome = strategy.resolve(context);
+			if (outcome !== null) return outcome;
+		}
+
+		return {
+			kind: "error",
+			error: "Path resolution failed: no strategy matched",
+		};
+	}
+
+	private findCandidatePath(relativePath: string, sourceFile: string): string {
 		const decodedRelativePath = decodeURIComponent(relativePath);
 
 		// Strategy 0: Expand tilde to home directory
@@ -180,17 +236,6 @@ export class PathResolver {
 			// Continue to next strategy if symlink resolution fails
 		}
 
-		// Strategy 4: File cache smart filename matching
-		if (this.fileCache) {
-			const filename = decodedRelativePath.split("/").pop() ?? "";
-			const cacheResult = this.fileCache.resolveFile(filename);
-
-			if (cacheResult.found && cacheResult.path) {
-				return cacheResult.path;
-			}
-		}
-
-		// Fallback: return standard path (caught as "file not found" upstream)
 		return standardPath;
 	}
 

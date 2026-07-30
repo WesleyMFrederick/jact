@@ -1,40 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { JactCli } from "../../dist/jact-cli.js";
 
-describe("JactCli class property types", () => {
-  it("parser property is a MarkdownParser instance", () => {
-    const manager = new JactCli();
-    // Access private properties via type-safe cast for verification
-    const internal = manager as unknown as Record<string, unknown>;
-    expect(internal.parser).toBeDefined();
-    expect(internal.parser).toHaveProperty("parseFile");
-  });
+describe("JactCli public operations", () => {
+	const operationNames = [
+		"getAst",
+		"validate",
+		"validateContent",
+		"extractLinks",
+		"extractFile",
+	] as const;
 
-  it("parsedFileCache property is a ParsedFileCache instance", () => {
-    const manager = new JactCli();
-    const internal = manager as unknown as Record<string, unknown>;
-    expect(internal.parsedFileCache).toBeDefined();
-    expect(internal.parsedFileCache).toHaveProperty("resolveParsedFile");
-  });
-
-  it("fileCache property is a FileCache instance", () => {
-    const manager = new JactCli();
-    const internal = manager as unknown as Record<string, unknown>;
-    expect(internal.fileCache).toBeDefined();
-    expect(internal.fileCache).toHaveProperty("buildCache");
-  });
-
-  it("validator property is a CitationValidator instance", () => {
-    const manager = new JactCli();
-    const internal = manager as unknown as Record<string, unknown>;
-    expect(internal.validator).toBeDefined();
-    expect(internal.validator).toHaveProperty("validateFile");
-  });
-
-  it("contentExtractor property is a ContentExtractor instance", () => {
-    const manager = new JactCli();
-    const internal = manager as unknown as Record<string, unknown>;
-    expect(internal.contentExtractor).toBeDefined();
-    expect(internal.contentExtractor).toHaveProperty("extractContent");
-  });
+	for (const operationName of operationNames) {
+		it(`exposes ${operationName}`, () => {
+			const manager = new JactCli();
+			expect(typeof manager[operationName]).toBe("function");
+		});
+	}
 });

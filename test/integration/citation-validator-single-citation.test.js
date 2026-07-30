@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
 import { MarkdownParser } from "../../src/core/MarkdownParser/index.js";
+import { createFileCache } from "../../src/factories/componentFactory.js";
 import { LinkObjectFactory } from "../../src/factories/LinkObjectFactory.js";
 import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 
@@ -19,7 +20,7 @@ describe("validateSingleCitation returns EnrichedLinkObject", () => {
 		const fs = { readFileSync };
 		const parser = new MarkdownParser(fs);
 		const cache = new ParsedFileCache(parser);
-		validator = new CitationValidator(cache, null);
+		validator = new CitationValidator(cache, createFileCache());
 		factory = new LinkObjectFactory();
 	});
 

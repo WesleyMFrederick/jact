@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createContentExtractor } from "../../src/factories/componentFactory.js";
+import { createExtractionHarness } from "../helpers/workflow-harness.js";
 
 /**
  * Integration tests for Content Extraction Workflow
@@ -14,14 +14,14 @@ import { createContentExtractor } from "../../src/factories/componentFactory.js"
 describe("Content Extraction Workflow Integration", () => {
 	it("should execute complete extraction workflow with real components", async () => {
 		// Given: Real components via factory (no mocks - "Real Systems, Fake Fixtures")
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Complete workflow executes
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -38,14 +38,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should handle section extraction with real implementation", async () => {
 		// Given: Real components and source with section link
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Extract content with section links
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -59,7 +59,7 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		expect(sectionResult).toBeDefined();
-		expect(sectionResult.status).toBe("success");
+		expect(sectionResult.status).toBe("extracted");
 		expect(sectionResult.contentId).toBeDefined();
 		const contentBlock = output.extractedContentBlocks[sectionResult.contentId];
 		expect(contentBlock.content).toContain(
@@ -69,14 +69,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should handle block extraction with real implementation", async () => {
 		// Given: Real components and source with block link
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Extract content with block links
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -90,7 +90,7 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		expect(blockResult).toBeDefined();
-		expect(blockResult.status).toBe("success");
+		expect(blockResult.status).toBe("extracted");
 		expect(blockResult.contentId).toBeDefined();
 		const blockContent = output.extractedContentBlocks[blockResult.contentId];
 		expect(blockContent.content).toContain(
@@ -101,14 +101,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should skip full file link when fullFiles flag disabled", async () => {
 		// Given: Real components with fullFiles flag disabled
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Extract content with fullFiles=false
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -127,14 +127,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should extract full file content when fullFiles flag enabled", async () => {
 		// Given: Real components with fullFiles flag enabled
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Extract content with fullFiles=true
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: true,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -148,7 +148,7 @@ describe("Content Extraction Workflow Integration", () => {
 		);
 
 		expect(fullFileResult).toBeDefined();
-		expect(fullFileResult.status).toBe("success");
+		expect(fullFileResult.status).toBe("extracted");
 		expect(fullFileResult.contentId).toBeDefined();
 		const fullFileContent =
 			output.extractedContentBlocks[fullFileResult.contentId];
@@ -159,14 +159,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should handle validation errors gracefully", async () => {
 		// Given: Real components and source with broken links
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/error-links-source.md",
 		);
 
 		// When: Extract content from file with errors
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -183,14 +183,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should use real ParsedFileCache for caching efficiency", async () => {
 		// Given: Real components with multiple links to same target
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Extract content (multiple links reference target-doc.md)
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -208,14 +208,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should return structured ExtractionResult array", async () => {
 		// Given: Real components
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Extract content
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -224,11 +224,10 @@ describe("Content Extraction Workflow Integration", () => {
 		for (const result of results) {
 			expect(result).toHaveProperty("sourceLink");
 			expect(result).toHaveProperty("status");
-			expect(["success", "skipped", "error"]).toContain(result.status);
+			expect(["extracted", "skipped", "failed"]).toContain(result.status);
 
-			if (result.status === "success") {
+			if (result.status === "extracted") {
 				expect(result).toHaveProperty("contentId");
-				expect(result).toHaveProperty("eligibilityReason");
 				expect(typeof result.contentId).toBe("string");
 				// Verify content exists in extractedContentBlocks
 				expect(output.extractedContentBlocks[result.contentId]).toBeDefined();
@@ -241,20 +240,20 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should integrate CitationValidator enrichment with eligibility analysis", async () => {
 		// Given: Real components
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Extract content
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: true,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
 
 		// Then: Results contain enriched link metadata from validator
-		const successResult = results.find((r) => r.status === "success");
+		const successResult = results.find((r) => r.status === "extracted");
 
 		expect(successResult).toBeDefined();
 		expect(successResult.sourceLink).toHaveProperty("validation");
@@ -265,14 +264,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should validate workflow orchestration phases", async () => {
 		// Given: Real components
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Complete workflow executes
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -293,21 +292,21 @@ describe("Content Extraction Workflow Integration", () => {
 		).toBe(true);
 
 		// Phase 3: Content retrieval (attempts extraction for eligible links)
-		expect(results.some((r) => ["success", "error"].includes(r.status))).toBe(
+		expect(results.some((r) => ["extracted", "failed"].includes(r.status))).toBe(
 			true,
 		);
 	});
 
 	it("should extract actual content for sections, blocks, and full files", async () => {
 		// Given: Real components via factory (no mocks)
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Complete workflow executes
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -323,7 +322,7 @@ describe("Content Extraction Workflow Integration", () => {
 				r.sourceLink.scope === "cross-document",
 		);
 		expect(sectionResult).toBeDefined();
-		expect(sectionResult.status).toBe("success");
+		expect(sectionResult.status).toBe("extracted");
 		expect(sectionResult.contentId).toBeDefined();
 		const sectionContent =
 			output.extractedContentBlocks[sectionResult.contentId];
@@ -339,7 +338,7 @@ describe("Content Extraction Workflow Integration", () => {
 				r.sourceLink.scope === "cross-document",
 		);
 		expect(blockResult).toBeDefined();
-		expect(blockResult.status).toBe("success");
+		expect(blockResult.status).toBe("extracted");
 		expect(blockResult.contentId).toBeDefined();
 		const blockContent2 = output.extractedContentBlocks[blockResult.contentId];
 		expect(blockContent2.content).toContain("This is a block reference");
@@ -357,14 +356,14 @@ describe("Content Extraction Workflow Integration", () => {
 
 	it("should extract full file content when --full-files flag enabled", async () => {
 		// Given: ContentExtractor with --full-files flag
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Execute with fullFiles flag
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: true,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -376,7 +375,7 @@ describe("Content Extraction Workflow Integration", () => {
 				r.sourceLink.scope === "cross-document",
 		);
 		expect(fullFileResult).toBeDefined();
-		expect(fullFileResult.status).toBe("success");
+		expect(fullFileResult.status).toBe("extracted");
 		expect(fullFileResult.contentId).toBeDefined();
 		const fullFileContent2 =
 			output.extractedContentBlocks[fullFileResult.contentId];

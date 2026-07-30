@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatExtractResult } from "../../src/formatExtractResult.js";
-import type { OutgoingLinksExtractedContent } from "../../src/types/contentExtractorTypes.js";
+import type { OutgoingLinksExtractedContent } from "../../src/types/extraction-types.js";
 
 /**
  * Unit tests for formatExtractResult — pure function, no CLI or filesystem.

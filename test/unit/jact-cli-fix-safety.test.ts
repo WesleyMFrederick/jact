@@ -46,13 +46,15 @@ const anchorFixableLink = {
 	},
 };
 
-/** Build a JactCli with validateFile stubbed to return the given links */
+/** Build a JactCli with semantic parsing and validation stubbed. */
 function buildCli(links: unknown[]): JactCli {
 	const cli = new JactCli();
-	const validator = (
-		cli as unknown as { validator: { validateFile: () => unknown } }
-	).validator;
-	vi.spyOn(validator, "validateFile").mockResolvedValue({ links });
+	const internal = cli as unknown as {
+		parsedFileCache: { resolveDocument: () => Promise<unknown> };
+		validator: { validateDocument: () => Promise<unknown> };
+	};
+	vi.spyOn(internal.parsedFileCache, "resolveDocument").mockResolvedValue({});
+	vi.spyOn(internal.validator, "validateDocument").mockResolvedValue({ links });
 	return cli;
 }
 

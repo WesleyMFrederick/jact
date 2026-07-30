@@ -25,8 +25,8 @@ describe("JactCli - extractLinks() Phase 1", () => {
 			"test/fixtures/section-extraction/links.md",
 		);
 
-		// When: Call extractLinks Phase 1
-		// Note: This test validates validator.validateFile() called
+		// When: Run the production extraction workflow
+		// Document validation must complete before content extraction.
 		await manager.extractLinks(sourceFile, {});
 
 		// Then: Validation executed and enriched links available

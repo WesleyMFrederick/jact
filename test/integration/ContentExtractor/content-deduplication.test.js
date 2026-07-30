@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createContentExtractor } from "../../../src/factories/componentFactory.js";
+import { createExtractionHarness } from "../../helpers/workflow-harness.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,7 +11,7 @@ describe("Content Deduplication - Basic Logic", () => {
 	it("should store identical content only once in extractedContentBlocks", async () => {
 		// Fixture: Create test file with multiple links extracting identical content
 		// Integration: Real ContentExtractor with real dependencies (no mocks)
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -19,7 +19,7 @@ describe("Content Deduplication - Basic Logic", () => {
 		);
 
 		// When: Extract content from source with duplicate links
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -45,7 +45,7 @@ describe("Content Deduplication - Basic Logic", () => {
 describe("Content Deduplication - Index Structure", () => {
 	it("should create index entries with content and contentLength", async () => {
 		// Given: Source with extractable links
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -53,7 +53,7 @@ describe("Content Deduplication - Index Structure", () => {
 		);
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -79,7 +79,7 @@ describe("Content Deduplication - Index Structure", () => {
 describe("Content Deduplication - Statistics: Total Links", () => {
 	it("should count all processed links in stats.totalLinks", async () => {
 		// Given: File with mixed link statuses (success, skipped, error)
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -87,7 +87,7 @@ describe("Content Deduplication - Statistics: Total Links", () => {
 		);
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -101,7 +101,7 @@ describe("Content Deduplication - Statistics: Total Links", () => {
 		const allStatuses = result.outgoingLinksReport.processedLinks.map(
 			(link) => link.status,
 		);
-		expect(allStatuses).toContain("success");
+		expect(allStatuses).toContain("extracted");
 		expect(result.stats.totalLinks).toBeGreaterThan(0);
 	});
 });
@@ -109,7 +109,7 @@ describe("Content Deduplication - Statistics: Total Links", () => {
 describe("Content Deduplication - Statistics: Unique Content", () => {
 	it("should count unique content blocks in stats.uniqueContent", async () => {
 		// Given: File with duplicate content extractions
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -117,7 +117,7 @@ describe("Content Deduplication - Statistics: Unique Content", () => {
 		);
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -137,18 +137,18 @@ describe("Content Deduplication - Statistics: Unique Content", () => {
 describe("Content Deduplication - ContentId References", () => {
 	it("should reference content via contentId in processedLinks", async () => {
 		// Given: Mixed success/skipped/error links
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(fixturesDir, "us2.2a", "mixed-links-source.md");
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
 		// Then: Successful links have valid contentId reference
 		// Verification: contentId matches extractedContentBlocks key (AC6)
 		const successLink = result.outgoingLinksReport.processedLinks.find(
-			(link) => link.status === "success",
+			(link) => link.status === "extracted",
 		);
 		expect(successLink).toBeDefined();
 		expect(successLink).toHaveProperty("contentId");
@@ -168,7 +168,7 @@ describe("Content Deduplication - ContentId References", () => {
 
 		// Additional verification: Error links also have null contentId
 		const errorLink = result.outgoingLinksReport.processedLinks.find(
-			(link) => link.status === "error",
+			(link) => link.status === "failed",
 		);
 		if (errorLink) {
 			expect(errorLink.contentId).toBeNull();
@@ -181,7 +181,7 @@ describe("Content Deduplication - ContentId References", () => {
 describe("Content Deduplication - Statistics: Duplicate Detection", () => {
 	it("should count duplicate content detections in stats.duplicateContentDetected", async () => {
 		// Given: File with 3 links extracting identical content
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -189,7 +189,7 @@ describe("Content Deduplication - Statistics: Duplicate Detection", () => {
 		);
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -208,7 +208,7 @@ describe("Content Deduplication - Statistics: Duplicate Detection", () => {
 describe("Content Deduplication - Statistics: Tokens Saved", () => {
 	it("should accumulate saved tokens in stats.tokensSaved", async () => {
 		// Given: File with duplicate content (known length)
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -216,7 +216,7 @@ describe("Content Deduplication - Statistics: Tokens Saved", () => {
 		);
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -237,7 +237,7 @@ describe("Content Deduplication - Statistics: Tokens Saved", () => {
 describe("Content Deduplication - Statistics: Compression Ratio", () => {
 	it("should calculate compression ratio as saved / (total + saved)", async () => {
 		// Given: File with known duplicate content
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -245,7 +245,7 @@ describe("Content Deduplication - Statistics: Compression Ratio", () => {
 		);
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -257,7 +257,8 @@ describe("Content Deduplication - Statistics: Compression Ratio", () => {
 		const tokensSaved = result.stats.tokensSaved;
 
 		// Verification: Compression ratio formula (AC7)
-		const expectedRatio = tokensSaved / (totalContentSize + tokensSaved);
+		const expectedRatio =
+			(tokensSaved / (totalContentSize + tokensSaved)) * 100;
 		expect(result.stats.compressionRatio).toBeCloseTo(expectedRatio, 5); // 5 decimal places
 	});
 });
@@ -265,11 +266,11 @@ describe("Content Deduplication - Statistics: Compression Ratio", () => {
 describe("Content Deduplication - Output Structure: Skipped Links", () => {
 	it("should include skipped links with null contentId and failure reason", async () => {
 		// Given: File with ineligible links (e.g., full-file without flag)
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(fixturesDir, "us2.2a", "mixed-links-source.md");
 
 		// When: Extract without --full-files flag
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -294,11 +295,11 @@ describe("Content Deduplication - Output Structure: Skipped Links", () => {
 describe("Content Deduplication - Output Structure: Error Links", () => {
 	it("should include error links with null contentId and failure reason", async () => {
 		// Given: File with broken links (validation errors)
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(fixturesDir, "us2.2a", "mixed-links-source.md");
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -325,26 +326,25 @@ describe("Content Deduplication - Output Structure: Error Links", () => {
 describe("Content Deduplication - Output Structure: Success Metadata", () => {
 	it("should preserve all link metadata for successful extractions", async () => {
 		// Given: File with successful extractions
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(fixturesDir, "us2.2a", "mixed-links-source.md");
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
 		// Then: Find successful link
 		const successLink = result.outgoingLinksReport.processedLinks.find(
-			(link) => link.status === "success",
+			(link) => link.status === "extracted",
 		);
 		expect(successLink).toBeDefined();
 
 		// Verification: All required metadata present (AC6)
 		expect(successLink).toHaveProperty("sourceLink"); // Original LinkObject
 		expect(successLink).toHaveProperty("contentId"); // Content reference
-		expect(successLink).toHaveProperty("status"); // 'success'
-		expect(successLink.status).toBe("success");
-		expect(successLink).toHaveProperty("eligibilityReason"); // Why extracted
+		expect(successLink).toHaveProperty("status");
+		expect(successLink.status).toBe("extracted");
 
 		// Verification: sourceLink has all original metadata
 		expect(successLink.sourceLink).toHaveProperty("line");
@@ -356,11 +356,11 @@ describe("Content Deduplication - Output Structure: Success Metadata", () => {
 describe("Content Deduplication - Output Structure: Complete Stats", () => {
 	it("should populate all five statistics fields accurately", async () => {
 		// Given: File with mixed extraction results
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(fixturesDir, "us2.2a", "mixed-links-source.md");
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -391,7 +391,7 @@ describe("Content Deduplication - Output Structure: Complete Stats", () => {
 describe("US2.2a Acceptance - Compression Ratio", () => {
 	it("should include compressionRatio in stats with correct calculation", async () => {
 		// Given: File with known duplication pattern
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -399,7 +399,7 @@ describe("US2.2a Acceptance - Compression Ratio", () => {
 		);
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -411,20 +411,20 @@ describe("US2.2a Acceptance - Compression Ratio", () => {
 			.filter(([key]) => !key.startsWith("_"))
 			.reduce((sum, [, block]) => sum + block.contentLength, 0);
 		const saved = result.stats.tokensSaved;
-		const expectedRatio = saved / (totalSize + saved);
+		const expectedRatio = (saved / (totalSize + saved)) * 100;
 
 		expect(result.stats.compressionRatio).toBeCloseTo(expectedRatio, 5);
 
-		// Verification: Ratio between 0 and 1 (percentage as decimal)
+		// Verification: Ratio is reported as a percentage.
 		expect(result.stats.compressionRatio).toBeGreaterThanOrEqual(0);
-		expect(result.stats.compressionRatio).toBeLessThanOrEqual(1);
+		expect(result.stats.compressionRatio).toBeLessThanOrEqual(100);
 	});
 });
 
 describe("US2.2a Acceptance - Three-Group Structure", () => {
 	it("should organize output into extractedContentBlocks, outgoingLinksReport, and stats", async () => {
 		// Given: Any extraction workflow
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(
 			fixturesDir,
 			"us2.2a",
@@ -432,7 +432,7 @@ describe("US2.2a Acceptance - Three-Group Structure", () => {
 		);
 
 		// When: Extract content
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -463,11 +463,11 @@ describe("US2.2a Acceptance - SHA-256 Content Hashing", () => {
 	it("should deduplicate based on content hash, not file/anchor identity", async () => {
 		// Fixture: Create files with identical content at different locations
 		// Research: Same section content in different files should deduplicate
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(fixturesDir, "us2.2a", "cross-file-duplicates.md");
 
 		// When: Extract content from different files with identical text
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -479,7 +479,7 @@ describe("US2.2a Acceptance - SHA-256 Content Hashing", () => {
 
 		// Given: 2 different files with identical section content
 		const processedCount = result.outgoingLinksReport.processedLinks.filter(
-			(link) => link.status === "success",
+			(link) => link.status === "extracted",
 		).length;
 		expect(processedCount).toBe(2); // 2 links processed
 		expect(contentIds.length).toBe(1); // But only 1 unique content block
@@ -487,7 +487,7 @@ describe("US2.2a Acceptance - SHA-256 Content Hashing", () => {
 		// Verification: Both links reference the same contentId (cross-file deduplication)
 		const contentBlock = result.extractedContentBlocks[contentIds[0]];
 		const successLinks = result.outgoingLinksReport.processedLinks.filter(
-			(link) => link.status === "success",
+			(link) => link.status === "extracted",
 		);
 		expect(successLinks).toHaveLength(2);
 
@@ -502,11 +502,11 @@ describe("US2.2a Acceptance - SHA-256 Content Hashing", () => {
 describe("Content Deduplication - Edge Cases", () => {
 	it("should return 0 compression ratio when no content extracted", async () => {
 		// Given: File with only failed/skipped links (no successful extractions)
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(fixturesDir, "us2.2a", "all-failed-links.md");
 
 		// When: Extract content (all links fail)
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -535,11 +535,11 @@ describe("US2.2a Acceptance - Complete Pipeline", () => {
 		// - Skipped links (ineligible)
 		// - Error links (validation failures)
 		// Integration: Real components (no mocks)
-		const extractor = createContentExtractor();
+		const { extractFile } = createExtractionHarness();
 		const sourceFile = join(fixturesDir, "us2.2a", "comprehensive-test.md");
 
 		// When: Complete pipeline executes
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -574,15 +574,15 @@ describe("US2.2a Acceptance - Complete Pipeline", () => {
 		const statuses = result.outgoingLinksReport.processedLinks.map(
 			(link) => link.status,
 		);
-		expect(statuses).toContain("success");
+		expect(statuses).toContain("extracted");
 		expect(statuses.some((s) => s === "skipped")).toBe(true);
 
 		// Verification: Content references correct (AC6, AC8)
 		const successLinks = result.outgoingLinksReport.processedLinks.filter(
-			(link) => link.status === "success",
+			(link) => link.status === "extracted",
 		);
 		const failedLinks = result.outgoingLinksReport.processedLinks.filter(
-			(link) => link.status !== "success",
+			(link) => link.status !== "extracted",
 		);
 
 		// For each success link: expect contentId to be non-null and in extractedContentBlocks

@@ -27,9 +27,10 @@ import { FileCache } from "../FileCache.js";
 import { ParsedFileCache } from "../ParsedFileCache.js";
 import type {
 	FileCacheLike,
-	ParsedFileCacheLike,
+	ParsedDocumentLifecycleLike,
 } from "../types/componentInterfaces.js";
-import type { ExtractionEligibilityStrategy } from "../types/contentExtractorTypes.js";
+import { ValidationWorkflow } from "../validate/validation-workflow.js";
+import type { ExtractionEligibilityStrategy } from "../types/strategy-types.js";
 
 /**
  * Create markdown parser with file system dependency
@@ -71,21 +72,21 @@ export function createParsedFileCache(
 /**
  * Create citation validator with optional dependency overrides
  *
- * Wires together ParsedFileCacheLike and FileCacheLike dependencies. If not
- * provided, creates default production instances. Accepts interface types so
+ * Wires together semantic-document lifecycle and file-cache dependencies. If
+ * omitted, creates default production instances. Accepts interface types so
  * callers can inject test doubles without importing production classes.
  *
- * @param parsedFileCache - Optional cache (production or test double)
+ * @param parsedDocuments - Optional lifecycle (production or test double)
  * @param fileCache - Optional file cache (production or test double)
  * @returns Validator instance with all dependencies wired
  */
 export function createCitationValidator(
-	parsedFileCache: ParsedFileCacheLike | null = null,
+	parsedDocuments: ParsedDocumentLifecycleLike | null = null,
 	fileCache: FileCacheLike | null = null,
 ): CitationValidator {
-	const _parsedFileCache = parsedFileCache || createParsedFileCache();
-	const _fileCache = fileCache || createFileCache();
-	return new CitationValidator(_parsedFileCache, _fileCache);
+	const lifecycle = parsedDocuments || createParsedFileCache();
+	const cache = fileCache || createFileCache();
+	return new CitationValidator(lifecycle, cache);
 }
 
 /**
@@ -98,30 +99,33 @@ export function createCitationValidator(
  * 3. SectionLinkStrategy - Anchors eligible by default
  * 4. CliFlagStrategy - --full-files flag (terminal)
  *
- * @param parsedFileCache - Optional cache for testing
- * @param citationValidator - Optional validator for testing
+ * @param parsedDocuments - Optional semantic-document lifecycle for testing
  * @param strategies - Optional strategy override
  * @returns Configured ContentExtractor instance
  */
 export function createContentExtractor(
-	parsedFileCache: ParsedFileCache | null = null,
-	citationValidator: CitationValidator | null = null,
+	parsedDocuments: ParsedFileCache | null = null,
 	strategies: ExtractionEligibilityStrategy[] | null = null,
 ): ContentExtractor {
-	// Use provided dependencies or create defaults
-	const _parsedFileCache = parsedFileCache || createParsedFileCache();
-	const _citationValidator = citationValidator || createCitationValidator();
-	const _strategies = strategies || [
+	const lifecycle = parsedDocuments || createParsedFileCache();
+	const eligibilityStrategies = strategies || [
 		new StopMarkerStrategy(),
 		new ForceMarkerStrategy(),
 		new SectionLinkStrategy(),
 		new CliFlagStrategy(),
 	];
+	return new ContentExtractor(eligibilityStrategies, lifecycle);
+}
 
-	// Instantiate ContentExtractor with ALL dependencies
-	return new ContentExtractor(
-		_strategies,
-		_parsedFileCache,
-		_citationValidator,
-	);
+export function createValidationWorkflow(
+	parsedDocuments: ParsedFileCache | null = null,
+	fileCache: FileCache | null = null,
+	validator: CitationValidator | null = null,
+): ValidationWorkflow {
+	const cache = fileCache || createFileCache();
+	const lifecycle =
+		parsedDocuments || createParsedFileCache(createMarkdownParser(cache));
+	const citationValidator =
+		validator || createCitationValidator(lifecycle, cache);
+	return new ValidationWorkflow(lifecycle, citationValidator, cache);
 }

@@ -28,11 +28,11 @@ describe("componentFactory TypeScript", () => {
   it("createCitationValidator accepts null dependencies", () => {
     const validator = createCitationValidator(null, null);
     expect(validator).toBeDefined();
-    expect(typeof validator.validateFile).toBe("function");
+    expect(typeof validator.validateDocument).toBe("function");
   });
 
   it("createContentExtractor accepts null dependencies", () => {
-    const extractor = createContentExtractor(null, null, null);
+    const extractor = createContentExtractor(null, null);
     expect(extractor).toBeDefined();
     expect(typeof extractor.extractContent).toBe("function");
   });
@@ -55,7 +55,7 @@ describe("componentFactory TypeScript", () => {
 
   it("createContentExtractor rejects wrong parameter types", () => {
     // @ts-expect-error - Should reject non-array strategies parameter
-    createContentExtractor(null, null, "not an array");
+    createContentExtractor(null, "not an array");
   });
 
   it("createFileCache rejects extra parameters", () => {

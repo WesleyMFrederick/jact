@@ -9,9 +9,7 @@
  * Path-resolution waterfall replaced by strategy array (issue #28).
  */
 
-import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import type { LinkObject, ParserOutput } from "../../types/citationTypes.js";
+import type { LinkObject } from "../../types/citationTypes.js";
 import type {
 	AnchorConversion,
 	EnrichedLinkObject,
@@ -20,19 +18,26 @@ import type {
 	ValidationResult,
 } from "../../types/validationTypes.js";
 import { computeValidationSummary } from "../computeValidationSummary.js";
-import type { ParsedFileCacheLike } from "./AnchorMatcher.js";
+import type {
+	ParsedDocumentLifecycleLike,
+	ParsedDocumentLike,
+} from "./AnchorMatcher.js";
 import { AnchorMatcher } from "./AnchorMatcher.js";
 import type { FileCacheLike } from "./PathResolver.js";
 import { PathResolver } from "./PathResolver.js";
-import {
-	defaultPathResolutionStrategies,
-	type PathResolutionResult,
-	type PathResolutionStrategy,
-} from "./pathResolutionStrategies/index.js";
 
-type ParsedFileCacheInterface = ParsedFileCacheLike;
 type FileCacheInterface = FileCacheLike;
-type SingleCitationValidationResult = PathResolutionResult;
+interface SingleCitationValidationResult {
+	line: number;
+	citation: string;
+	status: "valid" | "error" | "warning";
+	linkType: string;
+	scope: string;
+	error?: string;
+	suggestion?: string;
+	pathConversion?: PathConversion;
+	anchorConversion?: AnchorConversion;
+}
 
 // ── enrichLinkObject factory ──────────────────────────────────────────────────
 
@@ -75,55 +80,25 @@ const EMPHASIS_MARKED_EXAMPLES = [
 ];
 
 export class CitationValidator {
-	private parsedFileCache: ParsedFileCacheInterface;
-	private fileCache: FileCacheInterface;
 	private pathResolver: PathResolver;
 	private anchorMatcher: AnchorMatcher;
-	private pathResolutionStrategies: PathResolutionStrategy[];
 
 	constructor(
-		parsedFileCache: ParsedFileCacheInterface,
+		parsedDocumentLifecycle: ParsedDocumentLifecycleLike,
 		fileCache: FileCacheInterface,
-		pathResolutionStrategies?: PathResolutionStrategy[],
 	) {
-		this.parsedFileCache = parsedFileCache;
-		this.fileCache = fileCache;
 		this.pathResolver = new PathResolver(fileCache);
-		this.anchorMatcher = new AnchorMatcher(parsedFileCache);
-		this.pathResolutionStrategies =
-			pathResolutionStrategies ?? defaultPathResolutionStrategies;
+		this.anchorMatcher = new AnchorMatcher(parsedDocumentLifecycle);
 	}
 
 	// ── Public API ────────────────────────────────────────────────────────────
 
-	/**
-	 * Contract:
-	 * - Throws `Error("File not found: …")` when `filePath` does not exist on disk.
-	 * - Returns a `ValidationResult` with `links` array where every element is an
-	 *   `EnrichedLinkObject` (original parser `LinkObject` fields preserved, plus
-	 *   `validation` added via spread — original objects never mutated).
-	 * - `summary` reflects the aggregate status of all links in `links`.
-	 */
-	async validateFile(filePath: string): Promise<ValidationResult> {
-		if (!existsSync(filePath)) {
-			throw new Error(`File not found: ${filePath}`);
-		}
-
-		const sourceParsedDoc =
-			await this.parsedFileCache.resolveParsedFile(filePath);
-		return this.validateParsed(sourceParsedDoc.data, filePath);
-	}
-
-	/**
-	 * Validate an already-parsed doc — NO disk read of the source.
-	 * Contract: identical ValidationResult to validateFile for the same content; filePath is the
-	 * relative-link base for cross-document links and the self-anchor key.
-	 */
-	async validateParsed(
-		parsed: ParserOutput,
+	/** Validate one semantic document using filePath as its link base and self-anchor key. */
+	async validateDocument(
+		document: ParsedDocumentLike,
 		filePath: string,
 	): Promise<ValidationResult> {
-		const links = parsed.links;
+		const links = document.getLinks();
 
 		const enrichedLinks: EnrichedLinkObject[] = await Promise.all(
 			links.map((link: LinkObject) =>
@@ -180,32 +155,6 @@ export class CitationValidator {
 		}
 
 		return enrichLinkObject(citation, validation);
-	}
-
-	// ── Public delegates (for consumers that previously called CitationValidator directly) ──
-
-	/**
-	 * Calculate relative path from sourceFile to targetFile.
-	 * Delegates to PathResolver.
-	 */
-	calculateRelativePath(sourceFile: string, targetFile: string): string {
-		return this.pathResolver.calculateRelativePath(sourceFile, targetFile);
-	}
-
-	/**
-	 * Generate a path-conversion suggestion object.
-	 * Delegates to PathResolver.
-	 */
-	generatePathConversionSuggestion(
-		originalCitation: string,
-		sourceFile: string,
-		targetFile: string,
-	): PathConversion {
-		return this.pathResolver.generatePathConversionSuggestion(
-			originalCitation,
-			sourceFile,
-			targetFile,
-		);
 	}
 
 	// ── Pattern classification ────────────────────────────────────────────────
@@ -329,40 +278,65 @@ export class CitationValidator {
 		citation: LinkObject,
 		sourceFile?: string,
 	): Promise<SingleCitationValidationResult> {
-		const resolvedSourceFile = sourceFile ?? "";
-		const decodedRelativePath = decodeURIComponent(
-			citation.target.path.raw ?? "",
-		);
-		const sourceDir = dirname(resolvedSourceFile);
-		const standardPath = resolve(sourceDir, decodedRelativePath);
-		const targetPath = this.pathResolver.resolveTargetPath(
-			citation.target.path.raw ?? "",
-			resolvedSourceFile,
-		);
-
-		const ctx = {
+		const outcome = this.pathResolver.resolveCitationPath(
 			citation,
-			sourceFile: resolvedSourceFile,
-			targetPath,
-			standardPath,
-			pathResolver: this.pathResolver,
-			anchorMatcher: this.anchorMatcher,
-			fileCache: this.fileCache,
-		};
+			sourceFile ?? "",
+		);
+		if (outcome.kind === "error") {
+			return this.createValidationResult(
+				citation,
+				"error",
+				outcome.error,
+				outcome.suggestion ?? null,
+			);
+		}
+		if (outcome.kind === "warning") {
+			return this.createValidationResult(
+				citation,
+				"warning",
+				outcome.error,
+				outcome.suggestion ?? null,
+			);
+		}
 
-		for (const strategy of this.pathResolutionStrategies) {
-			const result = await strategy.resolve(ctx);
-			if (result !== null) {
-				return result;
+		if (citation.target.anchor) {
+			const anchor = await this.anchorMatcher.validateAnchorExists(
+				citation.target.anchor,
+				outcome.targetPath,
+			);
+			if (!anchor.valid) {
+				const anchorError = `Anchor not found: #${citation.target.anchor}`;
+				const prefix = outcome.anchorFailurePrefix ?? outcome.warning;
+				const error = prefix ? `${prefix}. ${anchorError}` : anchorError;
+				return this.createValidationResult(
+					citation,
+					outcome.anchorFailureStatus,
+					error,
+					anchor.suggestion ?? null,
+					null,
+					anchor.anchorConversion ?? null,
+				);
+			}
+			if (anchor.matchedAs === "block-ref-missing-caret") {
+				return this.createValidationResult(
+					citation,
+					"warning",
+					null,
+					anchor.suggestion ?? null,
+				);
 			}
 		}
 
-		// Should not reach here — CacheFallbackStrategy always returns a result
-		return this.createValidationResult(
-			citation,
-			"error",
-			"Path resolution failed: no strategy matched",
-		);
+		if (outcome.warning) {
+			return this.createValidationResult(
+				citation,
+				"warning",
+				null,
+				outcome.warning,
+				outcome.pathConversion ?? null,
+			);
+		}
+		return this.createValidationResult(citation, "valid");
 	}
 
 	private validateWikiStyleLink(

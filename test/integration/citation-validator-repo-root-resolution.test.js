@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createCitationValidator } from "../../src/factories/componentFactory.js";
+import { createCitationHarness } from "../helpers/workflow-harness.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -12,7 +12,7 @@ describe("Issue #13: repo-root-relative path resolution", () => {
 		it("should resolve footnote paths relative to repo root when file-relative fails", async () => {
 			// Given: A markdown file in a subdirectory with footnotes pointing to
 			// files using repo-root-relative paths (e.g., test/fixtures/file.md)
-			const validator = createCitationValidator();
+			const { validateDocumentFile } = createCitationHarness();
 			const sourceFile = join(
 				fixturesDir,
 				"subdir",
@@ -20,7 +20,7 @@ describe("Issue #13: repo-root-relative path resolution", () => {
 			);
 
 			// When: Validating the file
-			const result = await validator.validateFile(sourceFile);
+			const result = await validateDocumentFile(sourceFile);
 
 			// Then: The footnote [^S-001] pointing to test/fixtures/issue-13-repo-root-target.md
 			// should resolve successfully (not "File not found")
@@ -38,7 +38,7 @@ describe("Issue #13: repo-root-relative path resolution", () => {
 	describe("mailto links should not be treated as file paths", () => {
 		it("should skip mailto links during file resolution", async () => {
 			// Given: A markdown file with a mailto: footnote
-			const validator = createCitationValidator();
+			const { validateDocumentFile } = createCitationHarness();
 			const sourceFile = join(
 				fixturesDir,
 				"subdir",
@@ -46,7 +46,7 @@ describe("Issue #13: repo-root-relative path resolution", () => {
 			);
 
 			// When: Validating the file
-			const result = await validator.validateFile(sourceFile);
+			const result = await validateDocumentFile(sourceFile);
 
 			// Then: The mailto: link should NOT produce a "File not found" error
 			const mailtoLink = result.links.find(
@@ -74,7 +74,7 @@ describe("Issue #13: repo-root-relative path resolution", () => {
 		it("should resolve non-.md footnote targets relative to repo root", async () => {
 			// Given: A markdown file in a subdirectory with footnotes pointing to
 			// .ts files using repo-root-relative paths
-			const validator = createCitationValidator();
+			const { validateDocumentFile } = createCitationHarness();
 			const sourceFile = join(
 				fixturesDir,
 				"subdir",
@@ -82,7 +82,7 @@ describe("Issue #13: repo-root-relative path resolution", () => {
 			);
 
 			// When: Validating the file
-			const result = await validator.validateFile(sourceFile);
+			const result = await validateDocumentFile(sourceFile);
 
 			// Then: The footnote pointing to test/fixtures/issue-13-target-script.ts
 			// should resolve successfully

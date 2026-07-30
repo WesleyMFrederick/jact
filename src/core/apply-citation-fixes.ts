@@ -10,7 +10,8 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import type { FileCache } from "../FileCache.js";
-import type { CliValidateOptions } from "../types/contentExtractorTypes.js";
+import type { ParsedFileCache } from "../ParsedFileCache.js";
+import type { CliValidateOptions } from "../types/cli-types.js";
 import type {
 	EnrichedLinkObject,
 	FixRecord,
@@ -22,6 +23,7 @@ import { applyAnchorFix, applyPathConversion } from "./citationFixer.js";
 export interface ApplyCitationFixesDeps {
 	validator: CitationValidator;
 	fileCache: FileCache;
+	parsedDocuments: ParsedFileCache;
 }
 
 /** fs functions fix() can override for test isolation, matching JactCli.fix()'s `_fs` param. */
@@ -71,7 +73,14 @@ export async function applyCitationFixes(
 				);
 			}
 		}
-		const validationResults = await deps.validator.validateFile(filePath);
+		const document = await deps.parsedDocuments.resolveDocument({
+			kind: "file",
+			filePath,
+		});
+		const validationResults = await deps.validator.validateDocument(
+			document,
+			filePath,
+		);
 		const fixableLinks = validationResults.links.filter(
 			(link: EnrichedLinkObject) =>
 				(link.validation.status === "warning" &&

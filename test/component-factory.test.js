@@ -30,7 +30,7 @@ describe("createContentExtractor", () => {
 
 	it("should allow custom strategy override for testing", () => {
 		// Given: Custom empty strategy array
-		const extractor = createContentExtractor(null, null, []);
+		const extractor = createContentExtractor(null, []);
 
 		// When: analyzeEligibility called
 		const result = extractor.analyzeEligibility({}, {});

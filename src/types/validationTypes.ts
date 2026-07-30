@@ -89,10 +89,9 @@ export interface ValidationSummary {
 }
 
 /**
- * ValidationResult - CitationValidator.validateFile() return structure
+ * ValidationResult - semantic citation-validation result.
  *
- * CRITICAL: Property names are `summary` and `links` (NOT `results`)
- * This matches the enrichment pattern where links are enriched in-place.
+ * Property names are `summary` and `links` (not `results`).
  */
 export interface ValidationResult {
 	summary: ValidationSummary;

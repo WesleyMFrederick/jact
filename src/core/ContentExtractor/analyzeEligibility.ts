@@ -1,9 +1,7 @@
 import type { LinkObject } from '../../types/citationTypes.js';
-import type {
-	CliFlags,
-	EligibilityDecision,
-	ExtractionEligibilityStrategy,
-} from '../../types/contentExtractorTypes.js';
+import type { CliFlags } from '../../types/cli-types.js';
+import type { EligibilityDecision } from '../../types/extraction-types.js';
+import type { ExtractionEligibilityStrategy } from '../../types/strategy-types.js';
 
 /**
  * Analyze link eligibility using strategy chain.

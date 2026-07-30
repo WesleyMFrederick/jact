@@ -2,10 +2,8 @@
 
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
 import { ContentExtractor } from "../../src/core/ContentExtractor/ContentExtractor.js";
-import { createContentExtractor } from "../../src/factories/componentFactory.js";
-import { ParsedFileCache } from "../../src/ParsedFileCache.js";
+import { createExtractionHarness } from "../helpers/workflow-harness.js";
 
 /**
  * US2.2 Acceptance Criteria Validation Tests
@@ -19,32 +17,26 @@ import { ParsedFileCache } from "../../src/ParsedFileCache.js";
  * - Validates end-to-end orchestration
  */
 describe("US2.2 Acceptance Criteria Validation", () => {
-	it("AC1: should accept parsedFileCache and citationValidator dependencies", () => {
-		// Given: Real components via factory
-		const extractor = createContentExtractor();
+	it("AC1: should construct extraction with semantic dependencies", () => {
+		const { extractor, parsedDocuments, validator } = createExtractionHarness();
 
-		// Then: Constructor signature and dependency injection validated
 		expect(extractor).toBeInstanceOf(ContentExtractor);
-		expect(extractor.parsedFileCache).toBeInstanceOf(ParsedFileCache);
-		expect(extractor.citationValidator).toBeInstanceOf(CitationValidator);
-		expect(extractor.eligibilityStrategies).toBeDefined();
-		expect(extractor.eligibilityStrategies.length).toBe(4);
+		expect(typeof extractor.extractContent).toBe("function");
+		expect(typeof parsedDocuments.resolveDocument).toBe("function");
+		expect(typeof validator.validateDocument).toBe("function");
 	});
 
-	it("AC2: should provide extractLinksContent public method", async () => {
-		// Given: ContentExtractor instance
-		const extractor = createContentExtractor();
+	it("AC2: should provide one public extraction operation", async () => {
+		const { extractor, extractFile } = createExtractionHarness();
 
-		// Then: Method exists and returns Promise<OutgoingLinksExtractedContent>
-		expect(extractor.extractLinksContent).toBeDefined();
-		expect(typeof extractor.extractLinksContent).toBe("function");
+		expect(typeof extractor.extractContent).toBe("function");
 
 		// When: Method is called
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
-		const result = extractor.extractLinksContent(sourceFile, {
+		const result = extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -58,16 +50,16 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		expect(results).toHaveProperty("stats");
 	});
 
-	it("AC3: should internally call citationValidator.validateFile", async () => {
+	it("AC3: should validate links before extraction", async () => {
 		// Given: ContentExtractor with real CitationValidator
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
-		// When: extractLinksContent is called
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: the production extraction workflow runs
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -91,14 +83,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 	it("AC4: should filter out validation errors and ineligible links", async () => {
 		// Given: Source file with error links and mixed eligibility
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
-		// When: extractLinksContent is called without fullFiles flag
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: extraction runs without the full-files flag
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -125,14 +117,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 	it("AC5: should extract section content with URL-decoded anchor", async () => {
 		// Given: Source file with section link (URL-encoded anchor)
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
-		// When: extractLinksContent is called
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: the production extraction workflow runs
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -145,7 +137,7 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		);
 
 		expect(sectionLink).toBeDefined();
-		expect(sectionLink.status).toBe("success");
+		expect(sectionLink.status).toBe("extracted");
 		// Content is now in extractedContentBlocks, verify via contentId
 		expect(sectionLink.contentId).toBeDefined();
 		const contentBlock = output.extractedContentBlocks[sectionLink.contentId];
@@ -154,14 +146,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 	it("AC6: should extract block content with normalized anchor", async () => {
 		// Given: Source file with block link (anchor with '^' prefix)
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
-		// When: extractLinksContent is called
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: the production extraction workflow runs
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -174,7 +166,7 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		);
 
 		expect(blockLink).toBeDefined();
-		expect(blockLink.status).toBe("success");
+		expect(blockLink.status).toBe("extracted");
 		// Content is now in extractedContentBlocks, verify via contentId
 		expect(blockLink.contentId).toBeDefined();
 		const contentBlock = output.extractedContentBlocks[blockLink.contentId];
@@ -183,14 +175,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 	it("AC7: should extract full file content", async () => {
 		// Given: Source file with full file link
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
-		// When: extractLinksContent is called with fullFiles flag
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: extraction runs with the full-files flag
+		const output = await extractFile(sourceFile, {
 			fullFiles: true,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -203,7 +195,7 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		);
 
 		expect(fullFileLink).toBeDefined();
-		expect(fullFileLink.status).toBe("success");
+		expect(fullFileLink.status).toBe("extracted");
 		// Content is now in extractedContentBlocks, verify via contentId
 		expect(fullFileLink.contentId).toBeDefined();
 		const contentBlock = output.extractedContentBlocks[fullFileLink.contentId];
@@ -213,14 +205,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 	it("AC8: should return ExtractionResult with correct structure", async () => {
 		// Given: ContentExtractor with test fixture
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
-		// When: extractLinksContent is called
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: the production extraction workflow runs
+		const output = await extractFile(sourceFile, {
 			fullFiles: true,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
@@ -230,12 +222,11 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 			// Every result has sourceLink and status
 			expect(result).toHaveProperty("sourceLink");
 			expect(result).toHaveProperty("status");
-			expect(["success", "skipped", "error"]).toContain(result.status);
+			expect(["extracted", "skipped", "failed"]).toContain(result.status);
 
-			// Success results have contentId and eligibilityReason
-			if (result.status === "success") {
+			// Extracted results reference the deduplicated content index.
+			if (result.status === "extracted") {
 				expect(result).toHaveProperty("contentId");
-				expect(result).toHaveProperty("eligibilityReason");
 				expect(typeof result.contentId).toBe("string");
 				// Verify content exists in extractedContentBlocks
 				expect(output.extractedContentBlocks[result.contentId]).toBeDefined();
@@ -245,7 +236,7 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 			}
 
 			// Failure results have failureDetails with reason
-			if (result.status === "skipped" || result.status === "error") {
+			if (result.status === "skipped" || result.status === "failed") {
 				expect(result).toHaveProperty("failureDetails");
 				expect(result.failureDetails).toHaveProperty("reason");
 				expect(typeof result.failureDetails.reason).toBe("string");
@@ -255,14 +246,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 	it("AC9: should return Promise resolving to ExtractionResult array", async () => {
 		// Given: ContentExtractor instance
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
-		// When: extractLinksContent is called
-		const result = extractor.extractLinksContent(sourceFile, {
+		// When: the production extraction workflow runs
+		const result = extractFile(sourceFile, {
 			fullFiles: false,
 		});
 
@@ -282,43 +273,32 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		}
 	});
 
-	it("AC10: should wire dependencies via factory", () => {
-		// Given: Factory function is called
-		const extractor = createContentExtractor();
+	it("AC10: should preserve strategy overrides through factory construction", () => {
+		const { extractor } = createExtractionHarness({ strategies: [] });
 
-		// Then: All dependencies are wired correctly
-		expect(extractor.parsedFileCache).toBeInstanceOf(ParsedFileCache);
-		expect(extractor.citationValidator).toBeInstanceOf(CitationValidator);
-		expect(extractor.eligibilityStrategies).toBeDefined();
-
-		// Validation: Factory supports dependency override for testing
-		const mockCache = createContentExtractor(
-			new ParsedFileCache(null), // Override parsedFileCache
-			null, // Use default citationValidator
-			null, // Use default strategies
-		);
-		expect(mockCache.parsedFileCache).toBeInstanceOf(ParsedFileCache);
+		expect(
+			extractor.analyzeEligibility(
+				{ anchorType: "header", extractionMarker: null },
+				{},
+			),
+		).toEqual({ eligible: false, reason: "No strategy matched" });
 	});
 
 	it("AC11: should work with real components (no mocks)", async () => {
 		// Given: Real ParsedFileCache, CitationValidator, ParsedDocument integration
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
 		// When: Complete workflow executes with real components
-		const output = await extractor.extractLinksContent(sourceFile, {
+		const output = await extractFile(sourceFile, {
 			fullFiles: true,
 		});
 		const results = output.outgoingLinksReport.processedLinks;
 
-		// Then: Real ParsedFileCache used (file parsing and caching)
-		expect(extractor.parsedFileCache).toBeInstanceOf(ParsedFileCache);
-
-		// Then: Real CitationValidator used (link validation and enrichment)
-		expect(extractor.citationValidator).toBeInstanceOf(CitationValidator);
+		// Validation and extraction cross the same semantic production route.
 		expect(results.every((r) => r.sourceLink.validation !== undefined)).toBe(
 			true,
 		);
@@ -331,7 +311,7 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		expect(targetDocResults.length).toBeGreaterThan(1);
 
 		// Then: At least one successful extraction validates real ParsedDocument
-		const successResults = results.filter((r) => r.status === "success");
+		const successResults = results.filter((r) => r.status === "extracted");
 		expect(successResults.length).toBeGreaterThan(0);
 	});
 
@@ -340,7 +320,7 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		// This test confirms US2.1 functionality is still accessible
 
 		// Given: ContentExtractor from factory
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 
 		// When: US2.1 analyzeEligibility method is called
 		const link1 = { anchorType: null, extractionMarker: null };
@@ -356,8 +336,6 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 		// Then: Section links are eligible by default
 		expect(result2.eligible).toBe(true);
 
-		// Validation: All US2.1 tests continue passing (verified in Task 8)
-		expect(extractor.eligibilityStrategies.length).toBe(4);
 	});
 
 	it("AC13: should implement extractSection with 3-phase algorithm", async () => {
@@ -421,14 +399,14 @@ describe("US2.2 Acceptance Criteria Validation", () => {
 
 	it("AC15: should filter out internal links before processing", async () => {
 		// Given: Source file containing internal link (mixed-links-source.md line 21)
-		const extractor = createContentExtractor();
+		const { extractor, extractFile, parsedDocuments } = createExtractionHarness();
 		const sourceFile = join(
 			__dirname,
 			"../fixtures/us2.2/mixed-links-source.md",
 		);
 
-		// When: extractLinksContent is called
-		const output = await extractor.extractLinksContent(sourceFile, {
+		// When: the production extraction workflow runs
+		const output = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 		const results = output.outgoingLinksReport.processedLinks;

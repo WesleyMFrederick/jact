@@ -6,7 +6,7 @@
  *   - Markdown cleanup for comparison
  *   - Obsidian "better format" suggestion (prefer raw header over kebab-case)
  *   - Block-ref-without-caret detection
- *   - Full validateAnchorExists logic (requires ParsedFileCacheLike)
+ *   - Full validateAnchorExists logic through the parsed-document lifecycle
  *
  * Extracted from CitationValidator (issue #28).
  */
@@ -20,9 +20,8 @@ import type { AnchorConversion } from "../../types/validationTypes.js";
 import { normalizeAnchorText } from "../MarkdownParser/normalizeInlineText.js";
 
 /**
- * Minimal interface over ParsedDocument to avoid circular imports.
- * `data` is the full ParserOutput (not just `anchors`) so callers like
- * CitationValidator.validateFile can hand it straight to validateParsed.
+ * Minimal semantic-document interface used for anchor matching.
+ * `data` remains available for consumers that need parser metadata.
  */
 export interface ParsedDocumentLike {
 	hasAnchor(anchor: string): boolean;
@@ -32,21 +31,24 @@ export interface ParsedDocumentLike {
 }
 
 /**
- * Minimal interface over ParsedFileCache to avoid circular imports.
+ * Minimal parsed-document lifecycle needed for anchor validation.
  */
-export interface ParsedFileCacheLike {
-	resolveParsedFile(filePath: string): Promise<ParsedDocumentLike>;
+export interface ParsedDocumentLifecycleLike {
+	resolveDocument(source: {
+		kind: "file";
+		filePath: string;
+	}): Promise<ParsedDocumentLike>;
 }
 
 export class AnchorMatcher {
-	private parsedFileCache: ParsedFileCacheLike | null;
+	private parsedDocumentLifecycle: ParsedDocumentLifecycleLike | null;
 
 	/**
-	 * @param parsedFileCache - Optional. Required only for validateAnchorExists().
-	 *   Pass null when using only the pure matching helpers.
+	 * @param parsedDocumentLifecycle - Optional. Required only for
+	 *   validateAnchorExists(); pass null when using only pure matching helpers.
 	 */
-	constructor(parsedFileCache: ParsedFileCacheLike | null = null) {
-		this.parsedFileCache = parsedFileCache;
+	constructor(parsedDocumentLifecycle: ParsedDocumentLifecycleLike | null = null) {
+		this.parsedDocumentLifecycle = parsedDocumentLifecycle;
 	}
 
 	// ── Pure matching helpers (no I/O) ────────────────────────────────────────
@@ -179,7 +181,7 @@ export class AnchorMatcher {
 		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
 	}
 
-	// ── Async anchor validation (requires parsedFileCache) ────────────────────
+	// ── Async anchor validation (requires document lifecycle) ──────────────────
 
 	async validateAnchorExists(
 		anchor: string,
@@ -191,17 +193,19 @@ export class AnchorMatcher {
 		matchedAs?: string;
 		anchorConversion?: AnchorConversion;
 	}> {
-		if (!this.parsedFileCache) {
+		if (!this.parsedDocumentLifecycle) {
 			throw new Error(
-				"AnchorMatcher.validateAnchorExists requires a parsedFileCache. Pass one to the constructor.",
+				"AnchorMatcher.validateAnchorExists requires a parsed document lifecycle.",
 			);
 		}
 
 		try {
-			const targetParsedDoc =
-				await this.parsedFileCache.resolveParsedFile(targetFile);
+			const targetParsedDoc = await this.parsedDocumentLifecycle.resolveDocument({
+				kind: "file",
+				filePath: targetFile,
+			});
 
-			// Direct match via facade
+			// Direct semantic-document match
 			if (targetParsedDoc.hasAnchor(anchor)) {
 				// Check block anchor matched without caret prefix (Issue #81)
 				if (!anchor.startsWith("^") && !options?.isBlockRef) {

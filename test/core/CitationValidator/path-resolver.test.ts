@@ -1,86 +1,118 @@
-/**
- * PathResolver unit tests — RED phase for issue #28
- *
- * Verifies PathResolver can be instantiated and called without CitationValidator.
- * These tests use a minimal file-system stub so no real FS access is needed.
- */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { PathResolver } from "../../../src/core/CitationValidator/PathResolver.js";
+import type { LinkObject } from "../../../src/types/citationTypes.js";
 
-// Dynamic import so the test fails gracefully with "module not found" in RED phase
-describe("PathResolver — isolated unit", () => {
-	it("resolveTargetPath returns standard path when file exists at standard location", async () => {
-		const { PathResolver } = await import(
-			"../../../src/core/CitationValidator/PathResolver.js"
+function citation(rawPath: string): LinkObject {
+	return {
+		line: 1,
+		column: 1,
+		text: "target",
+		fullMatch: `[target](${rawPath})`,
+		linkType: "markdown",
+		scope: "cross-document",
+		anchorType: null,
+		source: { path: { raw: "/base/source.md", absolute: "/base/source.md" } },
+		target: {
+			path: { raw: rawPath, absolute: null },
+			anchor: null,
+		},
+		extractionMarker: null,
+	};
+}
+
+function resolver(): PathResolver {
+	return new PathResolver({
+		resolveFile: () => ({ found: false, reason: "not_found" }),
+	});
+}
+
+describe("PathResolver complete outcomes", () => {
+	it("returns the standard path when the direct file exists", () => {
+		const subject = resolver();
+		vi.spyOn(subject, "isFile").mockImplementation((candidate) =>
+			candidate.endsWith("/target.md"),
 		);
 
-		// Stub isFile to return true only for the standard resolved path
-		const resolver = new PathResolver({
-			isFile: (p: string) => p.endsWith("target.md"),
-			isDirectory: (_p: string) => false,
-			resolveFile: (_: string) => ({ found: false }),
-		});
+		const outcome = subject.resolveCitationPath(
+			citation("target.md"),
+			"/base/source.md",
+		);
 
-		const result = resolver.resolveTargetPath("target.md", "/base/source.md");
-		// Should return the resolved path (ends with target.md)
-		expect(result).toMatch(/target\.md$/);
+		expect(outcome).toMatchObject({
+			kind: "resolved",
+			targetPath: "/base/target.md",
+			anchorFailureStatus: "error",
+		});
 	});
 
-	it("resolveTargetPath expands tilde paths", async () => {
-		const { PathResolver } = await import(
-			"../../../src/core/CitationValidator/PathResolver.js"
+	it("expands tilde paths before returning a resolved outcome", () => {
+		const subject = resolver();
+		vi.spyOn(subject, "isFile").mockImplementation((candidate) =>
+			candidate.endsWith("/somefile.md"),
 		);
 
-		const resolver = new PathResolver({
-			isFile: (p: string) => p.includes("home") || p.includes("Users"),
-			isDirectory: (_p: string) => false,
-			resolveFile: (_: string) => ({ found: false }),
-		});
-
-		const result = resolver.resolveTargetPath(
-			"~/somefile.md",
+		const outcome = subject.resolveCitationPath(
+			citation("~/somefile.md"),
 			"/any/source.md",
 		);
-		// Should expand ~ to home dir (not start with ~)
-		expect(result).not.toMatch(/^~/);
+
+		expect(outcome.kind).toBe("resolved");
+		if (outcome.kind === "resolved") {
+			expect(outcome.targetPath).not.toMatch(/^~/);
+			expect(outcome.targetPath).toMatch(/somefile\.md$/);
+		}
 	});
 
-	it("isObsidianAbsolutePath detects vault-relative paths", async () => {
-		const { PathResolver } = await import(
-			"../../../src/core/CitationValidator/PathResolver.js"
-		);
-
-		const resolver = new PathResolver({
-			isFile: () => false,
-			isDirectory: () => false,
-			resolveFile: () => ({ found: false }),
-		});
+	it("detects vault-relative Obsidian paths", () => {
+		const subject = resolver();
 
 		expect(
-			resolver.isObsidianAbsolutePath("0_SoftwareDevelopment/file.md"),
+			subject.isObsidianAbsolutePath("0_SoftwareDevelopment/file.md"),
 		).toBe(true);
-		expect(resolver.isObsidianAbsolutePath("/absolute/path.md")).toBe(false);
-		expect(resolver.isObsidianAbsolutePath("relative/file.md")).toBe(true);
-		expect(resolver.isObsidianAbsolutePath("/starts/with/slash.md")).toBe(
+		expect(subject.isObsidianAbsolutePath("/absolute/path.md")).toBe(false);
+		expect(subject.isObsidianAbsolutePath("relative/file.md")).toBe(true);
+		expect(subject.isObsidianAbsolutePath("/starts/with/slash.md")).toBe(
 			false,
 		);
 	});
 
-	it("generatePathResolutionDebugInfo returns non-empty string", async () => {
-		const { PathResolver } = await import(
-			"../../../src/core/CitationValidator/PathResolver.js"
+	it("returns a complete warning outcome for folder targets", () => {
+		const subject = resolver();
+		vi.spyOn(subject, "isDirectory").mockImplementation((candidate) =>
+			candidate.endsWith("/folder"),
 		);
 
-		const resolver = new PathResolver({
-			isFile: () => false,
-			isDirectory: () => false,
-			resolveFile: () => ({ found: false }),
-		});
+		const outcome = subject.resolveCitationPath(
+			citation("folder"),
+			"/base/source.md",
+		);
 
-		const info = resolver.generatePathResolutionDebugInfo(
+		expect(outcome).toMatchObject({
+			kind: "warning",
+			error: "Link points to a folder, not a file: folder",
+		});
+	});
+
+	it("returns a complete error outcome for missing files", () => {
+		const outcome = resolver().resolveCitationPath(
+			citation("missing.md"),
+			"/base/source.md",
+		);
+
+		expect(outcome).toMatchObject({
+			kind: "error",
+			error: "File not found: missing.md",
+		});
+		if (outcome.kind === "error") {
+			expect(outcome.suggestion).toContain("Tried: /base/missing.md");
+		}
+	});
+
+	it("includes attempted paths in missing-file diagnostics", () => {
+		const info = resolver().generatePathResolutionDebugInfo(
 			"relative/target.md",
 			"/base/source.md",
 		);
-		expect(typeof info).toBe("string");
-		expect(info.length).toBeGreaterThan(0);
+		expect(info).toContain("Tried:");
 	});
 });

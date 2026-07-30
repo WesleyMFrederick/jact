@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { validateDocumentFile } from "../helpers/workflow-harness.js";
 import {
 	createCitationValidator,
 	createMarkdownParser,
@@ -31,7 +32,7 @@ describe("End-to-End Cache Integration", () => {
 		expect(existsSync(fixtureFile)).toBe(true);
 
 		// When: Validate file with multiple cross-document links
-		const result = await validator.validateFile(fixtureFile);
+		const result = await validateDocumentFile(validator, cache, fixtureFile);
 
 		// Then: Validation completes successfully
 		expect(result).toBeDefined();
@@ -53,7 +54,7 @@ describe("End-to-End Cache Integration", () => {
 		expect(existsSync(targetFile)).toBe(true);
 
 		// When: Validate file referencing same target multiple times
-		const result = await validator.validateFile(fixtureFile);
+		const result = await validateDocumentFile(validator, cache, fixtureFile);
 
 		// Then: Target parsed once, all links validated
 		const targetFileCalls = parseFileSpy.mock.calls.filter(
@@ -76,7 +77,7 @@ describe("End-to-End Cache Integration", () => {
 		const targetFile = resolve(__dirname, "../fixtures/shared-target.md");
 
 		// When: Validate file with repeated file references
-		await validator.validateFile(fixtureFile);
+		await validateDocumentFile(validator, cache, fixtureFile);
 
 		// Then: Each unique file parsed exactly once
 		const targetFileCalls = parseFileSpy.mock.calls.filter(
@@ -102,8 +103,8 @@ describe("End-to-End Cache Integration", () => {
 		const validator2 = createCitationValidator(cache);
 
 		// When: Validate same file twice
-		const result1 = await validator1.validateFile(fixtureFile);
-		const result2 = await validator2.validateFile(fixtureFile);
+		const result1 = await validateDocumentFile(validator1, cache, fixtureFile);
+		const result2 = await validateDocumentFile(validator2, cache, fixtureFile);
 
 		// Then: Results structurally identical
 		expect(result2.summary.total).toBe(result1.summary.total);
@@ -129,7 +130,7 @@ describe("End-to-End Cache Integration", () => {
 		const fixtureFile = resolve(__dirname, "../fixtures/valid-citations.md");
 
 		// When: Execute complete validation workflow
-		const result = await factoryValidator.validateFile(fixtureFile);
+		const result = await validateDocumentFile(factoryValidator, factoryCache, fixtureFile);
 
 		// Then: Workflow completes with expected results
 		expect(result).toBeDefined();
@@ -145,18 +146,21 @@ describe("End-to-End Cache Integration", () => {
 			"../fixtures/multiple-links-same-target.md",
 		);
 		const targetFile = resolve(__dirname, "../fixtures/shared-target.md");
-		const cacheResolveSpy = vi.spyOn(cache, "resolveParsedFile");
+		const cacheResolveSpy = vi.spyOn(cache, "resolveDocument");
 
 		// When: Validate file with anchor links
-		await validator.validateFile(fixtureFile);
+		await validateDocumentFile(validator, cache, fixtureFile);
 
 		// Then: Target file data retrieved from cache
 		const targetCacheCalls = cacheResolveSpy.mock.calls.filter(
-			(call) => call[0] === targetFile,
+			([source]) => source.kind === "file" && source.filePath === targetFile,
 		);
 		expect(targetCacheCalls.length).toBeGreaterThan(0);
 
 		// Then: Cache used for target file access
-		expect(cacheResolveSpy).toHaveBeenCalledWith(targetFile);
+		expect(cacheResolveSpy).toHaveBeenCalledWith({
+			kind: "file",
+			filePath: targetFile,
+		});
 	});
 });

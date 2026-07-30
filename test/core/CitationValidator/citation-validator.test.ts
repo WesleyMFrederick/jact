@@ -2,12 +2,11 @@
  * Unit tests for CitationValidator — enrichLinkObject factory (issue #37)
  *
  * TDD: RED test first — verifies original LinkObject is NOT mutated after
- * validateFile/validateSingleCitation returns. Proves the factory creates a
+ * validateDocument/validateSingleCitation returns. Proves the factory creates a
  * new object via spread rather than mutating the input in-place.
  *
- * Contract tests: validate the TSDoc Contract: blocks on enrichLinkObject,
- * validateFile, and validateSingleCitation. These tests will fail if those
- * contracts are broken — they are the enforcement layer for the TSDoc obligations.
+ * Contract tests enforce the TSDoc contracts on enrichLinkObject,
+ * validateDocument, and validateSingleCitation.
  */
 
 import fs, { mkdtempSync, writeFileSync } from "node:fs";
@@ -19,6 +18,7 @@ import { MarkdownParser } from "../../../src/core/MarkdownParser/MarkdownParser.
 import { FileCache } from "../../../src/FileCache.js";
 import { ParsedFileCache } from "../../../src/ParsedFileCache.js";
 import type { LinkObject } from "../../../src/types/citationTypes.js";
+import { validateDocumentFile } from "../../helpers/workflow-harness.js";
 
 function makeValidator() {
 	const fileCache = new FileCache(fs, path);
@@ -72,8 +72,8 @@ describe("Contract: enrichLinkObject — immutability and spread (issue #37)", (
 		expect(enriched).not.toBe(original);
 	});
 
-	it("validateFile does NOT mutate the original LinkObjects from the parser", async () => {
-		// Set up a real temp file with a single caret-syntax link so validateFile
+	it("validateDocument does NOT mutate the original LinkObjects from the parser", async () => {
+		// Set up a real temp file with a single caret-syntax link so document validation
 		// exercises the full enrichment path on real parser output.
 		const tmpDir = mkdtempSync(join(tmpdir(), "jact-cv-test-"));
 		const sourceFile = join(tmpDir, "source.md");
@@ -85,21 +85,21 @@ describe("Contract: enrichLinkObject — immutability and spread (issue #37)", (
 		const validator = new CitationValidator(cache, fileCache);
 
 		// Parse once to get the original LinkObjects.
-		const parsedDoc = await cache.resolveParsedFile(sourceFile);
+		const parsedDoc = await cache.resolveDocument({ kind: "file", filePath: sourceFile });
 		const originalLinks = parsedDoc.getLinks();
 
-		// Capture each link object reference BEFORE validateFile runs.
+		// Capture each link object reference before document validation.
 		// Snapshot the absence of .validation on every link.
 		for (const link of originalLinks) {
 			expect(
 				(link as LinkObject & { validation?: unknown }).validation,
-				`link at line ${link.line} must not have .validation before validateFile`,
+				`link at line ${link.line} must not have .validation before validation`,
 			).toBeUndefined();
 		}
 
-		const result = await validator.validateFile(sourceFile);
+		const result = await validateDocumentFile(validator, cache, sourceFile);
 
-		// validateFile must return enriched links.
+		// validateDocument must return enriched links.
 		expect(result.links.length).toBeGreaterThan(0);
 		for (const enriched of result.links) {
 			expect(enriched.validation).toBeDefined();
@@ -109,7 +109,7 @@ describe("Contract: enrichLinkObject — immutability and spread (issue #37)", (
 		for (const link of originalLinks) {
 			expect(
 				(link as LinkObject & { validation?: unknown }).validation,
-				`link at line ${link.line} must NOT be mutated by validateFile`,
+				`link at line ${link.line} must NOT be mutated by validation`,
 			).toBeUndefined();
 		}
 	});
@@ -133,15 +133,17 @@ describe("Contract: enrichLinkObject — immutability and spread (issue #37)", (
 	});
 });
 
-describe("Contract: validateFile — throws on missing file", () => {
-	it("throws Error('File not found: …') when filePath does not exist", async () => {
-		// Given: a validator and a path that does not exist on disk
-		const validator = makeValidator();
+describe("Contract: parsed document lifecycle — missing files", () => {
+	it("propagates the file adapter's missing-file error", async () => {
+		const fileCache = new FileCache(fs, path);
+		const cache = new ParsedFileCache(new MarkdownParser(fs, fileCache));
 
-		// When / Then: validateFile rejects with "File not found" contract
 		await expect(
-			validator.validateFile("/non-existent-path-jact-test.md"),
-		).rejects.toThrow("File not found");
+			cache.resolveDocument({
+				kind: "file",
+				filePath: "/non-existent-path-jact-test.md",
+			}),
+		).rejects.toThrow("ENOENT");
 	});
 });
 

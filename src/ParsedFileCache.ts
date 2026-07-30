@@ -3,6 +3,10 @@ import type { MarkdownParser } from "./core/MarkdownParser/index.js";
 import ParsedDocument from "./ParsedDocument.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 
+export type ParsedDocumentSource =
+	| { kind: "file"; filePath: string }
+	| { kind: "memory"; filePath: string; content: string };
+
 /**
  * Promise-based cache for parsed markdown files
  *
@@ -19,8 +23,8 @@ import type { ParserOutput } from "./types/citationTypes.js";
  * @example
  * const cache = new ParsedFileCache(parser);
  * // First call triggers parsing and facade wrapping, second call awaits the same Promise
- * const result1 = await cache.resolveParsedFile('/path/to/file.md');
- * const result2 = await cache.resolveParsedFile('/path/to/file.md'); // Uses cached Promise
+ * const result1 = await cache.resolveDocument({ kind: "file", filePath: "/path/to/file.md" });
+ * const result2 = await cache.resolveDocument({ kind: "file", filePath: "/path/to/file.md" }); // Uses cached Promise
  */
 export class ParsedFileCache {
 	private parser: MarkdownParser;
@@ -37,55 +41,45 @@ export class ParsedFileCache {
 	}
 
 	/**
-	 * Resolve parsed file data with automatic concurrent request deduplication
+	 * Resolve a semantic document from a file or in-memory source.
 	 *
-	 * Returns cached Promise if file is currently being parsed or already parsed.
+	 * Returns a cached Promise if a file is currently being parsed or already parsed.
 	 * If cache miss, creates new parse operation, wraps result in ParsedDocument facade,
 	 * and caches the Promise immediately before awaiting (prevents duplicate parses for concurrent requests).
 	 *
 	 * Failed parse operations are automatically removed from cache to allow retry.
 	 *
-	 * @param filePath - Path to markdown file (relative or absolute, will be normalized)
-	 * @returns ParsedDocument facade instance wrapping parser output
+	 * @param source - File or in-memory markdown source
+	 * @returns Semantic ParsedDocument facade
 	 */
-	async resolveParsedFile(filePath: string): Promise<ParsedDocument> {
-		// 1. Normalize path to absolute for consistent cache keys
-		const cacheKey = resolve(normalize(filePath));
+	async resolveDocument(source: ParsedDocumentSource): Promise<ParsedDocument> {
+		const cacheKey = resolve(normalize(source.filePath));
 
-		// 2. Decision point: Check cache for existing Promise
-		if (this.cache.has(cacheKey)) {
-			// Cache hit: Return existing ParsedDocument Promise
-			return this.cache.get(cacheKey)!;
+		if (source.kind === "file") {
+			const cached = this.cache.get(cacheKey);
+			if (cached) return cached;
 		}
 
-		// 3. Cache miss: Create parse operation
-		const parsePromise = this.parser.parseFile(cacheKey);
-
-		// 4. Wrap parser output in ParsedDocument facade before caching
-		const parsedDocPromise = parsePromise.then(
-			(contract: ParserOutput) => new ParsedDocument(contract),
+		const parsePromise: Promise<ParserOutput> =
+			source.kind === "file"
+				? this.parser.parseFile(cacheKey)
+				: Promise.resolve().then(() =>
+						this.parser.parseContent(source.content, cacheKey),
+					);
+		const documentPromise = parsePromise.then(
+			(parsed) => new ParsedDocument(parsed),
 		);
 
-		// 5. Store ParsedDocument Promise IMMEDIATELY (prevents duplicate parses)
-		this.cache.set(cacheKey, parsedDocPromise);
-
-		// 6. Error handling: Cleanup failed promises from cache
-		parsedDocPromise.catch(() => {
-			this.cache.delete(cacheKey);
+		// Store the in-flight promise before any caller can await it. An explicit
+		// memory source replaces an older entry for the same intended path so
+		// self-anchors always resolve against the supplied content.
+		this.cache.set(cacheKey, documentPromise);
+		documentPromise.catch(() => {
+			if (this.cache.get(cacheKey) === documentPromise) {
+				this.cache.delete(cacheKey);
+			}
 		});
 
-		return parsedDocPromise;
-	}
-
-	/**
-	 * Pre-populate the cache with an already-parsed in-memory doc, keyed by absolute path.
-	 * Contract: a later resolveParsedFile(filePath) returns THIS doc without touching disk.
-	 *
-	 * @param filePath - Path to key the cache entry by (need not exist on disk)
-	 * @param parsed - Parser output to wrap in a ParsedDocument facade and cache
-	 */
-	seedParsedFile(filePath: string, parsed: ParserOutput): void {
-		const cacheKey = resolve(normalize(filePath));
-		this.cache.set(cacheKey, Promise.resolve(new ParsedDocument(parsed)));
+		return documentPromise;
 	}
 }

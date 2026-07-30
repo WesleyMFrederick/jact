@@ -1,28 +1,19 @@
-import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
-import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
-import { MarkdownParser } from "../../src/core/MarkdownParser/index.js";
-import { ParsedFileCache } from "../../src/ParsedFileCache.js";
+import { createCitationHarness } from "../helpers/workflow-harness.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 describe("CitationValidator Validation Enrichment Pattern", () => {
-	let validator;
-	let parser;
-	let cache;
+	let validateDocumentFile;
 	let validLinksSourcePath;
 	let errorLinksSourcePath;
 	let mixedValidationSourcePath;
 
 	beforeEach(() => {
-		// Create real components with DI (no mocks)
-		const fs = { readFileSync };
-		parser = new MarkdownParser(fs);
-		cache = new ParsedFileCache(parser);
-		validator = new CitationValidator(cache, null);
+		({ validateDocumentFile } = createCitationHarness());
 
 		// Use real fixture files with mixed valid/invalid links
 		validLinksSourcePath = resolve(
@@ -42,7 +33,7 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 	it("should return ValidationResult with summary and enriched links", async () => {
 		// Given: Real markdown file with citations
 		// When: Validate file using enrichment pattern
-		const result = await validator.validateFile(validLinksSourcePath);
+		const result = await validateDocumentFile(validLinksSourcePath);
 
 		// Then: Result has correct structure
 		expect(result).toHaveProperty("summary");
@@ -53,7 +44,7 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 	it("should enrich valid LinkObjects with validation status", async () => {
 		// Given: File with valid citations
 		// When: Validation completes
-		const { links } = await validator.validateFile(validLinksSourcePath);
+		const { links } = await validateDocumentFile(validLinksSourcePath);
 
 		// Then: Valid links enriched with status="valid"
 		const validLink = links.find(
@@ -69,7 +60,7 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 	it("should enrich error LinkObjects with error and suggestion", async () => {
 		// Given: File with broken anchor
 		// When: Validation completes
-		const { links } = await validator.validateFile(errorLinksSourcePath);
+		const { links } = await validateDocumentFile(errorLinksSourcePath);
 
 		// Then: Error links enriched with status="error", error message, suggestion
 		const errorLink = links.find(
@@ -86,7 +77,7 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 	it("should derive summary counts from enriched links", async () => {
 		// Given: File with 2 valid, 2 error links
 		// When: Validation completes
-		const { summary, links } = await validator.validateFile(
+		const { summary, links } = await validateDocumentFile(
 			mixedValidationSourcePath,
 		);
 
@@ -108,7 +99,7 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 	it("should preserve LinkObject base properties from parser", async () => {
 		// Given: Validated file
 		// When: Retrieve enriched links
-		const { links } = await validator.validateFile(validLinksSourcePath);
+		const { links } = await validateDocumentFile(validLinksSourcePath);
 
 		// Then: Original LinkObject properties unchanged
 		const link = links[0];
@@ -125,7 +116,7 @@ describe("CitationValidator Validation Enrichment Pattern", () => {
 	it("should support single-object access pattern for validation status", async () => {
 		// Given: Component needs both link structure and validation
 		// When: Access enriched LinkObject
-		const { links } = await validator.validateFile(validLinksSourcePath);
+		const { links } = await validateDocumentFile(validLinksSourcePath);
 		const link = links[0];
 
 		// Then: Single object provides both structure and validation

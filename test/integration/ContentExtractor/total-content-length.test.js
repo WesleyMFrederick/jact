@@ -1,17 +1,17 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createContentExtractor } from "../../../src/factories/componentFactory.js";
+import { createExtractionHarness } from "../../helpers/workflow-harness.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "..", "..", "fixtures");
 
 describe("ContentExtractor Integration - _totalContentCharacterLength", () => {
-	let extractor;
+	let extractFile;
 
 	beforeEach(() => {
-		extractor = createContentExtractor();
+		({ extractFile } = createExtractionHarness());
 	});
 
 	it("should include _totalContentCharacterLength in real extraction", async () => {
@@ -19,7 +19,7 @@ describe("ContentExtractor Integration - _totalContentCharacterLength", () => {
 		const sourceFile = join(fixturesDir, "section-extraction", "links.md");
 
 		// When: Extract with real cache and parsers
-		const result = await extractor.extractLinksContent(sourceFile, {
+		const result = await extractFile(sourceFile, {
 			fullFiles: false,
 		});
 

@@ -2,8 +2,8 @@
  * Contract tests: componentFactory accepts interface-typed dependencies.
  *
  * These tests verify that:
- * 1. createCitationValidator accepts plain objects satisfying ParsedFileCacheLike
- *    and FileCacheLike WITHOUT importing the production ParsedFileCache / FileCache classes.
+ * 1. createCitationValidator accepts plain objects satisfying ParsedDocumentLifecycleLike
+ *    and FileCacheLike WITHOUT importing the production cache classes.
  * 2. InMemoryFileCache satisfies FileCacheLike and integrates via the factory.
  * 3. The factory wires the injected mock through to the constructed CitationValidator
  *    (behavioral proof, not instanceof check).
@@ -18,18 +18,17 @@ import { CitationValidator } from "../../../src/core/CitationValidator/CitationV
 import { createCitationValidator } from "../../../src/factories/componentFactory.js";
 import type {
 	FileCacheLike,
-	ParsedFileCacheLike,
+	ParsedDocumentLifecycleLike,
 } from "../../../src/types/componentInterfaces.js";
 
 // ── Minimal plain-object test doubles ────────────────────────────────────────
 
 /**
- * A plain object (no class import) that satisfies ParsedFileCacheLike.
- * The factory must accept this without requiring instanceof ParsedFileCache.
+ * A plain object (no class import) that satisfies ParsedDocumentLifecycleLike.
  */
-function makeMockParsedFileCache(): ParsedFileCacheLike {
+function makeMockParsedFileCache(): ParsedDocumentLifecycleLike {
 	return {
-		resolveParsedFile: vi.fn().mockResolvedValue({
+		resolveDocument: vi.fn().mockResolvedValue({
 			hasAnchor: vi.fn().mockReturnValue(false),
 			findSimilarAnchors: vi.fn().mockReturnValue([]),
 			getLinks: vi.fn().mockReturnValue([]),
@@ -50,7 +49,7 @@ function makeMockFileCache(): FileCacheLike {
 // ── Test suites ───────────────────────────────────────────────────────────────
 
 describe("createCitationValidator — interface injection (no production class import)", () => {
-	it("accepts a plain object implementing ParsedFileCacheLike without importing ParsedFileCache", () => {
+	it("accepts a plain semantic-document lifecycle without importing its production class", () => {
 		// Given: test doubles built from plain objects, no ParsedFileCache imported
 		const mockParsedCache = makeMockParsedFileCache();
 		const mockFileCache = makeMockFileCache();
@@ -80,24 +79,38 @@ describe("createCitationValidator — interface injection (no production class i
 		expect(validator).toBeInstanceOf(CitationValidator);
 	});
 
-	it("calls resolveParsedFile on the injected mock (behavioral wiring proof)", async () => {
-		// Given: mock with a spy on resolveParsedFile
-		const mockParsedCache = makeMockParsedFileCache();
-		const mockFileCache = makeMockFileCache();
-		const validator = createCitationValidator(
-			mockParsedCache as Parameters<typeof createCitationValidator>[0],
-			mockFileCache,
+	it("uses the injected lifecycle for semantic anchor validation", async () => {
+		const lifecycle = makeMockParsedFileCache();
+		const validator = createCitationValidator(lifecycle, makeMockFileCache());
+		const sourceDocument = {
+			getLinks: () => [
+				{
+					line: 1,
+					column: 1,
+					text: "self",
+					fullMatch: "[self](#missing)",
+					linkType: "markdown",
+					scope: "internal",
+					anchorType: "header",
+					source: { raw: "[self](#missing)" },
+					target: {
+						path: { raw: "", absolute: null },
+						anchor: "missing",
+					},
+				},
+			],
+		};
+
+		const result = await validator.validateDocument(
+			sourceDocument as Parameters<typeof validator.validateDocument>[0],
+			"/virtual/source.md",
 		);
 
-		// When: validateFile is called (it reads the source file via parsedFileCache)
-		// We pass a non-existent path — validator will throw "File not found" before
-		// ever calling resolveParsedFile, so we verify the mock was NOT called (no leak)
-		await expect(
-			validator.validateFile("/non-existent-path.md"),
-		).rejects.toThrow("File not found");
-
-		// Then: mock was not called (validator throws before reaching cache)
-		expect(mockParsedCache.resolveParsedFile).not.toHaveBeenCalled();
+		expect(lifecycle.resolveDocument).toHaveBeenCalledWith({
+			kind: "file",
+			filePath: "/virtual/source.md",
+		});
+		expect(result.summary.errors).toBe(1);
 	});
 });
 

@@ -1,9 +1,6 @@
 /**
- * D3 integration tests: applyScope helper + smart default scope inference.
- * Phase 2 — §8d assertions (8 total).
- *
+ * Integration tests for shared smart-default scope inference.
  * CLI invocations use node dist/cli.js (requires prior build).
- * Source-inspection assertions read src/jact-cli.ts directly.
  */
 
 import { exec } from "node:child_process";
@@ -19,7 +16,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CLI_PATH = join(__dirname, "../../dist/cli.js");
 const JACT_ROOT = join(__dirname, "../..");
-const JACT_SRC = join(JACT_ROOT, "src/jact-cli.ts");
 const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");
 
 let tmpDir: string;
@@ -117,27 +113,46 @@ describe("extract links — default scope inference", () => {
 	});
 });
 
-describe("applyScope — duplication elimination", () => {
-	it("given the three extract methods, when source is inspected, then each invokes applyScope and contains zero direct buildCache calls in extract body", () => {
-		const src = fs.readFileSync(JACT_SRC, "utf8");
+describe("shared extraction scope behavior", () => {
+	it("maps unresolved scope consistently for all extraction adapters", async () => {
+		const lonelyFile = path.join(tmpDir, "lonely.md");
+		const commands = [
+			`extract file "${lonelyFile}"`,
+			`extract header "${lonelyFile}" "Lonely"`,
+			`extract links "${lonelyFile}"`,
+		];
 
-		// applyScope must appear at least 3 times (once per extract method)
-		const applyScopeCount = (src.match(/this\.applyScope\(/g) ?? []).length;
-		expect(applyScopeCount).toBeGreaterThanOrEqual(3);
-
-		// No direct `this.fileCache.buildCache(` in extractLinks/Header/File method bodies
-		// (only allowed in applyScope itself + validate + fix)
-		// Strategy: split by method boundaries and check the 3 extract method regions
-		const buildCacheInExtract =
-			/async extract(?:Links|Header|File)[^}]*this\.fileCache\.buildCache\(/s;
-		expect(src).not.toMatch(buildCacheInExtract);
+		for (const command of commands) {
+			try {
+				await execAsync(`node "${CLI_PATH}" ${command}`, { cwd: tmpDir });
+				expect.fail(`Command should fail without a resolvable scope: ${command}`);
+			} catch (error: unknown) {
+				const result = error as { code: number; stderr: string; stdout: string };
+				expect(result.code).toBeGreaterThan(0);
+				expect(result.stderr + result.stdout).toContain("cannot resolve scope");
+			}
+		}
 	});
 
-	it("given applyScope receives source: 'none' from resolveScope, when called, then throws with M3 error before reaching FileCache", () => {
-		const src = fs.readFileSync(JACT_SRC, "utf8");
-		// applyScope must check for source === 'none' and throw
-		expect(src).toMatch(/source.*none|none.*source/);
-		expect(src).toMatch(/cannot resolve scope/);
+	it("lets every extraction adapter use the same explicit scope", async () => {
+		const lonelyFile = path.join(tmpDir, "lonely.md");
+		const commands = [
+			`extract file "${lonelyFile}" --scope "${tmpDir}"`,
+			`extract header "${lonelyFile}" "Lonely" --scope "${tmpDir}"`,
+			`extract links "${lonelyFile}" --scope "${tmpDir}"`,
+		];
+
+		for (const command of commands) {
+			try {
+				await execAsync(`node "${CLI_PATH}" ${command}`, { cwd: tmpDir });
+			} catch (error: unknown) {
+				const result = error as { code: number; stderr: string; stdout: string };
+				expect(result.code).toBe(1);
+				expect(result.stderr + result.stdout).not.toContain(
+					"cannot resolve scope",
+				);
+			}
+		}
 	});
 });
 
@@ -155,14 +170,5 @@ describe("M1 near-miss suggestion — not_found branch", () => {
 			const output = err.stderr + err.stdout;
 			expect(output).toContain("Did you mean: CLAUDE.md");
 		}
-	});
-});
-
-describe("applyScope — sync semantics (tech debt fix)", () => {
-	it("given extract header / extract file methods, when source is inspected, then no spurious 'await' on buildCache (TS80007 cleared)", () => {
-		const src = fs.readFileSync(JACT_SRC, "utf8");
-		// TS80007: 'await' has no effect here — buildCache is synchronous
-		// After fix, no `await this.fileCache.buildCache` should appear anywhere
-		expect(src).not.toContain("await this.fileCache.buildCache");
 	});
 });

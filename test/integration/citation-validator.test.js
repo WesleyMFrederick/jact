@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createCitationValidator } from "../../src/factories/componentFactory.js";
+import { createCitationHarness } from "../helpers/workflow-harness.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,11 +11,11 @@ describe("Component Integration", () => {
 	describe("CitationValidator with MarkdownParser and FileCache", () => {
 		it("should validate citations using real file operations", async () => {
 			// Given: Factory creates validator with production dependencies
-			const validator = createCitationValidator();
+			const { validateDocumentFile } = createCitationHarness();
 			const testFile = join(fixturesDir, "valid-citations.md");
 
 			// When: Validator processes file with real file system
-			const result = await validator.validateFile(testFile);
+			const result = await validateDocumentFile(testFile);
 
 			// Then: Validation succeeds with expected citation count
 			expect(result.summary.total).toBeGreaterThan(0);
@@ -36,11 +36,11 @@ describe("Component Integration", () => {
 
 		it("should detect broken links using component collaboration", async () => {
 			// Given: Factory-created validator with real dependencies
-			const validator = createCitationValidator();
+			const { validateDocumentFile } = createCitationHarness();
 			const testFile = join(fixturesDir, "broken-links.md");
 
 			// When: Validator processes broken-links.md fixture
-			const result = await validator.validateFile(testFile);
+			const result = await validateDocumentFile(testFile);
 
 			// Then: Component collaboration detects errors
 			expect(result.summary.total).toBeGreaterThan(0);
@@ -59,11 +59,11 @@ describe("Component Integration", () => {
 
 		it("should validate citations with cache-assisted resolution", async () => {
 			// Given: Validator with file cache built for fixtures directory
-			const validator = createCitationValidator();
+			const { validateDocumentFile } = createCitationHarness();
 			const testFile = join(fixturesDir, "scope-test.md");
 
 			// When: Validating scope-test.md using cache for resolution
-			const result = await validator.validateFile(testFile);
+			const result = await validateDocumentFile(testFile);
 
 			// Then: Cache-assisted validation succeeds
 			expect(result.summary.total).toBeGreaterThan(0);

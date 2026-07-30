@@ -1,27 +1,26 @@
 import type { LinkObject } from "../../types/citationTypes.js";
+import type { CliFlags } from "../../types/cli-types.js";
 import type {
-	CliFlags,
 	EligibilityDecision,
 	ExtractedContentBlock,
-	ExtractionEligibilityStrategy,
 	ExtractionStats,
 	OutgoingLinksExtractedContent,
 	ProcessedLinkEntry,
-} from "../../types/contentExtractorTypes.js";
-import type {
-	EnrichedLinkObject,
-	ValidationResult,
-} from "../../types/validationTypes.js";
+} from "../../types/extraction-types.js";
+import type { ExtractionEligibilityStrategy } from "../../types/strategy-types.js";
+import type { EnrichedLinkObject } from "../../types/validationTypes.js";
 import { analyzeEligibility } from "./analyzeEligibility.js";
-import { extractLinksContent as extractLinksContentOp } from "./extractLinksContent.js";
 import { generateContentId } from "./generateContentId.js";
 import { decodeUrlAnchor, normalizeBlockId } from "./normalizeAnchor.js";
 
 /**
- * Consumer-defined interface for ParsedFileCache dependency.
+ * Consumer-defined interface for the parsed-document lifecycle dependency.
  */
-interface ParsedFileCacheInterface {
-	resolveParsedFile(filePath: string): Promise<ParsedDocumentInterface>;
+interface ParsedDocumentLifecycleInterface {
+	resolveDocument(source: {
+		kind: "file";
+		filePath: string;
+	}): Promise<ParsedDocumentInterface>;
 }
 
 /**
@@ -34,32 +33,22 @@ interface ParsedDocumentInterface {
 }
 
 /**
- * Consumer-defined interface for CitationValidator dependency.
- */
-interface CitationValidatorInterface {
-	validateFile(filePath: string): Promise<ValidationResult>;
-}
-
-/**
  * Content Extractor component orchestrating extraction eligibility analysis.
  * Component entry point following TitleCase naming convention.
  */
 export class ContentExtractor {
 	private eligibilityStrategies: ExtractionEligibilityStrategy[];
-	private parsedFileCache: ParsedFileCacheInterface;
-	private citationValidator: CitationValidatorInterface;
+	private parsedDocuments: ParsedDocumentLifecycleInterface;
 
 	/**
 	 * Create ContentExtractor with eligibility strategies and dependencies.
 	 */
 	constructor(
 		eligibilityStrategies: ExtractionEligibilityStrategy[],
-		parsedFileCache: ParsedFileCacheInterface,
-		citationValidator: CitationValidatorInterface,
+		parsedDocuments: ParsedDocumentLifecycleInterface,
 	) {
 		this.eligibilityStrategies = eligibilityStrategies;
-		this.parsedFileCache = parsedFileCache;
-		this.citationValidator = citationValidator;
+		this.parsedDocuments = parsedDocuments;
 	}
 
 	/**
@@ -73,23 +62,8 @@ export class ContentExtractor {
 	}
 
 	/**
-	 * Extract content from links in source file.
-	 * Thin wrapper delegating to operation file.
-	 */
-	async extractLinksContent(
-		sourceFilePath: string,
-		cliFlags: CliFlags,
-	): Promise<OutgoingLinksExtractedContent> {
-		return await extractLinksContentOp(sourceFilePath, cliFlags, {
-			parsedFileCache: this.parsedFileCache,
-			citationValidator: this.citationValidator,
-			eligibilityStrategies: this.eligibilityStrategies,
-		});
-	}
-
-	/**
 	 * Extract content from pre-validated enriched links.
-	 * CLI handles Phase 1 validation, passes enriched links here.
+	 * Validation completes before the CLI passes enriched links here.
 	 */
 	async extractContent(
 		enrichedLinks: EnrichedLinkObject[],
@@ -160,8 +134,10 @@ export class ContentExtractor {
 					continue;
 				}
 				const decodedPath = decodeURIComponent(link.target.path.absolute);
-				const targetDoc =
-					await this.parsedFileCache.resolveParsedFile(decodedPath);
+				const targetDoc = await this.parsedDocuments.resolveDocument({
+					kind: "file",
+					filePath: decodedPath,
+				});
 
 				let extractedContent: string;
 				if (link.anchorType === "header") {

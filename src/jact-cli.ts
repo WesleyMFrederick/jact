@@ -7,7 +7,7 @@
  * @module jact
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import {
 	checkOutlineReminderCache,
@@ -21,12 +21,8 @@ import {
 import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
 import { generateContentId } from "./core/ContentExtractor/generateContentId.js";
-import {
-	detectNestedCodeblocks,
-	type NestedCodeblockWarning,
-} from "./core/MarkdownParser/detectNestedCodeblocks.js";
-import type { MarkdownParser } from "./core/MarkdownParser/index.js";
-import { resolveScope } from "./core/resolveScope.js";
+import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
+import { prepareScope } from "./core/prepare-scope.js";
 import type { FileCache } from "./FileCache.js";
 import {
 	createCitationValidator,
@@ -34,33 +30,34 @@ import {
 	createFileCache,
 	createMarkdownParser,
 	createParsedFileCache,
+	createValidationWorkflow,
 } from "./factories/componentFactory.js";
 import { LinkObjectFactory } from "./factories/LinkObjectFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
 import { formatAsJSON, formatForCLI } from "./formatValidationResult.js";
 import { renderOutline } from "./outline/render-outline.js";
-import ParsedDocument, {
-	type HeadingMatch,
-	type HeadingResolution,
+import type ParsedDocument from "./ParsedDocument.js";
+import type {
+	HeadingMatch,
+	HeadingResolution,
 } from "./ParsedDocument.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
-import type { CliOutlineOptions } from "./types/cli-types.js";
 import type {
 	CliExtractOptions,
+	CliOutlineOptions,
 	CliValidateOptions,
-	OutgoingLinksExtractedContent,
-} from "./types/contentExtractorTypes.js";
+} from "./types/cli-types.js";
+import type { OutgoingLinksExtractedContent } from "./types/extraction-types.js";
 import type { CacheStats } from "./types/fileCacheTypes.js";
 import type {
 	EnrichedLinkObject,
 	ValidationResult,
 } from "./types/validationTypes.js";
-
-interface LineRange {
-	startLine: number;
-	endLine: number;
-}
+import type {
+	ValidationWorkflow,
+	ValidationWorkflowOutcome,
+} from "./validate/validation-workflow.js";
 
 export interface OutlineCommandResult {
 	success: boolean;
@@ -121,83 +118,38 @@ function uniqueParentName(
  * Importable programmatically without activating Commander (wiring is in cli.ts).
  */
 export class JactCli {
-	private parser: MarkdownParser;
 	private parsedFileCache: ParsedFileCache;
 	private fileCache: FileCache;
 	private validator: CitationValidator;
 	private contentExtractor: ContentExtractor;
-	/** Scope/gitignore decisions from the last applyScope, surfaced by validate. */
-	private scopeNotices: string[] = [];
+	private validationWorkflow: ValidationWorkflow;
 
 	constructor() {
 		this.fileCache = createFileCache();
-		this.parser = createMarkdownParser(this.fileCache);
-		this.parsedFileCache = createParsedFileCache(this.parser);
+		const parser = createMarkdownParser(this.fileCache);
+		this.parsedFileCache = createParsedFileCache(parser);
 		this.validator = createCitationValidator(
 			this.parsedFileCache,
 			this.fileCache,
 		);
 		this.contentExtractor = createContentExtractor(this.parsedFileCache);
+		this.validationWorkflow = createValidationWorkflow(
+			this.parsedFileCache,
+			this.fileCache,
+			this.validator,
+		);
 	}
 
 	/**
 	 * Resolve scope and build the file cache. Throws if scope cannot be inferred.
-	 * Returns the cache stats so callers (e.g. validate) can emit verbose output.
+	 * Returns cache statistics for callers that need them.
 	 */
 	private applyScope(
 		options: { scope?: string; allowGitignore?: boolean },
 		targetFile?: string,
 	): CacheStats {
-		this.scopeNotices = [];
-		const resolved = resolveScope({
-			...(options.scope !== undefined && { explicit: options.scope }),
-			cwd: process.cwd(),
-			...(targetFile !== undefined && { targetFile }),
-		});
-		if (resolved.source === "none") {
-			const triedParts = resolved.triedFallbacks ?? [];
-			throw new Error(
-				`cannot resolve scope. Tried: ${triedParts.join(", ")}. Pass --scope <dir>.`,
-			);
-		}
-
-		// When a default root is auto-picked (not an explicit --scope) and the
-		// nearest marker is an Obsidian vault, say so — the user may have wanted a
-		// different root. (Core principle: surface defaults, don't hide them.)
-		if (resolved.marker === ".obsidian") {
-			this.scopeNotices.push(
-				`Scoped to ${resolved.scope} (nearest Obsidian vault). Override with --scope <dir>.`,
-			);
-		}
-
-		// Default: respect .gitignore. --allow-gitignore opts in to scanning excluded files.
-		// buildCache verbose stays false so JSON callers (ast/extract) keep clean
-		// stdout/stderr; verbose callers (validate) log from the returned stats.
-		const respectGitignore = !options.allowGitignore;
-		let stats = this.fileCache.buildCache(resolved.scope, false, resolved, {
-			respectGitignore,
-		});
-
-		// If the explicitly-targeted file is hidden by .gitignore or .jactignore
-		// under this scope, index its directory branch anyway — pointing jact at a
-		// file is an explicit request to validate it and its siblings (e.g. bare
-		// wiki page names). Not gated on respectGitignore: .jactignore applies
-		// even when --allow-gitignore disabled .gitignore.
-		if (targetFile !== undefined) {
-			const absTarget = path.resolve(targetFile);
-			if (this.fileCache.isIgnored(absTarget)) {
-				const includeDir = path.dirname(absTarget);
-				stats = this.fileCache.buildCache(resolved.scope, false, resolved, {
-					respectGitignore,
-					alwaysIncludeDir: includeDir,
-				});
-				this.scopeNotices.push(
-					`Note: ${includeDir} is gitignored under ${resolved.scope} (via .gitignore or .jactignore); indexed it because you targeted a file inside it. Use --allow-gitignore to scan all gitignored paths.`,
-				);
-			}
-		}
-
-		return stats;
+		const prepared = prepareScope(this.fileCache, options, targetFile);
+		return prepared.stats;
 	}
 
 	/**
@@ -225,17 +177,32 @@ export class JactCli {
 		filePath: string,
 		options: { scope?: string } = {},
 	): Promise<ParserOutput> {
+		return (await this.resolveDocument(filePath, options)).data;
+	}
+
+	private async resolveDocument(
+		filePath: string,
+		options: { scope?: string },
+	): Promise<ParsedDocument> {
 		this.applyScope(options, filePath);
 		const absolute = path.resolve(filePath);
 		if (existsSync(absolute)) {
-			return this.parser.parseFile(absolute);
+			return this.parsedFileCache.resolveDocument({
+				kind: "file",
+				filePath: absolute,
+			});
 		}
 		const cacheResult = this.fileCache.resolveFile(path.basename(filePath));
-		if (cacheResult.found) {
-			return this.parser.parseFile(cacheResult.path);
+		if (cacheResult.found && cacheResult.path) {
+			return this.parsedFileCache.resolveDocument({
+				kind: "file",
+				filePath: cacheResult.path,
+			});
 		}
 		const err = new Error(`File not found: ${absolute}`);
-		(err as Error & { suggestion?: string }).suggestion = cacheResult.message;
+		if (cacheResult.message !== undefined) {
+			(err as Error & { suggestion?: string }).suggestion = cacheResult.message;
+		}
 		throw err;
 	}
 
@@ -244,156 +211,61 @@ export class JactCli {
 		filePath: string,
 		options: CliValidateOptions = {},
 	): Promise<string> {
-		try {
-			const startTime = Date.now();
-			// Smart-default scope resolution (cwd-git → cwd-pkg → target-git →
-			// target-pkg), same as getAst. Seeds the shared FileCache so bare wiki
-			// page names resolve even when --scope is omitted.
-			const cacheStats = this.applyScope(options, filePath);
-			if (options.format !== "json") {
-				// Surface scope/gitignore decisions (Obsidian-vault default, gitignore
-				// relax) before the report so the user sees what jact chose.
-				for (const notice of this.scopeNotices) console.log(notice);
-				if (options.verbose) {
-					console.log(
-						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
-					);
-					if (cacheStats.duplicates > 0) {
-						console.log(
-							`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
-						);
-					}
-				}
-			}
-			const result = await this.validator.validateFile(filePath);
-			result.validationTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
-			const fileContent = readFileSync(filePath, "utf8");
-			const nestedCodeblockWarnings = detectNestedCodeblocks(fileContent);
-			const reportResult = options.lines
-				? this.filterResultsByLineRange(result, options.lines)
-				: result;
-			if (options.format === "json") return this.formatAsJSON(reportResult);
-			const cli = this.formatForCLI(
-				reportResult,
-				nestedCodeblockWarnings,
-				options.verbose ?? false,
-			);
-			return this.appendGitignoreHint(cli);
-		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
-			if (options.format === "json") {
-				return JSON.stringify(
-					{ error: errorMessage, file: filePath, success: false },
-					null,
-					2,
-				);
-			}
-			return `ERROR: ${errorMessage}`;
-		}
+		const outcome = await this.validationWorkflow.validate(
+			{ kind: "file", filePath },
+			options,
+		);
+		return this.renderValidationOutcome(outcome, options);
 	}
 
-	/**
-	 * Validate markdown supplied as a string (file not yet on disk). The in-memory analogue of validate().
-	 * Contract: options.filePath is the INTENDED path — used for scope, relative-link base, self-anchor key.
-	 * Returns the same formatted report string as validate(); same exit-code mapping in the CLI layer.
-	 */
+	/** Validate in-memory markdown under its intended path. */
 	async validateContent(
 		content: string,
 		options: CliValidateOptions & { filePath: string },
 	): Promise<string> {
-		const { filePath } = options;
-		try {
-			const startTime = Date.now();
-			// applyScope works without the file existing on disk — it only needs the
-			// intended path for the target-git/target-pkg fallback walk-up.
-			const cacheStats = this.applyScope(options, filePath);
-			if (options.format !== "json") {
-				for (const notice of this.scopeNotices) console.log(notice);
-				if (options.verbose) {
-					console.log(
-						`Scanned ${cacheStats.totalFiles} files in ${cacheStats.scopeFolder}`,
-					);
-					if (cacheStats.duplicates > 0) {
-						console.log(
-							`WARNING: Found ${cacheStats.duplicates} duplicate filenames`,
-						);
-					}
-				}
-			}
-			const abs = path.resolve(filePath);
-			const parsed = this.parser.parseContent(content, abs);
-			// Seed the cache so self-anchors (`#some-heading`) resolve against this
-			// in-memory content instead of attempting a disk read of an unwritten file.
-			this.parsedFileCache.seedParsedFile(abs, parsed);
-			const result = await this.validator.validateParsed(parsed, abs);
-			result.validationTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
-			// No disk read — feed the in-memory content directly to the nested-codeblock detector.
-			const nestedCodeblockWarnings = detectNestedCodeblocks(content);
-			const reportResult = options.lines
-				? this.filterResultsByLineRange(result, options.lines)
-				: result;
-			if (options.format === "json") return this.formatAsJSON(reportResult);
-			const cli = this.formatForCLI(
-				reportResult,
-				nestedCodeblockWarnings,
-				options.verbose ?? false,
-			);
-			return this.appendGitignoreHint(cli);
-		} catch (error) {
-			const errorMessage =
-				error instanceof Error ? error.message : String(error);
+		const outcome = await this.validationWorkflow.validate(
+			{ kind: "memory", filePath: options.filePath, content },
+			options,
+		);
+		return this.renderValidationOutcome(outcome, options);
+	}
+
+	private renderValidationOutcome(
+		outcome: ValidationWorkflowOutcome,
+		options: CliValidateOptions,
+	): string {
+		if (outcome.kind === "failed") {
 			if (options.format === "json") {
 				return JSON.stringify(
-					{ error: errorMessage, file: filePath, success: false },
+					{ error: outcome.error, file: outcome.filePath, success: false },
 					null,
 					2,
 				);
 			}
-			return `ERROR: ${errorMessage}`;
+			return `ERROR: ${outcome.error}`;
 		}
-	}
 
-	/** Filter links to those within lineRange and recompute summary stats. */
-	private filterResultsByLineRange(
-		result: ValidationResult,
-		lineRange: string,
-	): ValidationResult & { lineRange: string } {
-		const { startLine, endLine } = this.parseLineRange(lineRange);
-		const filteredLinks = result.links.filter(
-			(link: EnrichedLinkObject) =>
-				link.line >= startLine && link.line <= endLine,
+		if (options.format !== "json") {
+			for (const notice of outcome.scopeNotices) console.log(notice);
+			if (options.verbose) {
+				console.log(
+					`Scanned ${outcome.cacheStats.totalFiles} files in ${outcome.cacheStats.scopeFolder}`,
+				);
+				if (outcome.cacheStats.duplicates > 0) {
+					console.log(
+						`WARNING: Found ${outcome.cacheStats.duplicates} duplicate filenames`,
+					);
+				}
+			}
+		}
+		if (options.format === "json") return this.formatAsJSON(outcome.result);
+		return this.appendGitignoreHint(
+			this.formatForCLI(
+				outcome.result,
+				outcome.nestedCodeblockWarnings,
+				options.verbose ?? false,
+			),
 		);
-		const filteredSummary = {
-			total: filteredLinks.length,
-			valid: filteredLinks.filter(
-				(l: EnrichedLinkObject) => l.validation.status === "valid",
-			).length,
-			errors: filteredLinks.filter(
-				(l: EnrichedLinkObject) => l.validation.status === "error",
-			).length,
-			warnings: filteredLinks.filter(
-				(l: EnrichedLinkObject) => l.validation.status === "warning",
-			).length,
-		};
-		return {
-			...result,
-			links: filteredLinks,
-			summary: filteredSummary,
-			lineRange: `${startLine}-${endLine}`,
-		};
-	}
-
-	/** Parse "start-end" or single-line range string to LineRange. */
-	private parseLineRange(lineRange: string): LineRange {
-		if (lineRange.includes("-")) {
-			const [start, end] = lineRange
-				.split("-")
-				.map((n) => Number.parseInt(n.trim(), 10));
-			return { startLine: start || 0, endLine: end || 0 };
-		}
-		const line = Number.parseInt(lineRange.trim(), 10);
-		return { startLine: line, endLine: line };
 	}
 
 	/** Delegate to formatValidationResult.formatForCLI. */
@@ -416,8 +288,11 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<void> {
 		try {
-			this.applyScope(options, sourceFile);
-			const validationResult = await this.validator.validateFile(sourceFile);
+			const sourceDocument = await this.resolveDocument(sourceFile, options);
+			const validationResult = await this.validator.validateDocument(
+				sourceDocument,
+				sourceFile,
+			);
 			const enrichedLinks = validationResult.links;
 			if (validationResult.summary.errors > 0) {
 				console.error("Validation errors found:");
@@ -456,8 +331,8 @@ export class JactCli {
 		maxLevel: number,
 		options: CliOutlineOptions = {},
 	): Promise<OutlineCommandResult> {
-		const parsed = await this.getAst(filePath, options);
-		const document = new ParsedDocument(parsed);
+		const document = await this.resolveDocument(filePath, options);
+		const parsed = document.data;
 		const headings = document.getHeadings();
 		if (headings.length === 0) {
 			return {
@@ -568,8 +443,8 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<OutgoingLinksExtractedContent | undefined> {
 		try {
-			const parsed = await this.getAst(targetFile, options);
-			const document = new ParsedDocument(parsed);
+			const document = await this.resolveDocument(targetFile, options);
+			const parsed = document.data;
 			const resolution = document.resolveHeading(headerName, {
 				...(options.within !== undefined && { within: options.within }),
 			});
@@ -717,7 +592,11 @@ export class JactCli {
 		_fs?: FixFsOverrides,
 	): Promise<string> {
 		return applyCitationFixes(
-			{ validator: this.validator, fileCache: this.fileCache },
+			{
+				validator: this.validator,
+				fileCache: this.fileCache,
+				parsedDocuments: this.parsedFileCache,
+			},
 			filePath,
 			options,
 			_fs,

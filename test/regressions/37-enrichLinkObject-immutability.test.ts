@@ -23,6 +23,7 @@ import { MarkdownParser } from "../../src/core/MarkdownParser/MarkdownParser.js"
 import { FileCache } from "../../src/FileCache.js";
 import { ParsedFileCache } from "../../src/ParsedFileCache.js";
 import type { LinkObject } from "../../src/types/citationTypes.js";
+import { validateDocumentFile } from "../helpers/workflow-harness.js";
 
 describe("Regression #37: enrichLinkObject must not mutate the original LinkObject", () => {
 	it("validateSingleCitation — original LinkObject has no .validation after the call", async () => {
@@ -65,8 +66,8 @@ describe("Regression #37: enrichLinkObject must not mutate the original LinkObje
 		expect(enriched.validation).toBeDefined();
 	});
 
-	it("validateFile — original parser LinkObjects have no .validation after the call", async () => {
-		// Arrange: write a temp file so validateFile can parse real links
+	it("validateDocument — original parser LinkObjects have no .validation after the call", async () => {
+		// Arrange: write a temp file so semantic document validation can parse real links
 		const tmpDir = mkdtempSync(join(tmpdir(), "jact-regression-37-"));
 		const sourceFile = join(tmpDir, "source.md");
 		writeFileSync(sourceFile, "# Source\n\nSee [link](#section).\n\n^FR1\n");
@@ -76,18 +77,18 @@ describe("Regression #37: enrichLinkObject must not mutate the original LinkObje
 		const cache = new ParsedFileCache(parser);
 		const validator = new CitationValidator(cache, fileCache);
 
-		// Capture original LinkObject references from the parser BEFORE validateFile
-		const parsedDoc = await cache.resolveParsedFile(sourceFile);
+		// Capture original LinkObject references from the parser before validation
+		const parsedDoc = await cache.resolveDocument({ kind: "file", filePath: sourceFile });
 		const originalLinks = parsedDoc.getLinks();
 
 		// Act: run full-file validation
-		await validator.validateFile(sourceFile);
+		await validateDocumentFile(validator, cache, sourceFile);
 
 		// Assert: every original link is still unmutated — this FAILED before the fix
 		for (const link of originalLinks) {
 			expect(
 				(link as LinkObject & { validation?: unknown }).validation,
-				`link at line ${link.line} must NOT have .validation after validateFile (regression #37)`,
+				`link at line ${link.line} must NOT have .validation after validateDocument (regression #37)`,
 			).toBeUndefined();
 		}
 	});

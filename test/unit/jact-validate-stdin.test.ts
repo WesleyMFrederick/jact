@@ -1,7 +1,7 @@
 // Validate markdown content supplied as a string (not yet on disk) via
 // JactCli.validateContent — the in-memory analogue of validate() (R6 plan, M1-M5).
-// Exercises: self-anchor resolution against the in-memory cache seed (M1/M3),
-// validateParsed/validateFile parity (M2), and the --stdin CLI surface (M5).
+// Exercises: self-anchor resolution through the in-memory source adapter (M1/M3),
+// file/memory semantic-document parity (M2), and the --stdin CLI surface (M5).
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,7 +27,7 @@ function makeScopedTmpDir(): string {
 	return dir;
 }
 
-describe("JactCli.validateContent — self-anchor resolves against the in-memory seed (M1/M3)", () => {
+describe("JactCli.validateContent — self-anchor resolves against the in-memory document (M1/M3)", () => {
 	it("given content with a valid self-anchor, when validateContent runs with an unwritten filePath, then status is valid", async () => {
 		// Given an intended path that is never written to disk
 		const scopeDir = makeScopedTmpDir();
@@ -68,38 +68,44 @@ describe("JactCli.validateContent — self-anchor resolves against the in-memory
 	});
 });
 
-describe("CitationValidator.validateParsed vs validateFile — parity (M2)", () => {
-	it("given the same content, when validateParsed vs validateFile run, then results are identical", async () => {
-		// Given the same content, once on disk and once parsed+seeded in-memory under the same key
+describe("file and memory semantic-document parity (M2)", () => {
+	it("returns identical citation outcomes for identical file and memory content", async () => {
 		const scopeDir = makeScopedTmpDir();
 		const diskFile = join(scopeDir, "twin.md");
 		const content =
 			"# Heading\n\nSelf-referencing [Link](#heading) and plain text.\n";
 		writeFileSync(diskFile, content);
 
-		// validateFile path: real disk read
+		const fileDocuments = createParsedFileCache(createMarkdownParser());
 		const fileValidator = createCitationValidator(
-			createParsedFileCache(createMarkdownParser()),
+			fileDocuments,
 			createFileCache(),
 		);
-		const fileResult = await fileValidator.validateFile(diskFile);
-
-		// validateParsed path: in-memory only, independent cache instance seeded with the same content/key
-		const parser = createMarkdownParser();
-		const parsedFileCache = createParsedFileCache(parser);
-		const parsedValidator = createCitationValidator(
-			parsedFileCache,
-			createFileCache(),
-		);
-		const parsedDoc = parser.parseContent(content, diskFile);
-		parsedFileCache.seedParsedFile(diskFile, parsedDoc);
-		const parsedResult = await parsedValidator.validateParsed(
-			parsedDoc,
+		const fileDocument = await fileDocuments.resolveDocument({
+			kind: "file",
+			filePath: diskFile,
+		});
+		const fileResult = await fileValidator.validateDocument(
+			fileDocument,
 			diskFile,
 		);
 
-		// Then
-		expect(parsedResult).toEqual(fileResult);
+		const memoryDocuments = createParsedFileCache(createMarkdownParser());
+		const memoryValidator = createCitationValidator(
+			memoryDocuments,
+			createFileCache(),
+		);
+		const memoryDocument = await memoryDocuments.resolveDocument({
+			kind: "memory",
+			filePath: diskFile,
+			content,
+		});
+		const memoryResult = await memoryValidator.validateDocument(
+			memoryDocument,
+			diskFile,
+		);
+
+		expect(memoryResult).toEqual(fileResult);
 	});
 });
 

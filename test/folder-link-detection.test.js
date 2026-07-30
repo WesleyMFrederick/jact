@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { CitationValidator } from "../src/core/CitationValidator/CitationValidator.js";
 import { MarkdownParser } from "../src/core/MarkdownParser/index.js";
-import { createCitationValidator } from "../src/factories/componentFactory.js";
+import { createCitationHarness } from "./helpers/workflow-harness.js";
 import { ParsedFileCache } from "../src/ParsedFileCache.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -149,12 +149,12 @@ describe("Folder link detection (Issue #46)", () => {
 		});
 	});
 
-	describe("validateFile integration with folder links", () => {
+	describe("semantic document integration with folder links", () => {
 		it("should detect folder links in a markdown file and report warnings", async () => {
-			const factoryValidator = createCitationValidator();
+			const { validateDocumentFile } = createCitationHarness();
 			const testFile = join(fixturesDir, "folder-link-test.md");
 
-			const result = await factoryValidator.validateFile(testFile);
+			const result = await validateDocumentFile(testFile);
 
 			// Should have warnings for folder links
 			expect(result.summary.warnings).toBeGreaterThan(0);

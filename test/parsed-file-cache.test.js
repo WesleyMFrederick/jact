@@ -22,7 +22,7 @@ describe("ParsedFileCache", () => {
 		const testFile = join(__dirname, "fixtures", "valid-citations.md");
 
 		// When: First request for file
-		const result = await cache.resolveParsedFile(testFile);
+		const result = await cache.resolveDocument({ kind: "file", filePath: testFile });
 
 		// Then: ParsedDocument instance returned with facade methods
 		expect(result).toBeInstanceOf(ParsedDocument);
@@ -46,10 +46,10 @@ describe("ParsedFileCache", () => {
 		// Create spy on parser to track parse calls
 		const parseSpy = vi.spyOn(parser, "parseFile");
 
-		const firstResult = await cache.resolveParsedFile(testFile);
+		const firstResult = await cache.resolveDocument({ kind: "file", filePath: testFile });
 
 		// When: Second request for same file
-		const secondResult = await cache.resolveParsedFile(testFile);
+		const secondResult = await cache.resolveDocument({ kind: "file", filePath: testFile });
 
 		// Then: Same object instance returned (cache hit)
 		expect(secondResult).toBe(firstResult);
@@ -66,9 +66,9 @@ describe("ParsedFileCache", () => {
 		const parseSpy = vi.spyOn(parser, "parseFile");
 
 		// When: Multiple simultaneous requests for same file (no await between calls)
-		const promise1 = cache.resolveParsedFile(testFile);
-		const promise2 = cache.resolveParsedFile(testFile);
-		const promise3 = cache.resolveParsedFile(testFile);
+		const promise1 = cache.resolveDocument({ kind: "file", filePath: testFile });
+		const promise2 = cache.resolveDocument({ kind: "file", filePath: testFile });
+		const promise3 = cache.resolveDocument({ kind: "file", filePath: testFile });
 
 		// Wait for all promises to resolve
 		const [result1, result2, result3] = await Promise.all([
@@ -96,20 +96,38 @@ describe("ParsedFileCache", () => {
 	});
 
 	it("should propagate parser errors and remove from cache", async () => {
-		// Given: File that will cause parse error (non-existent file)
 		const invalidFile = join(
 			__dirname,
 			"fixtures",
 			"nonexistent-file-12345.md",
 		);
+		const parseSpy = vi.spyOn(parser, "parseFile");
 
-		// When: Request to parse invalid file
-		// Then: Promise rejects with error
-		await expect(cache.resolveParsedFile(invalidFile)).rejects.toThrow();
+		await expect(
+			cache.resolveDocument({ kind: "file", filePath: invalidFile }),
+		).rejects.toThrow();
+		await expect(
+			cache.resolveDocument({ kind: "file", filePath: invalidFile }),
+		).rejects.toThrow();
 
-		// Verify failed entry removed from cache by checking subsequent request also fails
-		// (if cached, it would return the rejected promise, but we want a fresh parse attempt)
-		await expect(cache.resolveParsedFile(invalidFile)).rejects.toThrow();
+		expect(parseSpy).toHaveBeenCalledTimes(2);
+	});
+
+	it("creates in-memory semantic documents without reading from disk", async () => {
+		const intendedPath = join(__dirname, "fixtures", "unwritten-memory.md");
+		const parseFileSpy = vi.spyOn(parser, "parseFile");
+		const parseContentSpy = vi.spyOn(parser, "parseContent");
+
+		const document = await cache.resolveDocument({
+			kind: "memory",
+			filePath: intendedPath,
+			content: "# Draft\n\n[Self](#Draft)\n",
+		});
+
+		expect(parseFileSpy).not.toHaveBeenCalled();
+		expect(parseContentSpy).toHaveBeenCalledOnce();
+		expect(document.hasAnchor("Draft")).toBe(true);
+		expect(document.getLinks()).toHaveLength(1);
 	});
 
 	it("should normalize file paths for consistent cache keys", async () => {
@@ -134,9 +152,9 @@ describe("ParsedFileCache", () => {
 		const parseSpy = vi.spyOn(parser, "parseFile");
 
 		// When: Request with different path formats for same file
-		const result1 = await cache.resolveParsedFile(absolutePath);
-		const result2 = await cache.resolveParsedFile(pathWithDotSlash);
-		const result3 = await cache.resolveParsedFile(absolutePath);
+		const result1 = await cache.resolveDocument({ kind: "file", filePath: absolutePath });
+		const result2 = await cache.resolveDocument({ kind: "file", filePath: pathWithDotSlash });
+		const result3 = await cache.resolveDocument({ kind: "file", filePath: absolutePath });
 
 		// Then: Treated as same cache entry (parser called only once)
 		expect(parseSpy).toHaveBeenCalledTimes(1);
@@ -156,9 +174,9 @@ describe("ParsedFileCache", () => {
 		const parseSpy = vi.spyOn(parser, "parseFile");
 
 		// When: Parse each file
-		const result1 = await cache.resolveParsedFile(file1);
-		const result2 = await cache.resolveParsedFile(file2);
-		const result3 = await cache.resolveParsedFile(file3);
+		const result1 = await cache.resolveDocument({ kind: "file", filePath: file1 });
+		const result2 = await cache.resolveDocument({ kind: "file", filePath: file2 });
+		const result3 = await cache.resolveDocument({ kind: "file", filePath: file3 });
 
 		// Then: Each cached separately (parser called once per unique file)
 		expect(parseSpy).toHaveBeenCalledTimes(3);
@@ -179,7 +197,7 @@ describe("ParsedFileCache", () => {
 		expect(content2).not.toBe(content3);
 
 		// Verify cache hits work independently (second request for file1 doesn't re-parse)
-		const result1Again = await cache.resolveParsedFile(file1);
+		const result1Again = await cache.resolveDocument({ kind: "file", filePath: file1 });
 		expect(result1Again).toBe(result1);
 		expect(parseSpy).toHaveBeenCalledTimes(3); // Still only 3 total calls
 	});

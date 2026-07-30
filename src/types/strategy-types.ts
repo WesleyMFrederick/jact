@@ -1,7 +1,6 @@
 /**
  * Strategy interface types for the extraction eligibility chain.
- *
- * Split from contentExtractorTypes.ts (issue #28).
+
  */
 
 import type { LinkObject } from "./citationTypes.js";

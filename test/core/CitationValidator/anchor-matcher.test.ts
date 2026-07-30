@@ -146,7 +146,7 @@ describe("Contract: AnchorMatcher.validateAnchorExists — structured anchorConv
 			},
 		];
 		const cache = {
-			resolveParsedFile: async () => stubParsedDoc(anchors),
+			resolveDocument: async () => stubParsedDoc(anchors),
 		};
 		const matcher = new AnchorMatcher(cache);
 
@@ -183,7 +183,7 @@ describe("Contract: AnchorMatcher.validateAnchorExists — structured anchorConv
 			},
 		];
 		const cache = {
-			resolveParsedFile: async () => stubParsedDoc(anchors),
+			resolveDocument: async () => stubParsedDoc(anchors),
 		};
 		const matcher = new AnchorMatcher(cache);
 
@@ -217,7 +217,7 @@ describe("Contract: AnchorMatcher.validateAnchorExists — structured anchorConv
 			},
 		];
 		const cache = {
-			resolveParsedFile: async () => stubParsedDoc(anchors),
+			resolveDocument: async () => stubParsedDoc(anchors),
 		};
 		const matcher = new AnchorMatcher(cache);
 

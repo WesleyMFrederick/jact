@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createCitationValidator } from "../../src/factories/componentFactory.js";
+import { createCitationHarness } from "../helpers/workflow-harness.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -9,10 +9,10 @@ const fixturesDir = join(__dirname, "..", "fixtures");
 
 describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 	it("should validate all internal links in backtick-anchors fixture without errors", async () => {
-		const validator = createCitationValidator();
+		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "backtick-anchors.md");
 
-		const result = await validator.validateFile(testFile);
+		const result = await validateDocumentFile(testFile);
 
 		expect(result.summary.total).toBeGreaterThan(0);
 
@@ -25,10 +25,10 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 	});
 
 	it("should not produce duplicate links from regex fallback when token parser succeeds", async () => {
-		const validator = createCitationValidator();
+		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "backtick-anchors.md");
 
-		const result = await validator.validateFile(testFile);
+		const result = await validateDocumentFile(testFile);
 
 		// Count links per line - no line should have more than one extracted link
 		const linksByLine = new Map();
@@ -45,16 +45,14 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 	});
 
 	it("should correctly extract anchors with nested parentheses", async () => {
-		const validator = createCitationValidator();
+		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "backtick-anchors.md");
 
-		const result = await validator.validateFile(testFile);
+		const result = await validateDocumentFile(testFile);
 
 		// Find the nested parens links referencing transform heading
 		const nestedParenLinks = result.links.filter(
-			(link) =>
-				link.target.anchor &&
-				link.target.anchor.includes("transform"),
+			(link) => link.target.anchor && link.target.anchor.includes("transform"),
 		);
 
 		expect(nestedParenLinks.length).toBeGreaterThanOrEqual(2);
@@ -65,16 +63,14 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 	});
 
 	it("should match URL-encoded backtick anchors to heading targets", async () => {
-		const validator = createCitationValidator();
+		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "backtick-anchors.md");
 
-		const result = await validator.validateFile(testFile);
+		const result = await validateDocumentFile(testFile);
 
 		// Find links with URL-encoded anchors containing backticks
 		const backtickLinks = result.links.filter(
-			(link) =>
-				link.target.anchor &&
-				link.target.anchor.includes("`"),
+			(link) => link.target.anchor && link.target.anchor.includes("`"),
 		);
 
 		expect(backtickLinks.length).toBeGreaterThanOrEqual(1);
@@ -85,16 +81,17 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 	});
 
 	it("should match anchors with %28/%29 encoded parentheses", async () => {
-		const validator = createCitationValidator();
+		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "backtick-anchors.md");
 
-		const result = await validator.validateFile(testFile);
+		const result = await validateDocumentFile(testFile);
 
 		// Find links with %28/%29 encoded parens
 		const encodedParenLinks = result.links.filter(
 			(link) =>
 				link.target.anchor &&
-				(link.target.anchor.includes("%28") || link.target.anchor.includes("%29")),
+				(link.target.anchor.includes("%28") ||
+					link.target.anchor.includes("%29")),
 		);
 
 		expect(encodedParenLinks.length).toBeGreaterThanOrEqual(2);
@@ -105,10 +102,10 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 	});
 
 	it("should handle unencoded special chars in internal anchor links", async () => {
-		const validator = createCitationValidator();
+		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "backtick-anchors.md");
 
-		const result = await validator.validateFile(testFile);
+		const result = await validateDocumentFile(testFile);
 
 		// Find links with unencoded colons (raw method signatures)
 		const unencodedLinks = result.links.filter(

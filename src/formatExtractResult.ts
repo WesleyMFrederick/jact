@@ -1,4 +1,4 @@
-import type { OutgoingLinksExtractedContent } from "./types/contentExtractorTypes.js";
+import type { OutgoingLinksExtractedContent } from "./types/extraction-types.js";
 
 /**
  * Formats an extraction result as either JSON or raw markdown.

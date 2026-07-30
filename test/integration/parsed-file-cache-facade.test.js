@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import ParsedDocument from "../../src/ParsedDocument.js";
-import { createCitationValidator } from "../../src/factories/componentFactory.js";
+import { createParsedFileCache } from "../../src/factories/componentFactory.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -22,13 +22,10 @@ const __dirname = dirname(__filename);
  * - Facade provides stable query interface hiding internal data structure
  */
 describe("ParsedFileCache Facade Integration Tests", () => {
-	let validator;
 	let cache;
 
 	beforeEach(() => {
-		// Given: Factory-created validator with all real dependencies wired
-		validator = createCitationValidator();
-		cache = validator.parsedFileCache;
+		cache = createParsedFileCache();
 	});
 
 	it("should return ParsedDocument instance (not raw contract)", async () => {
@@ -36,16 +33,13 @@ describe("ParsedFileCache Facade Integration Tests", () => {
 		const testFile = join(__dirname, "..", "fixtures", "valid-citations.md");
 
 		// When: Resolve parsed file from cache (first request triggers parse)
-		const result = await cache.resolveParsedFile(testFile);
+		const result = await cache.resolveDocument({ kind: "file", filePath: testFile });
 
-		// Then: Result is ParsedDocument instance, not raw MarkdownParser.Output.DataContract
+		// Then: callers receive the semantic document interface, not parser internals.
 		expect(result).toBeInstanceOf(ParsedDocument);
-
-		// Then: Facade wraps contract internally (private _data property exists)
-		expect(result._data).toBeDefined();
-		expect(result._data).toHaveProperty("filePath");
-		expect(result._data).toHaveProperty("content");
-		expect(result._data).toHaveProperty("anchors");
+		expect(result.extractFullContent()).toEqual(expect.any(String));
+		expect(result.getLinks()).toEqual(expect.any(Array));
+		expect(result.data.filePath).toBe(testFile);
 	});
 
 	it("should return instance with all expected query methods", async () => {
@@ -53,7 +47,7 @@ describe("ParsedFileCache Facade Integration Tests", () => {
 		const testFile = join(__dirname, "..", "fixtures", "complex-headers.md");
 
 		// When: Retrieve parsed document from cache
-		const parsedDoc = await cache.resolveParsedFile(testFile);
+		const parsedDoc = await cache.resolveDocument({ kind: "file", filePath: testFile });
 
 		// Then: Instance has all ParsedDocument facade query methods
 		expect(typeof parsedDoc.hasAnchor).toBe("function");
@@ -69,10 +63,10 @@ describe("ParsedFileCache Facade Integration Tests", () => {
 		const testFile = join(__dirname, "..", "fixtures", "anchor-matching.md");
 
 		// When: First request for file (triggers parse and facade wrapping)
-		const firstResult = await cache.resolveParsedFile(testFile);
+		const firstResult = await cache.resolveDocument({ kind: "file", filePath: testFile });
 
 		// When: Second request for same file (cache hit)
-		const secondResult = await cache.resolveParsedFile(testFile);
+		const secondResult = await cache.resolveDocument({ kind: "file", filePath: testFile });
 
 		// Then: Both results are ParsedDocument instances
 		expect(firstResult).toBeInstanceOf(ParsedDocument);
@@ -87,7 +81,7 @@ describe("ParsedFileCache Facade Integration Tests", () => {
 		const testFile = join(__dirname, "..", "fixtures", "complex-headers.md");
 
 		// When: Retrieve parsed document via cache
-		const parsedDoc = await cache.resolveParsedFile(testFile);
+		const parsedDoc = await cache.resolveDocument({ kind: "file", filePath: testFile });
 
 		// Then: Facade methods work correctly (query wrapped contract)
 		// Test hasAnchor method (should check wrapped contract anchors)

@@ -27,15 +27,13 @@ export type ValidateOneFn = (filePath: string) => Promise<ValidationResult>;
  * mutated per call — running files concurrently against the same validator
  * risks cache races.
  *
- * CALLER CONTRACT: construct a fresh `CitationValidator` (and its caches) per
- * batch run and pass its `validateFile` as `validateOne`. Never reuse one
- * `CitationValidator` instance across multiple `runBatch` calls — its
- * `FileCache` carries state between validations.
+ * CALLER CONTRACT: construct one validation workflow (and its caches) per
+ * batch run and adapt its completed result as `validateOne`. The workflow's
+ * `FileCache` carries state between validations within that run.
  *
  * @param files Resolved file paths to validate, in the order they should
  *   appear in `BatchSummary.results`.
- * @param validateOne Injected single-file validator, e.g.
- *   `(f) => citationValidator.validateFile(f)`.
+ * @param validateOne Adapter over the shared single-input validation workflow.
  * @returns Aggregate `BatchSummary` — `failed > 0` drives a non-zero exit
  *   code (ADR D4/D5).
  */

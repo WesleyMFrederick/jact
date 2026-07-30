@@ -1,7 +1,5 @@
 /**
  * Extraction result and eligibility types.
- *
- * Split from contentExtractorTypes.ts (issue #28).
  */
 
 import type { EnrichedLinkObject } from "./validationTypes.js";
@@ -39,13 +37,8 @@ export interface ExtractedContentBlock {
 export interface ProcessedLinkEntry {
 	sourceLink: EnrichedLinkObject;
 	contentId: string | null;
-	/**
-	 * Processing outcome status.
-	 * - extractLinksContent path: "skipped" | "success" | "error"
-	 * - ContentExtractor.extractContent path: "skipped" | "extracted" | "failed"
-	 */
-	status: "extracted" | "skipped" | "success" | "error" | "failed";
-	eligibilityReason?: string;
+	/** Processing outcome from the extraction workflow. */
+	status: "extracted" | "skipped" | "failed";
 	failureDetails?: {
 		reason: string;
 	};
@@ -56,7 +49,6 @@ export interface ProcessedLinkEntry {
  */
 export interface OutgoingLinksReport {
 	processedLinks: ProcessedLinkEntry[];
-	sourceFilePath?: string;
 }
 
 /**
@@ -74,8 +66,7 @@ export interface ExtractionStats {
  * Complete extraction result — the public output contract.
  * Built incrementally during extraction with inline deduplication.
  *
- * CRITICAL: This must match what extractLinksContent.js and
- * ContentExtractor.extractContent() actually return at runtime.
+ * This is the result returned by ContentExtractor.extractContent().
  */
 export interface OutgoingLinksExtractedContent {
 	extractedContentBlocks: {

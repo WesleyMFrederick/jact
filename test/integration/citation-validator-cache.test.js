@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
 import { MarkdownParser } from "../../src/core/MarkdownParser/index.js";
 import { ParsedFileCache } from "../../src/ParsedFileCache.js";
+import { validateDocumentFile } from "../helpers/workflow-harness.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,7 +46,7 @@ describe("CitationValidator Cache Integration", () => {
 		const cacheEnabledValidator = new CitationValidator(cache, null);
 
 		// When: Validate file with multiple links to same target
-		await cacheEnabledValidator.validateFile(fixtureFile);
+		await validateDocumentFile(cacheEnabledValidator, cache, fixtureFile);
 
 		// Then: Target file parsed exactly once despite multiple references
 		const targetFile = resolve(__dirname, "../fixtures/shared-target.md");
@@ -60,7 +61,7 @@ describe("CitationValidator Cache Integration", () => {
 
 	it("should use cache for source file parsing", async () => {
 		// Given: Factory-created validator with cache
-		const cacheResolveSpy = vi.spyOn(cache, "resolveParsedFile");
+		const cacheResolveSpy = vi.spyOn(cache, "resolveDocument");
 
 		// Given: Cache-enabled validator (Task 3.2 complete)
 		const cacheEnabledValidator = new CitationValidator(cache, null);
@@ -69,12 +70,15 @@ describe("CitationValidator Cache Integration", () => {
 		const fixtureFile = resolve(__dirname, "../fixtures/valid-citations.md");
 
 		// When: Validate file
-		await cacheEnabledValidator.validateFile(fixtureFile);
+		await validateDocumentFile(cacheEnabledValidator, cache, fixtureFile);
 
 		// Then: Source file requested from cache, not parser directly
-		// Expected: cache.resolveParsedFile called for source file
+		// Expected: cache.resolveDocument called for source file
 		// Current: Will fail until Task 3.2 changes validator to use cache
-		expect(cacheResolveSpy).toHaveBeenCalledWith(fixtureFile);
+		expect(cacheResolveSpy).toHaveBeenCalledWith({
+			kind: "file",
+			filePath: fixtureFile,
+		});
 	});
 
 	it("should use cache for target file anchor validation", async () => {
@@ -85,20 +89,20 @@ describe("CitationValidator Cache Integration", () => {
 		);
 		const targetFile = resolve(__dirname, "../fixtures/shared-target.md");
 
-		// Given: Cache with spy on resolveParsedFile
-		const cacheResolveSpy = vi.spyOn(cache, "resolveParsedFile");
+		// Given: Cache with spy on resolveDocument
+		const cacheResolveSpy = vi.spyOn(cache, "resolveDocument");
 
 		// Given: Cache-enabled validator (Task 3.2 complete)
 		const cacheEnabledValidator = new CitationValidator(cache, null);
 
 		// When: Validate anchor exists
-		await cacheEnabledValidator.validateFile(fixtureFile);
+		await validateDocumentFile(cacheEnabledValidator, cache, fixtureFile);
 
 		// Then: Target file data retrieved from cache
-		// Expected: cache.resolveParsedFile called for target file during anchor validation
+		// Expected: cache.resolveDocument called for target file during anchor validation
 		// Current: Will fail until Task 3.2 changes validator to use cache
 		const targetFileCacheCalls = cacheResolveSpy.mock.calls.filter(
-			(call) => call[0] === targetFile,
+			([source]) => source.kind === "file" && source.filePath === targetFile,
 		);
 		expect(targetFileCacheCalls.length).toBeGreaterThan(0);
 	});
@@ -114,8 +118,8 @@ describe("CitationValidator Cache Integration", () => {
 		const cachedValidator = new CitationValidator(cache, null);
 
 		// When: Compare validation results
-		const directResult = await directValidator.validateFile(fixtureFile);
-		const cachedResult = await cachedValidator.validateFile(fixtureFile);
+		const directResult = await validateDocumentFile(directValidator, cache, fixtureFile);
+		const cachedResult = await validateDocumentFile(cachedValidator, cache, fixtureFile);
 
 		// Then: Results identical (cache transparent to validation logic)
 		expect(cachedResult.summary.total).toBe(directResult.summary.total);

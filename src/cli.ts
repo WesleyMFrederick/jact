@@ -18,17 +18,13 @@ import {
 	checkExtractCache,
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
-import {
-	createCitationValidator,
-	createFileCache,
-	createParsedFileCache,
-} from "./factories/componentFactory.js";
+import { createValidationWorkflow } from "./factories/componentFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
 import { JactCli } from "./jact-cli.js";
 import type {
 	CliExtractOptions,
 	CliValidateOptions,
-} from "./types/contentExtractorTypes.js";
+} from "./types/cli-types.js";
 import { runBatch, type ValidateOneFn } from "./validate/batch-runner.js";
 import { renderHuman, renderJson } from "./validate/renderers.js";
 import { NotAGitRepositoryError } from "./validate/resolve-changed-files.js";
@@ -279,18 +275,23 @@ Exit Codes:
 			return;
 		}
 
-		// Batch mode (ADR D1–D6): resolve file set, run sequentially over a
-		// fresh CitationValidator, render, exit per D4/D5.
+		// Batch mode (ADR D1–D6): resolve the file set, run the shared
+		// single-input validation workflow sequentially, render, exit per D4/D5.
 		try {
 			const files = await resolveFileSet(
 				{ paths, changed: Boolean(options.changed) },
 				process.cwd(),
 			);
 
-			const parsedFileCache = createParsedFileCache();
-			const fileCache = createFileCache();
-			const validator = createCitationValidator(parsedFileCache, fileCache);
-			const validateOne: ValidateOneFn = (f) => validator.validateFile(f);
+			const workflow = createValidationWorkflow();
+			const validateOne: ValidateOneFn = async (filePath) => {
+				const outcome = await workflow.validate(
+					{ kind: "file", filePath },
+					options,
+				);
+				if (outcome.kind === "failed") throw new Error(outcome.error);
+				return outcome.result;
+			};
 
 			const summary = await runBatch(files, validateOne);
 

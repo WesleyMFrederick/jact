@@ -25,8 +25,6 @@ npm run test:watch    # Run tests in watch mode
 
 ### Citation Tool Commands
 
-%% *Last Modified: 05/01/26 21:23:24* %%
-
 ```bash
 # Validate citations (CLI output)
 npm run jact:validate path/to/file.md
@@ -82,8 +80,6 @@ Core Components:
 ```
 
 ### Source Organization
-%% *Last Modified: 07/01/26 17:02:05* %%
-
 ```
 src/
 ├── cli.ts / jact-cli.ts          # Commander entry + JactCli orchestration class
@@ -176,8 +172,6 @@ test/
 - **CLI Orchestrator**: Command routing, output formatting
 
 ## Design Documentation
-%% *Last Modified: 07/01/26 17:02:04* %%
-
 The project includes extensive architecture documentation:
 
 - **ARCHITECTURE-Citation-Manager.md**: C4 model diagrams and system context
@@ -189,7 +183,7 @@ The project includes extensive architecture documentation:
   - ParsedDocument Implementation Guide
   - ParsedFileCache Implementation Guide
 
-**When modifying components**: Consult the living spec at `design-docs/spec/SPEC.md` — `design-docs/component-guides/` is deprecated (banner-marked 2026-07-01).
+**When modifying components**: Consult the [jact Living Specification](docs/spec/SPEC.md#jact Living Specification) — `design-docs/component-guides/` is deprecated (banner-marked 2026-07-01).
 
 ## Path Resolution Strategy
 
@@ -250,8 +244,6 @@ How an LLM/agent session should orient in this codebase. Route by what you alrea
 Parser entry points for orientation: `src/core/MarkdownParser/extensions/flavors.ts` (what jact parses, grouped by flavor), `src/core/MarkdownParser/mdastAdapter.ts` (tree → domain objects), `src/factories/componentFactory.ts` (DI wiring — who gets injected what).
 
 ### Runtime analysis (AppMap)
-%% *Last Modified: 07/02/26 08:33:59* %%
-
 Capture real execution traces when static reading is not enough (cache behavior, DI resolution order, which strategy fired):
 
 ```bash
@@ -276,3 +268,17 @@ Start at L0 across a directory, zoom to L2 on the one map that matters. Config: 
 
 - `jact` CLI reads **markdown only** — never point it at `.ts`/`.json` (silently returns garbage).
 - After changing `src/**/*.ts`: tests need no build (Vitest transforms TS), but the `jact` CLI binary runs `dist/` — run `npm run build` before any end-to-end CLI check.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as local Markdown files under `.scratch/`. See [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue tracker: Local Markdown).
+
+### Triage labels
+
+Triage uses the five default role names. See [Triage Labels](docs/agents/triage-labels.md#Triage Labels).
+
+### Domain docs
+
+This is a single-context repository with ADRs in `docs/adrs/` and specifications in `docs/spec/`. See [Domain Docs](docs/agents/domain.md#Domain Docs).
