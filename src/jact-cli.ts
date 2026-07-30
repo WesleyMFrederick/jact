@@ -540,9 +540,15 @@ export class JactCli {
 			: false;
 
 		if (!remindersAlreadyShown) {
-			output +=
-				'\n\n[*] To Expand: run `jact outline "{{absolute-or-relative-path-to-file}}" H2 --expand "{{full-header-1-text}},{{full-header-2-text}}"`' +
-				'\nTo Extract: run `jact extract header "{{absolute-or-relative-path-to-file}}" "{{full-header-text}}" --within "{{unique-parent-header-text}}"`';
+			const reminders = [
+				...(rendered.collapsedIndexes.length > 0
+					? [
+							'[*] To Expand: run `jact outline "{{absolute-or-relative-path-to-file}}" H2 --expand "{{full-header-1-text}},{{full-header-2-text}}"`',
+						]
+					: []),
+				'To Extract: run `jact extract header "{{absolute-or-relative-path-to-file}}" "{{full-header-text}}" --within "{{unique-parent-header-text}}"`',
+			];
+			output += `\n\n${reminders.join("\n")}`;
 			if (sessionId) {
 				writeOutlineReminderCache(
 					sessionId,

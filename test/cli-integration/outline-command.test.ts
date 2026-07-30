@@ -62,6 +62,20 @@ describe("jact outline CLI", () => {
 		expect(result.stdout).not.toContain("Not a document heading");
 	});
 
+	it("omits expansion guidance when every section is visible", () => {
+		const shallowFile = path.join(workDir, "shallow.md");
+		writeFileSync(shallowFile, "# Guide\n\n## Install\n");
+
+		const result = run(
+			["outline", shallowFile, "H3", "--scope", workDir],
+			{ session: "shallow-session" },
+		);
+
+		expect(result.status).toBe(0);
+		expect(result.stdout).not.toContain("[*] To Expand:");
+		expect(result.stdout).toContain("To Extract:");
+	});
+
 	it("renders H1 only and accepts an explicit H-level with full branch expansion", () => {
 		const h1 = run(outlineArgs("H1"));
 		const expanded = run(
