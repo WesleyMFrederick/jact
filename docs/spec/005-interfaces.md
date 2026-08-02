@@ -90,6 +90,38 @@ One compact JSON object per line, no summary line (`renderers.ts:56-58`):
 
 ---
 
+## `jact outline <file> [level]`
+
+```
+jact outline <file> [level] [options]
+```
+
+Displays a parser-derived, quoted heading outline. The optional positional `level` accepts `H1` through `H6`, defaults to `H2`, and is an inclusive ceiling. For example, positional `H3` shows H1 through H3. The exact-filter and source-line behavior follows [ADR-0006 — Exact heading-level filtering and source lines](../adrs/adr-0006-exact-heading-level-and-source-lines.md#ADR-0006 — Exact heading-level filtering and source lines).
+
+| Flag | Default | Description |
+|---|---|---|
+| `--exact-heading-level <level>` | - | Show only headings at one level (`H1` through `H6`); positional `level` semantics stay unchanged |
+| `-n, --line-number` | `false` | Prefix each heading with its parser-derived, one-based source line |
+| `--expand <headings>` | - | Fully expand comma-separated heading branches |
+| `--within <parent>` | - | Limit the outline and heading resolution to one parent branch |
+| `--cache-reset` | `false` | Show next-step reminders again for the active session and target |
+| `--scope <folder>` | smart default | Folder search matches |
+
+Exact-level output excludes all other heading levels and does not mark deliberately filtered descendants as collapsed. Line-number output uses a right-aligned six-character line field followed by two spaces. If a visible heading has no parser source position, the command fails clearly instead of re-scanning Markdown.
+
+The first successful outline for a session and file also shows concise next-step commands: expand collapsed branches when present, show only the selected level with source lines via `--exact-heading-level` and `-n`, extract a section, and discover the remaining outline options via `jact outline -h`. The reminder revision is part of its cache namespace, so newly added guidance appears once after an upgrade instead of being hidden by an older reminder marker.
+
+```bash
+jact outline docs/guide.md
+jact outline docs/guide.md H3
+jact outline docs/guide.md --exact-heading-level H3 --line-number
+jact outline handbook.md H2 --expand "Install" --within "Guide"
+```
+
+**Exit codes:** `0` outline rendered, including a valid file with no headings; `1` heading selector missing, ambiguous, or unsupported; `2` file lookup, scope, permission, parse, or source-position error.
+
+---
+
 ## `jact ast <file>`
 
 ```
@@ -172,11 +204,11 @@ Builds a synthetic full-file link via `LinkObjectFactory.createFileLink()`, vali
 
 | Code | When |
 |---|---|
-| `0` | Success — all citations valid (validate), all files passed (batch), extraction produced content |
-| `1` | Validation/extraction failure — errors found, no eligible links, header not found |
-| `2` | System/usage error — file not found, permission denied, parse error, bad flag combination, glob matched nothing and nothing else was selected, not a git repository |
+| `0` | Success — citations valid, files passed, extraction produced content, or outline rendered |
+| `1` | Validation/extraction/selection failure — errors found, no eligible links, header not found, or outline selector unresolved |
+| `2` | System/usage error — file not found, permission denied, parse error, missing requested source position, bad flag combination, glob matched nothing and nothing else was selected, or not a git repository |
 
-Exit code `2` is consistent across `validate`, `ast`, and `extract` for system-level failures — this is a deliberate compatibility guarantee (batch-validate feature ADR D4, `design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md`).
+Exit code `2` is consistent across `validate`, `outline`, `ast`, and `extract` for system-level failures — this is a deliberate compatibility guarantee (batch-validate feature ADR D4, `design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md`).
 
 ---
 
@@ -184,4 +216,6 @@ Exit code `2` is consistent across `validate`, `ast`, and `extract` for system-l
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-07-31 | Added contextual outline next-step guidance for exact-level filtering, source lines, extraction, expansion, and help discovery |
+| 1.0.0-draft | 2026-07-31 | Added parser-derived outline interface, exact heading-level filtering, and source-line prefixes |
 | 1.0.0-draft | 2026-07-01 | Initial interfaces doc, grounded in `src/cli.ts` |

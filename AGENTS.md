@@ -33,6 +33,10 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 - **WHEN** browser rendering, DOM inspection, screengrabs, or other headless browser work is required, **ALWAYS** use `ws-chromium` as the [Pointer](CONTEXT.md#Pointer) to Chromium under `~/Applications`; **NEVER** infer Chromium is unavailable from a failed `open`, PATH lookup, or system Chrome launch, **BECAUSE** the Pointer resolves the canonical browser source without copying launch details that drift or become stale.
 
+## Delta design research
+
+- **WHEN** proposing a delta or delta hypothesis, **ALWAYS** research how established expert repositories, tools, or domain authorities already solve the same problem before choosing names or interfaces, and cite the evidence that affects the proposal, **BECAUSE** observed conventions prevent local invention and make the change predictable.
+
 ## Design-doc hygiene
 
 - Strip Obsidian `%% *Last Modified: ...* %%` timestamps from any markdown committed to this repo — they are fork-local vault artifacts that leak into PRs.

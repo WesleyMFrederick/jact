@@ -56,7 +56,13 @@ describe("jact outline CLI", () => {
 			'[*] To Expand: run `jact outline "{{absolute-or-relative-path-to-file}}" H2 --expand "{{full-header-1-text}},{{full-header-2-text}}"`',
 		);
 		expect(result.stdout).toContain(
+			'To Show Only H2 with Source Lines: run `jact outline "{{absolute-or-relative-path-to-file}}" --exact-heading-level H2 -n`',
+		);
+		expect(result.stdout).toContain(
 			'To Extract: run `jact extract header "{{absolute-or-relative-path-to-file}}" "{{full-header-text}}" --within "{{unique-parent-header-text}}"`',
+		);
+		expect(result.stdout).toContain(
+			"More Outline Options: run `jact outline -h`",
 		);
 		expect(result.stdout).not.toContain('"macOS"');
 		expect(result.stdout).not.toContain("Not a document heading");
@@ -66,14 +72,19 @@ describe("jact outline CLI", () => {
 		const shallowFile = path.join(workDir, "shallow.md");
 		writeFileSync(shallowFile, "# Guide\n\n## Install\n");
 
-		const result = run(
-			["outline", shallowFile, "H3", "--scope", workDir],
-			{ session: "shallow-session" },
-		);
+		const result = run(["outline", shallowFile, "H3", "--scope", workDir], {
+			session: "shallow-session",
+		});
 
 		expect(result.status).toBe(0);
 		expect(result.stdout).not.toContain("[*] To Expand:");
 		expect(result.stdout).toContain("To Extract:");
+		expect(result.stdout).toContain(
+			'To Show Only H3 with Source Lines: run `jact outline "{{absolute-or-relative-path-to-file}}" --exact-heading-level H3 -n`',
+		);
+		expect(result.stdout).toContain(
+			"More Outline Options: run `jact outline -h`",
+		);
 	});
 
 	it("renders H1 only and accepts an explicit H-level with full branch expansion", () => {
@@ -94,6 +105,23 @@ describe("jact outline CLI", () => {
 		);
 		expect(expanded.stdout).not.toContain('"Deep logs"');
 		expect(expanded.stdout).not.toContain('"Appendix"');
+	});
+
+	it("renders an exact heading level with parser-derived source lines", () => {
+		const result = run(
+			outlineArgs("--exact-heading-level", "H3", "--line-number"),
+		);
+		const outline = result.stdout.split("\n\n")[0];
+
+		expect(result.status).toBe(0);
+		expect(outline).toBe(
+			[
+				'     5  "macOS"',
+				'     9  "Linux"',
+				'    26  "Alternate install"',
+				'    30  "Tradeoffs"',
+			].join("\n"),
+		);
 	});
 
 	it("fully expands multiple named sections in one command", () => {
@@ -271,6 +299,8 @@ describe("jact outline CLI", () => {
 		expect(result.stdout).toContain("[level]");
 		expect(result.stdout).toContain("--expand <headings>");
 		expect(result.stdout).toContain("--within <parent>");
+		expect(result.stdout).toContain("--exact-heading-level <level>");
+		expect(result.stdout).toContain("-n, --line-number");
 		expect(result.stdout).toContain("--cache-reset");
 		expect(result.stdout).toContain("Default: H2");
 		expect(result.stdout).not.toContain("--session");

@@ -48,6 +48,8 @@ export interface CliExtractOptions {
 export interface CliOutlineOptions {
 	scope?: string;
 	expand?: string;
+	exactHeadingLevel?: number;
+	lineNumber?: boolean;
 	within?: string;
 	cacheReset?: boolean;
 	/** Integration-owned session identity; intentionally not a public CLI option. */

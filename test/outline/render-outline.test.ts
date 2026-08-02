@@ -6,6 +6,20 @@ function headings(...values: Array<[number, string]>): HeadingObject[] {
 	return values.map(([level, text]) => ({ level, text, raw: "" }));
 }
 
+function positionedHeadings(
+	...values: Array<[number, string, number]>
+): HeadingObject[] {
+	return values.map(([level, text, line]) => ({
+		level,
+		text,
+		raw: "",
+		position: {
+			start: { line, column: 1, offset: 0 },
+			end: { line, column: 1, offset: 0 },
+		},
+	}));
+}
+
 describe("renderOutline", () => {
 	it("renders quoted H1-H2 nodes and marks collapsed branches by default", () => {
 		const result = renderOutline(
@@ -72,6 +86,42 @@ describe("renderOutline", () => {
 		expect(result.text).toContain('"Guide"');
 		expect(result.text).toContain('"Install"');
 		expect(result.text).not.toContain('"Appendix"');
+	});
+
+	it("renders only one exact heading level without collapsed markers", () => {
+		const result = renderOutline(
+			headings(
+				[1, "Guide"],
+				[2, "Install"],
+				[3, "macOS"],
+				[3, "Linux"],
+				[2, "Troubleshooting"],
+				[3, "Logs"],
+			),
+			{ exactHeadingLevel: 3 },
+		);
+
+		expect(result).toEqual({
+			text: '"macOS"\n"Linux"\n"Logs"',
+			collapsedIndexes: [],
+		});
+	});
+
+	it("prefixes visible headings with parser-derived source lines", () => {
+		const result = renderOutline(
+			positionedHeadings([1, "Guide", 1], [2, "Install", 11]),
+			{ maxLevel: 2, lineNumber: true },
+		);
+
+		expect(result.text).toBe('     1  "Guide"\n    11  └── "Install"');
+	});
+
+	it("fails clearly when a visible heading has no parser source position", () => {
+		expect(() =>
+			renderOutline(headings([1, "Guide"]), { lineNumber: true }),
+		).toThrow(
+			'Cannot render line numbers: heading "Guide" has no parser source position.',
+		);
 	});
 
 	it("returns the heading-free guidance for an empty heading collection", () => {
