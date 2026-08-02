@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 
-const OUTLINE_NAMESPACE = "outline";
+const OUTLINE_NAMESPACE = "outline-v2";
 
 function hash(value: string | Buffer): string {
 	return createHash("sha256").update(value).digest("hex");

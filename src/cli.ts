@@ -327,6 +327,17 @@ program
 			.choices(["H1", "H2", "H3", "H4", "H5", "H6"])
 			.default("H2"),
 	)
+	.addOption(
+		new Option(
+			"--exact-heading-level <level>",
+			"show only headings at one level",
+		).choices(["H1", "H2", "H3", "H4", "H5", "H6"]),
+	)
+	.option(
+		"-n, --line-number",
+		"prefix headings with one-based source line numbers",
+		false,
+	)
 	.option(
 		"--expand <headings>",
 		"fully expand comma-separated heading branches",
@@ -345,10 +356,12 @@ program
 		"after",
 		`
 Default: H2 shows H1 through H2 across the document. Expanded branches show all descendants.
+--exact-heading-level selects only that level; positional H-level remains an inclusive ceiling.
 
 Examples:
     $ jact outline docs/guide.md
     $ jact outline docs/guide.md H1
+    $ jact outline docs/guide.md --exact-heading-level H3 --line-number
     $ jact outline docs/guide.md H3 --expand "Install,Troubleshooting"
     $ jact outline handbook.md H2 --expand "Install" --within "Guide"
     $ jact outline docs/guide.md --cache-reset
@@ -366,17 +379,26 @@ Exit Codes:
 			options: {
 				expand?: string;
 				within?: string;
+				exactHeadingLevel?: string;
+				lineNumber?: boolean;
 				cacheReset?: boolean;
 				scope?: string;
 			},
 		) => {
 			const manager = new JactCli();
+			const { exactHeadingLevel, ...outlineOptions } = options;
 			try {
 				const result = await manager.outline(
 					file,
 					Number.parseInt(level.slice(1), 10),
 					{
-						...options,
+						...outlineOptions,
+						...(exactHeadingLevel !== undefined && {
+							exactHeadingLevel: Number.parseInt(
+								exactHeadingLevel.slice(1),
+								10,
+							),
+						}),
 						...(process.env["JACT_SESSION_ID"] !== undefined
 							? { sessionId: process.env["JACT_SESSION_ID"] }
 							: process.env["CLAUDE_SESSION_ID"] !== undefined

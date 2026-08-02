@@ -37,10 +37,7 @@ import { formatExtractResult } from "./formatExtractResult.js";
 import { formatAsJSON, formatForCLI } from "./formatValidationResult.js";
 import { renderOutline } from "./outline/render-outline.js";
 import type ParsedDocument from "./ParsedDocument.js";
-import type {
-	HeadingMatch,
-	HeadingResolution,
-} from "./ParsedDocument.js";
+import type { HeadingMatch, HeadingResolution } from "./ParsedDocument.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type {
@@ -402,6 +399,12 @@ export class JactCli {
 		const rendered = renderOutline(headings, {
 			maxLevel,
 			expandedIndexes,
+			...(options.exactHeadingLevel !== undefined && {
+				exactHeadingLevel: options.exactHeadingLevel,
+			}),
+			...(options.lineNumber !== undefined && {
+				lineNumber: options.lineNumber,
+			}),
 			...(withinIndex !== undefined && { withinIndex }),
 		});
 		let output = rendered.text;
@@ -415,13 +418,16 @@ export class JactCli {
 			: false;
 
 		if (!remindersAlreadyShown) {
+			const suggestedLevel = options.exactHeadingLevel ?? maxLevel;
 			const reminders = [
 				...(rendered.collapsedIndexes.length > 0
 					? [
-							'[*] To Expand: run `jact outline "{{absolute-or-relative-path-to-file}}" H2 --expand "{{full-header-1-text}},{{full-header-2-text}}"`',
+							`[*] To Expand: run \`jact outline "{{absolute-or-relative-path-to-file}}" H${maxLevel} --expand "{{full-header-1-text}},{{full-header-2-text}}"\``,
 						]
 					: []),
+				`To Show Only H${suggestedLevel} with Source Lines: run \`jact outline "{{absolute-or-relative-path-to-file}}" --exact-heading-level H${suggestedLevel} -n\``,
 				'To Extract: run `jact extract header "{{absolute-or-relative-path-to-file}}" "{{full-header-text}}" --within "{{unique-parent-header-text}}"`',
+				"More Outline Options: run `jact outline -h`",
 			];
 			output += `\n\n${reminders.join("\n")}`;
 			if (sessionId) {

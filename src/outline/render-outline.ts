@@ -9,6 +9,8 @@ export interface HeadingTreeNode {
 
 export interface RenderOutlineOptions {
 	maxLevel?: number;
+	exactHeadingLevel?: number;
+	lineNumber?: boolean;
 	expandedIndexes?: ReadonlySet<number>;
 	withinIndex?: number;
 }
@@ -105,6 +107,12 @@ export function renderOutline(
 	const visible = new Set<number>();
 	for (const node of nodes) {
 		if (!scope.has(node.index)) continue;
+		if (options.exactHeadingLevel !== undefined) {
+			if (node.heading.level === options.exactHeadingLevel) {
+				visible.add(node.index);
+			}
+			continue;
+		}
 		if (
 			node.heading.level <= maxLevel ||
 			expandedScope.has(node.index) ||
@@ -115,12 +123,14 @@ export function renderOutline(
 	}
 
 	const collapsedIndexes: number[] = [];
-	for (const node of nodes) {
-		if (!visible.has(node.index) || expanded.has(node.index)) continue;
-		const hasHiddenDescendant = [...descendantsOf(nodes, node.index)].some(
-			(index) => scope.has(index) && !visible.has(index),
-		);
-		if (hasHiddenDescendant) collapsedIndexes.push(node.index);
+	if (options.exactHeadingLevel === undefined) {
+		for (const node of nodes) {
+			if (!visible.has(node.index) || expanded.has(node.index)) continue;
+			const hasHiddenDescendant = [...descendantsOf(nodes, node.index)].some(
+				(index) => scope.has(index) && !visible.has(index),
+			);
+			if (hasHiddenDescendant) collapsedIndexes.push(node.index);
+		}
 	}
 	const collapsed = new Set(collapsedIndexes);
 
@@ -133,9 +143,18 @@ export function renderOutline(
 		const node = nodes[index];
 		if (!node || !visible.has(index)) return;
 		const marker = collapsed.has(index) ? " [*]" : "";
-		lines.push(
-			`${prefix}${connector}${JSON.stringify(node.heading.text)}${marker}`,
-		);
+		const headingText = `${prefix}${connector}${JSON.stringify(node.heading.text)}${marker}`;
+		if (!options.lineNumber) {
+			lines.push(headingText);
+		} else {
+			const line = node.heading.position?.start.line;
+			if (line === undefined) {
+				throw new Error(
+					`Cannot render line numbers: heading ${JSON.stringify(node.heading.text)} has no parser source position.`,
+				);
+			}
+			lines.push(`${String(line).padStart(6)}  ${headingText}`);
+		}
 
 		const children = node.childIndexes.filter((child) => visible.has(child));
 		for (const [childPosition, child] of children.entries()) {
