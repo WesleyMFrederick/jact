@@ -25,7 +25,7 @@ jact validate [paths...] [options]
 | `--scope <folder>` | smart default | Limit file resolution to a folder (enables smart filename matching) |
 | `--fix` | - | Auto-fix citation anchors/paths, including kebab-case conversions |
 | `--dry-run` | - | Preview `--fix` changes without writing files |
-| `--verbose` | `false` | Full validation report (all valid citations, duplicate-filename warnings, summary block) instead of minimal errors/warnings-only output |
+| `--verbose` | `false` | Full validation report (all valid citations, every ranked duplicate-filename candidate, summary block) instead of minimal errors/warnings-only output |
 | `--allow-gitignore` | `false` | Include `.gitignore`-excluded files in the scope scan |
 | `--changed` | `false` | Union git working-tree-modified markdown into the selection (batch mode) |
 | `--json` | `false` | Batch mode: emit one compact JSON object per file (JSONL) |
@@ -36,6 +36,8 @@ jact validate [paths...] [options]
 **`--stdin` constraints** (`cli.ts:210-223`): exactly one path required; incompatible with any batch-mode trigger (multiple paths, glob, `--changed`, `--json`) — violating either exits 2 with an explicit error.
 
 **`--json` + `--format json` conflict** (`cli.ts:202-208`): passing both exits 2 — they are different shapes (single-file rich JSON vs. batch JSONL) and cannot compose.
+
+**Document opt-out:** `<!-- jact-validate-disable -->` skips the whole document only when it is the first Markdown body block, with at most one parser-recognized YAML frontmatter block before it. The directive must be an exact HTML comment node; a later, fenced, quoted, or near-match comment does not disable validation. This applies to file, `--stdin`, batch, and `--fix` workflows.
 
 ### Examples
 
@@ -58,6 +60,10 @@ cat draft.md | jact validate <path> --stdin      # validate unwritten content
 ```
 OK: <N> citations valid
 ```
+or, when the document opts out:
+```
+SKIPPED: validation disabled by document directive
+```
 or, with errors/warnings:
 ```
 ERRORS (n)
@@ -67,23 +73,42 @@ WARNINGS (n)
 FAILED: X errors, Y warnings
 ```
 
+Duplicate-filename errors show at most five ranked scope-relative candidates by default, followed by the omitted count and guidance to use `--verbose` or narrow `--scope`. `--verbose` shows every ranked candidate. The same limit applies to the rich single-file JSON suggestion string; internal ranking metadata is not serialized.
+
 ### Output — batch, human (default)
 
-One line per file, plus a summary line (`src/validate/renderers.ts:20-34`):
+When a batch has at most five errors in total, output retains one status line per file, full error details, and the file-count summary (`src/validate/renderers.ts`):
 
 ```
+SKIPPED: examples/example.md (validation disabled by document directive)
 ✅ concepts/bar.md
 ❌ concepts/foo.md
    Line 94: File not found: concepts/attention-mechanism
 ---
-2 files · 1 passed · 1 failed
+3 files · 1 passed · 1 failed · 1 skipped
 ```
+
+When a batch has more than five errors, default output collapses the details and omits passing and skipped file lines. It reports every failing file with that file's error count, preserves the totals, explains the five-error display limit, and prints commands for single-file validation, line filtering, fix preview/application, full `--verbose` expansion, and help discovery:
+
+```
+❌ concepts/foo.md (8 errors)
+❌ concepts/baz.md (2 errors)
+---
+3 files · 1 passed · 2 failed · 0 skipped
+
+10 error details hidden because they exceed the default 5-error display limit.
+To Drill Into a File: run `jact validate "{{path-to-file}}"`
+...
+```
+
+`--verbose` bypasses this collapse and renders every file and error. The collapse changes presentation only: any batch with `failed > 0` still exits `1`.
 
 ### Output — batch, `--json` (JSONL)
 
-One compact JSON object per line, no summary line (`renderers.ts:56-58`):
+One complete compact JSON object per line, no summary line (`src/validate/renderers.ts`). JSONL does not apply the human display collapse. Skipped rows have `ok: true`, an empty error list, and `skipped: true`; they do not increment `passed`.
 
 ```json
+{"path":"examples/example.md","ok":true,"errors":[],"skipped":true}
 {"path":"concepts/foo.md","ok":false,"errors":[{"line":94,"message":"File not found: concepts/attention-mechanism"}]}
 {"path":"concepts/bar.md","ok":true,"errors":[]}
 ```
@@ -216,6 +241,8 @@ Exit code `2` is consistent across `validate`, `outline`, `ast`, and `extract` f
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-08-02 | Added five-error batch disclosure threshold, failing-file error counts, drill/filter/fix guidance, and verbose expansion without changing exit codes |
+| 1.0.0-draft | 2026-08-02 | Added bounded duplicate-path diagnostics, verbose expansion, and explicit document-skip output |
 | 1.0.0-draft | 2026-07-31 | Added contextual outline next-step guidance for exact-level filtering, source lines, extraction, expansion, and help discovery |
 | 1.0.0-draft | 2026-07-31 | Added parser-derived outline interface, exact heading-level filtering, and source-line prefixes |
 | 1.0.0-draft | 2026-07-01 | Initial interfaces doc, grounded in `src/cli.ts` |

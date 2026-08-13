@@ -43,7 +43,10 @@ describe("Component Factory - ParsedFileCache Creation", () => {
 		const fixtureFile = resolve(__dirname, "fixtures/valid-citations.md");
 
 		// When: Cache resolves parsed file
-		const result = await cache.resolveDocument({ kind: "file", filePath: fixtureFile });
+		const result = await cache.resolveDocument({
+			kind: "file",
+			filePath: fixtureFile,
+		});
 
 		// Then: Returns valid ParsedDocument facade instance
 		expect(result).toBeInstanceOf(ParsedDocument);
@@ -134,12 +137,17 @@ describe("Component Factory - CitationValidator lifecycle wiring", () => {
 			"/virtual/source.md",
 		);
 
-		expect(resolveFile).toHaveBeenCalledWith("missing.md");
+		expect(resolveFile).toHaveBeenCalledWith("missing.md", {
+			expectedPath: "/virtual/missing.md",
+		});
 	});
 
 	it("wires parser, lifecycle, and validator into one working chain", async () => {
 		const parsedDocuments = createParsedFileCache();
-		const validator = createCitationValidator(parsedDocuments, createFileCache());
+		const validator = createCitationValidator(
+			parsedDocuments,
+			createFileCache(),
+		);
 		const fixtureFile = resolve(__dirname, "fixtures/valid-citations.md");
 		const document = await parsedDocuments.resolveDocument({
 			kind: "file",
@@ -155,10 +163,7 @@ describe("Component Factory - CitationValidator lifecycle wiring", () => {
 describe("Component Factory - ValidationWorkflow wiring", () => {
 	it("shares the scoped file cache with wiki parsing and validation", async () => {
 		const fixtureDir = resolve(__dirname, "fixtures/wiki-scope-resolution");
-		const sourceFile = resolve(
-			fixtureDir,
-			"wiki-scope-resolution-source.md",
-		);
+		const sourceFile = resolve(fixtureDir, "wiki-scope-resolution-source.md");
 		const workflow = createValidationWorkflow();
 
 		const outcome = await workflow.validate(

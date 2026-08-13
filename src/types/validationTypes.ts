@@ -44,6 +44,13 @@ export interface AnchorConversion {
 	recommended: string;
 }
 
+export interface DuplicatePathSuggestion {
+	filename: string;
+	total: number;
+	candidates: string[];
+	debugInfo: string;
+}
+
 /**
  * ValidationMetadata - Discriminated union based on status
  *
@@ -58,6 +65,7 @@ export type ValidationMetadata =
 			suggestion?: string;
 			pathConversion?: PathConversion;
 			anchorConversion?: AnchorConversion;
+			duplicatePathSuggestion?: DuplicatePathSuggestion;
 	  }
 	| {
 			status: "warning";
@@ -65,6 +73,7 @@ export type ValidationMetadata =
 			suggestion?: string;
 			pathConversion?: PathConversion;
 			anchorConversion?: AnchorConversion;
+			duplicatePathSuggestion?: DuplicatePathSuggestion;
 	  };
 
 /**

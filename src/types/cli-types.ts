@@ -106,6 +106,7 @@ export interface FileResult {
 	path: string;
 	ok: boolean;
 	errors: ValidationError[];
+	skipped?: true;
 }
 
 /**
@@ -126,14 +127,16 @@ export interface ValidationError {
  *
  * Exit code (ADR D4/D5): system or usage error → 2; else `failed > 0` → 1; else 0.
  *
- * @property total   Files validated.
- * @property passed  Count with `ok === true`.
+ * @property total   Files selected.
+ * @property passed  Count validated successfully (skips excluded).
  * @property failed  Count with `ok === false`.
+ * @property skipped Count intentionally not validated.
  * @property results Per-file results, in selection order.
  */
 export interface BatchSummary {
 	total: number;
 	passed: number;
 	failed: number;
+	skipped: number;
 	results: FileResult[];
 }

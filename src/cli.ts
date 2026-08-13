@@ -136,7 +136,7 @@ program
 	)
 	.option(
 		"--verbose",
-		"show full validation report: all valid citations, duplicate-filename warnings, summary block (default: minimal output with only errors/warnings)",
+		"show full validation report; in batch mode, expand error details that default output collapses",
 		false,
 	)
 	.option(
@@ -164,10 +164,12 @@ program
 Default Output (no --verbose):
   Clean file:      "OK: <N> citations valid"
   Errors/warnings: ERRORS (n) and/or WARNINGS (n) blocks with line, link, error, suggestion; ends with "FAILED: X errors, Y warnings"
+  Disabled document: "SKIPPED: validation disabled by document directive"
 
 Batch mode (multiple paths, a glob, --changed, or --json):
-  ✅/❌ one line per file, plus a "<N> files · <P> passed · <F> failed" summary
-  --json → one JSONL object per file: {"path","ok","errors"}; no summary line
+  Up to 5 errors: one status line per file with error details, plus the file-count summary
+  More than 5 errors: one line per failing file with its error count, the summary, and drill/filter/fix commands; use --verbose for full details
+  --json → one complete JSONL object per file: {"path","ok","errors","skipped"?}; no summary line
 
 Examples:
     $ jact validate docs/design.md                   # minimal output (default, single-file, unchanged)
@@ -290,12 +292,17 @@ Exit Codes:
 					options,
 				);
 				if (outcome.kind === "failed") throw new Error(outcome.error);
+				if (outcome.kind === "skipped") return { skipped: true };
 				return outcome.result;
 			};
 
 			const summary = await runBatch(files, validateOne);
 
-			console.log(options.json ? renderJson(summary) : renderHuman(summary));
+			console.log(
+				options.json
+					? renderJson(summary)
+					: renderHuman(summary, options.verbose),
+			);
 			process.exitCode = summary.failed > 0 ? 1 : 0;
 		} catch (error) {
 			if (

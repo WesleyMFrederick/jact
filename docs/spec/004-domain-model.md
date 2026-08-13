@@ -89,17 +89,17 @@ A heading extracted from the mdast tree (`src/types/citationTypes.ts:127-138`). 
 
 ### ParserOutput
 
-The complete contract returned by `MarkdownParser.parseFile()` (`src/types/citationTypes.ts:144-158`).
+The complete contract returned by `MarkdownParser.parseFile()` (`src/types/citationTypes.ts`).
 
 ```ts
-// path: src/types/citationTypes.ts:144
 export interface ParserOutput {
 	filePath: string;
 	content: string;
-	ast: Root;              // mdast Root — internal reader for the ParsedDocument facade
+	ast: Root;
+	validationDisabled: boolean; // exact first-body HTML directive, after optional YAML
 	links: LinkObject[];
 	headings: HeadingObject[];
-	anchors: AnchorObject[]; // potential link targets in the document
+	anchors: AnchorObject[];
 }
 ```
 
@@ -110,13 +110,18 @@ export interface ParserOutput {
 `src/types/validationTypes.ts`. `CitationValidator.validateSingleCitation()` returns a new `EnrichedLinkObject` built by object-spreading `{ ...link, validation: meta }` — the original `LinkObject` is never mutated (tracked as Issue #37 in the source comments, `validationTypes.ts:1-9`).
 
 ```ts
-// path: src/types/validationTypes.ts:38
+export interface DuplicatePathSuggestion {
+	filename: string;
+	total: number;
+	candidates: string[]; // complete ranked, scope-relative set
+	debugInfo: string;
+}
+
 export type ValidationMetadata =
 	| { status: "valid" }
-	| { status: "error"; error: string; suggestion?: string; pathConversion?: PathConversion }
-	| { status: "warning"; message: string; suggestion?: string; pathConversion?: PathConversion };
+	| { status: "error"; error: string; suggestion?: string; duplicatePathSuggestion?: DuplicatePathSuggestion; /* fix metadata */ }
+	| { status: "warning"; message: string; suggestion?: string; duplicatePathSuggestion?: DuplicatePathSuggestion; /* fix metadata */ };
 
-// path: src/types/validationTypes.ts:60
 export interface EnrichedLinkObject extends LinkObject {
 	validation: ValidationMetadata;
 }
@@ -130,7 +135,7 @@ export interface EnrichedLinkObject extends LinkObject {
 
 ### ValidationResult
 
-`CitationValidator.validateFile()`'s return shape (`validationTypes.ts:80-84`). **Property names are `summary` and `links`, not `results`** — this matches the enrichment pattern where links are enriched in place within the array.
+`CitationValidator.validateDocument()`'s return shape (`src/types/validationTypes.ts`). **Property names are `summary` and `links`, not `results`** — this matches the enrichment pattern where links are enriched in place within the array.
 
 ```ts
 // path: src/types/validationTypes.ts:67
@@ -156,31 +161,29 @@ export interface ValidationResult {
 Added for the `jact validate` batch-mode feature (multiple paths, globs, `--changed`, `--json`).
 
 ```ts
-// path: src/types/cli-types.ts:79
 export interface BatchValidateOptions {
 	paths: string[];
 	changed: boolean;
 	json: boolean;
 }
 
-// path: src/types/cli-types.ts:93
 export interface FileResult {
 	path: string;
-	ok: boolean;        // true iff summary.errors === 0
+	ok: boolean;
 	errors: ValidationError[];
+	skipped?: true; // present only for an intentional document opt-out
 }
 
-// path: src/types/cli-types.ts:107
 export interface ValidationError {
-	line: number | null; // 1-indexed; null = file-level, not tied to a line
+	line: number | null;
 	message: string;
 }
 
-// path: src/types/cli-types.ts:122
 export interface BatchSummary {
 	total: number;
-	passed: number;
+	passed: number;  // successfully validated; skips excluded
 	failed: number;
+	skipped: number;
 	results: FileResult[];
 }
 ```
@@ -241,36 +244,23 @@ export interface OutgoingLinksExtractedContent {
 ## FileCache Types (`src/types/fileCacheTypes.ts`)
 
 ```ts
-// path: src/types/fileCacheTypes.ts:3
-export interface CacheStats {
-	totalFiles: number;
-	duplicates: number;
-	scopeFolder: string;
-	realScopeFolder: string;
+export interface ResolveFileOptions {
+	expectedPath?: string;
 }
 
-// path: src/types/fileCacheTypes.ts:10
-export interface ResolveResultSuccess {
-	found: true;
-	path: string;
-	fuzzyMatch?: boolean;
-	correctedFilename?: string;
-	message?: string;
-}
-
-// path: src/types/fileCacheTypes.ts:18
 export interface ResolveResultFailure {
 	found: false;
 	reason: "duplicate" | "not_found" | "duplicate_fuzzy";
 	message: string;
-	candidates?: string[];         // reason: 'duplicate' | 'duplicate_fuzzy'
+	candidates?: string[];        // complete ranked absolute paths
+	displayCandidates?: string[]; // complete ranked scope-relative paths
 	scope?: ScopeResolution;
-	nearMisses?: string[];         // reason: 'not_found'; top-3 Levenshtein ≤ 2
+	nearMisses?: string[];
 	attemptedPaths?: readonly string[];
 }
-
-export type ResolveResult = ResolveResultSuccess | ResolveResultFailure;
 ```
+
+Duplicate candidates are ranked by tree distance from `expectedPath`'s directory, then by normalized scope-relative path. `FileCache` retains the complete list; the output formatter, not resolution, applies the default five-candidate display limit.
 
 ---
 
@@ -294,4 +284,5 @@ ProcessedLinkEntry 1───1 EnrichedLinkObject (sourceLink)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-08-02 | Added parser disable state, structured duplicate-path diagnostics, and skipped batch results |
 | 1.0.0-draft | 2026-07-01 | Initial domain model, grounded in `src/types/*.ts` |

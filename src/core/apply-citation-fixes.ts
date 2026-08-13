@@ -18,6 +18,7 @@ import type {
 } from "../types/validationTypes.js";
 import type { CitationValidator } from "./CitationValidator/CitationValidator.js";
 import { applyAnchorFix, applyPathConversion } from "./citationFixer.js";
+import { VALIDATION_DISABLED_REASON } from "../validate/validation-disable.js";
 
 /** Dependencies apply-citation-fixes reads from JactCli — same instances, not copies. */
 export interface ApplyCitationFixesDeps {
@@ -77,6 +78,9 @@ export async function applyCitationFixes(
 			kind: "file",
 			filePath,
 		});
+		if (document.data.validationDisabled) {
+			return `SKIPPED: ${VALIDATION_DISABLED_REASON}`;
+		}
 		const validationResults = await deps.validator.validateDocument(
 			document,
 			filePath,

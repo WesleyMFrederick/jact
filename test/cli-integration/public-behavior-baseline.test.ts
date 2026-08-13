@@ -124,9 +124,7 @@ describe("public CLI behavior baseline", () => {
 
 		const usageError = run(["validate", "--stdin"], "# Draft\n");
 		expect(usageError.exitCode).toBe(2);
-		expect(usageError.stderr).toContain(
-			"--stdin requires exactly one <path>",
-		);
+		expect(usageError.stderr).toContain("--stdin requires exactly one <path>");
 	});
 
 	it("characterizes sequential batch human, compact JSON, and usage errors", () => {
@@ -136,11 +134,16 @@ describe("public CLI behavior baseline", () => {
 		expect(human.exitCode).toBe(1);
 		expect(human.stdout).toContain(`✅ ${good}`);
 		expect(human.stdout).toContain(`❌ ${broken}`);
-		expect(human.stdout).toContain("2 files · 1 passed · 1 failed");
+		expect(human.stdout).toContain("2 files · 1 passed · 1 failed · 0 skipped");
 
 		const json = run(["validate", good, broken, "--json"]);
 		expect(json.exitCode).toBe(1);
-		expect(json.stdout.trim().split("\n").map((line) => JSON.parse(line))).toEqual([
+		expect(
+			json.stdout
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line)),
+		).toEqual([
 			{
 				path: broken,
 				ok: false,
@@ -149,13 +152,7 @@ describe("public CLI behavior baseline", () => {
 			{ path: good, ok: true, errors: [] },
 		]);
 
-		const usageError = run([
-			"validate",
-			good,
-			"--json",
-			"--format",
-			"json",
-		]);
+		const usageError = run(["validate", good, "--json", "--format", "json"]);
 		expect(usageError.exitCode).toBe(2);
 		expect(usageError.stderr).toContain(
 			"--json and --format json cannot both be set",

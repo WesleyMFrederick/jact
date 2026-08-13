@@ -10,6 +10,8 @@
  *   markdown-flavor-extension-collection-design.md
  */
 
+import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
+import { frontmatter } from "micromark-extension-frontmatter";
 import type { Extension as MdastExtension } from "mdast-util-from-markdown";
 import type { Extension } from "micromark-util-types";
 import { caretAnchorFromMarkdown, caretAnchorSyntax } from "./caretAnchor.js";
@@ -61,6 +63,7 @@ export const obsidianFlavor: FlavorExtensionGroup = {
 	description:
 		"Obsidian additions: highlight, comment, citation, caret anchor, wikilink, permissive link",
 	syntax: [
+		frontmatter(["yaml"]),
 		highlightSyntax,
 		obsidianCommentSyntax,
 		citationSyntax,
@@ -69,6 +72,7 @@ export const obsidianFlavor: FlavorExtensionGroup = {
 		obsidianLinkSyntax,
 	],
 	fromMarkdown: [
+		frontmatterFromMarkdown(["yaml"]),
 		highlightFromMarkdown,
 		obsidianCommentFromMarkdown,
 		citationFromMarkdown,

@@ -4,28 +4,31 @@
 
 ## Validate Workflow (single file)
 
-`JactCli.validate(filePath, options)` (`src/jact-cli.ts:173-224`):
+`ValidationWorkflow.validate()` (`src/validate/validation-workflow.ts`), used by file, in-memory, and batch validation:
 
-1. **Resolve scope** via `applyScope()` — see Scope Resolution Order below. Seeds the shared `FileCache` even when `--scope` is omitted, so bare wiki page names resolve.
-2. **Emit scope notices** (non-JSON format only) — e.g. a hint when the scope auto-resolved to the nearest `.obsidian` vault rather than an explicit choice.
-3. **Parse + validate**: `CitationValidator.validateFile(filePath)` — throws `File not found` if the path doesn't exist on disk; otherwise resolves the parsed document via `ParsedFileCache` and validates every extracted `LinkObject`.
-4. **Detect nested-codeblock warnings** via `detectNestedCodeblocks(fileContent)` — a separate warning channel from citation validation.
-5. **Apply `--lines` filter** if present — `filterResultsByLineRange()` re-slices `links` to the given range and recomputes `summary` from the filtered set only.
-6. **Format**: `--format json` → `formatAsJSON()`; otherwise `formatForCLI()` (verbose tree or minimal one-liner per `--verbose`).
-7. **Append gitignore hint** if a wiki page wasn't found and the active scope has a `.gitignore` — nudges toward `--allow-gitignore`.
+1. **Resolve scope** via `prepareScope()`. Seeds the shared `FileCache` even when `--scope` is omitted, so bare wiki page names resolve.
+2. **Emit scope notices** (non-JSON format only), such as an automatically selected Obsidian vault.
+3. **Parse** through `ParsedFileCache`. If `ParserOutput.validationDisabled` is true, return a successful skipped outcome before citation validation, nested-codeblock detection, line filtering, or fixes.
+4. **Validate links** with `CitationValidator.validateDocument()` and detect nested-codeblock warnings.
+5. **Apply `--lines` filter** if present. `filterResultsByLineRange()` re-slices `links` and recomputes `summary`.
+6. **Format**: `--format json` uses `formatAsJSON()`; human output uses the verbose tree or minimal formatter.
+7. **Append gitignore hint** if a wiki page was not found and the active scope has a `.gitignore`.
 
-`validateContent(content, options & {filePath})` (`jact.ts:231-285`) is the in-memory analogue for `--stdin`: identical pipeline, but skips the disk read and instead calls `MarkdownParser` on the supplied string content, with `filePath` used only as the *intended* path for scope resolution, relative-link base, and self-anchor context.
+`JactCli.validateContent(content, options & {filePath})` is the in-memory analogue for `--stdin`: it skips the disk read and parses the supplied content, while `filePath` remains the intended path for scope resolution and relative links.
+
+The disable state is parser-derived, not found by a source-text scan. `<!-- jact-validate-disable -->` must be the exact first mdast HTML body node; one mdast YAML frontmatter node may precede it. Blank lines do not create body nodes. Comments after other content, inside code fences or blockquotes, or with additional text do not disable validation.
 
 ## Validate Workflow (batch)
 
-Batch mode (`src/cli.ts:283-312`) is a distinct code path from single-file validate, reusing the same `CitationValidator.validateFile`:
+Batch mode (`src/cli.ts`) is a distinct orchestration path over the same validation workflow:
 
-1. `resolveFileSet({paths, changed}, cwd)` — expands globs (tinyglobby), unions in `--changed` git-modified `.md` files, dedupes, sorts lexicographically. Throws `NoFilesMatchedError` (exit 2) or `NotAGitRepositoryError` (exit 2) on failure.
-2. Fresh `ParsedFileCache`/`FileCache`/`CitationValidator` are constructed **per batch run** — never reused across runs, since `FileCache` carries state between validations.
-3. `runBatch(files, validateOne)` iterates **sequentially** (not concurrently) — a deliberate choice (see the ADRs section) to avoid cache races on the shared `CitationValidator`.
-4. Each file's `ValidationResult` maps to a `FileResult` (`ok = summary.errors === 0`), aggregated into a `BatchSummary`.
-5. Render: `renderHuman()` (default) or `renderJson()` (`--json`, JSONL).
-6. Exit code: `summary.failed > 0 ? 1 : 0`.
+1. `resolveFileSet({paths, changed}, cwd)` expands globs, unions `--changed` Markdown files, deduplicates, and sorts.
+2. Fresh parser, cache, and validator instances are constructed per batch run.
+3. `runBatch(files, validateOne)` iterates sequentially to avoid shared-cache races.
+4. Completed results map to passing or failing `FileResult` values. Disabled documents map to `ok: true`, `errors: []`, and `skipped: true`.
+5. `BatchSummary` counts skipped files separately; `passed` excludes them.
+6. `renderHuman()` totals errors across the batch. At five or fewer it reports every file and error. Above five, default output reports only failing files with per-file error counts, the totals, the reason details were hidden, and drill/filter/fix guidance. `--verbose` bypasses the collapse. `renderJson()` remains complete.
+7. Exit code is `1` only when `failed > 0`; a batch containing only passes and skips exits `0`.
 
 ## Scope Resolution Order
 
@@ -47,6 +50,8 @@ When the scope resolves via `.obsidian` (not an explicit `--scope`), `JactCli` e
 3. **`FolderLinkStrategy`** — the resolved path exists but is a directory, not a file → warning.
 4. **`FileFoundStrategy`** — target file exists on disk via standard or cross-directory resolution; warns + suggests a path-conversion fix if the resolution crossed directories, otherwise valid after an anchor check.
 5. **`CacheFallbackStrategy`** — file not found via standard resolution; probes `FileCache.resolveFile()` for a fuzzy match, an exact match in a different directory, or a duplicate-filename conflict. This strategy always returns a result (never `null`), so it terminates the chain.
+
+For duplicate-filename failures, `FileCache` ranks every candidate by directory-tree distance from the unresolved target's expected directory. Normalized scope-relative path provides the deterministic tie-break. Default human and single-file JSON output render the first five candidates, an omitted count, and recovery guidance. `--verbose` renders the full ranked set. Stored candidates remain complete in both modes.
 
 Internally, `PathResolver.resolveTargetPath()` (`src/core/CitationValidator/PathResolver.ts:123-195`) runs its own 5-step waterfall to produce the candidate path each strategy checks: (0) tilde-expand `~/`, (1) standard relative resolution (with a decoded/non-decoded retry for URL-encoded paths), (2) Obsidian absolute-path format (`0_SoftwareDevelopment/...` style, walking up from the source file to find a match), (3) symlink-resolved source directory retry, (4) `FileCache` smart filename matching. If none succeed, it falls back to the standard path, which the caller then reports as "file not found."
 
@@ -88,12 +93,12 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 ## Fix Workflow (`--fix`)
 
-`JactCli.fix()` (`src/jact-cli.ts:482-`): validates the file, filters to fixable links (warnings with a `pathConversion`, or errors whose suggestion recommends the raw header format), fails fast with an explicit error if a path fix is needed but `--scope` wasn't supplied (anchor-only fixes don't need scope), then either:
-- prints a diff and exits without writing (`--dry-run`), or
-- writes a timestamped `.bak` backup of the original content, applies the fixes in place, and writes the result.
+`JactCli.fix()` parses before selecting fixes. A document with the validation-disable directive returns the same successful skip result as validation and is not read again, backed up, or written. Other documents validate, filter to fixable links, require `--scope` for path fixes, and then either print a dry-run diff or create a timestamped backup before writing.
 
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-08-02 | Added progressive disclosure for batches above five errors while preserving complete verbose/JSON output and existing exit-code semantics |
+| 1.0.0-draft | 2026-08-02 | Added bounded duplicate diagnostics and parser-derived document opt-out across validation, batch, stdin, and fix |
 | 1.0.0-draft | 2026-07-01 | Initial behavior doc, grounded in `src/jact-cli.ts`, `src/core/CitationValidator/*`, `src/core/ContentExtractor/*`, `src/core/resolveScope.ts` |

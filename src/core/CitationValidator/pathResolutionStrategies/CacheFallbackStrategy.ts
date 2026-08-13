@@ -1,3 +1,4 @@
+import { dirname, resolve } from "node:path";
 import type { PathResolutionOutcome } from "../PathResolver.js";
 import type {
 	PathResolutionContext,
@@ -9,7 +10,9 @@ export class CacheFallbackStrategy implements PathResolutionStrategy {
 		const { citation, sourceFile, pathResolver, fileCache } = context;
 		const rawPath = citation.target.path.raw ?? "";
 		const filename = rawPath.split("/").pop() ?? "";
-		const cacheResult = fileCache.resolveFile(filename);
+		const cacheResult = fileCache.resolveFile(filename, {
+			expectedPath: resolve(dirname(sourceFile), rawPath),
+		});
 
 		if (
 			cacheResult.found &&
@@ -62,12 +65,26 @@ export class CacheFallbackStrategy implements PathResolutionStrategy {
 			cacheResult.reason === "duplicate" ||
 			cacheResult.reason === "duplicate_fuzzy" ||
 			cacheResult.reason === "not_found";
+		const duplicatePathSuggestion =
+			(cacheResult.reason === "duplicate" ||
+				cacheResult.reason === "duplicate_fuzzy") &&
+			cacheResult.displayCandidates !== undefined
+				? {
+						filename,
+						total: cacheResult.displayCandidates.length,
+						candidates: cacheResult.displayCandidates,
+						debugInfo,
+					}
+				: undefined;
 		return {
 			kind: "error",
 			error: `File not found: ${rawPath}`,
 			suggestion: hasCacheFailure
 				? `${cacheResult.message ?? ""} ${debugInfo}`
 				: `Check if file exists or fix path. ${debugInfo}`,
+			...(duplicatePathSuggestion !== undefined && {
+				duplicatePathSuggestion,
+			}),
 		};
 	}
 }

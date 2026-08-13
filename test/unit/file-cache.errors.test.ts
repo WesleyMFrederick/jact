@@ -76,50 +76,63 @@ describe("M1 — not-found error format", () => {
 });
 
 describe("M2 — duplicate error format", () => {
-	it("given filename matches 2 paths in scope, when resolveFile fails, then error states 'matched 2 files in scope=<path>'", () => {
-		writeFile("sub1/doc.md");
-		writeFile("sub2/doc.md");
+	it("bounds the message to five candidates while preserving every ranked candidate", () => {
+		for (let index = 0; index < 7; index++) {
+			writeFile(`sub-${index}/dup.md`);
+		}
 		cache.buildCache(tmpDir, false, mockScope);
-		const result = cache.resolveFile("doc.md");
+		const result = cache.resolveFile("dup.md");
 		expect(result.found).toBe(false);
 		if (!result.found) {
 			expect(result.message).toContain(
-				"matched 2 files in scope=/project/root",
+				"'dup.md' matched 7 files; closest matches:",
 			);
+			expect(result.message).toContain(
+				"... 2 more matches; use --verbose to show all or --scope to narrow",
+			);
+			expect(result.message.match(/sub-\d\/dup\.md/g)).toHaveLength(5);
+			expect(result.candidates).toHaveLength(7);
+			expect(result.displayCandidates).toHaveLength(7);
 		}
 	});
 
-	it("given duplicate failure, when error inspected, then every candidate path printed on its own indented line", () => {
-		const p1 = writeFile("sub1/dup.md");
-		const p2 = writeFile("sub2/dup.md");
-		cache.buildCache(tmpDir, false, mockScope);
-		const result = cache.resolveFile("dup.md");
+	it("ranks by expected directory distance, then scope-relative path", () => {
+		writeFile("docs/missing/dup.md");
+		writeFile("docs/dup.md");
+		writeFile("other/a/dup.md");
+		writeFile("other/b/dup.md");
+		cache.buildCache(tmpDir);
+		const result = cache.resolveFile("dup.md", {
+			expectedPath: path.join(tmpDir, "docs/missing/skill/dup.md"),
+		});
 		expect(result.found).toBe(false);
 		if (!result.found) {
-			expect(result.message).toContain(`  ${p1}`);
-			expect(result.message).toContain(`  ${p2}`);
+			expect(result.displayCandidates).toEqual([
+				"docs/missing/dup.md",
+				"docs/dup.md",
+				"other/a/dup.md",
+				"other/b/dup.md",
+			]);
 		}
 	});
 
-	it("given duplicate failure, when error inspected, then trailing line reads 'Pass --scope to narrow.'", () => {
-		writeFile("sub1/dup.md");
-		writeFile("sub2/dup.md");
-		cache.buildCache(tmpDir, false, mockScope);
-		const result = cache.resolveFile("dup.md");
+	it("ranks logical expected paths against a symlink-resolved scan root", () => {
+		const realRoot = path.join(tmpDir, "real");
+		const logicalRoot = path.join(tmpDir, "logical");
+		writeFile("real/docs/missing/dup.md");
+		writeFile("real/docs/dup.md");
+		writeFile("real/other/dup.md");
+		fs.symlinkSync(realRoot, logicalRoot, "dir");
+		cache.buildCache(logicalRoot);
+		const result = cache.resolveFile("dup.md", {
+			expectedPath: path.join(logicalRoot, "docs/missing/skill/dup.md"),
+		});
 		expect(result.found).toBe(false);
 		if (!result.found) {
-			expect(result.message.trimEnd()).toMatch(/Pass --scope to narrow\.$/);
-		}
-	});
-
-	it("given duplicate failure, when error inspected, then message contains source: <enum-value>", () => {
-		writeFile("sub1/dup.md");
-		writeFile("sub2/dup.md");
-		cache.buildCache(tmpDir, false, mockScope);
-		const result = cache.resolveFile("dup.md");
-		expect(result.found).toBe(false);
-		if (!result.found) {
-			expect(result.message).toContain("source: cwd-git");
+			expect(result.displayCandidates?.slice(0, 2)).toEqual([
+				"docs/missing/dup.md",
+				"docs/dup.md",
+			]);
 		}
 	});
 });

@@ -231,6 +231,22 @@ export class JactCli {
 		outcome: ValidationWorkflowOutcome,
 		options: CliValidateOptions,
 	): string {
+		if (outcome.kind === "skipped") {
+			if (options.format === "json") {
+				return JSON.stringify(
+					{
+						summary: { total: 0, valid: 0, warnings: 0, errors: 0 },
+						links: [],
+						skipped: true,
+						skipReason: outcome.reason,
+					},
+					null,
+					2,
+				);
+			}
+			return `SKIPPED: ${outcome.reason}`;
+		}
+
 		if (outcome.kind === "failed") {
 			if (options.format === "json") {
 				return JSON.stringify(
@@ -255,7 +271,9 @@ export class JactCli {
 				}
 			}
 		}
-		if (options.format === "json") return this.formatAsJSON(outcome.result);
+		if (options.format === "json") {
+			return formatAsJSON(outcome.result, options.verbose ?? false);
+		}
 		return this.appendGitignoreHint(
 			this.formatForCLI(
 				outcome.result,
@@ -272,11 +290,6 @@ export class JactCli {
 		verbose = false,
 	): string {
 		return formatForCLI(result, nestedCodeblockWarnings, verbose);
-	}
-
-	/** Delegate to formatValidationResult.formatAsJSON. */
-	private formatAsJSON(result: ValidationResult): string {
-		return formatAsJSON(result);
 	}
 
 	/** Validate all citations in sourceFile and extract referenced content to stdout. */

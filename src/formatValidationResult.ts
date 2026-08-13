@@ -1,6 +1,8 @@
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import type {
+	DuplicatePathSuggestion,
 	EnrichedLinkObject,
+	ValidationMetadata,
 	ValidationResult,
 } from "./types/validationTypes.js";
 
@@ -46,8 +48,9 @@ export function formatForCLI(
 			lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
 			if (link.validation.status === "error") {
 				lines.push(`│  └─ ${link.validation.error}`);
-				if (link.validation.suggestion) {
-					lines.push(`│  └─ Suggestion: ${link.validation.suggestion}`);
+				const suggestion = renderValidationSuggestion(link.validation, true);
+				if (suggestion) {
+					lines.push(`│  └─ Suggestion: ${suggestion}`);
 				}
 			}
 			if (!isLast) lines.push("│");
@@ -68,8 +71,9 @@ export function formatForCLI(
 				if (link.validation.message) {
 					lines.push(`│  └─ ${link.validation.message}`);
 				}
-				if (link.validation.suggestion) {
-					lines.push(`│  └─ ${link.validation.suggestion}`);
+				const suggestion = renderValidationSuggestion(link.validation, true);
+				if (suggestion) {
+					lines.push(`│  └─ ${suggestion}`);
 				}
 			}
 			if (!isLast) lines.push("│");
@@ -159,8 +163,9 @@ export function formatForCLIMinimal(
 			lines.push(`- Line ${link.line}: ${link.fullMatch}`);
 			if (link.validation.status === "error") {
 				lines.push(`  error: ${link.validation.error}`);
-				if (link.validation.suggestion) {
-					lines.push(`  suggestion: ${link.validation.suggestion}`);
+				const suggestion = renderValidationSuggestion(link.validation, false);
+				if (suggestion) {
+					lines.push(`  suggestion: ${suggestion}`);
 				}
 			}
 		}
@@ -181,8 +186,9 @@ export function formatForCLIMinimal(
 				if (link.validation.message) {
 					lines.push(`  message: ${link.validation.message}`);
 				}
-				if (link.validation.suggestion) {
-					lines.push(`  suggestion: ${link.validation.suggestion}`);
+				const suggestion = renderValidationSuggestion(link.validation, false);
+				if (suggestion) {
+					lines.push(`  suggestion: ${suggestion}`);
 				}
 			}
 		}
@@ -215,12 +221,64 @@ export function formatForCLIMinimal(
 	return lines.join("\n");
 }
 
+function renderDuplicatePathSuggestion(
+	details: DuplicatePathSuggestion,
+	verbose: boolean,
+): string {
+	const candidates = verbose ? details.candidates : details.candidates.slice(0, 5);
+	const candidateLines = candidates
+		.map((candidate) => `  ${candidate}`)
+		.join("\n");
+	const omitted = details.total - candidates.length;
+	const omittedLine =
+		!verbose && omitted > 0
+			? `\n  ... ${omitted} more matches; use --verbose to show all or --scope to narrow`
+			: "";
+	return `'${details.filename}' matched ${details.total} files; closest matches:\n${candidateLines}${omittedLine} ${details.debugInfo}`;
+}
+
+function renderValidationSuggestion(
+	validation: ValidationMetadata,
+	verbose: boolean,
+): string | undefined {
+	if (validation.status === "valid") return undefined;
+	if (validation.duplicatePathSuggestion !== undefined) {
+		return renderDuplicatePathSuggestion(
+			validation.duplicatePathSuggestion,
+			verbose,
+		);
+	}
+	return validation.suggestion;
+}
+
 /**
  * Format validation results as JSON.
  *
  * @param result - Result object to format
+ * @param verbose - Include every ranked duplicate-path candidate
  * @returns JSON string representation
  */
-export function formatAsJSON(result: ValidationResult): string {
-	return JSON.stringify(result, null, 2);
+export function formatAsJSON(
+	result: ValidationResult,
+	verbose = false,
+): string {
+	const links = result.links.map((link) => {
+		if (
+			link.validation.status === "valid" ||
+			link.validation.duplicatePathSuggestion === undefined
+		) {
+			return link;
+		}
+
+		const validation = {
+			...link.validation,
+			suggestion: renderDuplicatePathSuggestion(
+				link.validation.duplicatePathSuggestion,
+				verbose,
+			),
+		};
+		delete validation.duplicatePathSuggestion;
+		return { ...link, validation };
+	});
+	return JSON.stringify({ ...result, links }, null, 2);
 }

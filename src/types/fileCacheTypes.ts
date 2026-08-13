@@ -15,12 +15,17 @@ export interface ResolveResultSuccess {
 	message?: string;
 }
 
+export interface ResolveFileOptions {
+	expectedPath?: string;
+}
+
 export interface ResolveResultFailure {
 	found: false;
 	reason: "duplicate" | "not_found" | "duplicate_fuzzy";
 	message: string;
 	// Optional diagnostic fields, populated based on `reason`:
-	candidates?: string[]; // reason: 'duplicate' | 'duplicate_fuzzy'
+	candidates?: string[]; // ranked absolute paths; reason: 'duplicate' | 'duplicate_fuzzy'
+	displayCandidates?: string[]; // ranked scope-relative paths for rendering
 	scope?: ScopeResolution; // populated when caller built the cache via applyScope
 	nearMisses?: string[]; // reason: 'not_found'; top-3 Levenshtein ≤ 2
 	attemptedPaths?: readonly string[]; // reason: 'not_found'; full paths attempted during resolution (for error output)

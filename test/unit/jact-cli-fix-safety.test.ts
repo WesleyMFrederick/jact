@@ -53,7 +53,9 @@ function buildCli(links: unknown[]): JactCli {
 		parsedFileCache: { resolveDocument: () => Promise<unknown> };
 		validator: { validateDocument: () => Promise<unknown> };
 	};
-	vi.spyOn(internal.parsedFileCache, "resolveDocument").mockResolvedValue({});
+	vi.spyOn(internal.parsedFileCache, "resolveDocument").mockResolvedValue({
+		data: { validationDisabled: false },
+	});
 	vi.spyOn(internal.validator, "validateDocument").mockResolvedValue({ links });
 	return cli;
 }

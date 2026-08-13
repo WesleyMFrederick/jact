@@ -149,6 +149,9 @@ export interface ParserOutput {
 	/** internal reader for the ParsedDocument facade (D-008) */
 	ast: Root;
 
+	/** exact top-of-document directive intentionally disables citation validation */
+	validationDisabled: boolean;
+
 	links: LinkObject[];
 
 	headings: HeadingObject[];

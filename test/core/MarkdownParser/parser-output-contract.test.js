@@ -22,6 +22,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 		expect(result).toHaveProperty("links");
 		expect(result).toHaveProperty("headings");
 		expect(result).toHaveProperty("anchors");
+		expect(result).toHaveProperty("validationDisabled");
 
 		expect(typeof result.filePath).toBe("string");
 		expect(typeof result.content).toBe("string");
@@ -29,6 +30,34 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 		expect(Array.isArray(result.links)).toBe(true);
 		expect(Array.isArray(result.headings)).toBe(true);
 		expect(Array.isArray(result.anchors)).toBe(true);
+		expect(typeof result.validationDisabled).toBe("boolean");
+	});
+
+	it("recognizes the exact disable comment as the first body block after optional YAML", () => {
+		const parser = createMarkdownParser();
+		const direct = parser.parseContent(
+			"<!-- jact-validate-disable -->\n\n[example](missing.md)",
+		);
+		const afterFrontmatter = parser.parseContent(
+			"---\ntitle: Example\n---\n<!-- jact-validate-disable -->\n\n[example](missing.md)",
+		);
+
+		expect(direct.validationDisabled).toBe(true);
+		expect(afterFrontmatter.ast.children[0]?.type).toBe("yaml");
+		expect(afterFrontmatter.validationDisabled).toBe(true);
+	});
+
+	it("does not recognize a late, fenced, or near-match disable comment", () => {
+		const parser = createMarkdownParser();
+		const samples = [
+			"# Intro\n\n<!-- jact-validate-disable -->",
+			"```md\n<!-- jact-validate-disable -->\n```",
+			"<!-- jact-validate-disable extra -->",
+		];
+
+		for (const sample of samples) {
+			expect(parser.parseContent(sample).validationDisabled).toBe(false);
+		}
 	});
 
 	it("should populate headings array with level, text, raw properties", async () => {
@@ -233,6 +262,7 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 			"links",
 			"headings",
 			"anchors",
+			"validationDisabled",
 		];
 		for (const field of requiredFields) {
 			expect(result).toHaveProperty(field);

@@ -6,7 +6,11 @@
  * a `BatchSummary` that drives the process exit code (R4, ADR D6).
  */
 
-import type { BatchSummary, FileResult, ValidationError } from "../types/cli-types.js";
+import type {
+	BatchSummary,
+	FileResult,
+	ValidationError,
+} from "../types/cli-types.js";
 import type { ValidationResult } from "../types/validationTypes.js";
 
 /**
@@ -15,7 +19,8 @@ import type { ValidationResult } from "../types/validationTypes.js";
  *
  * @param filePath File to validate.
  */
-export type ValidateOneFn = (filePath: string) => Promise<ValidationResult>;
+export type ValidateOneResult = ValidationResult | { skipped: true };
+export type ValidateOneFn = (filePath: string) => Promise<ValidateOneResult>;
 
 /**
  * Run `validateOne` sequentially over `files`, in order, aggregating into a
@@ -38,24 +43,33 @@ export type ValidateOneFn = (filePath: string) => Promise<ValidationResult>;
  *   code (ADR D4/D5).
  */
 export async function runBatch(
-  files: readonly string[],
-  validateOne: ValidateOneFn,
+	files: readonly string[],
+	validateOne: ValidateOneFn,
 ): Promise<BatchSummary> {
-  const results: FileResult[] = [];
+	const results: FileResult[] = [];
 
-  for (const path of files) {
-    const result = await validateOne(path);
-    results.push(toFileResult(path, result));
-  }
+	for (const path of files) {
+		const result = await validateOne(path);
+		results.push(
+			"skipped" in result
+				? { path, ok: true, errors: [], skipped: true }
+				: toFileResult(path, result),
+		);
+	}
 
-  const passed = results.filter((r) => r.ok).length;
+	const skipped = results.filter((result) => result.skipped).length;
+	const passed = results.filter(
+		(result) => result.ok && !result.skipped,
+	).length;
+	const failed = results.filter((result) => !result.ok).length;
 
-  return {
-    total: results.length,
-    passed,
-    failed: results.length - passed,
-    results,
-  };
+	return {
+		total: results.length,
+		passed,
+		failed,
+		skipped,
+		results,
+	};
 }
 
 /**
@@ -64,16 +78,17 @@ export async function runBatch(
  * error-status link.
  */
 function toFileResult(path: string, result: ValidationResult): FileResult {
-  const ok = result.summary.errors === 0;
+	const ok = result.summary.errors === 0;
 
-  const errors: ValidationError[] = ok
-    ? []
-    : result.links
-        .filter((link) => link.validation.status === "error")
-        .map((link) => ({
-          line: link.line,
-          message: link.validation.status === "error" ? link.validation.error : "",
-        }));
+	const errors: ValidationError[] = ok
+		? []
+		: result.links
+				.filter((link) => link.validation.status === "error")
+				.map((link) => ({
+					line: link.line,
+					message:
+						link.validation.status === "error" ? link.validation.error : "",
+				}));
 
-  return { path, ok, errors };
+	return { path, ok, errors };
 }

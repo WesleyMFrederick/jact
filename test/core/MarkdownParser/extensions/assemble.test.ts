@@ -22,9 +22,9 @@ function typesIn(md: string) {
 }
 
 describe("assemble — combined Obsidian-style extension set", () => {
-	it("returns one combined syntax extension and six fromMarkdown extensions", () => {
+	it("returns one combined syntax extension and seven fromMarkdown extensions", () => {
 		expect(jactSyntaxExtension()).toBeTypeOf("object");
-		expect(jactMdastExtensions()).toHaveLength(6);
+		expect(jactMdastExtensions()).toHaveLength(7);
 	});
 
 	it("parses all six custom syntaxes in a single document", () => {

@@ -12,6 +12,7 @@
 import type { LinkObject } from "../../types/citationTypes.js";
 import type {
 	AnchorConversion,
+	DuplicatePathSuggestion,
 	EnrichedLinkObject,
 	PathConversion,
 	ValidationMetadata,
@@ -37,6 +38,7 @@ interface SingleCitationValidationResult {
 	suggestion?: string;
 	pathConversion?: PathConversion;
 	anchorConversion?: AnchorConversion;
+	duplicatePathSuggestion?: DuplicatePathSuggestion;
 }
 
 // ── enrichLinkObject factory ──────────────────────────────────────────────────
@@ -141,6 +143,9 @@ export class CitationValidator {
 				...(result.anchorConversion && {
 					anchorConversion: result.anchorConversion,
 				}),
+				...(result.duplicatePathSuggestion && {
+					duplicatePathSuggestion: result.duplicatePathSuggestion,
+				}),
 			};
 		} else {
 			validation = {
@@ -150,6 +155,9 @@ export class CitationValidator {
 				...(result.pathConversion && { pathConversion: result.pathConversion }),
 				...(result.anchorConversion && {
 					anchorConversion: result.anchorConversion,
+				}),
+				...(result.duplicatePathSuggestion && {
+					duplicatePathSuggestion: result.duplicatePathSuggestion,
 				}),
 			};
 		}
@@ -288,6 +296,9 @@ export class CitationValidator {
 				"error",
 				outcome.error,
 				outcome.suggestion ?? null,
+				null,
+				null,
+				outcome.duplicatePathSuggestion ?? null,
 			);
 		}
 		if (outcome.kind === "warning") {
@@ -407,6 +418,7 @@ export class CitationValidator {
 		message: string | null = null,
 		suggestion: PathConversion | null = null,
 		anchorConversion: AnchorConversion | null = null,
+		duplicatePathSuggestion: DuplicatePathSuggestion | null = null,
 	): SingleCitationValidationResult {
 		const result: SingleCitationValidationResult = {
 			line: citation.line,
@@ -427,6 +439,9 @@ export class CitationValidator {
 		}
 		if (anchorConversion) {
 			result.anchorConversion = anchorConversion;
+		}
+		if (duplicatePathSuggestion) {
+			result.duplicatePathSuggestion = duplicatePathSuggestion;
 		}
 
 		return result;

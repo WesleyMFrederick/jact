@@ -4,7 +4,12 @@ import {
 	DEFAULT_SCAN_IGNORE_PATTERNS,
 } from "./core/ignoreRules.js";
 import type { ScopeResolution } from "./core/resolveScope.js";
-import type { CacheStats, ResolveResult } from "./types/fileCacheTypes.js";
+import type {
+	CacheStats,
+	ResolveFileOptions,
+	ResolveResult,
+	ResolveResultFailure,
+} from "./types/fileCacheTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 
 interface FileEntry {
@@ -47,6 +52,7 @@ export class FileCache {
 	private entries: Map<string, string[]>; // filename -> all paths in scan order
 	private scope: ScopeResolution | undefined = undefined; // set by buildCache; embedded in error messages from resolveFile
 	private lastScanRoot: string | undefined = undefined; // real scan root of the last buildCache, for isIgnored()
+	private lastLogicalRoot: string | undefined = undefined; // caller-facing root before realpath normalization
 	private lastRespectGitignore = false; // whether the last buildCache honored .gitignore
 
 	/**
@@ -102,6 +108,7 @@ export class FileCache {
 		}
 
 		const respectGitignore = options.respectGitignore !== false;
+		this.lastLogicalRoot = absoluteScopeFolder;
 		this.lastScanRoot = targetScanFolder;
 		this.lastRespectGitignore = respectGitignore;
 		const ignoreRules = buildIgnoreRules(
@@ -315,17 +322,21 @@ export class FileCache {
 	 * 3. Fuzzy matching for typos and common issues
 	 *
 	 * Returns error if filename is ambiguous (multiple files with same name).
-	 * Failure results carry candidates[] listing every matching path so callers
-	 * can present the disambiguation choice to users.
+	 * Failure results carry ranked candidates[] listing every matching path so
+	 * renderers can present a bounded default and a complete verbose view.
 	 *
 	 * @param filename - Filename to resolve (with or without .md extension)
+	 * @param options - Optional expected target path used to rank duplicate matches
 	 * @returns Result object with { found, path?, reason?, message?, candidates?, fuzzyMatch?, correctedFilename? }
 	 */
-	resolveFile(filename: string): ResolveResult {
+	resolveFile(
+		filename: string,
+		options: ResolveFileOptions = {},
+	): ResolveResult {
 		const arr = this.entries.get(filename);
 		if (arr !== undefined) {
 			if (arr.length > 1) {
-				return this.buildDuplicateFailure(filename, arr);
+				return this.buildDuplicateFailure(filename, arr, options.expectedPath);
 			}
 			// arr.length === 1 guaranteed (addToCache always pushes at least one)
 			const resolvedPath = arr[0];
@@ -342,7 +353,11 @@ export class FileCache {
 		const arrExt = this.entries.get(withMdExt);
 		if (arrExt !== undefined) {
 			if (arrExt.length > 1) {
-				return this.buildDuplicateFailure(withMdExt, arrExt);
+				return this.buildDuplicateFailure(
+					withMdExt,
+					arrExt,
+					options.expectedPath,
+				);
 			}
 			const resolvedPathExt = arrExt[0];
 			if (resolvedPathExt === undefined) {
@@ -363,24 +378,111 @@ export class FileCache {
 	private buildDuplicateFailure(
 		filename: string,
 		paths: string[],
-	): import("./types/fileCacheTypes.js").ResolveResultFailure {
-		const scopeStr = this.scope
-			? ` in scope=${this.scope.scope} (source: ${this.scope.source})`
-			: "";
-		const candidateLines = paths.map((p) => `  ${p}`).join("\n");
-		const message = `'${filename}' matched ${paths.length} files${scopeStr}:\n${candidateLines}\nPass --scope to narrow.`;
+		expectedPath?: string,
+	): ResolveResultFailure {
+		const candidates = this.rankDuplicateCandidates(paths, expectedPath);
+		const displayCandidates = candidates.map((candidate) =>
+			this.toDisplayPath(candidate),
+		);
+		const visibleCandidates = displayCandidates.slice(0, 5);
+		const candidateLines = visibleCandidates
+			.map((candidate) => `  ${candidate}`)
+			.join("\n");
+		const omitted = displayCandidates.length - visibleCandidates.length;
+		const omittedLine =
+			omitted > 0
+				? `\n  ... ${omitted} more matches; use --verbose to show all or --scope to narrow`
+				: "";
+		const message = `'${filename}' matched ${candidates.length} files; closest matches:\n${candidateLines}${omittedLine}`;
 		return {
 			found: false,
 			reason: "duplicate",
-			candidates: paths,
+			candidates,
+			displayCandidates,
 			...(this.scope !== undefined && { scope: this.scope }),
 			message,
 		};
 	}
 
-	private buildNotFoundFailure(
-		filename: string,
-	): import("./types/fileCacheTypes.js").ResolveResultFailure {
+	private rankDuplicateCandidates(
+		paths: string[],
+		expectedPath?: string,
+	): string[] {
+		const expectedDirectory =
+			expectedPath === undefined
+				? undefined
+				: this.toLogicalDirectory(this.path.dirname(expectedPath));
+
+		return [...paths].sort((left, right) => {
+			if (expectedDirectory !== undefined) {
+				const distanceDifference =
+					this.directoryDistance(
+						expectedDirectory,
+						this.toLogicalDirectory(this.path.dirname(left)),
+					) -
+					this.directoryDistance(
+						expectedDirectory,
+						this.toLogicalDirectory(this.path.dirname(right)),
+					);
+				if (distanceDifference !== 0) return distanceDifference;
+			}
+
+			const leftPath = this.toDisplayPath(left);
+			const rightPath = this.toDisplayPath(right);
+			return leftPath < rightPath ? -1 : leftPath > rightPath ? 1 : 0;
+		});
+	}
+
+	private toLogicalDirectory(directory: string): string[] {
+		const resolvedDirectory = this.path.resolve(directory);
+		const roots = [this.lastScanRoot, this.lastLogicalRoot];
+		for (const root of roots) {
+			if (root === undefined) continue;
+			const relativePath = this.path.relative(root, resolvedDirectory);
+			if (
+				relativePath === "" ||
+				(!relativePath.startsWith(`..${this.path.sep}`) &&
+					relativePath !== ".." &&
+					!this.path.isAbsolute(relativePath))
+			) {
+				return relativePath
+					.split(this.path.sep)
+					.filter((part) => part.length > 0);
+			}
+		}
+		return resolvedDirectory
+			.split(this.path.sep)
+			.filter((part) => part.length > 0);
+	}
+
+	private directoryDistance(left: string[], right: string[]): number {
+		let commonLength = 0;
+		while (
+			commonLength < left.length &&
+			commonLength < right.length &&
+			left[commonLength] === right[commonLength]
+		) {
+			commonLength++;
+		}
+		return left.length + right.length - commonLength * 2;
+	}
+
+	private toDisplayPath(candidate: string): string {
+		const root = this.lastScanRoot ?? this.scope?.scope;
+		if (root === undefined) return candidate;
+
+		const relativePath = this.path.relative(root, candidate);
+		if (
+			relativePath === ".." ||
+			relativePath.startsWith(`..${this.path.sep}`) ||
+			this.path.isAbsolute(relativePath)
+		) {
+			return candidate;
+		}
+		return relativePath.split(this.path.sep).join("/");
+	}
+
+	private buildNotFoundFailure(filename: string): ResolveResultFailure {
 		const nearMisses = findNearMisses(filename, this.entries);
 		const scopeStr = this.scope
 			? `'${filename}' not found in scope=${this.scope.scope} (source: ${this.scope.source}).`

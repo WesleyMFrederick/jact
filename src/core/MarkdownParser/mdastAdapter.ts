@@ -14,6 +14,7 @@ import type {
 	HeadingObject,
 	LinkObject,
 } from "../../types/citationTypes.js";
+import { isValidationDisabled } from "../../validate/validation-disable.js";
 import { extractAnchors } from "./extractAnchors.js";
 import { extractHeadings } from "./extractHeadings.js";
 import { extractLinks } from "./extractLinks.js";
@@ -23,6 +24,7 @@ export interface AdaptedParserFields {
 	links: LinkObject[];
 	headings: HeadingObject[];
 	anchors: AnchorObject[];
+	validationDisabled: boolean;
 }
 
 /**
@@ -42,5 +44,6 @@ export function adaptMdastToParserOutput(
 	const headings = extractHeadings(ast, content);
 	const links = extractLinks(content, filePath, fileCache, ast);
 	const anchors = extractAnchors(ast, content);
-	return { links, headings, anchors };
+	const validationDisabled = isValidationDisabled(ast);
+	return { links, headings, anchors, validationDisabled };
 }

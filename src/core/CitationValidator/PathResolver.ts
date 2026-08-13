@@ -16,7 +16,10 @@ import { existsSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { LinkObject } from "../../types/citationTypes.js";
-import type { PathConversion } from "../../types/validationTypes.js";
+import type {
+	DuplicatePathSuggestion,
+	PathConversion,
+} from "../../types/validationTypes.js";
 import { CacheFallbackStrategy } from "./pathResolutionStrategies/CacheFallbackStrategy.js";
 import { FileFoundStrategy } from "./pathResolutionStrategies/FileFoundStrategy.js";
 import { FolderLinkStrategy } from "./pathResolutionStrategies/FolderLinkStrategy.js";
@@ -28,12 +31,17 @@ import { WikiFastPathStrategy } from "./pathResolutionStrategies/WikiFastPathStr
  * Minimal interface over FileCache to avoid circular imports.
  */
 export interface FileCacheLike {
-	resolveFile(filename: string): {
+	resolveFile(
+		filename: string,
+		options?: { expectedPath?: string },
+	): {
 		found: boolean;
 		path?: string | null;
 		fuzzyMatch?: boolean;
 		message?: string;
 		reason?: string;
+		candidates?: string[];
+		displayCandidates?: string[];
 	};
 }
 
@@ -46,8 +54,18 @@ export type PathResolutionOutcome =
 			warning?: string;
 			pathConversion?: PathConversion;
 	  }
-	| { kind: "warning"; error: string; suggestion?: string }
-	| { kind: "error"; error: string; suggestion?: string };
+	| {
+			kind: "warning";
+			error: string;
+			suggestion?: string;
+			duplicatePathSuggestion?: DuplicatePathSuggestion;
+	  }
+	| {
+			kind: "error";
+			error: string;
+			suggestion?: string;
+			duplicatePathSuggestion?: DuplicatePathSuggestion;
+	  };
 
 export class PathResolver {
 	private fileCache: FileCacheLike;

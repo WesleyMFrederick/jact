@@ -76,6 +76,7 @@ describe("runBatch — all pass", () => {
     expect(summary.total).toBe(3);
     expect(summary.passed).toBe(3);
     expect(summary.failed).toBe(0);
+    expect(summary.skipped).toBe(0);
     expect(summary.results).toEqual([
       { path: "/vault/one.md", ok: true, errors: [] },
       { path: "/vault/two.md", ok: true, errors: [] },
@@ -104,6 +105,7 @@ describe("runBatch — one failure fails the batch", () => {
     expect(summary.total).toBe(10);
     expect(summary.passed).toBe(9);
     expect(summary.failed).toBe(1);
+    expect(summary.skipped).toBe(0);
 
     const failing = summary.results.find((r) => !r.ok);
     expect(failing).toEqual({
@@ -127,9 +129,28 @@ describe("runBatch — one failure fails the batch", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Empty input
-// ---------------------------------------------------------------------------
+describe("runBatch — skipped files", () => {
+  it("reports skips separately from passed and failed files", async () => {
+    const validateOne: ValidateOneFn = async (filePath) =>
+      filePath.endsWith("example.md") ? { skipped: true } : passingResult();
+
+    const summary = await runBatch(
+      ["/vault/example.md", "/vault/valid.md"],
+      validateOne,
+    );
+
+    expect(summary).toEqual({
+      total: 2,
+      passed: 1,
+      failed: 0,
+      skipped: 1,
+      results: [
+        { path: "/vault/example.md", ok: true, errors: [], skipped: true },
+        { path: "/vault/valid.md", ok: true, errors: [] },
+      ],
+    });
+  });
+});
 
 describe("runBatch — empty file list", () => {
   it("returns a zeroed summary without calling the validator", async () => {
@@ -141,7 +162,13 @@ describe("runBatch — empty file list", () => {
 
     const summary = await runBatch([], validateOne);
 
-    expect(summary).toEqual({ total: 0, passed: 0, failed: 0, results: [] });
+    expect(summary).toEqual({
+      total: 0,
+      passed: 0,
+      failed: 0,
+      skipped: 0,
+      results: [],
+    });
     expect(calls).toBe(0);
   });
 });

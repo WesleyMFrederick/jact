@@ -11,6 +11,7 @@ import type { ParsedFileCache } from "../ParsedFileCache.js";
 import type { CliValidateOptions } from "../types/cli-types.js";
 import type { CacheStats } from "../types/fileCacheTypes.js";
 import type { ValidationResult } from "../types/validationTypes.js";
+import { VALIDATION_DISABLED_REASON } from "./validation-disable.js";
 
 export type ValidationInput =
 	| { kind: "file"; filePath: string }
@@ -24,6 +25,11 @@ export type ValidationWorkflowOutcome =
 			nestedCodeblockWarnings: NestedCodeblockWarning[];
 			scopeNotices: string[];
 			cacheStats: CacheStats;
+	  }
+	| {
+			kind: "skipped";
+			filePath: string;
+			reason: string;
 	  }
 	| { kind: "failed"; filePath: string; error: string };
 
@@ -60,6 +66,13 @@ export class ValidationWorkflow {
 						}
 					: { kind: "file", filePath: intendedPath },
 			);
+			if (document.data.validationDisabled) {
+				return {
+					kind: "skipped",
+					filePath: intendedPath,
+					reason: VALIDATION_DISABLED_REASON,
+				};
+			}
 			const validation = await this.validator.validateDocument(
 				document,
 				intendedPath,
@@ -103,10 +116,12 @@ export class ValidationWorkflow {
 			links,
 			summary: {
 				total: links.length,
-				valid: links.filter((link) => link.validation.status === "valid").length,
+				valid: links.filter((link) => link.validation.status === "valid")
+					.length,
 				warnings: links.filter((link) => link.validation.status === "warning")
 					.length,
-				errors: links.filter((link) => link.validation.status === "error").length,
+				errors: links.filter((link) => link.validation.status === "error")
+					.length,
 			},
 			lineRange: `${startLine}-${endLine}`,
 		};
