@@ -21,10 +21,10 @@ const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");
 // guaranteed to persist beyond any single feature's lifecycle.
 const PLAN_MD = join(JACT_ROOT, "test/fixtures/extract-verbose-fixture.md");
 
-describe("extract file — output mode default", () => {
+describe("extract file — JSON output modes", () => {
 	it("given no --verbose flag, when extract file runs, then output has only extractedContentBlocks key", async () => {
 		const { stdout } = await execAsync(
-			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}"`,
+			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --format json`,
 			{ cwd: JACT_ROOT },
 		);
 		const result = JSON.parse(stdout) as Record<string, unknown>;
@@ -33,7 +33,7 @@ describe("extract file — output mode default", () => {
 
 	it("given no --verbose flag, then output omits outgoingLinksReport", async () => {
 		const { stdout } = await execAsync(
-			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}"`,
+			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --format json`,
 			{ cwd: JACT_ROOT },
 		);
 		const result = JSON.parse(stdout) as Record<string, unknown>;
@@ -42,7 +42,7 @@ describe("extract file — output mode default", () => {
 
 	it("given no --verbose flag, then output omits stats", async () => {
 		const { stdout } = await execAsync(
-			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}"`,
+			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --format json`,
 			{ cwd: JACT_ROOT },
 		);
 		const result = JSON.parse(stdout) as Record<string, unknown>;
@@ -53,7 +53,7 @@ describe("extract file — output mode default", () => {
 describe("extract file — --verbose mode", () => {
 	it("given --verbose flag, when extract file runs, then output includes extractedContentBlocks, outgoingLinksReport, and stats", async () => {
 		const { stdout } = await execAsync(
-			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --verbose`,
+			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --format json --verbose`,
 			{ cwd: JACT_ROOT },
 		);
 		const result = JSON.parse(stdout) as Record<string, unknown>;
@@ -64,11 +64,11 @@ describe("extract file — --verbose mode", () => {
 
 	it("given --verbose flag, verbose output contains all keys that minimal output contains", async () => {
 		const [minimalOut, verboseOut] = await Promise.all([
-			execAsync(`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}"`, {
+			execAsync(`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --format json`, {
 				cwd: JACT_ROOT,
 			}),
 			execAsync(
-				`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --verbose`,
+				`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --format json --verbose`,
 				{ cwd: JACT_ROOT },
 			),
 		]);
@@ -86,9 +86,9 @@ describe("extract header — output mode default", () => {
 			`node "${CLI_PATH}" extract header "${PLAN_MD}" "Context"`,
 			{ cwd: JACT_ROOT },
 		);
-		// Plain markdown — not valid JSON
+		// Numbered markdown — not valid JSON.
 		expect(() => JSON.parse(stdout)).toThrow();
-		expect(stdout.trim()).toBeTruthy();
+		expect(stdout).toMatch(/^\s+\d+\t/);
 	});
 
 	it("given --verbose flag with markdown format, then output appends Outgoing Links Report and Stats sections", async () => {

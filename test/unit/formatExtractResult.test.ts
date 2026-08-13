@@ -8,7 +8,10 @@ import type { OutgoingLinksExtractedContent } from "../../src/types/extraction-t
  */
 
 function makeResult(
-	blocks: Record<string, { content: string; contentLength: number }>,
+	blocks: Record<
+		string,
+		{ content: string; contentLength: number; startLine?: number }
+	>,
 	totalLength: number = 0,
 ): OutgoingLinksExtractedContent {
 	return {
@@ -55,6 +58,32 @@ describe("formatExtractResult", () => {
 		expect(output).toBe("# Hello\nSome content here.");
 		// Must not be valid JSON — it's raw markdown
 		expect(() => JSON.parse(output)).toThrow();
+	});
+
+	it("prefixes markdown with cat-style source line fields when requested", () => {
+		const result = makeResult({
+			"block-1": {
+				content: "## Overview\n\nBody.\n",
+				contentLength: 20,
+				startLine: 3,
+			},
+		});
+
+		expect(
+			formatExtractResult(result, "markdown", "minimal", {
+				lineNumbers: true,
+			}),
+		).toBe("     3\t## Overview\n     4\t\n     5\tBody.\n");
+	});
+
+	it("fails numbered markdown when source position metadata is unavailable", () => {
+		expect(() =>
+			formatExtractResult(singleBlock, "markdown", "minimal", {
+				lineNumbers: true,
+			}),
+		).toThrow(
+			"Cannot render line numbers: extracted content has no source start line.",
+		);
 	});
 
 	it("format 'markdown' joins multiple blocks with '\\n---\\n' separator", () => {

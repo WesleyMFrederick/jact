@@ -549,7 +549,7 @@ Examples:
     $ jact extract header plan.md "Task 1: Implementation"
     $ jact extract header docs/guide.md "Overview" --scope ./docs
     $ jact extract header handbook.md "Install" --within "Guide"
-    $ jact extract header file.md "Design" | jq '.extractedContentBlocks'
+    $ jact extract header file.md "Design" --format json | jq '.extractedContentBlocks'
 
 Exit Codes:
   0  Header extracted successfully
@@ -574,15 +574,19 @@ Exit Codes:
 					options,
 				);
 
-				// Format output based on --format flag (default: markdown); minimal payload by default
 				if (result) {
-					console.log(
-						formatExtractResult(
-							result,
-							options.format ?? "markdown",
-							options.verbose ? "verbose" : "minimal",
-						),
+					const format = options.format ?? "markdown";
+					const output = formatExtractResult(
+						result,
+						format,
+						options.verbose ? "verbose" : "minimal",
+						{ lineNumbers: true },
 					);
+					if (format === "markdown" && !options.verbose) {
+						process.stdout.write(output);
+					} else {
+						console.log(output);
+					}
 					process.exitCode = 0;
 				}
 				// Note: Error exit codes set by extractHeader() method
@@ -602,15 +606,19 @@ extractCmd
 	.argument("<target-file>", "Markdown file to extract")
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
-	.option("--format <type>", "Output format (json)", "json")
+	.addOption(
+		new Option("--format <type>", "Output format")
+			.choices(["markdown", "json"])
+			.default("markdown"),
+	)
 	.addHelpText(
 		"after",
 		`
 Examples:
     $ jact extract file docs/architecture.md
     $ jact extract file architecture.md --scope ./docs
-    $ jact extract file file.md | jq '.extractedContentBlocks'
-    $ jact extract file file.md | jq '.stats'
+    $ jact extract file file.md --format json | jq '.extractedContentBlocks'
+    $ jact extract file file.md --format json --verbose | jq '.stats'
 
 Exit Codes:
   0  File extracted successfully
@@ -626,15 +634,19 @@ Exit Codes:
 			// Pattern: Delegate to JactCli orchestration method
 			const result = await manager.extractFile(targetFile, options);
 
-			// Output JSON to stdout if extraction succeeded — minimal by default, --verbose adds report + stats
 			if (result) {
-				console.log(
-					formatExtractResult(
-						result,
-						"json",
-						options.verbose ? "verbose" : "minimal",
-					),
+				const format = options.format ?? "markdown";
+				const output = formatExtractResult(
+					result,
+					format,
+					options.verbose ? "verbose" : "minimal",
+					{ lineNumbers: true },
 				);
+				if (format === "markdown" && !options.verbose) {
+					process.stdout.write(output);
+				} else {
+					console.log(output);
+				}
 				process.exitCode = 0;
 			}
 			// Note: Error exit codes set by extractFile() method

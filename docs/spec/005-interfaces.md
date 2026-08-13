@@ -197,14 +197,14 @@ jact extract links file.md | jq '.stats.compressionRatio'
 jact extract header <target-file> <header-name> [options]
 ```
 
-Builds a synthetic header link via `LinkObjectFactory.createHeaderLink()`, validates it, extracts the section content. `--format` choices: `markdown` (default) or `json` (`cli.ts:428-432`).
+Builds a synthetic header link via `LinkObjectFactory.createHeaderLink()`, validates it, and extracts the section content. The default `markdown` output prefixes every extracted line in `cat -n` format: a right-aligned six-character source line followed by a tab. `--format json` preserves raw content and returns the structured extraction contract.
 
 **Exit codes:** `0` header extracted; `1` header not found or validation failed; `2` system error.
 
 ```bash
 jact extract header plan.md "Task 1: Implementation"
 jact extract header docs/guide.md "Overview" --scope ./docs
-jact extract header file.md "Design" | jq '.extractedContentBlocks'
+jact extract header file.md "Design" --format json | jq '.extractedContentBlocks'
 ```
 
 ---
@@ -215,7 +215,12 @@ jact extract header file.md "Design" | jq '.extractedContentBlocks'
 jact extract file <target-file> [options]
 ```
 
-Builds a synthetic full-file link via `LinkObjectFactory.createFileLink()`, validates it, extracts the entire file content. `--format` is `json` only.
+Builds a synthetic full-file link via `LinkObjectFactory.createFileLink()`, validates it, and extracts the entire file content. The default `markdown` output prefixes every line in `cat -n` format using its original one-based source line. `--format json` returns the structured extraction contract with raw, unnumbered content.
+
+```bash
+jact extract file docs/architecture.md
+jact extract file docs/architecture.md --format json | jq '.extractedContentBlocks'
+```
 
 ---
 
@@ -241,6 +246,7 @@ Exit code `2` is consistent across `validate`, `outline`, `ast`, and `extract` f
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-08-13 | Made numbered markdown the default output for `extract header` and `extract file`; explicit JSON remains raw |
 | 1.0.0-draft | 2026-08-02 | Added five-error batch disclosure threshold, failing-file error counts, drill/filter/fix guidance, and verbose expansion without changing exit codes |
 | 1.0.0-draft | 2026-08-02 | Added bounded duplicate-path diagnostics, verbose expansion, and explicit document-skip output |
 | 1.0.0-draft | 2026-07-31 | Added contextual outline next-step guidance for exact-level filtering, source lines, extraction, expansion, and help discovery |

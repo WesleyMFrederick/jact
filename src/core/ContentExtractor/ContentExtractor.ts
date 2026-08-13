@@ -166,6 +166,7 @@ export class ContentExtractor {
 					extractedContentBlocks[contentId] = {
 						content: extractedContent,
 						contentLength,
+						...(link.anchorType === null && { startLine: 1 }),
 						sourceLinks: [],
 					};
 					stats.uniqueContent++;

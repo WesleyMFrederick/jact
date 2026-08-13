@@ -484,6 +484,13 @@ export class JactCli {
 				process.exitCode = 1;
 				return undefined;
 			}
+			const startLine = resolution.match.heading.position?.start.line;
+			if (startLine === undefined) {
+				throw new Error(
+					`Cannot render line numbers: heading ${quote(headerName)} has no parser source position.`,
+				);
+			}
+
 
 			const content = document.extractResolvedSection(resolution.match);
 			if (content === null)
@@ -510,6 +517,7 @@ export class JactCli {
 			const block = {
 				content,
 				contentLength: content.length,
+				startLine,
 				sourceLinks: [
 					{
 						rawSourceLink: syntheticLink.fullMatch,

@@ -1,4 +1,21 @@
 import type { OutgoingLinksExtractedContent } from "./types/extraction-types.js";
+export interface FormatExtractOptions {
+	lineNumbers?: boolean;
+}
+
+function formatSourceLines(content: string, startLine: number): string {
+	if (content.length === 0) return content;
+
+	const lines = content.split("\n");
+	const hasTrailingNewline = content.endsWith("\n");
+	if (hasTrailingNewline) lines.pop();
+
+	const numbered = lines
+		.map((line, index) => `${String(startLine + index).padStart(6)}\t${line}`)
+		.join("\n");
+	return hasTrailingNewline ? `${numbered}\n` : numbered;
+}
+
 
 /**
  * Formats an extraction result as either JSON or raw markdown.
@@ -7,12 +24,14 @@ import type { OutgoingLinksExtractedContent } from "./types/extraction-types.js"
  *
  * @param result - The extraction result containing content blocks and metadata.
  * @param format - Output format: "json" for full JSON, "markdown" for raw content.
+ * @param options - Presentation options for markdown output.
  * @returns Formatted string for stdout output.
  */
 export function formatExtractResult(
 	result: OutgoingLinksExtractedContent,
 	format: "markdown" | "json",
 	mode: "minimal" | "verbose" = "minimal",
+	options: FormatExtractOptions = {},
 ): string {
 	switch (format) {
 		case "json": {
@@ -30,7 +49,13 @@ export function formatExtractResult(
 					if (typeof block === "number") {
 						return undefined;
 					}
-					return block.content;
+					if (!options.lineNumbers) return block.content;
+					if (block.startLine === undefined) {
+						throw new Error(
+							"Cannot render line numbers: extracted content has no source start line.",
+						);
+					}
+					return formatSourceLines(block.content, block.startLine);
 				})
 				.filter((content): content is string => content !== undefined);
 

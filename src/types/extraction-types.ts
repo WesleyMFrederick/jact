@@ -27,6 +27,8 @@ export interface SourceLinkEntry {
 export interface ExtractedContentBlock {
 	content: string;
 	contentLength: number;
+	/** One-based source line containing the first character of content. */
+	startLine?: number;
 	sourceLinks?: SourceLinkEntry[];
 }
 

@@ -37,7 +37,7 @@ afterAll(() => {
 describe("extract file — default scope inference", () => {
 	it("given cwd inside jact repo and no --scope flag, when extract file <name> runs, then succeeds without error", async () => {
 		const { stdout, stderr } = await execAsync(
-			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}"`,
+			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --format json`,
 			{ cwd: JACT_ROOT },
 		);
 		const result = JSON.parse(stdout);
@@ -47,7 +47,7 @@ describe("extract file — default scope inference", () => {
 
 	it("given cwd inside jact repo and --scope passed, when extract file runs, then explicit scope wins (matches D1 source: 'explicit')", async () => {
 		const { stdout } = await execAsync(
-			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --scope "${JACT_ROOT}"`,
+			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --scope "${JACT_ROOT}" --format json`,
 			{ cwd: JACT_ROOT },
 		);
 		const result = JSON.parse(stdout);
@@ -57,7 +57,7 @@ describe("extract file — default scope inference", () => {
 	it("given cwd outside any project + no --scope + targetFile inside a repo, when extract file runs, then succeeds via target-walk-up", async () => {
 		// cwd = tmpDir (no .git / package.json); targetFile = jact CLAUDE.md (inside jact .git repo)
 		const { stdout, stderr } = await execAsync(
-			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}"`,
+			`node "${CLI_PATH}" extract file "${JACT_CLAUDE_MD}" --format json`,
 			{ cwd: tmpDir },
 		);
 		const result = JSON.parse(stdout);
@@ -87,8 +87,8 @@ describe("extract header — default scope inference", () => {
 			`node "${CLI_PATH}" extract header "${JACT_CLAUDE_MD}" "Project Overview"`,
 			{ cwd: JACT_ROOT },
 		);
-		// Should produce JSON output (even if header not found, no crash)
-		expect(stdout.length).toBeGreaterThan(0);
+		// Successful default output is numbered markdown.
+		expect(stdout).toMatch(/^\s+\d+\t/);
 	});
 });
 

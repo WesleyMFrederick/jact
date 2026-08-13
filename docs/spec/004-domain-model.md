@@ -205,6 +205,7 @@ export interface EligibilityDecision {
 export interface ExtractedContentBlock {
 	content: string;
 	contentLength: number;
+	startLine?: number; // one-based source line for the first content line
 	sourceLinks?: SourceLinkEntry[]; // { rawSourceLink, sourceLine }
 }
 
@@ -284,5 +285,6 @@ ProcessedLinkEntry 1───1 EnrichedLinkObject (sourceLink)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-08-13 | Added optional extracted-content start lines for source-numbered command output |
 | 1.0.0-draft | 2026-08-02 | Added parser disable state, structured duplicate-path diagnostics, and skipped batch results |
 | 1.0.0-draft | 2026-07-01 | Initial domain model, grounded in `src/types/*.ts` |

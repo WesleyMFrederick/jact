@@ -180,17 +180,17 @@ This is equivalent to: `npm run jact:validate path/to/file.md -- --format json |
 Extract entire file content directly without requiring a source document containing links:
 
 ```bash
-# Extract complete file content
+# Extract complete file content with original source line numbers
 node tools/jact/src/jact.js extract file docs/architecture.md
 
 # Extract with scope restriction for filename resolution
 node tools/jact/src/jact.js extract file architecture.md --scope ./docs
 
-# Pipe output to jq for content filtering
-node tools/jact/src/jact.js extract file file.md | jq '.extractedContentBlocks'
+# Request structured JSON for content filtering
+node tools/jact/src/jact.js extract file file.md --format json | jq '.extractedContentBlocks'
 ```
 
-**Output Format**: JSON OutgoingLinksExtractedContent structure with deduplicated content blocks
+**Output Format**: `cat -n`-formatted Markdown by default. Use `--format json` for the `OutgoingLinksExtractedContent` structure with raw, unnumbered content.
 
 **Exit Codes**:
 - `0`: File extracted successfully

@@ -28,17 +28,18 @@ describe("extract header --format flag", () => {
 		rmSync(testDir, { recursive: true, force: true });
 	});
 
-	it("default output (no --format flag) is raw markdown, NOT JSON", () => {
+	it("defaults to numbered markdown using original source lines", () => {
 		writeFileSync(join(testDir, "source.md"), SOURCE_MD_CONTENT);
 		const output = execSync(
 			`node "${CLI_PATH}" extract header "${join(testDir, "source.md")}" "Overview" --scope "${testDir}"`,
 			{ encoding: "utf8" },
 		);
 
-		// Default should be raw markdown — not parseable as JSON
 		expect(() => JSON.parse(output)).toThrow();
-		// Should contain the actual markdown content
-		expect(output).toContain("This is the overview content.");
+		expect(output).toContain("     3\t## Overview");
+		expect(output).toContain("     5\tThis is the overview content.");
+		expect(output).toContain("     7\tWith multiple lines.");
+		expect(output).not.toContain("## Other");
 	});
 
 	it("--format json returns valid JSON with OutgoingLinksExtractedContent structure", () => {
@@ -72,7 +73,7 @@ describe("extract header --format flag", () => {
 		expect(explicitOutput).toBe(defaultOutput);
 	});
 
-	it("markdown content matches what JSON extractedContentBlocks[id].content would return", () => {
+	it("keeps JSON content raw while markdown adds source line prefixes", () => {
 		writeFileSync(join(testDir, "source.md"), SOURCE_MD_CONTENT);
 		const jsonOutput = execSync(
 			`node "${CLI_PATH}" extract header "${join(testDir, "source.md")}" "Overview" --scope "${testDir}" --format json`,
@@ -85,15 +86,13 @@ describe("extract header --format flag", () => {
 		);
 
 		const result = JSON.parse(jsonOutput);
-		const blockKeys = Object.keys(result.extractedContentBlocks).filter(
-			(k) => k !== "_totalContentCharacterLength",
+		const blockKey = Object.keys(result.extractedContentBlocks).find(
+			(key) => key !== "_totalContentCharacterLength",
 		);
-		const blockContent = blockKeys
-			.map((k) => result.extractedContentBlocks[k].content)
-			.join("\n---\n");
-
-		// Markdown output should match the content extracted from JSON blocks
-		// Both trimmed: console.log adds trailing \n, and block content may have trailing whitespace
-		expect(markdownOutput.trimEnd()).toBe(blockContent.trimEnd());
+		if (blockKey === undefined) throw new Error("Expected extracted content block");
+		expect(
+			result.extractedContentBlocks[blockKey].content.startsWith("## Overview"),
+		).toBe(true);
+		expect(markdownOutput.startsWith("     3\t## Overview")).toBe(true);
 	});
 });
