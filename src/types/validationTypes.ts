@@ -51,6 +51,25 @@ export interface DuplicatePathSuggestion {
 	debugInfo: string;
 }
 
+export interface ResolvedCitationTarget {
+	filePath: string;
+	kind: "header" | "block";
+	nodeId: string;
+	line: number;
+	column: number;
+	heading?: string;
+	blockId?: string;
+}
+
+export type CitationTargetResolution =
+	| { status: "resolved"; target: ResolvedCitationTarget }
+	| {
+			status: "ambiguous";
+			candidates: ResolvedCitationTarget[];
+			reason: string;
+	  }
+	| { status: "failed"; reason: string; targetFile?: string };
+
 /**
  * ValidationMetadata - Discriminated union based on status
  *

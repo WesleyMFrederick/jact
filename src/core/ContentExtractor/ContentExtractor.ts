@@ -3,6 +3,7 @@ import type { CliFlags } from "../../types/cli-types.js";
 import type {
 	EligibilityDecision,
 	ExtractedContentBlock,
+	ExtractionRunOptions,
 	ExtractionStats,
 	OutgoingLinksExtractedContent,
 	ProcessedLinkEntry,
@@ -68,11 +69,11 @@ export class ContentExtractor {
 	async extractContent(
 		enrichedLinks: EnrichedLinkObject[],
 		cliFlags: CliFlags,
+		runOptions: ExtractionRunOptions = {},
 	): Promise<OutgoingLinksExtractedContent> {
-		// AC15: Filter out internal links before processing
-		const crossDocumentLinks = enrichedLinks.filter(
-			(link) => link.scope !== "internal",
-		);
+		const candidateLinks = runOptions.includeInternal
+			? enrichedLinks
+			: enrichedLinks.filter((link) => link.scope !== "internal");
 
 		// Initialize Deduplicated Structure
 		const extractedContentBlocks: Record<string, ExtractedContentBlock> = {};
@@ -86,7 +87,7 @@ export class ContentExtractor {
 		};
 
 		// Process each link with deduplication
-		for (const link of crossDocumentLinks) {
+		for (const link of candidateLinks) {
 			stats.totalLinks++;
 
 			// AC4: Skip validation errors

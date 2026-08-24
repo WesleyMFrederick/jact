@@ -210,6 +210,23 @@ describe("ParsedDocument Content Extraction", () => {
 			expect(section).not.toBeNull();
 			expect(section).toContain("Normal Heading");
 		});
+
+		it("returns parser-bounded section links and inclusive source lines", () => {
+			const doc = docFromMarkdown(
+				"# Doc\n\n## Root\n\n[Local](#Local)\n\n## Next\n\n[Root](#Root)\n\n## Local\n\nContent.\n",
+			);
+			const resolution = doc.resolveHeading("Root");
+			if (resolution.status !== "unique") {
+				throw new Error("Expected Root to resolve uniquely");
+			}
+
+			const section = doc.getResolvedSection(resolution.match);
+
+			expect(section).toMatchObject({ startLine: 3, endLine: 5 });
+			expect(section.links).toHaveLength(1);
+			expect(section.links[0].fullMatch).toBe("[Local](#Local)");
+			expect(section.content).not.toContain("## Next");
+		});
 	});
 
 	describe("extractBlock", () => {

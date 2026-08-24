@@ -22,6 +22,7 @@ import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/
 import { ForceMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
 import { SectionLinkStrategy } from "../core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
 import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import { LinkedHeaderContextQuery } from "../core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
 import { MarkdownParser } from "../core/MarkdownParser/index.js";
 import { FileCache } from "../FileCache.js";
 import { ParsedFileCache } from "../ParsedFileCache.js";
@@ -29,8 +30,8 @@ import type {
 	FileCacheLike,
 	ParsedDocumentLifecycleLike,
 } from "../types/componentInterfaces.js";
-import { ValidationWorkflow } from "../validate/validation-workflow.js";
 import type { ExtractionEligibilityStrategy } from "../types/strategy-types.js";
+import { ValidationWorkflow } from "../validate/validation-workflow.js";
 
 /**
  * Create markdown parser with file system dependency
@@ -115,6 +116,21 @@ export function createContentExtractor(
 		new CliFlagStrategy(),
 	];
 	return new ContentExtractor(eligibilityStrategies, lifecycle);
+}
+
+export function createLinkedHeaderContextQuery(
+	parsedDocuments: ParsedFileCache | null = null,
+	fileCache: FileCache | null = null,
+	validator: CitationValidator | null = null,
+	contentExtractor: ContentExtractor | null = null,
+): LinkedHeaderContextQuery {
+	const cache = fileCache || createFileCache();
+	const lifecycle =
+		parsedDocuments || createParsedFileCache(createMarkdownParser(cache));
+	const citationValidator =
+		validator || createCitationValidator(lifecycle, cache);
+	const extractor = contentExtractor || createContentExtractor(lifecycle);
+	return new LinkedHeaderContextQuery(lifecycle, citationValidator, extractor);
 }
 
 export function createValidationWorkflow(

@@ -7,7 +7,7 @@
  * @module jact
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import {
 	checkOutlineReminderCache,
@@ -20,6 +20,7 @@ import {
 } from "./core/apply-citation-fixes.js";
 import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
+import type { LinkedHeaderContextQuery } from "./core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
 import { generateContentId } from "./core/ContentExtractor/generateContentId.js";
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "./core/prepare-scope.js";
@@ -33,6 +34,7 @@ import {
 	createCitationValidator,
 	createContentExtractor,
 	createFileCache,
+	createLinkedHeaderContextQuery,
 	createMarkdownParser,
 	createParsedFileCache,
 	createValidationWorkflow,
@@ -51,7 +53,10 @@ import type {
 	CliRenameOptions,
 	CliValidateOptions,
 } from "./types/cli-types.js";
-import type { OutgoingLinksExtractedContent } from "./types/extraction-types.js";
+import type {
+	HeaderExtractionResult,
+	OutgoingLinksExtractedContent,
+} from "./types/extraction-types.js";
 import type { CacheStats } from "./types/fileCacheTypes.js";
 import type {
 	EnrichedLinkObject,
@@ -125,6 +130,7 @@ export class JactCli {
 	private fileCache: FileCache;
 	private validator: CitationValidator;
 	private contentExtractor: ContentExtractor;
+	private linkedHeaderContextQuery: LinkedHeaderContextQuery;
 	private validationWorkflow: ValidationWorkflow;
 
 	constructor() {
@@ -136,6 +142,12 @@ export class JactCli {
 			this.fileCache,
 		);
 		this.contentExtractor = createContentExtractor(this.parsedFileCache);
+		this.linkedHeaderContextQuery = createLinkedHeaderContextQuery(
+			this.parsedFileCache,
+			this.fileCache,
+			this.validator,
+			this.contentExtractor,
+		);
 		this.validationWorkflow = createValidationWorkflow(
 			this.parsedFileCache,
 			this.fileCache,
@@ -188,6 +200,12 @@ export class JactCli {
 		options: { scope?: string },
 	): Promise<ParsedDocument> {
 		this.applyScope(options, filePath);
+		return this.resolveDocumentFromPreparedScope(filePath);
+	}
+
+	private async resolveDocumentFromPreparedScope(
+		filePath: string,
+	): Promise<ParsedDocument> {
 		const absolute = path.resolve(filePath);
 		if (existsSync(absolute)) {
 			return this.parsedFileCache.resolveDocument({
@@ -207,6 +225,7 @@ export class JactCli {
 			(err as Error & { suggestion?: string }).suggestion = cacheResult.message;
 		}
 		throw err;
+
 	}
 
 	/** Validate citations in a markdown file and return a formatted report. */
@@ -466,9 +485,36 @@ export class JactCli {
 		targetFile: string,
 		headerName: string,
 		options: CliExtractOptions,
-	): Promise<OutgoingLinksExtractedContent | undefined> {
+	): Promise<HeaderExtractionResult | undefined> {
 		try {
-			const document = await this.resolveDocument(targetFile, options);
+			let scopeStats: CacheStats | undefined;
+			let document: ParsedDocument;
+			if (options.linkedContext) {
+				scopeStats = this.applyScope(options, targetFile);
+				const absoluteTarget = path.resolve(targetFile);
+				const linkedTarget = existsSync(absoluteTarget)
+					? realpathSync(absoluteTarget)
+					: targetFile;
+				document = await this.resolveDocumentFromPreparedScope(linkedTarget);
+				const canonicalTarget = realpathSync(document.data.filePath);
+				const relativeTarget = path.relative(
+					scopeStats.realScopeFolder,
+					canonicalTarget,
+				);
+				if (
+					relativeTarget === ".." ||
+					relativeTarget.startsWith(`..${path.sep}`) ||
+					path.isAbsolute(relativeTarget)
+				) {
+					console.error(
+						`Target file is outside the resolved scope. Retry with --scope ${quote(path.dirname(canonicalTarget))}.`,
+					);
+					process.exitCode = 1;
+					return undefined;
+				}
+			} else {
+				document = await this.resolveDocument(targetFile, options);
+			}
 			const parsed = document.data;
 			const resolution = document.resolveHeading(headerName, {
 				...(options.within !== undefined && { within: options.within }),
@@ -489,6 +535,20 @@ export class JactCli {
 				}
 				process.exitCode = 1;
 				return undefined;
+			}
+			if (options.linkedContext) {
+				if (scopeStats === undefined) {
+					throw new Error("Linked context scope was not prepared");
+				}
+				const result = await this.linkedHeaderContextQuery.execute({
+					rootDocument: document,
+					rootHeading: resolution.match,
+					scopePath: scopeStats.scopeFolder,
+					scopeFiles: this.fileCache.getAllFiles().map((entry) => entry.path),
+					respectGitignore: true,
+				});
+				if (!result.complete) process.exitCode = 1;
+				return result;
 			}
 			const startLine = resolution.match.heading.position?.start.line;
 			if (startLine === undefined) {

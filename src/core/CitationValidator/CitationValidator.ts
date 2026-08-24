@@ -12,9 +12,11 @@
 import type { LinkObject } from "../../types/citationTypes.js";
 import type {
 	AnchorConversion,
+	CitationTargetResolution,
 	DuplicatePathSuggestion,
 	EnrichedLinkObject,
 	PathConversion,
+	ResolvedCitationTarget,
 	ValidationMetadata,
 	ValidationResult,
 } from "../../types/validationTypes.js";
@@ -83,12 +85,14 @@ const EMPHASIS_MARKED_EXAMPLES = [
 
 export class CitationValidator {
 	private pathResolver: PathResolver;
+	private parsedDocumentLifecycle: ParsedDocumentLifecycleLike;
 	private anchorMatcher: AnchorMatcher;
 
 	constructor(
 		parsedDocumentLifecycle: ParsedDocumentLifecycleLike,
 		fileCache: FileCacheInterface,
 	) {
+		this.parsedDocumentLifecycle = parsedDocumentLifecycle;
 		this.pathResolver = new PathResolver(fileCache);
 		this.anchorMatcher = new AnchorMatcher(parsedDocumentLifecycle);
 	}
@@ -163,6 +167,96 @@ export class CitationValidator {
 		}
 
 		return enrichLinkObject(citation, validation);
+	}
+
+	async resolveCitationTarget(
+		citation: LinkObject,
+		sourceFile: string,
+	): Promise<CitationTargetResolution> {
+		if (citation.anchorType === null || citation.target.anchor === null) {
+			return {
+				status: "failed",
+				reason: "Linked context follows section and block links only",
+			};
+		}
+
+		let targetFile: string;
+		if (citation.scope === "internal") {
+			targetFile = sourceFile;
+		} else {
+			const pathOutcome = this.pathResolver.resolveCitationPath(
+				citation,
+				sourceFile,
+			);
+			if (pathOutcome.kind !== "resolved") {
+				return { status: "failed", reason: pathOutcome.error };
+			}
+			targetFile = pathOutcome.targetPath;
+		}
+
+		try {
+			const document = await this.parsedDocumentLifecycle.resolveDocument({
+				kind: "file",
+				filePath: targetFile,
+			});
+			const matches = this.anchorMatcher.findMatchingAnchors(
+				citation.target.anchor,
+				document.data.anchors.filter(
+					(anchor) => anchor.anchorType === citation.anchorType,
+				),
+			);
+			const targets: ResolvedCitationTarget[] = [];
+			for (const { anchor } of matches) {
+				if (anchor.anchorType === "block") {
+					targets.push({
+						filePath: document.data.filePath,
+						kind: "block",
+						nodeId: `block:${anchor.id}:${anchor.line}:${anchor.column}`,
+						line: anchor.line,
+						column: anchor.column,
+						blockId: anchor.id,
+					});
+					continue;
+				}
+
+				const headingIndex = document.data.headings.findIndex(
+					(heading) => heading.position?.start.line === anchor.line,
+				);
+				const heading = document.data.headings[headingIndex];
+				if (headingIndex < 0 || heading === undefined) continue;
+				targets.push({
+					filePath: document.data.filePath,
+					kind: "header",
+					nodeId: `header:${headingIndex}`,
+					line: anchor.line,
+					column: anchor.column,
+					heading: heading.text,
+				});
+			}
+
+			if (targets.length === 1) {
+				const target = targets[0];
+				if (target !== undefined) return { status: "resolved", target };
+			}
+			if (targets.length > 1) {
+				return {
+					status: "ambiguous",
+					candidates: targets,
+					reason: `Anchor resolves to ${targets.length} targets: ${citation.target.anchor}`,
+				};
+			}
+			return {
+				status: "failed",
+				targetFile: document.data.filePath,
+				reason: `Anchor not found: ${citation.target.anchor}`,
+			};
+		} catch (error) {
+			return {
+				status: "failed",
+				targetFile,
+				reason: error instanceof Error ? error.message : String(error),
+			};
+		}
 	}
 
 	// ── Pattern classification ────────────────────────────────────────────────

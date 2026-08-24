@@ -20,6 +20,15 @@ interface InlineNode {
 	children?: InlineNode[];
 }
 
+// Assembled once per process: extension composition is pure and reusable, and
+// per-call assembly dominated CPU profiles (672k rebuilds in one CLI run).
+const inlineSyntaxExtension = jactSyntaxExtension();
+const inlineMdastExtensions = jactMdastExtensions();
+
+// Anchor/heading fragments repeat heavily across fuzzy-match comparisons;
+// memoizing turns O(comparisons) parses into O(unique fragments).
+const stripCache = new Map<string, string>();
+
 /**
  * Strip markdown formatting from a text fragment by tokenizing it and
  * concatenating the plain text the tree holds.
@@ -35,11 +44,15 @@ interface InlineNode {
  */
 export function stripInlineMarkdown(text: string): string {
 	if (!text) return "";
+	const cached = stripCache.get(text);
+	if (cached !== undefined) return cached;
 	const tree = fromMarkdown(text, {
-		extensions: [jactSyntaxExtension()],
-		mdastExtensions: jactMdastExtensions(),
+		extensions: [inlineSyntaxExtension],
+		mdastExtensions: inlineMdastExtensions,
 	}) as unknown as InlineNode;
-	return collectPlainText(tree).trim();
+	const result = collectPlainText(tree).trim();
+	stripCache.set(text, result);
+	return result;
 }
 
 function collectPlainText(node: InlineNode): string {

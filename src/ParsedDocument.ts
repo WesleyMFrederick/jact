@@ -9,6 +9,7 @@ import type {
 	ParserOutput,
 } from "./types/citationTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
+import type { ResolvedSection } from "./types/extraction-types.js";
 
 export interface HeadingMatch {
 	index: number;
@@ -284,8 +285,8 @@ class ParsedDocument {
 			: null;
 	}
 
-	/** Extract one section from an already uniquely resolved heading. */
-	extractResolvedSection(match: HeadingMatch): string | null {
+	/** Return one resolved section and its parser-bounded source links. */
+	getResolvedSection(match: HeadingMatch): ResolvedSection | null {
 		const ast = this._data.ast;
 		if (!ast) return null;
 
@@ -314,10 +315,28 @@ class ParsedDocument {
 		}
 
 		const startOffset = targetNode.position?.start.offset;
-		if (startOffset === undefined) return null;
+		const startLine = targetNode.position?.start.line;
+		if (startOffset === undefined || startLine === undefined) return null;
 		const endOffset =
 			boundaryNode?.position?.start.offset ?? this._data.content.length;
-		return this._data.content.slice(startOffset, endOffset);
+		const content = this._data.content.slice(startOffset, endOffset);
+		const substantiveContent = content.trimEnd();
+		const lineCount = substantiveContent.split(/\r\n|\r|\n/).length;
+		const endLine = startLine + Math.max(lineCount - 1, 0);
+
+		return {
+			content,
+			startLine,
+			endLine,
+			links: this._data.links.filter(
+				(link) => link.line >= startLine && link.line <= endLine,
+			),
+		};
+	}
+
+	/** Extract one section from an already uniquely resolved heading. */
+	extractResolvedSection(match: HeadingMatch): string | null {
+		return this.getResolvedSection(match)?.content ?? null;
 	}
 
 	/**

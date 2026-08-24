@@ -618,6 +618,11 @@ extractCmd
 		"--within <parent>",
 		"limit heading resolution to descendants of one unique parent",
 	)
+	.option(
+		"--linked-context",
+		"include one-hop linked sections and scoped backlinks",
+		false,
+	)
 	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
 	.addOption(
 		new Option("--format <type>", "Output format")
@@ -632,11 +637,12 @@ Examples:
     $ jact extract header docs/guide.md "Overview" --scope ./docs
     $ jact extract header handbook.md "Install" --within "Guide"
     $ jact extract header file.md "Design" --format json | jq '.extractedContentBlocks'
+    $ jact extract header plan.md "Overview" --linked-context --scope ./docs
 
 Exit Codes:
-  0  Header extracted successfully
-  1  Header not found or validation failed
-  2  System error (file not found, permission denied)
+  0  Header extracted successfully; linked context is complete
+  1  Header failed to resolve, or linked context is incomplete
+  2  System error (file not found, permission denied, incomplete scope scan)
 `,
 	)
 	.action(
@@ -669,7 +675,12 @@ Exit Codes:
 					} else {
 						console.log(output);
 					}
-					process.exitCode = 0;
+					process.exitCode =
+						"mode" in result && result.mode === "linked-context"
+							? result.complete
+								? 0
+								: 1
+							: 0;
 				}
 				// Note: Error exit codes set by extractHeader() method
 			} catch (error) {

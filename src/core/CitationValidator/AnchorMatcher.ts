@@ -47,7 +47,9 @@ export class AnchorMatcher {
 	 * @param parsedDocumentLifecycle - Optional. Required only for
 	 *   validateAnchorExists(); pass null when using only pure matching helpers.
 	 */
-	constructor(parsedDocumentLifecycle: ParsedDocumentLifecycleLike | null = null) {
+	constructor(
+		parsedDocumentLifecycle: ParsedDocumentLifecycleLike | null = null,
+	) {
 		this.parsedDocumentLifecycle = parsedDocumentLifecycle;
 	}
 
@@ -72,7 +74,15 @@ export class AnchorMatcher {
 		searchAnchor: string,
 		availableAnchors: AnchorObject[],
 	): { found: boolean; matchType?: string } {
-		const cleanSearchAnchor = decodeURIComponent(searchAnchor);
+		let cleanSearchAnchor: string;
+		try {
+			cleanSearchAnchor = decodeURIComponent(searchAnchor);
+		} catch {
+			cleanSearchAnchor = searchAnchor;
+		}
+		// Cleaned once per lookup, not once per candidate anchor — cleaning is
+		// the expensive tokenizer-backed path and the search string is constant.
+		const cleanedSearch = this.cleanMarkdownForComparison(cleanSearchAnchor);
 
 		for (const anchorObj of availableAnchors) {
 			const anchorText = anchorObj.id;
@@ -111,7 +121,6 @@ export class AnchorMatcher {
 			const cleanedHeader = this.cleanMarkdownForComparison(
 				rawText || anchorText,
 			);
-			const cleanedSearch = this.cleanMarkdownForComparison(cleanSearchAnchor);
 
 			if (cleanedHeader === cleanedSearch) {
 				return { found: true, matchType: "markdown-cleaned" };
@@ -119,6 +128,78 @@ export class AnchorMatcher {
 		}
 
 		return { found: false };
+	}
+
+	findMatchingAnchors(
+		searchAnchor: string,
+		availableAnchors: AnchorObject[],
+	): Array<{ anchor: AnchorObject; matchType?: string }> {
+		let decodedSearchAnchor: string;
+		try {
+			decodedSearchAnchor = decodeURIComponent(searchAnchor);
+		} catch {
+			decodedSearchAnchor = searchAnchor;
+		}
+		const blockSearchAnchor = decodedSearchAnchor.startsWith("^")
+			? decodedSearchAnchor.slice(1)
+			: decodedSearchAnchor;
+
+		return availableAnchors.flatMap((anchor) => {
+			if (
+				anchor.id === searchAnchor ||
+				anchor.id === decodedSearchAnchor ||
+				(anchor.anchorType === "block" && anchor.id === blockSearchAnchor)
+			) {
+				return [
+					{
+						anchor,
+						matchType:
+							anchor.anchorType === "block" &&
+							decodedSearchAnchor.startsWith("^")
+								? "block-ref"
+								: "exact",
+					},
+				];
+			}
+
+			if (anchor.anchorType === "header") {
+				let decodedUrlEncodedId: string;
+				try {
+					decodedUrlEncodedId = decodeURIComponent(anchor.urlEncodedId);
+				} catch {
+					decodedUrlEncodedId = anchor.urlEncodedId;
+				}
+				if (
+					anchor.urlEncodedId === searchAnchor ||
+					decodedUrlEncodedId === decodedSearchAnchor
+				) {
+					return [{ anchor, matchType: "url-encoded" }];
+				}
+
+				const normalizedId = normalizeAnchorText(anchor.id, {
+					stripMarkdown: false,
+					colons: "strip",
+				});
+				const normalizedSearch = normalizeAnchorText(decodedSearchAnchor, {
+					stripMarkdown: false,
+					colons: "strip",
+				});
+				if (normalizedId === normalizedSearch) {
+					return [{ anchor, matchType: "normalized" }];
+				}
+			}
+
+			const match = this.findFlexibleAnchorMatch(decodedSearchAnchor, [anchor]);
+			if (!match.found) return [];
+			return [
+				{
+					anchor,
+					...(match.matchType !== undefined && {
+						matchType: match.matchType,
+					}),
+				},
+			];
+		});
 	}
 
 	suggestObsidianBetterFormat(
@@ -192,6 +273,7 @@ export class AnchorMatcher {
 		suggestion?: string;
 		matchedAs?: string;
 		anchorConversion?: AnchorConversion;
+		matchedAnchors?: AnchorObject[];
 	}> {
 		if (!this.parsedDocumentLifecycle) {
 			throw new Error(
@@ -200,37 +282,48 @@ export class AnchorMatcher {
 		}
 
 		try {
-			const targetParsedDoc = await this.parsedDocumentLifecycle.resolveDocument({
-				kind: "file",
-				filePath: targetFile,
-			});
+			const targetParsedDoc =
+				await this.parsedDocumentLifecycle.resolveDocument({
+					kind: "file",
+					filePath: targetFile,
+				});
 
-			// Direct semantic-document match
-			if (targetParsedDoc.hasAnchor(anchor)) {
-				// Check block anchor matched without caret prefix (Issue #81)
+			const matches = this.findMatchingAnchors(
+				anchor,
+				targetParsedDoc.data.anchors,
+			);
+			if (matches.length > 0) {
+				const matchedAnchors = matches.map((match) => match.anchor);
 				if (!anchor.startsWith("^") && !options?.isBlockRef) {
-					const matchedBlockAnchor = targetParsedDoc.data.anchors.find(
-						(a) => a.anchorType === "block" && a.id === anchor,
+					const matchedBlockAnchor = matchedAnchors.find(
+						(candidate) => candidate.anchorType === "block",
 					);
-					if (matchedBlockAnchor) {
-						const hasHeaderMatch = targetParsedDoc.data.anchors.some(
-							(a) => a.anchorType === "header" && a.id === anchor,
-						);
-						if (!hasHeaderMatch) {
-							return {
-								valid: true,
-								matchedAs: "block-ref-missing-caret",
-								suggestion: `Use #^${anchor} for block anchor references`,
-							};
-						}
+					const hasHeaderMatch = matchedAnchors.some(
+						(candidate) => candidate.anchorType === "header",
+					);
+					if (matchedBlockAnchor !== undefined && !hasHeaderMatch) {
+						return {
+							valid: true,
+							matchedAs: "block-ref-missing-caret",
+							suggestion: `Use #^${anchor} for block anchor references`,
+							matchedAnchors,
+						};
 					}
 				}
 
-				// Check for Obsidian better format suggestion
-				const obsidianBetterSuggestion = this.suggestObsidianBetterFormat(
-					anchor,
-					targetParsedDoc.data.anchors,
+				const directSemanticMatch = matches.some(
+					({ matchType }) =>
+						matchType === "exact" ||
+						matchType === "url-encoded" ||
+						matchType === "normalized" ||
+						matchType === "block-ref",
 				);
+				const obsidianBetterSuggestion = directSemanticMatch
+					? this.suggestObsidianBetterFormat(
+							anchor,
+							targetParsedDoc.data.anchors,
+						)
+					: null;
 				if (obsidianBetterSuggestion) {
 					return {
 						valid: false,
@@ -240,38 +333,16 @@ export class AnchorMatcher {
 							original: anchor,
 							recommended: obsidianBetterSuggestion,
 						},
+						matchedAnchors,
 					};
 				}
-				return { valid: true };
-			}
 
-			// URL-decoded match for emphasis-marked anchors
-			if (anchor.includes("%20")) {
-				const decoded = decodeURIComponent(anchor);
-				if (targetParsedDoc.hasAnchor(decoded)) {
-					return { valid: true };
-				}
-			}
-
-			// Obsidian block reference matching (^ prefix)
-			if (anchor.startsWith("^")) {
-				const blockRefName = anchor.substring(1);
-				if (targetParsedDoc.hasAnchor(blockRefName)) {
-					return { valid: true, matchedAs: "block-ref" };
-				}
-			}
-
-			// Flexible markdown matching
-			const flexibleMatch = this.findFlexibleAnchorMatch(
-				anchor,
-				targetParsedDoc.data.anchors,
-			);
-			if (flexibleMatch.found) {
+				const matchType = matches[0]?.matchType;
 				return {
 					valid: true,
-					...(flexibleMatch.matchType && {
-						matchedAs: flexibleMatch.matchType,
-					}),
+					matchedAnchors,
+					...(matchType !== undefined &&
+						matchType !== "exact" && { matchedAs: matchType }),
 				};
 			}
 

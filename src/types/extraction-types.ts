@@ -2,6 +2,9 @@
  * Extraction result and eligibility types.
  */
 
+import type ParsedDocument from "../ParsedDocument.js";
+import type { HeadingMatch } from "../ParsedDocument.js";
+import type { LinkObject } from "./citationTypes.js";
 import type { EnrichedLinkObject } from "./validationTypes.js";
 
 /**
@@ -78,3 +81,97 @@ export interface OutgoingLinksExtractedContent {
 	outgoingLinksReport: OutgoingLinksReport;
 	stats: ExtractionStats;
 }
+
+export interface ExtractionRunOptions {
+	includeInternal?: boolean;
+}
+
+export interface ResolvedSection {
+	content: string;
+	startLine: number;
+	endLine: number;
+	links: readonly LinkObject[];
+}
+
+export interface LinkedHeaderContextInput {
+	rootDocument: ParsedDocument;
+	rootHeading: HeadingMatch;
+	scopePath: string;
+	scopeFiles: readonly string[];
+	respectGitignore: boolean;
+}
+
+export interface LinkedContextSourcePosition {
+	file: string;
+	line: number;
+	column: number;
+	raw: string;
+}
+
+export interface LinkedContentSource {
+	file: string;
+	kind: "header" | "block";
+	heading?: string;
+	blockId?: string;
+	startLine: number;
+	endLine: number;
+}
+
+export interface LinkedExtractedContentBlock extends ExtractedContentBlock {
+	source: LinkedContentSource;
+}
+
+export interface LinkedContextTarget {
+	file: string;
+	kind: "header" | "block";
+	heading?: string;
+	blockId?: string;
+}
+
+export interface LinkedContextOutgoingLink {
+	source: LinkedContextSourcePosition;
+	target?: LinkedContextTarget;
+	status: "extracted" | "deduplicated" | "not-followed" | "failed";
+	contentId?: string;
+	reason?: string;
+}
+
+export interface LinkedContextBacklink {
+	source: LinkedContextSourcePosition;
+	target: LinkedContextTarget;
+}
+
+export interface LinkedContextFailure {
+	source?: LinkedContextSourcePosition;
+	reason: string;
+}
+
+export interface LinkedHeaderContextResult {
+	mode: "linked-context";
+	complete: boolean;
+	scope: {
+		path: string;
+		filesScanned: number;
+		respectGitignore: boolean;
+	};
+	root: {
+		contentId: string;
+		source: LinkedContentSource;
+	};
+	extractedContentBlocks: {
+		_totalContentCharacterLength: number;
+		[contentId: string]: LinkedExtractedContentBlock | number;
+	};
+	outgoingLinks: LinkedContextOutgoingLink[];
+	backlinks: LinkedContextBacklink[];
+	failures: LinkedContextFailure[];
+	stats: {
+		directLinks: number;
+		uniqueLinkedContent: number;
+		backlinks: number;
+	};
+}
+
+export type HeaderExtractionResult =
+	| OutgoingLinksExtractedContent
+	| LinkedHeaderContextResult;

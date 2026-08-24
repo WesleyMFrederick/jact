@@ -80,6 +80,40 @@ describe("ContentExtractor", () => {
 		expect(result.stats.uniqueContent).toBe(1);
 	});
 
+	it("keeps internal links excluded by default and extracts them only per call", async () => {
+		const resolveDocument = vi.fn().mockResolvedValue({
+			extractSection: () => "## Local\n\nLocal content.\n",
+		});
+		const extractor = new ContentExtractor(
+			[new SectionLinkStrategy()],
+			{ resolveDocument },
+		);
+		const internalLink = {
+			scope: "internal",
+			anchorType: "header",
+			validation: { status: "valid" },
+			target: {
+				path: { absolute: "/virtual/source.md" },
+				anchor: "Local",
+			},
+			fullMatch: "[Local](#Local)",
+			line: 1,
+			column: 1,
+			extractionMarker: null,
+		};
+
+		const defaultResult = await extractor.extractContent([internalLink], {});
+		const linkedResult = await extractor.extractContent(
+			[internalLink],
+			{},
+			{ includeInternal: true },
+		);
+
+		expect(defaultResult.stats.totalLinks).toBe(0);
+		expect(linkedResult.stats.uniqueContent).toBe(1);
+		expect(resolveDocument).toHaveBeenCalledTimes(1);
+	});
+
 	it("exposes one extraction operation with the production result contract", async () => {
 		const extractor = new ContentExtractor([], { resolveDocument: vi.fn() });
 
