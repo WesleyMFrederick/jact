@@ -87,6 +87,7 @@ createFileCache(): FileCache
 createParsedFileCache(parser?: MarkdownParser | null): ParsedFileCache
 createCitationValidator(parsedFileCache?, fileCache?): CitationValidator
 createContentExtractor(parsedFileCache?, citationValidator?, strategies?): ContentExtractor
+createLinkedHeaderContextQuery(parsedFileCache?, fileCache?, validator?, contentExtractor?, candidateFilter?): LinkedHeaderContextQuery
 ```
 
 `createContentExtractor` wires the eligibility strategy chain in fixed precedence order: `[StopMarkerStrategy, ForceMarkerStrategy, SectionLinkStrategy, CliFlagStrategy]` — see the Behavior section for what each does. This is the seam tests use to inject fakes without importing concrete production classes (`FileCacheLike`/`ParsedFileCacheLike` interfaces in `src/types/componentInterfaces.ts` exist for exactly this purpose).
@@ -94,6 +95,15 @@ createContentExtractor(parsedFileCache?, citationValidator?, strategies?): Conte
 `LinkObjectFactory` (`src/factories/LinkObjectFactory.ts`) is a separate, smaller factory used only by the CLI's `extract header`/`extract file` commands to build a synthetic `LinkObject` from CLI string arguments (`createHeaderLink`, `createFileLink`) before handing it to `CitationValidator.validateSingleCitation()` — the same validation path real parsed links go through.
 
 ---
+
+### BacklinkCandidateFilter (`src/core/LinkedHeaderContext/BacklinkCandidateFilter.ts`)
+
+Screens the resolved scope before linked-context backlink parsing. `selectCandidates(scopeFiles, rootFilePath)` reads each non-root file once and keeps files containing the root filename stem in decoded or percent-encoded form, case-insensitively. The root file is always kept so internal links remain discoverable.
+
+This component can only exclude parse candidates; it does not create backlink facts. `LinkedHeaderContextQuery` still parses every candidate and confirms links through `CitationValidator.resolveCitationTarget()`. Unreadable files, an empty stem, or a filter failure fall back to exhaustive parsing. `scope.filesScanned` continues to report the full resolved scope size.
+
+---
+
 
 ### MarkdownParser (`src/core/MarkdownParser/`)
 
@@ -242,4 +252,5 @@ Added as an orchestration layer over the same single-file `CitationValidator` �
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-08-24 | Added the stateless backlink candidate filter and its excludes-only correctness boundary |
 | 1.0.0-draft | 2026-07-01 | Initial architecture doc, replacing per-component design-docs guides |

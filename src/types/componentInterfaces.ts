@@ -15,6 +15,7 @@
 
 export type { ParsedDocumentLifecycleLike } from "../core/CitationValidator/AnchorMatcher.js";
 export type { FileCacheLike } from "../core/CitationValidator/PathResolver.js";
+export type { BacklinkCandidateFilterLike } from "../core/LinkedHeaderContext/BacklinkCandidateFilter.js";
 export type { LinkedHeaderContextQueryLike } from "../core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
 export type {
 	CitationTargetResolution,

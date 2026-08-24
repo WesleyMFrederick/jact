@@ -41,6 +41,12 @@ Batch mode (`src/cli.ts`) is a distinct orchestration path over the same validat
 
 When the scope resolves via `.obsidian` (not an explicit `--scope`), `JactCli` emits a notice: *"Scoped to `<dir>` (nearest Obsidian vault). Override with --scope <dir>."* — surfacing the default instead of hiding it.
 
+## Linked-context Backlink Discovery
+
+`extract header ... --linked-context` begins with the complete file list produced by [Scope Resolution Order](#Scope%20Resolution%20Order). Before parsing backlinks, `BacklinkCandidateFilter` reads each file as text and keeps files containing the root filename stem in decoded or percent-encoded form, case-insensitively. It always keeps the root file so same-file header links remain discoverable.
+
+The screen is excludes-only. Every candidate is parsed and every possible backlink is resolved through `CitationValidator.resolveCitationTarget()` before it can appear in the result. Unreadable files, an empty root stem, and candidate-filter failures use exhaustive parsing instead. Output, failures, exit codes, and `scope.filesScanned` therefore retain exhaustive-scan semantics.
+
 ## Path Resolution Strategy Order (cross-document links)
 
 `CitationValidator.validateCrossDocumentLink()` iterates `defaultPathResolutionStrategies` (`src/core/CitationValidator/pathResolutionStrategies/index.ts:32-38`) and returns the first non-null result:
@@ -99,6 +105,7 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-08-24 | Added byte-screened backlink candidates with exhaustive fallback and unchanged output semantics |
 | 1.0.0-draft | 2026-08-02 | Added progressive disclosure for batches above five errors while preserving complete verbose/JSON output and existing exit-code semantics |
 | 1.0.0-draft | 2026-08-02 | Added bounded duplicate diagnostics and parser-derived document opt-out across validation, batch, stdin, and fix |
 | 1.0.0-draft | 2026-07-01 | Initial behavior doc, grounded in `src/jact-cli.ts`, `src/core/CitationValidator/*`, `src/core/ContentExtractor/*`, `src/core/resolveScope.ts` |

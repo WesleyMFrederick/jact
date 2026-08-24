@@ -18,6 +18,7 @@ import type {
 } from "../../types/validationTypes.js";
 import { enrichLinkObject } from "../CitationValidator/CitationValidator.js";
 import { generateContentId } from "../ContentExtractor/generateContentId.js";
+import type { BacklinkCandidateFilterLike } from "./BacklinkCandidateFilter.js";
 
 interface ParsedDocumentLifecycleLike {
 	resolveDocument(source: {
@@ -56,15 +57,18 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 	private parsedDocuments: ParsedDocumentLifecycleLike;
 	private validator: CitationValidatorLike;
 	private contentExtractor: ContentExtractorLike;
+	private candidateFilter: BacklinkCandidateFilterLike;
 
 	constructor(
 		parsedDocuments: ParsedDocumentLifecycleLike,
 		validator: CitationValidatorLike,
 		contentExtractor: ContentExtractorLike,
+		candidateFilter: BacklinkCandidateFilterLike,
 	) {
 		this.parsedDocuments = parsedDocuments;
 		this.validator = validator;
 		this.contentExtractor = contentExtractor;
+		this.candidateFilter = candidateFilter;
 	}
 
 	async execute(
@@ -221,7 +225,19 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 		const sortedScopeFiles = [...input.scopeFiles].sort((a, b) =>
 			a.localeCompare(b),
 		);
-		for (const scopeFile of sortedScopeFiles) {
+		let backlinkCandidates: readonly string[];
+		try {
+			backlinkCandidates = await this.candidateFilter.selectCandidates(
+				sortedScopeFiles,
+				rootFile,
+			);
+		} catch {
+			backlinkCandidates = sortedScopeFiles;
+		}
+		const sortedBacklinkCandidates = [...backlinkCandidates].sort((a, b) =>
+			a.localeCompare(b),
+		);
+		for (const scopeFile of sortedBacklinkCandidates) {
 			const document = await this.parsedDocuments.resolveDocument({
 				kind: "file",
 				filePath: scopeFile,

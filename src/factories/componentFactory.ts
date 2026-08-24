@@ -22,6 +22,10 @@ import { CliFlagStrategy } from "../core/ContentExtractor/eligibilityStrategies/
 import { ForceMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/ForceMarkerStrategy.js";
 import { SectionLinkStrategy } from "../core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
 import { StopMarkerStrategy } from "../core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
+import {
+	BacklinkCandidateFilter,
+	type BacklinkCandidateFilterLike,
+} from "../core/LinkedHeaderContext/BacklinkCandidateFilter.js";
 import { LinkedHeaderContextQuery } from "../core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
 import { MarkdownParser } from "../core/MarkdownParser/index.js";
 import { FileCache } from "../FileCache.js";
@@ -123,6 +127,7 @@ export function createLinkedHeaderContextQuery(
 	fileCache: FileCache | null = null,
 	validator: CitationValidator | null = null,
 	contentExtractor: ContentExtractor | null = null,
+	candidateFilter: BacklinkCandidateFilterLike | null = null,
 ): LinkedHeaderContextQuery {
 	const cache = fileCache || createFileCache();
 	const lifecycle =
@@ -130,7 +135,12 @@ export function createLinkedHeaderContextQuery(
 	const citationValidator =
 		validator || createCitationValidator(lifecycle, cache);
 	const extractor = contentExtractor || createContentExtractor(lifecycle);
-	return new LinkedHeaderContextQuery(lifecycle, citationValidator, extractor);
+	return new LinkedHeaderContextQuery(
+		lifecycle,
+		citationValidator,
+		extractor,
+		candidateFilter || new BacklinkCandidateFilter(),
+	);
 }
 
 export function createValidationWorkflow(

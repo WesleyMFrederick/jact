@@ -39,7 +39,7 @@ describe("extract header --linked-context", () => {
 			mode: "linked-context",
 			complete: true,
 			scope: {
-				filesScanned: 4,
+				filesScanned: 5,
 				respectGitignore: true,
 			},
 			stats: {
@@ -52,16 +52,16 @@ describe("extract header --linked-context", () => {
 			([key]) => key !== "_totalContentCharacterLength",
 		);
 		expect(blocks).toHaveLength(4);
-		expect(result.outgoingLinks.map(({ status }: { status: string }) => status)).toEqual(
-			[
-				"extracted",
-				"extracted",
-				"deduplicated",
-				"extracted",
-				"not-followed",
-				"not-followed",
-			],
-		);
+		expect(
+			result.outgoingLinks.map(({ status }: { status: string }) => status),
+		).toEqual([
+			"extracted",
+			"extracted",
+			"deduplicated",
+			"extracted",
+			"not-followed",
+			"not-followed",
+		]);
 		expect(
 			result.backlinks.map(
 				({ source }: { source: { file: string; line: number } }) =>
