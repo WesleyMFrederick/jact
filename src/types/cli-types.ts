@@ -31,6 +31,14 @@ export interface CliValidateOptions {
 	stdin?: boolean;
 }
 
+/** CLI options for a guarded same-directory markdown rename. */
+export interface CliRenameOptions {
+	scope?: string;
+	fix?: boolean;
+	json?: boolean;
+	allowGitignore?: boolean;
+}
+
 /**
  * CLI extract command options.
  * Integration: Passed to JactCli.extractLinks/Header/File methods.

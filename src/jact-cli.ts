@@ -23,6 +23,11 @@ import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.
 import { generateContentId } from "./core/ContentExtractor/generateContentId.js";
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "./core/prepare-scope.js";
+import {
+	type RenameMarkdownFileResult,
+	RenameValidationError,
+	renameMarkdownFile,
+} from "./core/rename-markdown-file.js";
 import type { FileCache } from "./FileCache.js";
 import {
 	createCitationValidator,
@@ -43,6 +48,7 @@ import type { ParserOutput } from "./types/citationTypes.js";
 import type {
 	CliExtractOptions,
 	CliOutlineOptions,
+	CliRenameOptions,
 	CliValidateOptions,
 } from "./types/cli-types.js";
 import type { OutgoingLinksExtractedContent } from "./types/extraction-types.js";
@@ -491,7 +497,6 @@ export class JactCli {
 				);
 			}
 
-
 			const content = document.extractResolvedSection(resolution.match);
 			if (content === null)
 				throw new Error(`Unable to extract heading: ${headerName}`);
@@ -599,6 +604,36 @@ export class JactCli {
 			process.exitCode = 2;
 			return undefined;
 		}
+	}
+
+	/** Plan or apply a guarded same-directory markdown rename. */
+	async rename(
+		sourceFile: string,
+		newFilename: string,
+		options: CliRenameOptions = {},
+	): Promise<RenameMarkdownFileResult> {
+		const stats = this.applyScope(options, sourceFile);
+		let resolvedSource = path.resolve(sourceFile);
+		if (!existsSync(resolvedSource)) {
+			const cacheResult = this.fileCache.resolveFile(path.basename(sourceFile));
+			if (!cacheResult.found) {
+				const error = new RenameValidationError(
+					cacheResult.message ?? `Source file not found: ${resolvedSource}`,
+				);
+				throw error;
+			}
+			resolvedSource = cacheResult.path;
+		}
+		return renameMarkdownFile(
+			{
+				fileCache: this.fileCache,
+				parsedDocuments: this.parsedFileCache,
+			},
+			resolvedSource,
+			newFilename,
+			stats.realScopeFolder,
+			options,
+		);
 	}
 
 	/**

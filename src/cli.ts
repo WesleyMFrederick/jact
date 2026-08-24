@@ -18,11 +18,13 @@ import {
 	checkExtractCache,
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
+import { RenameValidationError } from "./core/rename-markdown-file.js";
 import { createValidationWorkflow } from "./factories/componentFactory.js";
 import { formatExtractResult } from "./formatExtractResult.js";
 import { JactCli } from "./jact-cli.js";
 import type {
 	CliExtractOptions,
+	CliRenameOptions,
 	CliValidateOptions,
 } from "./types/cli-types.js";
 import { runBatch, type ValidateOneFn } from "./validate/batch-runner.js";
@@ -324,6 +326,86 @@ const SCOPE_OPTION_DESCRIPTION =
 	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
 const VERBOSE_OPTION_DESCRIPTION =
 	"Include outgoingLinksReport + stats in output";
+
+program
+	.command("rename")
+	.description(
+		"Preview or apply a same-directory Markdown file rename and update every incoming link in scope",
+	)
+	.argument("<source-file>", "path to the Markdown file to rename")
+	.argument(
+		"<new-filename>",
+		"new basename ending in .md; directory moves are not supported",
+	)
+	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.option(
+		"--fix",
+		"apply the rename and link updates; without this flag, only preview",
+		false,
+	)
+	.option("--json", "emit machine-readable JSON", false)
+	.option(
+		"--allow-gitignore",
+		"include files excluded by .gitignore (default ignore patterns still apply)",
+		false,
+	)
+	.addHelpText(
+		"after",
+		`
+Examples:
+    $ jact rename docs/old-name.md new-name.md --scope .
+    $ jact rename docs/old-name.md new-name.md --scope . --fix
+    $ jact rename docs/old-name.md new-name.md --scope . --json
+
+Safety:
+  Preview is the default. --fix creates backups, verifies inputs did not change,
+  applies the file rename and parser-owned link edits, then verifies every updated relationship.
+
+Exit Codes:
+  0  Preview or rename completed successfully
+  1  Invalid request or unsafe rename plan; no files changed
+  2  File-system, parse, commit, or rollback failure
+`,
+	)
+	.action(
+		async (
+			sourceFile: string,
+			newFilename: string,
+			options: CliRenameOptions,
+		) => {
+			const manager = new JactCli();
+			try {
+				const result = await manager.rename(sourceFile, newFilename, options);
+				if (options.json) {
+					console.log(JSON.stringify(result, null, 2));
+					return;
+				}
+
+				const lines = [
+					result.applied ? "Rename applied." : "Rename preview.",
+					`Source: ${result.source}`,
+					`Destination: ${result.destination}`,
+					`Incoming links: ${result.links} in ${result.files.length} file${result.files.length === 1 ? "" : "s"}`,
+				];
+				for (const file of result.files) {
+					lines.push(`  ${file.links}  ${file.path}`);
+				}
+				if (result.applied) {
+					lines.push(`Backups: ${result.backups.length}`);
+					for (const backup of result.backups) lines.push(`  ${backup}`);
+				} else {
+					lines.push("No files written. Re-run with --fix to apply this plan.");
+				}
+				console.log(lines.join("\n"));
+			} catch (error) {
+				console.error(
+					"ERROR:",
+					error instanceof Error ? error.message : String(error),
+				);
+				process.exitCode = error instanceof RenameValidationError ? 1 : 2;
+			}
+		},
+	);
 
 program
 	.command("outline")
