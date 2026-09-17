@@ -115,6 +115,33 @@ One complete compact JSON object per line, no summary line (`src/validate/render
 
 ---
 
+## `jact rename <source-file> <destination>`
+
+```
+jact rename <source-file> <destination> [options]
+```
+
+Previews or applies one guarded Markdown rename or move. `<destination>` accepts a `.md` path or an existing directory; a bare filename keeps the source directory. The command rewrites every parsed incoming link in scope. When the source changes directories, it also rewrites every parsed cross-document link inside the moved file relative to its new location.
+
+| Flag | Default | Description |
+|---|---|---|
+| `--scope <folder>` | smart default | Bounds source, destination, and backlink discovery |
+| `--fix` | `false` | Apply the file operation and link edits; omission is a read-only preview |
+| `--json` | `false` | Emit the structured rename result |
+| `--allow-gitignore` | `false` | Include ignored Markdown files while discovering links |
+
+The destination must remain inside scope and must not exist. Its parent directory must already exist. A cross-directory move fails before writing if an outgoing cross-document link cannot be resolved, because its correct post-move relative path is unknown. On apply, jact backs up every changed file, stages edits, moves the source, verifies all updated relationships, and rolls back on verification failure.
+
+```bash
+jact rename docs/old.md new.md --scope .                 # preview same-directory rename
+jact rename docs/old.md archive/ --scope . --fix         # move, retaining old.md
+jact rename docs/old.md archive/new.md --scope . --fix   # move and rename
+```
+
+**Exit codes:** `0` preview or apply succeeded; `1` invalid or unsafe plan with no writes; `2` file-system, parse, commit, or rollback failure.
+
+---
+
 ## `jact outline <file> [level]`
 
 ```

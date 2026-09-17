@@ -25,6 +25,9 @@ const destination = path.join(
 );
 const incoming = path.join(workDir, "card17-requirements.md");
 const otherTarget = path.join(workDir, "other", "card17-conops.md");
+const movedDirectory = path.join(workDir, "moved", "notes");
+const movedDestination = path.join(movedDirectory, path.basename(source));
+const outgoingTarget = path.join(workDir, "reference", "shared.md");
 
 const originalIncoming = `# Requirements
 
@@ -130,6 +133,54 @@ describe("jact rename CLI", () => {
 		expect(readFileSync(otherTarget, "utf8")).toBe("# Other concept\n");
 	});
 
+	it("moves into a directory and updates incoming and outgoing links", () => {
+		mkdirSync(movedDirectory, { recursive: true });
+		mkdirSync(path.dirname(outgoingTarget), { recursive: true });
+		writeFileSync(outgoingTarget, "# Shared\n");
+		writeFileSync(
+			source,
+			"# Concept\n\n[Shared](../reference/shared.md)\n\n[[../reference/shared|Shared]]\n\n[cite: ../reference/shared.md#Shared]\n",
+		);
+
+		const preview = run([
+			"rename",
+			source,
+			movedDirectory,
+			"--scope",
+			workDir,
+			"--json",
+		]);
+		expect(preview.status).toBe(0);
+		expect(JSON.parse(preview.stdout)).toMatchObject({
+			source,
+			destination: movedDestination,
+			applied: false,
+			links: 7,
+		});
+		expect(existsSync(movedDestination)).toBe(false);
+
+		const applied = run([
+			"rename",
+			source,
+			movedDirectory,
+			"--scope",
+			workDir,
+			"--json",
+			"--fix",
+		]);
+		expect(applied.status).toBe(0);
+		expect(existsSync(source)).toBe(false);
+		expect(readFileSync(movedDestination, "utf8")).toBe(
+			"# Concept\n\n[Shared](../../reference/shared.md)\n\n[[../../reference/shared|Shared]]\n\n[cite: ../../reference/shared.md#Shared]\n",
+		);
+		expect(readFileSync(incoming, "utf8")).toContain(
+			"moved/notes/card17-conops.md#Overview",
+		);
+		expect(readFileSync(incoming, "utf8")).toContain(
+			"[[moved/notes/card17-conops#Overview|ConOps]]",
+		);
+	});
+
 	it("fails closed when the destination already exists", () => {
 		writeFileSync(destination, "# Collision\n");
 
@@ -142,7 +193,7 @@ describe("jact rename CLI", () => {
 		expect(readFileSync(incoming, "utf8")).toBe(originalIncoming);
 	});
 
-	it("rejects directory moves before writing", () => {
+	it("rejects moves outside scope before writing", () => {
 		const result = run([
 			"rename",
 			source,
@@ -153,7 +204,7 @@ describe("jact rename CLI", () => {
 		]);
 
 		expect(result.status).toBe(1);
-		expect(result.stderr).toContain("filename, not a path");
+		expect(result.stderr).toContain("outside the rename scope");
 		expect(existsSync(source)).toBe(true);
 		expect(readFileSync(incoming, "utf8")).toBe(originalIncoming);
 	});
