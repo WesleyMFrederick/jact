@@ -17,7 +17,7 @@ build/
 .env.production.local
 
 # IDE files
-.vscode/
+/.vscode
 .idea/
 *.swp
 *.swo
@@ -38,7 +38,7 @@ Thumbs.db
 *.jsonl
 
 # Claude Code plugin (copied from local hub)
-.claude/
+/.claude
 
 # Logs
 logs/
@@ -74,6 +74,12 @@ pids/
 
 # session tracking
 current-status.json
+
+# Worktree-local project configuration and shared issue tracker
+/.jactignore
+/.mcp.json
+/.pi
+/.scratch
 
 # archive files
 .archive/
