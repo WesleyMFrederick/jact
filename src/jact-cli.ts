@@ -666,10 +666,10 @@ export class JactCli {
 		}
 	}
 
-	/** Plan or apply a guarded same-directory markdown rename. */
+	/** Plan or apply a guarded Markdown file rename or move. */
 	async rename(
 		sourceFile: string,
-		newFilename: string,
+		destination: string,
 		options: CliRenameOptions = {},
 	): Promise<RenameMarkdownFileResult> {
 		const stats = this.applyScope(options, sourceFile);
@@ -690,7 +690,7 @@ export class JactCli {
 				parsedDocuments: this.parsedFileCache,
 			},
 			resolvedSource,
-			newFilename,
+			destination,
 			stats.realScopeFolder,
 			options,
 		);

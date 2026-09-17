@@ -71,7 +71,11 @@ const program: Command = new Command();
 program
 	.name("jact")
 	.description("Citation validation and management tool for markdown files")
-	.version("1.0.0");
+	.version("1.0.0")
+	.addHelpText(
+		"after",
+		"\nEach command has its own help page. Run `jact <command> --help`.",
+	);
 
 // Configure custom error output with semantic suggestions
 program.configureOutput({
@@ -330,12 +334,12 @@ const VERBOSE_OPTION_DESCRIPTION =
 program
 	.command("rename")
 	.description(
-		"Preview or apply a same-directory Markdown file rename and update every incoming link in scope",
+		"Preview (default) or apply (--fix) a Markdown file rename or move and update incoming and outgoing links in scope",
 	)
-	.argument("<source-file>", "path to the Markdown file to rename")
+	.argument("<source-file>", "path to the Markdown file to rename or move")
 	.argument(
-		"<new-filename>",
-		"new basename ending in .md; directory moves are not supported",
+		"<destination>",
+		"new .md path or existing directory; a bare filename renames in place",
 	)
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option(
@@ -354,12 +358,12 @@ program
 		`
 Examples:
     $ jact rename docs/old-name.md new-name.md --scope .
-    $ jact rename docs/old-name.md new-name.md --scope . --fix
-    $ jact rename docs/old-name.md new-name.md --scope . --json
+    $ jact rename docs/old-name.md archive/renamed.md --scope . --fix
+    $ jact rename docs/old-name.md archive/ --scope . --json
 
 Safety:
   Preview is the default. --fix creates backups, verifies inputs did not change,
-  applies the file rename and parser-owned link edits, then verifies every updated relationship.
+  moves the file, updates incoming and moved-file outgoing links, then verifies every relationship.
 
 Exit Codes:
   0  Preview or rename completed successfully
@@ -370,12 +374,12 @@ Exit Codes:
 	.action(
 		async (
 			sourceFile: string,
-			newFilename: string,
+			destination: string,
 			options: CliRenameOptions,
 		) => {
 			const manager = new JactCli();
 			try {
-				const result = await manager.rename(sourceFile, newFilename, options);
+				const result = await manager.rename(sourceFile, destination, options);
 				if (options.json) {
 					console.log(JSON.stringify(result, null, 2));
 					return;
@@ -385,7 +389,7 @@ Exit Codes:
 					result.applied ? "Rename applied." : "Rename preview.",
 					`Source: ${result.source}`,
 					`Destination: ${result.destination}`,
-					`Incoming links: ${result.links} in ${result.files.length} file${result.files.length === 1 ? "" : "s"}`,
+					`Updated links: ${result.links} in ${result.files.length} file${result.files.length === 1 ? "" : "s"}`,
 				];
 				for (const file of result.files) {
 					lines.push(`  ${file.links}  ${file.path}`);

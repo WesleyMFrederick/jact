@@ -56,6 +56,7 @@ interface TextEdit {
 interface PlannedFile extends RenameFileChange {
 	original: string;
 	updated: string;
+	expectedTargets: string[];
 }
 
 function canonicalExisting(filePath: string): string {
@@ -81,10 +82,11 @@ function decodedBasename(rawPath: string): string {
 	}
 }
 
-function renamedRawPath(
+function rewrittenRawPath(
 	link: LinkObject,
 	rawPath: string,
-	newFilename: string,
+	target: string,
+	sourceAfterMove: string,
 ): string {
 	const citationAnchor =
 		link.fullMatch.startsWith("[cite:") && rawPath.includes("#")
@@ -92,22 +94,25 @@ function renamedRawPath(
 			: "";
 	const filePath =
 		citationAnchor === "" ? rawPath : rawPath.slice(0, -citationAnchor.length);
-	const separator = Math.max(
-		filePath.lastIndexOf("/"),
-		filePath.lastIndexOf("\\"),
-	);
-	const prefix = filePath.slice(0, separator + 1);
-	const oldBasename = decodedBasename(filePath);
-	const keepsExtension = /\.md$/i.test(oldBasename);
-	const nextBasename = keepsExtension
-		? newFilename
-		: newFilename.replace(/\.md$/i, "");
+	let decodedPath: string;
+	try {
+		decodedPath = decodeURI(filePath);
+	} catch {
+		decodedPath = filePath;
+	}
+	const keepsExtension = /\.md$/i.test(decodedBasename(filePath));
+	const targetPath = path.isAbsolute(decodedPath)
+		? target
+		: path.relative(path.dirname(sourceAfterMove), target);
+	const portablePath = targetPath.split(path.sep).join("/");
+	const nextPath = keepsExtension
+		? portablePath
+		: portablePath.replace(/\.md$/i, "");
 
 	if (link.linkType === "wiki" || link.fullMatch.startsWith("[cite:")) {
-		return `${prefix}${nextBasename}${citationAnchor}`;
+		return `${nextPath}${citationAnchor}`;
 	}
-
-	return `${prefix}${encodeURI(nextBasename)}`;
+	return encodeURI(nextPath);
 }
 
 function destinationStart(link: LinkObject, rawPath: string): number {
@@ -136,7 +141,11 @@ function destinationStart(link: LinkObject, rawPath: string): number {
 	return start;
 }
 
-function rewriteLink(link: LinkObject, newFilename: string): string {
+function rewriteLink(
+	link: LinkObject,
+	target: string,
+	sourceAfterMove: string,
+): string {
 	const rawPath = link.target.path.raw;
 	if (rawPath === null) {
 		throw new RenameValidationError(
@@ -144,7 +153,7 @@ function rewriteLink(link: LinkObject, newFilename: string): string {
 		);
 	}
 	const start = destinationStart(link, rawPath);
-	return `${link.fullMatch.slice(0, start)}${renamedRawPath(link, rawPath, newFilename)}${link.fullMatch.slice(start + rawPath.length)}`;
+	return `${link.fullMatch.slice(0, start)}${rewrittenRawPath(link, rawPath, target, sourceAfterMove)}${link.fullMatch.slice(start + rawPath.length)}`;
 }
 
 function lineStarts(content: string): number[] {
@@ -184,7 +193,7 @@ function applyEdits(
 	return updated;
 }
 
-function sameExistingFile(link: LinkObject, canonicalSource: string): boolean {
+function existingTarget(link: LinkObject): string | null {
 	const candidates: string[] = [];
 	const absolute = link.target.path.absolute;
 	if (absolute != null) {
@@ -219,38 +228,51 @@ function sameExistingFile(link: LinkObject, canonicalSource: string): boolean {
 	for (const candidate of candidates) {
 		if (!existsSync(candidate)) continue;
 		try {
-			if (canonicalExisting(candidate) === canonicalSource) return true;
+			return canonicalExisting(candidate);
 		} catch {}
 	}
-	return false;
+	return null;
 }
+
 
 async function planFiles(
 	deps: RenameMarkdownFileDeps,
 	canonicalSource: string,
-	newFilename: string,
+	destination: string,
 ): Promise<PlannedFile[]> {
 	const indexedFiles = deps.fileCache
 		.getAllFiles()
 		.map((entry) => entry.path)
 		.sort((left, right) => left.localeCompare(right));
 	const planned: PlannedFile[] = [];
+	const movesDirectory =
+		path.dirname(canonicalSource) !== path.dirname(destination);
 
 	for (const filePath of indexedFiles) {
 		const document = await deps.parsedDocuments.resolveDocument({
 			kind: "file",
 			filePath,
 		});
-		const matchingLinks = document.data.links.filter(
-			(link) =>
-				link.scope === "cross-document" &&
-				sameExistingFile(link, canonicalSource),
-		);
-		if (matchingLinks.length === 0) continue;
-
+		const sourceAfterMove =
+			filePath === canonicalSource ? destination : filePath;
+		const edits: TextEdit[] = [];
+		const expectedTargets: string[] = [];
 		const content = document.data.content;
 		const starts = lineStarts(content);
-		const edits = matchingLinks.map((link): TextEdit => {
+
+		for (const link of document.data.links) {
+			if (link.scope !== "cross-document") continue;
+			const currentTarget = existingTarget(link);
+			const isIncoming = currentTarget === canonicalSource;
+			const isMovedOutgoing = movesDirectory && filePath === canonicalSource;
+			if (!isIncoming && !isMovedOutgoing) continue;
+			if (currentTarget === null) {
+				throw new RenameValidationError(
+					`Cannot safely move ${canonicalSource}: outgoing link at line ${link.line} does not resolve. No files were changed.`,
+				);
+			}
+
+			const nextTarget = isIncoming ? destination : currentTarget;
 			const start = linkOffset(link, starts);
 			const end = start + link.fullMatch.length;
 			if (content.slice(start, end) !== link.fullMatch) {
@@ -258,13 +280,21 @@ async function planFiles(
 					`Parsed link text changed at ${filePath}:${link.line}. No files were changed.`,
 				);
 			}
-			return { start, end, replacement: rewriteLink(link, newFilename) };
-		});
+			edits.push({
+				start,
+				end,
+				replacement: rewriteLink(link, nextTarget, sourceAfterMove),
+			});
+			expectedTargets.push(nextTarget);
+		}
+		if (edits.length === 0) continue;
+
 		planned.push({
 			path: filePath,
-			links: matchingLinks.length,
+			links: edits.length,
 			original: content,
 			updated: applyEdits(content, edits, filePath),
+			expectedTargets,
 		});
 	}
 
@@ -307,7 +337,6 @@ async function verifyRelationships(
 	});
 	const parser = createMarkdownParser(verificationCache);
 	const documents = createParsedFileCache(parser);
-	const canonicalDestination = canonicalExisting(destination);
 
 	for (const file of files) {
 		const finalPath = file.path === source ? destination : file.path;
@@ -315,15 +344,29 @@ async function verifyRelationships(
 			kind: "file",
 			filePath: finalPath,
 		});
-		const resolved = document.data.links.filter(
-			(link) =>
-				link.scope === "cross-document" &&
-				sameExistingFile(link, canonicalDestination),
-		).length;
-		if (resolved < file.links) {
-			throw new Error(
-				`Post-rename verification failed in ${finalPath}: expected ${file.links} updated links, found ${resolved}`,
+		const actualCounts = new Map<string, number>();
+		for (const link of document.data.links) {
+			if (link.scope !== "cross-document") continue;
+			const target = existingTarget(link);
+			if (target !== null) {
+				actualCounts.set(target, (actualCounts.get(target) ?? 0) + 1);
+			}
+		}
+		const expectedCounts = new Map<string, number>();
+		for (const target of file.expectedTargets) {
+			const canonicalTarget = canonicalExisting(target);
+			expectedCounts.set(
+				canonicalTarget,
+				(expectedCounts.get(canonicalTarget) ?? 0) + 1,
 			);
+		}
+		for (const [target, expected] of expectedCounts) {
+			const actual = actualCounts.get(target) ?? 0;
+			if (actual < expected) {
+				throw new Error(
+					`Post-rename verification failed in ${finalPath}: expected ${expected} updated link(s) to ${target}, found ${actual}`,
+				);
+			}
 		}
 	}
 }
@@ -409,37 +452,60 @@ async function commitPlan(
 export async function renameMarkdownFile(
 	deps: RenameMarkdownFileDeps,
 	sourceFile: string,
-	newFilename: string,
+	destinationPath: string,
 	scopeFolder: string,
 	options: CliRenameOptions = {},
 ): Promise<RenameMarkdownFileResult> {
-	const source = path.resolve(sourceFile);
-	if (!existsSync(source)) {
-		throw new RenameValidationError(`Source file not found: ${source}`);
-	}
-	if (
-		path.basename(newFilename) !== newFilename ||
-		newFilename === "." ||
-		newFilename === ".."
-	) {
+	const requestedSource = path.resolve(sourceFile);
+	if (!existsSync(requestedSource)) {
 		throw new RenameValidationError(
-			"The new name must be a filename, not a path. Moves are not supported.",
+			`Source file not found: ${requestedSource}`,
 		);
 	}
-	if (!/\.md$/i.test(newFilename)) {
-		throw new RenameValidationError("The new filename must end in .md.");
-	}
 
-	const canonicalSource = canonicalExisting(source);
+	const source = canonicalExisting(requestedSource);
 	const canonicalScope = canonicalExisting(scopeFolder);
-	if (!isWithin(canonicalScope, canonicalSource)) {
+	if (!isWithin(canonicalScope, source)) {
 		throw new RenameValidationError(
 			`Source is outside the rename scope: ${scopeFolder}`,
 		);
 	}
-	const destination = path.join(path.dirname(source), newFilename);
+
+	const requestedDestination =
+		path.basename(destinationPath) === destinationPath
+			? path.join(path.dirname(requestedSource), destinationPath)
+			: path.resolve(destinationPath);
+	const destinationCandidate =
+		existsSync(requestedDestination) &&
+		statSync(requestedDestination).isDirectory()
+			? path.join(requestedDestination, path.basename(requestedSource))
+			: requestedDestination;
+	const reportedDestination = path.resolve(destinationCandidate);
+	const destinationParent = path.dirname(destinationCandidate);
+	if (
+		!existsSync(destinationParent) ||
+		!statSync(destinationParent).isDirectory()
+	) {
+		throw new RenameValidationError(
+			`Destination directory does not exist: ${destinationParent}`,
+		);
+	}
+	const destination = path.join(
+		canonicalExisting(destinationParent),
+		path.basename(destinationCandidate),
+	);
+	if (!/\.md$/i.test(destination)) {
+		throw new RenameValidationError(
+			"The destination must be a Markdown filename or an existing directory.",
+		);
+	}
+	if (!isWithin(canonicalScope, destination)) {
+		throw new RenameValidationError(
+			`Destination is outside the rename scope: ${destination}`,
+		);
+	}
 	if (destination === source) {
-		throw new RenameValidationError("The new filename is unchanged.");
+		throw new RenameValidationError("The destination is unchanged.");
 	}
 	if (existsSync(destination)) {
 		throw new RenameValidationError(
@@ -447,7 +513,7 @@ export async function renameMarkdownFile(
 		);
 	}
 
-	const plannedFiles = await planFiles(deps, canonicalSource, newFilename);
+	const plannedFiles = await planFiles(deps, source, destination);
 	const links = plannedFiles.reduce((total, file) => total + file.links, 0);
 	const backups = options.fix
 		? await commitPlan(
@@ -460,13 +526,13 @@ export async function renameMarkdownFile(
 		: [];
 
 	return {
-		source,
-		destination,
+		source: requestedSource,
+		destination: reportedDestination,
 		scope: canonicalScope,
 		applied: options.fix === true,
 		links,
 		files: plannedFiles.map(({ path: filePath, links: fileLinks }) => ({
-			path: filePath === source ? destination : filePath,
+			path: filePath === source ? reportedDestination : filePath,
 			links: fileLinks,
 		})),
 		backups,

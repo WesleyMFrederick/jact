@@ -1,0 +1,9 @@
+{
+  "worktree": {
+    "setup": [
+      "for path in .claude .jactignore .mcp.json .pi .scratch .vscode design-docs .env .env.local .env.development.local .env.test.local .env.production.local; do if { [ -e \"$PASEO_SOURCE_CHECKOUT_PATH/$path\" ] || [ -L \"$PASEO_SOURCE_CHECKOUT_PATH/$path\" ]; } && [ ! -e \"$path\" ] && [ ! -L \"$path\" ]; then ln -s \"$PASEO_SOURCE_CHECKOUT_PATH/$path\" \"$path\"; fi; done",
+      "npm ci",
+      "npm run build"
+    ]
+  }
+}
