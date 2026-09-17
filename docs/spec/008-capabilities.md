@@ -10,6 +10,7 @@ Feature matrix — what jact can do today. Command/flag details: [005 · Interfa
 | Validate from stdin (hook/pipe usage) | ✅ | `jact validate --stdin` |
 | Batch validation with file selection + reporting | ✅ | `src/validate/batch-runner.ts` |
 | Auto-fix broken anchors + path conversions | ✅ | `jact validate --fix` (structured `PathConversion`/`AnchorConversion`) |
+| Rename or move Markdown files while updating incoming and moved-file outgoing links | ✅ | [`jact rename`](005-interfaces.md#`jact rename <source-file> <destination>`) |
 | Line-scoped validation | ✅ | `--lines N-M` |
 | Scope override for cross-project resolution | ✅ | `--scope <dir>` (auto-inferred in-repo) |
 | AST + extracted-data view | ✅ | `jact ast <file>` |

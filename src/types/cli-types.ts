@@ -31,7 +31,7 @@ export interface CliValidateOptions {
 	stdin?: boolean;
 }
 
-/** CLI options for a guarded same-directory markdown rename. */
+/** CLI options for a guarded Markdown file rename or move. */
 export interface CliRenameOptions {
 	scope?: string;
 	fix?: boolean;
