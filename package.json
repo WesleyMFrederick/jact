@@ -5,11 +5,10 @@
 	"type": "module",
 	"main": "dist/jact-cli.js",
 	"bin": {
-		"jact": "./dist/cli.js"
+		"jact": "./bin/jact.js"
 	},
 	"scripts": {
 		"build": "tsc",
-		"prepublishOnly": "npm run build",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:ui": "vitest --ui",
