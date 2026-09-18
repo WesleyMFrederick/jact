@@ -23,6 +23,7 @@
 		"forceConsistentCasingInFileNames": true,
 		"skipLibCheck": true,
 		"noEmit": false,
+		"noEmitOnError": true,
 		"noImplicitAny": true
 	},
 	"include": ["src/**/*.ts"],

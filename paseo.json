@@ -2,6 +2,7 @@
   "worktree": {
     "setup": [
       "for path in .claude .jactignore .mcp.json .pi .scratch .vscode architecture-principles design-docs .env .env.local .env.development.local .env.test.local .env.production.local; do source_path=\"$PASEO_SOURCE_CHECKOUT_PATH/$path\"; if [ ! -e \"$path\" ] && [ ! -L \"$path\" ]; then if [ -L \"$source_path\" ]; then link_target=\"$(readlink \"$source_path\")\"; case \"$link_target\" in /*) ;; *) link_target=\"$(dirname \"$source_path\")/$link_target\" ;; esac; ln -s \"$link_target\" \"$path\"; elif [ -e \"$source_path\" ]; then ln -s \"$source_path\" \"$path\"; fi; fi; done",
+      "git config core.hooksPath \"$PASEO_SOURCE_CHECKOUT_PATH/.githooks\"",
       "npm ci",
       "npm run build"
     ]

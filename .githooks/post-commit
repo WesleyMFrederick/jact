@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Refreshes the main-owned CLI after commits, including completed conflict merges.
+set -euo pipefail
+
+HOOK_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+exec "$HOOK_DIR/../scripts/refresh-global-cli.sh" --hook

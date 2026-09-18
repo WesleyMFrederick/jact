@@ -18,7 +18,12 @@ LLM sessions use jact as a context tool: `jact ast <file>` (heading shape) → `
 
 ## npm global link
 
-`npm link` exposes `jact` on `$PATH`; `package.json` `main` points at `dist/jact-cli.js`. After source changes the binary runs stale `dist/` until `npm run build` — e2e checks must rebuild first.
+The global `jact` on `$PATH` is an `npm link` symlink into the canonical `main` checkout's `bin/jact.js`, which loads that checkout's `dist/cli.js`. Contract:
+
+- The tracked `.githooks/post-merge` hook handles merges and fast-forward pulls. The tracked `.githooks/post-commit` hook handles commits, including completed conflict merges. Both call `scripts/refresh-global-cli.sh --hook`, so changes landing on canonical `main` synchronize dependencies, rebuild `dist/`, and refresh the link with no user action.
+- `scripts/refresh-global-cli.sh` is the only operation that builds-and-links. It derives the canonical root from the absolute git common dir and proceeds only when the invoking worktree *is* that root and its `HEAD` is `main`. Hook-mode invocation elsewhere prints a skip and exits 0; direct invocation (`npm run global:link`) elsewhere is refused with a nonzero exit.
+- Paseo worktree setup only points `core.hooksPath` at the canonical `.githooks` directory; it never links.
+- Branch-specific CLI checks run `node ./dist/cli.js` in the feature worktree; the global command always reflects canonical `main`.
 
 ## AppMap (runtime traces, dev-time)
 

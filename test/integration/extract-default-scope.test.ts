@@ -16,6 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CLI_PATH = join(__dirname, "../../dist/cli.js");
 const JACT_ROOT = join(__dirname, "../..");
+const JACT_AGENTS_MD = join(JACT_ROOT, "AGENTS.md");
 const JACT_CLAUDE_MD = join(JACT_ROOT, "CLAUDE.md");
 
 let tmpDir: string;
@@ -84,7 +85,7 @@ describe("extract file — default scope inference", () => {
 describe("extract header — default scope inference", () => {
 	it("given cwd inside jact repo and no --scope, when extract header runs, then succeeds (mirrors extract file behavior)", async () => {
 		const { stdout } = await execAsync(
-			`node "${CLI_PATH}" extract header "${JACT_CLAUDE_MD}" "Project Overview"`,
+			`node "${CLI_PATH}" extract header "${JACT_AGENTS_MD}" "Project Overview"`,
 			{ cwd: JACT_ROOT },
 		);
 		// Successful default output is numbered markdown.

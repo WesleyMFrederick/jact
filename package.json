@@ -13,6 +13,7 @@
 	],
 	"scripts": {
 		"build": "tsc",
+		"global:link": "bash scripts/refresh-global-cli.sh",
 		"prepublishOnly": "npm run build",
 		"test": "vitest run",
 		"test:watch": "vitest",

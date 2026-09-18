@@ -48,8 +48,11 @@ describe("C4 — pipeline portability", () => {
 	});
 
 	it("scripts/*.sh accept project-root as arg with default (pwd)", () => {
+		// refresh-global-cli.sh derives its root from git common-dir, not a
+		// positional arg — it is exempt from the project-root convention.
+		const EXEMPT = new Set(["refresh-global-cli.sh"]);
 		const shFiles = readdirSync(SCRIPTS_DIR)
-			.filter((f) => f.endsWith(".sh"))
+			.filter((f) => f.endsWith(".sh") && !EXEMPT.has(f))
 			.map((f) => join(SCRIPTS_DIR, f));
 		for (const file of shFiles) {
 			const text = readFileSync(file, "utf8");
