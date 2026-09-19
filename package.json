@@ -5,8 +5,12 @@
 	"type": "module",
 	"main": "dist/jact-cli.js",
 	"bin": {
-		"jact": "./dist/cli.js"
+		"jact": "./bin/jact.js"
 	},
+	"files": [
+		"bin/",
+		"dist/"
+	],
 	"scripts": {
 		"build": "tsc",
 		"prepublishOnly": "npm run build",
