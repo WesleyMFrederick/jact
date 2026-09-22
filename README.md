@@ -4,21 +4,13 @@
 
 A citation validation and management tool for markdown files that enforces cross-document links and proper anchor patterns. Features three-tier validation with warning detection and (limited) automated citation correction capabilities.
 
-## Installation
+## Managed CLI
 
-```bash
-# Install dependencies
-npm install
+Paseo prepares development worktrees. The global `jact` command is a symlink owned by the canonical `main` checkout.
 
-# Build TypeScript and link CLI globally
-npm run build
-npm link
+Tracked Git hooks synchronize dependencies, rebuild, and relink `jact` after changes land on `main`, including commits, merges, completed conflict merges, and fast-forward pulls. The user does not install, link, or refresh the global command.
 
-# Verify CLI is available
-jact --help
-```
-
-> **Note:** Source is TypeScript (`src/*.ts`), compiled to `dist/*.js`. After any TS changes, re-run `npm run build` to update the CLI.
+To exercise branch-specific behavior in a feature worktree, build the branch and run `node ./dist/cli.js`. The global `jact` command always runs the build from canonical `main`.
 
 ## Features
 

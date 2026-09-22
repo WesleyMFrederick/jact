@@ -57,13 +57,12 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 ### Essential Commands
 ```bash
-# Install dependencies and build
+# Install dependencies and build the local checkout
 npm install
-npm run build          # Compile TypeScript to dist/
-npm link               # Make jact CLI globally available
-
-# After modifying TypeScript files, always rebuild
 npm run build
+
+# Run this branch's CLI; tracked hooks maintain global jact from canonical main
+node ./dist/cli.js --help
 
 # Run tests
 npm test              # Run all Vitest tests
@@ -100,7 +99,7 @@ npm run jact:base-paths path/to/file.md
 # Extract content from links
 npm run jact:extract path/to/file.md
 
-# Direct CLI usage (after npm link)
+# Global CLI usage (always canonical main's build; use `node ./dist/cli.js` for this branch)
 # In-repo: scope auto-inferred from cwd
 jact validate path/to/file.md --lines 157
 
@@ -314,7 +313,7 @@ Start at L0 across a directory, zoom to L2 on the one map that matters. Config: 
 ### Ground rules
 
 - `jact` CLI reads **markdown only** — never point it at `.ts`/`.json` (silently returns garbage).
-- After changing `src/**/*.ts`: tests need no build (Vitest transforms TS), but the `jact` CLI binary runs `dist/` — run `npm run build` before any end-to-end CLI check.
+- After changing `src/**/*.ts`, Vitest needs no build. For an end-to-end check of *this* branch, run `npm run build` and invoke `node ./dist/cli.js`—never the global `jact`. Tracked Git hooks synchronize dependencies, rebuild, and relink the global command after changes land on canonical `main`. `npm run global:link` exists only as agent/system recovery and refuses to run outside canonical main.
 
 ## Agent skills
 

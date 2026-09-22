@@ -105,5 +105,11 @@ claude-code-transcripts/
 design-docs
 architecture-principles
 
+# Temporary backup used by the main CLI refresh
+.jact-refresh.*
+
 # AppMap runtime captures
 tmp/appmap/
+
+# Tracked git hooks (re-included against dot-file ignore rules)
+!.githooks/

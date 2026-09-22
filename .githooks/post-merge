@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Runs after every merge and fast-forward pull. The refresh script decides
+# whether this checkout is allowed to touch the global link.
+set -euo pipefail
+
+HOOK_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+exec "$HOOK_DIR/../scripts/refresh-global-cli.sh" --hook
