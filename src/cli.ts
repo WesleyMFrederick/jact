@@ -647,23 +647,32 @@ const MAX_CHARS_OPTION = "--max-chars <n>";
 const MAX_CHARS_DESCRIPTION = `with --extract-linked-content: above this size, print a content map instead of the content (default: ${DEFAULT_MAX_CHARS})`;
 
 /**
- * Print extraction output plus hints. Linked markdown output above `--max-chars`
- * becomes a content map so agents load only the blocks they need.
+ * Print extraction output, failures, then hints. Linked markdown output above
+ * `--max-chars` becomes a content map so agents load only the blocks they need.
+ * JSON keeps stdout parseable: failures and hints go to stderr.
  */
 function writeExtractOutput(
 	result: HeaderExtractionResult,
 	output: string,
 	options: CliExtractOptions,
 	hints: readonly string[],
+	failures: readonly string[] = [],
 ): void {
 	const format = options.format ?? "markdown";
 	const maxChars = options.maxChars ?? DEFAULT_MAX_CHARS;
+	const failureLines = failures.map((failure) => `- ${failure}`).join("\n");
+	const writeFailures = () => {
+		if (failures.length === 0) return;
+		if (format === "json") console.error(`Failures:\n${failureLines}`);
+		else process.stdout.write(`\n\n## Failures\n\n${failureLines}`);
+	};
 	if (
 		format === "markdown" &&
 		options.extractLinkedContent !== undefined &&
 		output.length > maxChars
 	) {
 		process.stdout.write(formatContentMap(result, output.length, maxChars));
+		writeFailures();
 		writeNextStepHints(
 			[
 				`To Print Everything Anyway: rerun with \`--max-chars ${output.length}\``,
@@ -675,6 +684,7 @@ function writeExtractOutput(
 	}
 	if (format === "markdown" && !options.verbose) process.stdout.write(output);
 	else console.log(output);
+	writeFailures();
 	writeNextStepHints(hints, format);
 }
 
@@ -829,8 +839,14 @@ Exit Codes:
 						sourceLabels: options.extractLinkedContent !== undefined,
 					},
 				);
-				writeExtractOutput(outcome.result, output, options, outcome.nextStepHints);
-				process.exitCode = 0;
+				writeExtractOutput(
+					outcome.result,
+					output,
+					options,
+					outcome.nextStepHints,
+					outcome.failures,
+				);
+				process.exitCode = outcome.failures.length > 0 ? 1 : 0;
 			}
 			// Note: Error exit codes set by extractFile() method
 		} catch (error) {

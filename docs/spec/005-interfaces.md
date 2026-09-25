@@ -249,6 +249,8 @@ Builds a synthetic full-file link via `LinkObjectFactory.createFileLink()`, vali
 
 `--extract-linked-content [depth]` also extracts what the file links to, following linked files up to `depth` levels (whole number ≥ 1; default `1`). Linked section and block links extract that section or block; full-file links to `.md` files extract the file and, while depth remains, its links. Each file is followed once, so link cycles end. Links marked `%%stop-extract-link%%` are neither extracted nor followed. Without the option, only the target file is extracted.
 
+If a linked target cannot be extracted (file not found, anchor not found, or file not readable), jact still extracts the other links, lists each failed link as `file:line — reason` under `## Failures` (on stderr as `Failures:` for `json`), and exits `1`. Stop-marker links are intentional skips, not failures.
+
 After the content, `jact outline`-style next-step hints follow — on stdout for `markdown`, on stderr for `json` so stdout stays parseable. A `[+] … To Go Deeper` hint with the next depth appears only when the depth limit cut off links that would add content.
 
 `--max-chars <n>` (default `28000`, whole number ≥ 1) caps `markdown` output from `--extract-linked-content`. When the full output would exceed it, jact prints a **content map** instead: one row per block with its `Source`, `Via`, character count, and a command that loads only that block (`jact extract header` for section links, `jact extract file` for whole-file links, a line range for block links). A `To Print Everything Anyway` hint gives the `--max-chars` value that prints it all. The default fits a default Claude Code Bash result, which shows 30,000 characters inline. `json` output is never replaced.
@@ -285,6 +287,7 @@ Exit code `2` is consistent across `validate`, `outline`, `ast`, and `extract` f
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-09-25 | `extract file --extract-linked-content` lists links it could not extract under `## Failures` and exits `1`, instead of skipping them without a message |
 | 1.0.0-draft | 2026-09-25 | Added `--extract-linked-content [depth]` to `extract file` and `extract header` (replaces `extract header --linked-context`) with depth-limited link following, `Source:`/`Via:` labels, and next-step hints; linked section and block content now carries source start lines; both commands print a content map above `--max-chars` |
 | 1.0.0-draft | 2026-08-13 | Made numbered markdown the default output for `extract header` and `extract file`; explicit JSON remains raw |
 | 1.0.0-draft | 2026-08-02 | Added five-error batch disclosure threshold, failing-file error counts, drill/filter/fix guidance, and verbose expansion without changing exit codes |

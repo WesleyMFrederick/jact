@@ -700,7 +700,7 @@ export class JactCli {
 				...options,
 				fullFiles: true,
 			});
-			if (depth === undefined) return { result, nextStepHints: [] };
+			if (depth === undefined) return { result, nextStepHints: [], failures: [] };
 			return {
 				result,
 				nextStepHints: linkedContentHints(
@@ -708,6 +708,7 @@ export class JactCli {
 					depth,
 					unfollowedLinkedFileCount,
 				),
+				failures: linkFailures(result),
 			};
 		} catch (error) {
 			console.error(
@@ -783,6 +784,27 @@ export class JactCli {
 export interface FileExtractionOutcome {
 	result: OutgoingLinksExtractedContent;
 	nextStepHints: string[];
+	/** `file:line — reason` for each linked target that could not be extracted. */
+	failures: string[];
+}
+
+/**
+ * Links whose content is missing from the result because the target could not
+ * be validated or read. Intentional skips (stop markers, ineligible links) are
+ * not failures.
+ */
+function linkFailures(result: OutgoingLinksExtractedContent): string[] {
+	return result.outgoingLinksReport.processedLinks.flatMap((entry) => {
+		const invalid =
+			entry.status === "skipped" &&
+			entry.sourceLink.validation.status === "error";
+		if (entry.status !== "failed" && !invalid) return [];
+		const source = entry.sourceLink.source.path.absolute;
+		const location = source
+			? `${path.relative(process.cwd(), source)}:${entry.sourceLink.line}`
+			: "linked content";
+		return [`${location} — ${entry.failureDetails?.reason ?? "unknown error"}`];
+	});
 }
 
 /**
