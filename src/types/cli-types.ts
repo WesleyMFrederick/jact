@@ -25,6 +25,8 @@ export interface CliValidateOptions {
 	fix?: boolean;
 	/** When true, preview fixes without writing files. Prints a diff to stdout. Requires fix: true. */
 	dryRun?: boolean;
+	/** When false (`--no-backup`), `--fix` does not write the timestamped `.bak` backup. Default true. */
+	backup?: boolean;
 	verbose?: boolean;
 	allowGitignore?: boolean;
 	/** Read markdown from stdin instead of <file-path>; <file-path> becomes the intended path (D1/D2). */

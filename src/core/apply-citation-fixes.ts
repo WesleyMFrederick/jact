@@ -49,7 +49,8 @@ const isAnchorFixable = (link: EnrichedLinkObject): boolean =>
  * Validate citations in filePath, auto-fix path/anchor issues, write in-place.
  *
  * Safety features:
- * - Writes a timestamped `.bak` backup before any file mutation.
+ * - Writes a timestamped `.bak` backup before any file mutation, unless `options.backup` is false.
+ * - Skips fixes that leave a citation unchanged; they are not counted or reported.
  * - When `options.dryRun` is true, returns a diff without writing any files.
  * - Fails fast with a clear error if path corrections are needed but `options.scope` is absent.
  *
@@ -124,30 +125,30 @@ export async function applyCitationFixes(
 		let anchorFixesApplied = 0;
 		const fixes: FixRecord[] = [];
 		for (const link of fixableLinks) {
-			let newCitation = link.fullMatch;
-			let fixType = "";
-			if (
-				link.validation.status !== "valid" &&
-				link.validation.pathConversion
-			) {
-				newCitation = applyPathConversion(
-					newCitation,
-					link.validation.pathConversion,
-				);
-				pathFixesApplied++;
-				fixType = "path";
-			}
-			if (isAnchorFixable(link)) {
-				newCitation = applyAnchorFix(newCitation, link);
-				anchorFixesApplied++;
-				fixType = fixType ? "path+anchor" : "anchor";
-			}
+			const pathCitation =
+				link.validation.status !== "valid" && link.validation.pathConversion
+					? applyPathConversion(link.fullMatch, link.validation.pathConversion)
+					: link.fullMatch;
+			const newCitation = isAnchorFixable(link)
+				? applyAnchorFix(pathCitation, link)
+				: pathCitation;
+			// A fix that leaves the citation unchanged is not a fix: skip it.
+			if (newCitation === link.fullMatch) continue;
+			const pathChanged = pathCitation !== link.fullMatch;
+			const anchorChanged = newCitation !== pathCitation;
+			if (pathChanged) pathFixesApplied++;
+			if (anchorChanged) anchorFixesApplied++;
 			fileContent = fileContent.replace(link.fullMatch, newCitation);
 			fixes.push({
 				line: link.line,
 				old: link.fullMatch,
 				new: newCitation,
-				type: fixType,
+				type:
+					pathChanged && anchorChanged
+						? "path+anchor"
+						: pathChanged
+							? "path"
+							: "anchor",
 			});
 			fixesApplied++;
 		}
@@ -168,16 +169,19 @@ export async function applyCitationFixes(
 				return output.join("\n");
 			}
 
-			// Write backup before mutating the file
-			const backupPath = `${filePath}.${Date.now()}.bak`;
-			fsWrite(backupPath, originalContent, "utf8");
+			// Write backup before mutating the file, unless --no-backup
+			const backupPath =
+				options.backup === false ? null : `${filePath}.${Date.now()}.bak`;
+			if (backupPath !== null) fsWrite(backupPath, originalContent, "utf8");
 
 			// Apply fix
 			fsWrite(filePath, fileContent, "utf8");
 
 			const output = [
 				`Fixed ${fixesApplied} citation${fixesApplied === 1 ? "" : "s"} in ${filePath}:`,
-				`  Backup written to: ${backupPath}`,
+				backupPath === null
+					? "  No backup written (--no-backup)."
+					: `  Backup written to: ${backupPath}`,
 			];
 			if (pathFixesApplied > 0)
 				output.push(
@@ -196,7 +200,7 @@ export async function applyCitationFixes(
 			}
 			return output.join("\n");
 		}
-		return `WARNING: Found ${fixableLinks.length} fixable citations but could not apply fixes`;
+		return `No auto-fixable citations found in ${filePath}`;
 	} catch (error) {
 		return `ERROR: ${error instanceof Error ? error.message : String(error)}`;
 	}

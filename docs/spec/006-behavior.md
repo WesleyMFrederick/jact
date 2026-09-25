@@ -109,12 +109,13 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 ## Fix Workflow (`--fix`)
 
-`JactCli.fix()` parses before selecting fixes. A document with the validation-disable directive returns the same successful skip result as validation and is not read again, backed up, or written. Other documents validate, filter to fixable links, require `--scope` for path fixes, and then either print a dry-run diff or create a timestamped backup before writing. Anchor fixes cover the kebab-case-to-raw-header conversion, a fuzzy header match for a missing anchor, and anchors with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same.
+`JactCli.fix()` parses before selecting fixes. A document with the validation-disable directive returns the same successful skip result as validation and is not read again, backed up, or written. Other documents validate, filter to fixable links, require `--scope` for path fixes, and then either print a dry-run diff or write the fixes. Before it writes, `--fix` creates a timestamped `.bak` backup; `--no-backup` skips the backup. Anchor fixes cover the kebab-case-to-raw-header conversion, a fuzzy header match for a missing anchor, and anchors with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged (for example, a missing anchor with no close header match) is not applied, counted, or reported. If no fix changes a citation, `--fix` prints `No auto-fixable citations found in <file>` and writes nothing.
 
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-09-25 | Added `--fix --no-backup`; `--fix` skips fixes that leave a citation unchanged |
 | 1.0.0-draft | 2026-09-25 | Added the error and `--fix` correction for header anchors with characters Obsidian drops (`: # \| ^ [ ]`) |
 | 1.0.0-draft | 2026-08-24 | Added byte-screened backlink candidates with exhaustive fallback and unchanged output semantics |
 | 1.0.0-draft | 2026-08-02 | Added progressive disclosure for batches above five errors while preserving complete verbose/JSON output and existing exit-code semantics |

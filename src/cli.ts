@@ -142,6 +142,10 @@ program
 		"preview fixes without writing files; prints a diff of what would change (use with --fix)",
 	)
 	.option(
+		"--no-backup",
+		"do not write the timestamped .bak backup before --fix changes a file",
+	)
+	.option(
 		"--verbose",
 		"show full validation report; in batch mode, expand error details that default output collapses",
 		false,
