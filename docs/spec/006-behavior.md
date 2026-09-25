@@ -43,7 +43,7 @@ When the scope resolves via `.obsidian` (not an explicit `--scope`), `JactCli` e
 
 ## Linked-context Backlink Discovery
 
-`extract header ... --linked-context` begins with the complete file list produced by [Scope Resolution Order](#Scope%20Resolution%20Order). Before parsing backlinks, `BacklinkCandidateFilter` reads each file as text and keeps files containing the root filename stem in decoded or percent-encoded form, case-insensitively. It always keeps the root file so same-file header links remain discoverable.
+`extract header ... --extract-linked-content` begins with the complete file list produced by [Scope Resolution Order](#Scope%20Resolution%20Order). Before parsing backlinks, `BacklinkCandidateFilter` reads each file as text and keeps files containing the root filename stem in decoded or percent-encoded form, case-insensitively. It always keeps the root file so same-file header links remain discoverable.
 
 The screen is excludes-only. Every candidate is parsed and every possible backlink is resolved through `CitationValidator.resolveCitationTarget()` before it can appear in the result. Unreadable files, an empty root stem, and candidate-filter failures use exhaustive parsing instead. Output, failures, exit codes, and `scope.filesScanned` therefore retain exhaustive-scan semantics.
 

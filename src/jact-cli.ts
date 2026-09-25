@@ -20,7 +20,10 @@ import {
 } from "./core/apply-citation-fixes.js";
 import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
-import type { LinkedHeaderContextQuery } from "./core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
+import {
+	followableMarkdownFile,
+	type LinkedHeaderContextQuery,
+} from "./core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
 import { generateContentId } from "./core/ContentExtractor/generateContentId.js";
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "./core/prepare-scope.js";
@@ -46,6 +49,7 @@ import { renderOutline } from "./outline/render-outline.js";
 import type ParsedDocument from "./ParsedDocument.js";
 import type { HeadingMatch, HeadingResolution } from "./ParsedDocument.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
+import { quote, shellFileArgument } from "./shellArgument.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type {
 	CliExtractOptions,
@@ -74,10 +78,6 @@ export interface OutlineCommandResult {
 
 const OUTLINE_CACHE_DIR = ".jact/claude-cache";
 
-function quote(value: string): string {
-	return JSON.stringify(value);
-}
-
 function headingLocation(match: HeadingMatch): string {
 	if (match.ancestors.length === 0) return "at document root";
 	return `under ${match.ancestors.map((heading) => quote(heading.text)).join(" > ")}`;
@@ -103,10 +103,6 @@ function formatHeadingResolution(resolution: HeadingResolution): string {
 		);
 	}
 	return lines.join("\n");
-}
-
-function shellFileArgument(filePath: string): string {
-	return /^[A-Za-z0-9_./-]+$/.test(filePath) ? filePath : quote(filePath);
 }
 
 function uniqueParentName(
@@ -489,7 +485,7 @@ export class JactCli {
 		try {
 			let scopeStats: CacheStats | undefined;
 			let document: ParsedDocument;
-			if (options.linkedContext) {
+			if (options.extractLinkedContent !== undefined) {
 				scopeStats = this.applyScope(options, targetFile);
 				const absoluteTarget = path.resolve(targetFile);
 				const linkedTarget = existsSync(absoluteTarget)
@@ -536,7 +532,7 @@ export class JactCli {
 				process.exitCode = 1;
 				return undefined;
 			}
-			if (options.linkedContext) {
+			if (options.extractLinkedContent !== undefined) {
 				if (scopeStats === undefined) {
 					throw new Error("Linked context scope was not prepared");
 				}
@@ -546,6 +542,7 @@ export class JactCli {
 					scopePath: scopeStats.scopeFolder,
 					scopeFiles: this.fileCache.getAllFiles().map((entry) => entry.path),
 					respectGitignore: true,
+					depth: options.extractLinkedContent,
 				});
 				if (!result.complete) process.exitCode = 1;
 				return result;
@@ -618,11 +615,11 @@ export class JactCli {
 		}
 	}
 
-	/** Create a synthetic whole-file citation, validate it, and extract the full file content. */
+	/** Create a synthetic whole-file citation, validate it, and extract the full file content, optionally following links to a depth. */
 	async extractFile(
 		targetFile: string,
 		options: CliExtractOptions,
-	): Promise<OutgoingLinksExtractedContent | undefined> {
+	): Promise<FileExtractionOutcome | undefined> {
 		try {
 			this.applyScope(options, targetFile);
 			// Fix(#63): Resolve to absolute before factory so target.path.raw is absolute.
@@ -652,10 +649,61 @@ export class JactCli {
 				process.exitCode = 1;
 				return;
 			}
-			return await this.contentExtractor.extractContent([enrichedLink], {
+			const depth = options.extractLinkedContent;
+			const links: EnrichedLinkObject[] = [enrichedLink];
+			let unfollowedLinkedFileCount = 0;
+			const rootPath = syntheticLink.target.path.absolute;
+			if (depth !== undefined && rootPath) {
+				const visited = new Set<string>([rootPath]);
+				let frontier = [rootPath];
+				// One probe level past `depth` counts files whose links would add content.
+				for (let level = 1; level <= depth + 1 && frontier.length > 0; level++) {
+					const next: string[] = [];
+					for (const filePath of frontier) {
+						const document =
+							await this.resolveDocumentFromPreparedScope(filePath);
+						const validation = await this.validator.validateDocument(
+							document,
+							filePath,
+						);
+						if (level > depth) {
+							const hasNewContent = validation.links.some((link) => {
+								const linkedPath = followableMarkdownFile(link);
+								return linkedPath
+									? !visited.has(linkedPath)
+									: link.scope === "cross-document" &&
+											link.anchorType !== null &&
+											link.validation.status !== "error" &&
+											link.extractionMarker?.innerText !== "stop-extract-link";
+							});
+							if (hasNewContent) unfollowedLinkedFileCount++;
+							continue;
+						}
+						for (const link of validation.links) {
+							links.push(link);
+							const linkedPath = followableMarkdownFile(link);
+							if (linkedPath && !visited.has(linkedPath)) {
+								visited.add(linkedPath);
+								next.push(linkedPath);
+							}
+						}
+					}
+					frontier = next;
+				}
+			}
+			const result = await this.contentExtractor.extractContent(links, {
 				...options,
 				fullFiles: true,
 			});
+			if (depth === undefined) return { result, nextStepHints: [] };
+			return {
+				result,
+				nextStepHints: linkedContentHints(
+					["file", targetFile],
+					depth,
+					unfollowedLinkedFileCount,
+				),
+			};
 		} catch (error) {
 			console.error(
 				"ERROR:",
@@ -724,4 +772,35 @@ export class JactCli {
 			_fs,
 		);
 	}
+}
+
+/** Result of `extract file`, plus agent navigation hints when linked content was requested. */
+export interface FileExtractionOutcome {
+	result: OutgoingLinksExtractedContent;
+	nextStepHints: string[];
+}
+
+/**
+ * `jact outline`-style next steps after a `--extract-linked-content` run.
+ * `commandArgs` = [subcommand, target file, ...remaining positional args].
+ */
+export function linkedContentHints(
+	commandArgs: readonly [string, string, ...string[]],
+	depth: number,
+	unfollowedDeeperFiles: number,
+): string[] {
+	const [subcommand, targetFile, ...rest] = commandArgs;
+	const file = shellFileArgument(targetFile);
+	const command = [`jact extract ${subcommand} ${file}`, ...rest.map(quote)].join(" ");
+	return [
+		...(unfollowedDeeperFiles > 0
+			? [
+					`[+] ${unfollowedDeeperFiles} linked file(s) contain further links not extracted (depth limit ${depth})`,
+					`To Go Deeper: run \`${command} --extract-linked-content ${depth + 1}\``,
+				]
+			: []),
+		'To Extract One Link Target: run `jact extract file "{{linked-file-path}}" --extract-linked-content`',
+		`To Review Links First: run \`jact extract links ${file} --verbose\``,
+		"To Read Around a Source or Via Line: open that `file:line` with your file-read tool (e.g. Read with offset = line)",
+	];
 }

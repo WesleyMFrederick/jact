@@ -98,7 +98,7 @@ createLinkedHeaderContextQuery(parsedFileCache?, fileCache?, validator?, content
 
 ### BacklinkCandidateFilter (`src/core/LinkedHeaderContext/BacklinkCandidateFilter.ts`)
 
-Screens the resolved scope before linked-context backlink parsing. `selectCandidates(scopeFiles, rootFilePath)` reads each non-root file once and keeps files containing the root filename stem in decoded or percent-encoded form, case-insensitively. The root file is always kept so internal links remain discoverable.
+Screens the resolved scope before `extract header --extract-linked-content` backlink parsing. `selectCandidates(scopeFiles, rootFilePath)` reads each non-root file once and keeps files containing the root filename stem in decoded or percent-encoded form, case-insensitively. The root file is always kept so internal links remain discoverable.
 
 This component can only exclude parse candidates; it does not create backlink facts. `LinkedHeaderContextQuery` still parses every candidate and confirms links through `CitationValidator.resolveCitationTarget()`. Unreadable files, an empty stem, or a filter failure fall back to exhaustive parsing. `scope.filesScanned` continues to report the full resolved scope size.
 

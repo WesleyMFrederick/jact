@@ -82,7 +82,11 @@ describe("ContentExtractor", () => {
 
 	it("keeps internal links excluded by default and extracts them only per call", async () => {
 		const resolveDocument = vi.fn().mockResolvedValue({
-			extractSection: () => "## Local\n\nLocal content.\n",
+			resolveHeading: (heading) => ({ status: "unique", match: heading }),
+			getResolvedSection: () => ({
+				content: "## Local\n\nLocal content.\n",
+				startLine: 1,
+			}),
 		});
 		const extractor = new ContentExtractor(
 			[new SectionLinkStrategy()],
@@ -321,10 +325,14 @@ describe("ContentExtractor", () => {
 
 			const mockParsedFileCache = {
 				resolveDocument: vi.fn().mockResolvedValue({
-					extractSection: (anchor) => {
-						if (anchor === "Section One") return "Content for section one";
-						if (anchor === "Section Two") return "Content for section two";
-					},
+					resolveHeading: (heading) => ({ status: "unique", match: heading }),
+					getResolvedSection: (heading) => ({
+						content:
+							heading === "Section One"
+								? "Content for section one"
+								: "Content for section two",
+						startLine: 1,
+					}),
 				}),
 			};
 

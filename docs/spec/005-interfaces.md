@@ -226,12 +226,15 @@ jact extract header <target-file> <header-name> [options]
 
 Builds a synthetic header link via `LinkObjectFactory.createHeaderLink()`, validates it, and extracts the section content. The default `markdown` output prefixes every extracted line in `cat -n` format: a right-aligned six-character source line followed by a tab. `--format json` preserves raw content and returns the structured extraction contract.
 
-**Exit codes:** `0` header extracted; `1` header not found or validation failed; `2` system error.
+`--extract-linked-content [depth]` also extracts linked sections, blocks, and whole markdown files, following links to `depth` (default `1`, minimum `1`), and lists backlinks to the header across the scope. The markdown output labels every block with `Source: file:start-end` and, for linked blocks, `Via: file:line` (the link that pulled it in). The same next-step hints and `--max-chars` content map as [`jact extract file <target-file>`](#`jact extract file <target-file>`) apply; the header map keeps the backlinks and failures lists.
+
+**Exit codes:** `0` header extracted (and all linked content resolved); `1` header not found, validation failed, or some linked content failed to resolve; `2` system error.
 
 ```bash
 jact extract header plan.md "Task 1: Implementation"
 jact extract header docs/guide.md "Overview" --scope ./docs
 jact extract header file.md "Design" --format json | jq '.extractedContentBlocks'
+jact extract header plan.md "Overview" --extract-linked-content 2
 ```
 
 ---
@@ -244,9 +247,18 @@ jact extract file <target-file> [options]
 
 Builds a synthetic full-file link via `LinkObjectFactory.createFileLink()`, validates it, and extracts the entire file content. The default `markdown` output prefixes every line in `cat -n` format using its original one-based source line. `--format json` returns the structured extraction contract with raw, unnumbered content.
 
+`--extract-linked-content [depth]` also extracts what the file links to, following linked files up to `depth` levels (whole number ≥ 1; default `1`). Linked section and block links extract that section or block; full-file links to `.md` files extract the file and, while depth remains, its links. Each file is followed once, so link cycles end. Links marked `%%stop-extract-link%%` are neither extracted nor followed. Without the option, only the target file is extracted.
+
+After the content, `jact outline`-style next-step hints follow — on stdout for `markdown`, on stderr for `json` so stdout stays parseable. A `[+] … To Go Deeper` hint with the next depth appears only when the depth limit cut off links that would add content.
+
+`--max-chars <n>` (default `28000`, whole number ≥ 1) caps `markdown` output from `--extract-linked-content`. When the full output would exceed it, jact prints a **content map** instead: one row per block with its `Source`, `Via`, character count, and a command that loads only that block (`jact extract header` for section links, `jact extract file` for whole-file links, a line range for block links). A `To Print Everything Anyway` hint gives the `--max-chars` value that prints it all. The default fits a default Claude Code Bash result, which shows 30,000 characters inline. `json` output is never replaced.
+
 ```bash
 jact extract file docs/architecture.md
 jact extract file docs/architecture.md --format json | jq '.extractedContentBlocks'
+jact extract file docs/plan.md --extract-linked-content
+jact extract file docs/plan.md --extract-linked-content 2
+jact extract file docs/plan.md --extract-linked-content --max-chars 100000
 ```
 
 ---
@@ -273,6 +285,7 @@ Exit code `2` is consistent across `validate`, `outline`, `ast`, and `extract` f
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-09-25 | Added `--extract-linked-content [depth]` to `extract file` and `extract header` (replaces `extract header --linked-context`) with depth-limited link following, `Source:`/`Via:` labels, and next-step hints; linked section and block content now carries source start lines; both commands print a content map above `--max-chars` |
 | 1.0.0-draft | 2026-08-13 | Made numbered markdown the default output for `extract header` and `extract file`; explicit JSON remains raw |
 | 1.0.0-draft | 2026-08-02 | Added five-error batch disclosure threshold, failing-file error counts, drill/filter/fix guidance, and verbose expansion without changing exit codes |
 | 1.0.0-draft | 2026-08-02 | Added bounded duplicate-path diagnostics, verbose expansion, and explicit document-skip output |

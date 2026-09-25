@@ -50,7 +50,10 @@ export interface CliExtractOptions {
 	session?: string;
 	within?: string;
 	verbose?: boolean;
-	linkedContext?: boolean;
+	/** Link depth followed by `extract file` / `extract header`; undefined = no linking */
+	extractLinkedContent?: number;
+	/** Above this many characters, `extract file` linked output becomes a content map. */
+	maxChars?: number;
 }
 
 /** CLI options for the text-only outline command. */

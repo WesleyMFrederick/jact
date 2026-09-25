@@ -1,10 +1,11 @@
-import { relative, sep } from "node:path";
+import { extname, relative, resolve, sep } from "node:path";
 import type ParsedDocument from "../../ParsedDocument.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import type { CliFlags } from "../../types/cli-types.js";
 import type {
 	EligibilityDecision,
 	LinkedContentSource,
+	LinkedExtractedContentBlock,
 	LinkedContextSourcePosition,
 	LinkedContextTarget,
 	LinkedHeaderContextInput,
@@ -47,10 +48,10 @@ export interface LinkedHeaderContextQueryLike {
 	execute(input: LinkedHeaderContextInput): Promise<LinkedHeaderContextResult>;
 }
 
-interface ResolvedOutgoingLink {
-	link: LinkObject;
-	target: ResolvedCitationTarget;
-	enriched: EnrichedLinkObject;
+/** Links found in one source (root section or a followed file) awaiting a depth level. */
+interface PendingLinks {
+	file: string;
+	links: readonly LinkObject[];
 }
 
 export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
@@ -103,123 +104,152 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 			};
 		const outgoingLinks: LinkedHeaderContextResult["outgoingLinks"] = [];
 		const failures: LinkedHeaderContextResult["failures"] = [];
-		const resolvedOutgoing: ResolvedOutgoingLink[] = [];
-		const resolvedOutgoingIndexes: number[] = [];
+		const seenContentIds = new Set<string>([rootContentId]);
+		const expandedFiles = new Set<string>();
+		const recordContent = (
+			contentId: string,
+			block: LinkedExtractedContentBlock,
+		): "extracted" | "deduplicated" => {
+			if (seenContentIds.has(contentId)) return "deduplicated";
+			seenContentIds.add(contentId);
+			extractedContentBlocks[contentId] = block;
+			return "extracted";
+		};
 
-		for (const link of rootSection.links) {
-			const source = this.sourcePosition(input.scopePath, rootFile, link);
-			if (link.anchorType === null) {
-				outgoingLinks.push({
-					source,
-					status: "not-followed",
-					reason:
-						"Whole-file and remote targets are outside linked-context scope",
-				});
-				continue;
+		let pending: PendingLinks[] = [{ file: rootFile, links: rootSection.links }];
+		for (let level = 1; level <= input.depth && pending.length > 0; level++) {
+			const next: PendingLinks[] = [];
+			for (const { file, links } of pending) {
+				for (const link of links) {
+					const source = this.sourcePosition(input.scopePath, file, link);
+					const eligibility = this.contentExtractor.analyzeEligibility(
+						link,
+						{ fullFiles: true },
+					);
+					if (!eligibility.eligible) {
+						outgoingLinks.push({
+							source,
+							status: "not-followed",
+							reason: eligibility.reason,
+						});
+						continue;
+					}
+
+					if (link.anchorType === null) {
+						const targetFile = followableMarkdownFile(link);
+						if (targetFile === undefined) {
+							outgoingLinks.push({
+								source,
+								status: "not-followed",
+								reason: "Remote, unresolved, or non-markdown targets are not followed",
+							});
+							continue;
+						}
+						const document = await this.parsedDocuments.resolveDocument({
+							kind: "file",
+							filePath: targetFile,
+						});
+						const content = document.extractFullContent();
+						const contentId = generateContentId(content);
+						const lineCount =
+							content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
+						const target: LinkedContextTarget = {
+							file: this.scopeRelativePath(input.scopePath, targetFile),
+							kind: "file",
+						};
+						const status = recordContent(contentId, {
+							content,
+							contentLength: content.length,
+							startLine: 1,
+							sourceLinks: [],
+							source: { ...target, startLine: 1, endLine: Math.max(lineCount, 1) },
+						});
+						outgoingLinks.push({ source, target, status, contentId });
+						if (!expandedFiles.has(targetFile)) {
+							expandedFiles.add(targetFile);
+							next.push({ file: targetFile, links: document.getLinks() });
+						}
+						continue;
+					}
+
+					const resolution = await this.validator.resolveCitationTarget(
+						link,
+						file,
+					);
+					if (resolution.status !== "resolved") {
+						const reason = resolution.reason;
+						outgoingLinks.push({ source, status: "failed", reason });
+						failures.push({ source, reason });
+						continue;
+					}
+					const enriched = enrichLinkObject(link, { status: "valid" });
+					const extraction = await this.contentExtractor.extractContent(
+						[
+							{
+								...enriched,
+								target: {
+									...enriched.target,
+									path: {
+										...enriched.target.path,
+										absolute: resolution.target.filePath,
+									},
+								},
+								validation: { status: "valid" },
+							},
+						],
+						{},
+						{ includeInternal: true },
+					);
+					const target = this.publicTarget(input.scopePath, resolution.target);
+					const processed = extraction.outgoingLinksReport.processedLinks[0];
+					const extractedBlock =
+						processed?.contentId == null
+							? undefined
+							: extraction.extractedContentBlocks[processed.contentId];
+					if (
+						processed?.status !== "extracted" ||
+						processed.contentId === null ||
+						typeof extractedBlock !== "object"
+					) {
+						const reason =
+							processed?.failureDetails?.reason ??
+							"Linked content extraction failed";
+						outgoingLinks.push({ source, target, status: "failed", reason });
+						failures.push({ source, reason });
+						continue;
+					}
+					const status = recordContent(processed.contentId, {
+						...extractedBlock,
+						source: await this.contentSource(
+							input.scopePath,
+							resolution.target,
+						),
+					});
+					outgoingLinks.push({
+						source,
+						target,
+						status,
+						contentId: processed.contentId,
+					});
+				}
 			}
-
-			const eligibility = this.contentExtractor.analyzeEligibility(link, {});
-			if (!eligibility.eligible) {
-				outgoingLinks.push({
-					source,
-					status: "not-followed",
-					reason: eligibility.reason,
-				});
-				continue;
-			}
-
-			const resolution = await this.validator.resolveCitationTarget(
-				link,
-				rootFile,
-			);
-			if (resolution.status !== "resolved") {
-				const reason = resolution.reason;
-				outgoingLinks.push({ source, status: "failed", reason });
-				failures.push({ source, reason });
-				continue;
-			}
-
-			const enriched = enrichLinkObject(link, { status: "valid" });
-			const extractionLink: EnrichedLinkObject = {
-				...enriched,
-				target: {
-					...enriched.target,
-					path: {
-						...enriched.target.path,
-						absolute: resolution.target.filePath,
-					},
-				},
-				validation: { status: "valid" },
-			};
-			resolvedOutgoingIndexes.push(outgoingLinks.length);
-			outgoingLinks.push({
-				source,
-				target: this.publicTarget(input.scopePath, resolution.target),
-				status: "failed",
-				reason: "Extraction did not return a result",
-			});
-			resolvedOutgoing.push({
-				link,
-				target: resolution.target,
-				enriched: extractionLink,
-			});
+			pending = next;
 		}
 
-		if (resolvedOutgoing.length > 0) {
-			const extraction = await this.contentExtractor.extractContent(
-				resolvedOutgoing.map(({ enriched }) => enriched),
-				{},
-				{ includeInternal: true },
-			);
-			const seenContentIds = new Set<string>([rootContentId]);
-			for (let index = 0; index < resolvedOutgoing.length; index++) {
-				const resolved = resolvedOutgoing[index];
-				const processed = extraction.outgoingLinksReport.processedLinks[index];
-				const outputIndex = resolvedOutgoingIndexes[index];
+		// Files left at the depth boundary whose links would still add content.
+		const unfollowedDeeperFiles = pending.filter(({ links }) =>
+			links.some((link) => {
 				if (
-					resolved === undefined ||
-					processed === undefined ||
-					outputIndex === undefined
+					!this.contentExtractor.analyzeEligibility(link, { fullFiles: true })
+						.eligible
 				) {
-					throw new Error("Content extractor returned misaligned link results");
+					return false;
 				}
-				const outgoing = outgoingLinks[outputIndex];
-				if (outgoing === undefined) {
-					throw new Error("Missing outgoing link result slot");
-				}
-
-				if (processed.status !== "extracted" || processed.contentId === null) {
-					const reason =
-						processed.failureDetails?.reason ??
-						"Direct linked content extraction failed";
-					outgoing.status = "failed";
-					outgoing.reason = reason;
-					failures.push({ source: outgoing.source, reason });
-					continue;
-				}
-
-				const contentId = processed.contentId;
-				outgoing.contentId = contentId;
-				outgoing.status = seenContentIds.has(contentId)
-					? "deduplicated"
-					: "extracted";
-				delete outgoing.reason;
-				if (seenContentIds.has(contentId)) continue;
-				seenContentIds.add(contentId);
-
-				const extractedBlock = extraction.extractedContentBlocks[contentId];
-				if (
-					typeof extractedBlock === "number" ||
-					extractedBlock === undefined
-				) {
-					throw new Error(`Missing extracted content block: ${contentId}`);
-				}
-				extractedContentBlocks[contentId] = {
-					...extractedBlock,
-					source: await this.contentSource(input.scopePath, resolved.target),
-				};
-			}
-		}
+				if (link.anchorType !== null) return link.scope === "cross-document";
+				const targetFile = followableMarkdownFile(link);
+				return targetFile !== undefined && !expandedFiles.has(targetFile);
+			}),
+		).length;
 
 		const backlinks: LinkedHeaderContextResult["backlinks"] = [];
 		const sortedScopeFiles = [...input.scopeFiles].sort((a, b) =>
@@ -299,6 +329,8 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 		return {
 			mode: "linked-context",
 			complete: failures.length === 0,
+			depth: input.depth,
+			unfollowedDeeperFiles,
 			scope: {
 				path: input.scopePath,
 				filesScanned: sortedScopeFiles.length,
@@ -388,4 +420,19 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 	private scopeRelativePath(scopePath: string, filePath: string): string {
 		return relative(scopePath, filePath).split(sep).join("/");
 	}
+}
+
+/** Absolute markdown file a valid, unstopped whole-file link points to; otherwise undefined. */
+export function followableMarkdownFile(link: LinkObject): string | undefined {
+	const absolute = link.target.path.absolute;
+	if (
+		link.validation?.status === "error" ||
+		link.anchorType !== null ||
+		link.extractionMarker?.innerText === "stop-extract-link" ||
+		!absolute ||
+		extname(absolute).toLowerCase() !== ".md"
+	) {
+		return undefined;
+	}
+	return resolve(decodeURIComponent(absolute));
 }

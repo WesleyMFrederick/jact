@@ -29,9 +29,9 @@ function runHeader(...extraArguments: string[]) {
 	);
 }
 
-describe("extract header --linked-context", () => {
-	it("returns one-hop content, semantic backlinks, policy decisions, and stable ordering", () => {
-		const execution = runHeader("--linked-context", "--format", "json");
+describe("extract header --extract-linked-content", () => {
+	it("returns depth-1 content, semantic backlinks, policy decisions, and stable ordering", () => {
+		const execution = runHeader("--extract-linked-content", "--format", "json");
 
 		expect(execution.status).toBe(0);
 		const result = JSON.parse(execution.stdout);
@@ -44,14 +44,15 @@ describe("extract header --linked-context", () => {
 			},
 			stats: {
 				directLinks: 6,
-				uniqueLinkedContent: 3,
+				uniqueLinkedContent: 4,
 				backlinks: 2,
 			},
 		});
 		const blocks = Object.entries(result.extractedContentBlocks).filter(
 			([key]) => key !== "_totalContentCharacterLength",
 		);
-		expect(blocks).toHaveLength(4);
+		expect(blocks).toHaveLength(5);
+		expect(result.depth).toBe(1);
 		expect(
 			result.outgoingLinks.map(({ status }: { status: string }) => status),
 		).toEqual([
@@ -60,7 +61,7 @@ describe("extract header --linked-context", () => {
 			"deduplicated",
 			"extracted",
 			"not-followed",
-			"not-followed",
+			"extracted",
 		]);
 		expect(
 			result.backlinks.map(
@@ -84,13 +85,13 @@ describe("extract header --linked-context", () => {
 		expect(extractedText).toContain("Local content.");
 		expect(extractedText).toContain("Target content.");
 		expect(extractedText).toContain("Block content. ^linked-block");
-		expect(extractedText).not.toContain("This content must not be followed.");
+		expect(extractedText).toContain("This content must not be followed.");
 		expect(result.failures).toEqual([]);
 	});
 
 	it("returns byte-identical JSON ordering for unchanged files", () => {
-		const first = runHeader("--linked-context", "--format", "json");
-		const second = runHeader("--linked-context", "--format", "json");
+		const first = runHeader("--extract-linked-content", "--format", "json");
+		const second = runHeader("--extract-linked-content", "--format", "json");
 
 		expect(first.status).toBe(0);
 		expect(second.status).toBe(0);
@@ -98,15 +99,27 @@ describe("extract header --linked-context", () => {
 	});
 
 	it("renders the complete context contract as numbered Markdown", () => {
-		const execution = runHeader("--linked-context");
+		const execution = runHeader("--extract-linked-content");
 
 		expect(execution.status).toBe(0);
 		expect(execution.stdout).toContain("# Header context");
 		expect(execution.stdout).toContain("Complete: yes");
 		expect(execution.stdout).toContain("## Root");
-		expect(execution.stdout).toContain("## Direct linked content");
+		expect(execution.stdout).toContain("## Linked content (depth 1)");
 		expect(execution.stdout).toContain("## Backlinks to root");
 		expect(execution.stdout).toContain("     3\t## Root");
+		expect(execution.stdout).toContain("- backlinks.md:3 —");
+	});
+
+	it("prints a cwd-runnable content map, keeping backlinks, above --max-chars", () => {
+		const execution = runHeader("--extract-linked-content", "--max-chars", "100");
+
+		expect(execution.status).toBe(0);
+		expect(execution.stdout).toContain("# Content map");
+		expect(execution.stdout).not.toContain("     3\t## Root");
+		expect(execution.stdout).toContain(
+			'`jact extract header test/fixtures/linked-header-context/root.md "Root"`',
+		);
 		expect(execution.stdout).toContain("- backlinks.md:3 —");
 	});
 
@@ -121,7 +134,7 @@ describe("extract header --linked-context", () => {
 				"Invalid Root",
 				"--scope",
 				fixtureScope,
-				"--linked-context",
+				"--extract-linked-content",
 				"--format",
 				"json",
 			],
@@ -150,7 +163,7 @@ describe("extract header --linked-context", () => {
 				"header",
 				"--scope",
 				fixtureScope,
-				"--linked-context",
+				"--extract-linked-content",
 			],
 			{ cwd: repositoryRoot, encoding: "utf8" },
 		);
