@@ -1,5 +1,5 @@
 import { exec } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -238,5 +238,40 @@ describe("CLI extract file --extract-linked-content", () => {
 			{ cwd: dir },
 		);
 		expect(section).toContain("Part body");
+	});
+
+	it("lists unreadable and missing links under Failures, still extracts the rest, and exits 1", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "jact-linked-locked-"));
+		const scope = join(dir, "scope");
+		mkdirSync(scope);
+		writeFileSync(join(scope, "package.json"), "{}");
+		writeFileSync(
+			join(scope, "root.md"),
+			"# Root\n\n[Locked](../locked.md) [Gone](gone.md) [A](a.md)\n",
+		);
+		writeFileSync(join(scope, "a.md"), "# A\n\nA body\n");
+		writeFileSync(join(dir, "locked.md"), "# Locked\n");
+		chmodSync(join(dir, "locked.md"), 0o000);
+
+		try {
+			const failure = await run(scope, "--extract-linked-content").catch(
+				(error) => error,
+			);
+
+			expect(failure.code).toBe(1);
+			expect(failure.stdout).toContain("A body");
+			const failures = failure.stdout.split("## Failures")[1];
+			expect(failures).toMatch(/root\.md:3 — EACCES/);
+			expect(failures).toMatch(/root\.md:3 — .*File not found: gone\.md/);
+
+			const json = await run(scope, "--extract-linked-content --format json").catch(
+				(error) => error,
+			);
+			expect(json.code).toBe(1);
+			expect(() => JSON.parse(json.stdout)).not.toThrow();
+			expect(json.stderr).toMatch(/Failures:\n- root\.md:3 — EACCES/);
+		} finally {
+			chmodSync(join(dir, "locked.md"), 0o600);
+		}
 	});
 });
