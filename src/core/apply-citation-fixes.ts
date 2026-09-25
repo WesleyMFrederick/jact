@@ -16,6 +16,7 @@ import type {
 	EnrichedLinkObject,
 	FixRecord,
 } from "../types/validationTypes.js";
+import { OBSIDIAN_DROPPED_CHARS_ERROR } from "./CitationValidator/AnchorMatcher.js";
 import type { CitationValidator } from "./CitationValidator/CitationValidator.js";
 import { applyAnchorFix, applyPathConversion } from "./citationFixer.js";
 import { VALIDATION_DISABLED_REASON } from "../validate/validation-disable.js";
@@ -32,6 +33,17 @@ export interface FixFsOverrides {
 	readFileSync?: (p: string, enc: BufferEncoding) => string;
 	writeFileSync?: (p: string, data: string, enc: BufferEncoding) => void;
 }
+
+/** True when the validator reported an anchor error that `--fix` can rewrite. */
+const isAnchorFixable = (link: EnrichedLinkObject): boolean =>
+	link.validation.status === "error" &&
+	(link.validation.error.includes(OBSIDIAN_DROPPED_CHARS_ERROR) ||
+		(link.validation.suggestion !== undefined &&
+			(link.validation.suggestion.includes(
+				"Use raw header format for better Obsidian compatibility",
+			) ||
+				(link.validation.error.startsWith("Anchor not found") &&
+					link.validation.suggestion.includes("Available headers:")))));
 
 /**
  * Validate citations in filePath, auto-fix path/anchor issues, write in-place.
@@ -89,13 +101,7 @@ export async function applyCitationFixes(
 			(link: EnrichedLinkObject) =>
 				(link.validation.status === "warning" &&
 					link.validation.pathConversion) ||
-				(link.validation.status === "error" &&
-					link.validation.suggestion &&
-					(link.validation.suggestion.includes(
-						"Use raw header format for better Obsidian compatibility",
-					) ||
-						(link.validation.error.startsWith("Anchor not found") &&
-							link.validation.suggestion.includes("Available headers:")))),
+				isAnchorFixable(link),
 		);
 		if (fixableLinks.length === 0) {
 			return `No auto-fixable citations found in ${filePath}`;
@@ -131,15 +137,7 @@ export async function applyCitationFixes(
 				pathFixesApplied++;
 				fixType = "path";
 			}
-			if (
-				link.validation.status === "error" &&
-				link.validation.suggestion &&
-				(link.validation.suggestion.includes(
-					"Use raw header format for better Obsidian compatibility",
-				) ||
-					(link.validation.error.startsWith("Anchor not found") &&
-						link.validation.suggestion.includes("Available headers:")))
-			) {
+			if (isAnchorFixable(link)) {
 				newCitation = applyAnchorFix(newCitation, link);
 				anchorFixesApplied++;
 				fixType = fixType ? "path+anchor" : "anchor";

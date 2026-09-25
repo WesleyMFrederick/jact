@@ -73,6 +73,16 @@ Internally, `PathResolver.resolveTargetPath()` (`src/core/CitationValidator/Path
 
 `validateAnchorExists()` (`AnchorMatcher.ts:142-279`) wraps this with additional passes checked *before* falling through to the flexible matcher: a direct `ParsedDocument.hasAnchor()` check, block-ref-without-caret detection (a link to `^id` that omits the leading `^`), URL-decoded `%20` matching for emphasis-marked anchors, and `^`-prefixed Obsidian block-reference matching. If nothing matches, it falls back to an Obsidian "better format" suggestion (prefer the raw header over a guessed kebab-case slug) and, failing that, Levenshtein-based similar-anchor suggestions.
 
+### Anchors with characters Obsidian drops
+
+Obsidian drops `:` `#` `|` `^` `[` `]` from heading-link anchors. It renders an anchor that keeps any of these characters as an external link. Before the matching passes, `validateAnchorExists()` decodes a header anchor (an anchor that does not start with `^`) and checks it for these characters. If the anchor has one, `AnchorMatcher` replaces each character with a space, collapses whitespace, and matches again. When a header matches, the link is an error:
+
+- `error`: `Anchor uses characters Obsidian drops (<chars>): #<anchor>`
+- `suggestion`: the corrected anchor, `#` + the header text with those characters replaced and whitespace collapsed, spaces encoded as `%20`. Examples: `#Q1%20Does%20the%20gap?` for the heading `Q1: Does the gap?`; `#Trace%20run%20(opsx%20continue)` for the heading `Trace: run (opsx:continue)`
+- `anchorConversion`: the same correction, which `--fix` applies
+
+If no header matches after the replacement, the normal `Anchor not found` result applies. Its `Available headers` list and its fuzzy-match `--fix` correction use the same replacement, so they never suggest an anchor that this rule rejects.
+
 ## Extraction Eligibility Order
 
 `ContentExtractor.extractContent()` runs each cross-document link (internal links are filtered out first, per AC15) through `analyzeEligibility()`, which tries strategies in this fixed order (`componentFactory.ts:95-99`, wired in `createContentExtractor`):
@@ -99,12 +109,13 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 ## Fix Workflow (`--fix`)
 
-`JactCli.fix()` parses before selecting fixes. A document with the validation-disable directive returns the same successful skip result as validation and is not read again, backed up, or written. Other documents validate, filter to fixable links, require `--scope` for path fixes, and then either print a dry-run diff or create a timestamped backup before writing.
+`JactCli.fix()` parses before selecting fixes. A document with the validation-disable directive returns the same successful skip result as validation and is not read again, backed up, or written. Other documents validate, filter to fixable links, require `--scope` for path fixes, and then either print a dry-run diff or create a timestamped backup before writing. Anchor fixes cover the kebab-case-to-raw-header conversion, a fuzzy header match for a missing anchor, and anchors with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same.
 
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-09-25 | Added the error and `--fix` correction for header anchors with characters Obsidian drops (`: # \| ^ [ ]`) |
 | 1.0.0-draft | 2026-08-24 | Added byte-screened backlink candidates with exhaustive fallback and unchanged output semantics |
 | 1.0.0-draft | 2026-08-02 | Added progressive disclosure for batches above five errors while preserving complete verbose/JSON output and existing exit-code semantics |
 | 1.0.0-draft | 2026-08-02 | Added bounded duplicate diagnostics and parser-derived document opt-out across validation, batch, stdin, and fix |

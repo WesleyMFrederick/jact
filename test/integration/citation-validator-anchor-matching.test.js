@@ -8,7 +8,7 @@ const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "..", "fixtures");
 
 describe("CitationValidator Anchor Matching with Dual IDs", () => {
-	it("should match anchor using raw ID format", async () => {
+	it("should flag raw ID format with a colon and suggest the URL-encoded ID", async () => {
 		// Given: Validator with test fixture containing header "Story 1.5: Implement Cache"
 		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "anchor-matching-source.md");
@@ -16,14 +16,20 @@ describe("CitationValidator Anchor Matching with Dual IDs", () => {
 		// When: Validate link using RAW format: #Story 1.5: Implement Cache
 		const result = await validateDocumentFile(testFile);
 
-		// Then: Validation succeeds (finds anchor by id field)
+		// Then: The anchor resolves, but Obsidian drops the colon, so it is an error
 		const linkObject = result.links.find(
 			(link) =>
 				link.fullMatch ===
 				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
 		);
 		expect(linkObject).toBeDefined();
-		expect(linkObject.validation.status).toBe("valid");
+		expect(linkObject.validation.status).toBe("error");
+		expect(linkObject.validation.error).toMatch(
+			/^Anchor uses characters Obsidian drops/,
+		);
+		expect(linkObject.validation.suggestion).toBe(
+			"#Story%201.5%20Implement%20Cache",
+		);
 	});
 
 	it("should match anchor using URL-encoded ID format", async () => {
@@ -42,33 +48,6 @@ describe("CitationValidator Anchor Matching with Dual IDs", () => {
 		);
 		expect(linkObject).toBeDefined();
 		expect(linkObject.validation.status).toBe("valid");
-	});
-
-	it("should match both ID formats to same anchor object", async () => {
-		// Given: Fixture with header "Story 1.5: Implement Cache"
-		const { validateDocumentFile } = createCitationHarness();
-		const testFile = join(fixturesDir, "anchor-matching-source.md");
-
-		// When: Validate both raw and encoded formats
-		const result = await validateDocumentFile(testFile);
-
-		// Then: Both succeed (both match SAME underlying anchor)
-		const rawLink = result.links.find(
-			(link) =>
-				link.fullMatch ===
-				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
-		);
-		const encodedLink = result.links.find(
-			(link) =>
-				link.fullMatch ===
-				"[Link using URL-encoded format](anchor-matching.md#Story%201.5%20Implement%20Cache)",
-		);
-
-		expect(rawLink).toBeDefined();
-		expect(rawLink.validation.status).toBe("valid");
-		expect(encodedLink).toBeDefined();
-		expect(encodedLink.validation.status).toBe("valid");
-		// Both should reference same anchor object in parsed data
 	});
 
 	it("should fail validation when anchor not found in either ID field", async () => {

@@ -7,8 +7,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "..", "fixtures");
 
+/**
+ * A link resolves to its heading when it is valid, or when the only problem is
+ * that its anchor keeps characters Obsidian drops (`: # | ^ [ ]`).
+ */
+function expectResolvesToHeading(link) {
+	if (link.validation.status === "valid") return;
+	expect(link.validation.error).toMatch(
+		/^Anchor uses characters Obsidian drops/,
+	);
+}
+
 describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
-	it("should validate all internal links in backtick-anchors fixture without errors", async () => {
+	it("should resolve every internal link in backtick-anchors fixture to its heading", async () => {
 		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "backtick-anchors.md");
 
@@ -16,12 +27,10 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 
 		expect(result.summary.total).toBeGreaterThan(0);
 
-		// No link should have validation errors - all reference valid headings
-		const errorLinks = result.links.filter(
-			(link) => link.validation.status === "error",
-		);
-
-		expect(errorLinks).toEqual([]);
+		// Every link references an existing heading
+		for (const link of result.links) {
+			expectResolvesToHeading(link);
+		}
 	});
 
 	it("should not produce duplicate links from regex fallback when token parser succeeds", async () => {
@@ -58,7 +67,7 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 		expect(nestedParenLinks.length).toBeGreaterThanOrEqual(2);
 
 		for (const link of nestedParenLinks) {
-			expect(link.validation.status).toBe("valid");
+			expectResolvesToHeading(link);
 		}
 	});
 
@@ -76,7 +85,7 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 		expect(backtickLinks.length).toBeGreaterThanOrEqual(1);
 
 		for (const link of backtickLinks) {
-			expect(link.validation.status).toBe("valid");
+			expectResolvesToHeading(link);
 		}
 	});
 
@@ -97,7 +106,7 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 		expect(encodedParenLinks.length).toBeGreaterThanOrEqual(2);
 
 		for (const link of encodedParenLinks) {
-			expect(link.validation.status).toBe("valid");
+			expectResolvesToHeading(link);
 		}
 	});
 
@@ -118,7 +127,7 @@ describe("Internal links with backticks in anchor IDs (Issue #27)", () => {
 		expect(unencodedLinks.length).toBeGreaterThanOrEqual(1);
 
 		for (const link of unencodedLinks) {
-			expect(link.validation.status).toBe("valid");
+			expectResolvesToHeading(link);
 		}
 	});
 });
