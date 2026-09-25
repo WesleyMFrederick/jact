@@ -660,8 +660,13 @@ export class JactCli {
 				for (let level = 1; level <= depth + 1 && frontier.length > 0; level++) {
 					const next: string[] = [];
 					for (const filePath of frontier) {
-						const document =
-							await this.resolveDocumentFromPreparedScope(filePath);
+						let document: ParsedDocument;
+						try {
+							document = await this.resolveDocumentFromPreparedScope(filePath);
+						} catch {
+							// ContentExtractor reports this link's read failure; skip its outgoing links.
+							continue;
+						}
 						const validation = await this.validator.validateDocument(
 							document,
 							filePath,

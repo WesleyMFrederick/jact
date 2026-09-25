@@ -1,5 +1,5 @@
 import { exec } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -238,5 +238,25 @@ describe("CLI extract file --extract-linked-content", () => {
 			{ cwd: dir },
 		);
 		expect(section).toContain("Part body");
+	});
+
+	it("skips an unreadable linked file and still extracts the other links", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "jact-linked-locked-"));
+		const scope = join(dir, "scope");
+		mkdirSync(scope);
+		writeFileSync(join(scope, "package.json"), "{}");
+		writeFileSync(join(scope, "root.md"), "# Root\n\n[Locked](../locked.md) [A](a.md)\n");
+		writeFileSync(join(scope, "a.md"), "# A\n\nA body\n");
+		writeFileSync(join(dir, "locked.md"), "# Locked\n");
+		chmodSync(join(dir, "locked.md"), 0o000);
+
+		try {
+			const { stdout } = await run(scope, "--extract-linked-content");
+
+			expect(stdout).toContain("A body");
+			expect(stdout).not.toContain("ERROR:");
+		} finally {
+			chmodSync(join(dir, "locked.md"), 0o600);
+		}
 	});
 });
