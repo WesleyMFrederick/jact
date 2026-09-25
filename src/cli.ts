@@ -259,25 +259,26 @@ Exit Codes:
 				console.log(result);
 			}
 
-			// Set exit code based on validation result (only for validation, not fix)
+			// Set exit code based on validation result (only for validation, not fix).
+			// Use process.exitCode, not process.exit(): exit() ends the process
+			// before a piped stdout drains and truncates output at 64KB.
 			if (!options.fix) {
 				if (options.format === "json") {
 					const parsed = JSON.parse(result);
 					if (parsed.error) {
-						process.exit(2); // File not found or other errors
+						process.exitCode = 2; // File not found or other errors
 					} else {
-						process.exit(parsed.summary?.errors > 0 ? 1 : 0);
+						process.exitCode = parsed.summary?.errors > 0 ? 1 : 0;
 					}
 				} else {
 					if (result.includes("ERROR:")) {
-						process.exit(2); // File not found or other errors
+						process.exitCode = 2; // File not found or other errors
 					} else {
 						// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
-						process.exit(
+						process.exitCode =
 							result.includes("FAILED:") || result.includes("VALIDATION FAILED")
 								? 1
-								: 0,
-						);
+								: 0;
 					}
 				}
 			}
