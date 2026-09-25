@@ -145,10 +145,19 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 							});
 							continue;
 						}
-						const document = await this.parsedDocuments.resolveDocument({
-							kind: "file",
-							filePath: targetFile,
-						});
+						let document: ParsedDocument;
+						try {
+							document = await this.parsedDocuments.resolveDocument({
+								kind: "file",
+								filePath: targetFile,
+							});
+						} catch (error) {
+							const reason =
+								error instanceof Error ? error.message : String(error);
+							outgoingLinks.push({ source, status: "failed", reason });
+							failures.push({ source, reason });
+							continue;
+						}
 						const content = document.extractFullContent();
 						const contentId = generateContentId(content);
 						const lineCount =
@@ -162,7 +171,11 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 							contentLength: content.length,
 							startLine: 1,
 							sourceLinks: [],
-							source: { ...target, startLine: 1, endLine: Math.max(lineCount, 1) },
+							source: {
+								...target,
+								startLine: 1,
+								endLine: Math.max(lineCount, 1),
+							},
 						});
 						outgoingLinks.push({ source, target, status, contentId });
 						if (!expandedFiles.has(targetFile)) {

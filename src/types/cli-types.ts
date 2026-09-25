@@ -52,7 +52,7 @@ export interface CliExtractOptions {
 	verbose?: boolean;
 	/** Link depth followed by `extract file` / `extract header`; undefined = no linking */
 	extractLinkedContent?: number;
-	/** Above this many characters, `extract file` linked output becomes a content map. */
+	/** If linked output from `extract file` or `extract header` exceeds this character count, use a content map. */
 	maxChars?: number;
 }
 

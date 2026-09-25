@@ -5,7 +5,9 @@ export function quote(value: string): string {
 
 /** Leave simple paths bare; quote anything with spaces or shell characters. */
 export function shellFileArgument(filePath: string): string {
-	return /^[A-Za-z0-9_./-]+$/.test(filePath) ? filePath : quote(filePath);
+	return /^[A-Za-z0-9_./-]+$/.test(filePath)
+		? filePath
+		: shellTextArgument(filePath);
 }
 
 /** Quote for the shell; single quotes when double quotes would expand `` ` `` or `$`. */

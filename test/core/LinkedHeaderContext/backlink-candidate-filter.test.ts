@@ -186,4 +186,151 @@ describe("LinkedHeaderContextQuery backlink filtering", () => {
 
 		expect(resolveDocument).toHaveBeenCalledOnce();
 	});
+
+	it("continues when it cannot load one linked file", async () => {
+		const root = join(testDirectory, "root.md");
+		const bad = join(testDirectory, "bad.md");
+		const good = join(testDirectory, "good.md");
+		writeFileSync(root, "# Root\n\n[bad](./bad.md)\n\n[good](./good.md)\n");
+		writeFileSync(good, "# Good\n\nGood content.\n");
+		const parser = createParsedFileCache();
+		const rootDocument = await parser.resolveDocument({
+			kind: "file",
+			filePath: root,
+		});
+		const goodDocument = await parser.resolveDocument({
+			kind: "file",
+			filePath: good,
+		});
+		const headingResolution = rootDocument.resolveHeading("Root");
+		if (headingResolution.status !== "unique") {
+			throw new Error("Root fixture heading must resolve uniquely");
+		}
+		const query = new LinkedHeaderContextQuery(
+			{
+				resolveDocument: async ({ filePath }) => {
+					if (filePath === bad) throw new Error("bad document unavailable");
+					if (filePath === root) return rootDocument;
+					if (filePath === good) return goodDocument;
+					throw new Error(`Missing fixture: ${filePath}`);
+				},
+			},
+			{
+				resolveCitationTarget: async () => {
+					throw new Error("No anchored links expected");
+				},
+			},
+			{
+				analyzeEligibility: () => ({ eligible: true as const }),
+				extractContent: async () => {
+					throw new Error("No anchored links expected");
+				},
+			},
+			{ selectCandidates: async () => [] },
+		);
+
+		const result = await query.execute({
+			rootDocument,
+			rootHeading: headingResolution.match,
+			scopePath: testDirectory,
+			scopeFiles: [root, good],
+			respectGitignore: true,
+			depth: 1,
+		});
+
+		expect(result.outgoingLinks).toHaveLength(2);
+		expect(result.outgoingLinks[0]).toEqual({
+			source: {
+				file: "root.md",
+				line: 3,
+				column: 0,
+				raw: "[bad](./bad.md)",
+			},
+			status: "failed",
+			reason: "bad document unavailable",
+		});
+		expect(result.outgoingLinks[1]).toMatchObject({
+			source: { raw: "[good](./good.md)" },
+			status: "extracted",
+			target: { file: "good.md", kind: "file" },
+			contentId: expect.any(String),
+		});
+		expect(result.failures).toEqual([
+			{
+				source: {
+					file: "root.md",
+					line: 3,
+					column: 0,
+					raw: "[bad](./bad.md)",
+				},
+				reason: "bad document unavailable",
+			},
+		]);
+		expect(result.complete).toBe(false);
+		expect(
+			Object.values(result.extractedContentBlocks).some(
+				(block) =>
+					typeof block !== "number" &&
+					block.content === "# Good\n\nGood content.\n",
+			),
+		).toBe(true);
+	});
+
+	it("does not catch an error while reading links after loading a linked file", async () => {
+		const root = join(testDirectory, "root.md");
+		const linked = join(testDirectory, "linked.md");
+		writeFileSync(root, "# Root\n\n[linked](./linked.md)\n");
+		writeFileSync(linked, "# Linked\n");
+		const parser = createParsedFileCache();
+		const rootDocument = await parser.resolveDocument({
+			kind: "file",
+			filePath: root,
+		});
+		const linkedDocument = await parser.resolveDocument({
+			kind: "file",
+			filePath: linked,
+		});
+		const headingResolution = rootDocument.resolveHeading("Root");
+		if (headingResolution.status !== "unique") {
+			throw new Error("Root fixture heading must resolve uniquely");
+		}
+		const getLinks = vi
+			.spyOn(linkedDocument, "getLinks")
+			.mockImplementation(() => {
+				throw new Error("link processing failed");
+			});
+		const query = new LinkedHeaderContextQuery(
+			{
+				resolveDocument: async ({ filePath }) => {
+					if (filePath === root) return rootDocument;
+					if (filePath === linked) return linkedDocument;
+					throw new Error(`Missing fixture: ${filePath}`);
+				},
+			},
+			{
+				resolveCitationTarget: async () => {
+					throw new Error("No anchored links expected");
+				},
+			},
+			{
+				analyzeEligibility: () => ({ eligible: true as const }),
+				extractContent: async () => {
+					throw new Error("No anchored links expected");
+				},
+			},
+			{ selectCandidates: async () => [] },
+		);
+
+		await expect(
+			query.execute({
+				rootDocument,
+				rootHeading: headingResolution.match,
+				scopePath: testDirectory,
+				scopeFiles: [root],
+				respectGitignore: true,
+				depth: 1,
+			}),
+		).rejects.toThrow("link processing failed");
+		getLinks.mockRestore();
+	});
 });
