@@ -177,7 +177,7 @@ describe("CLI Help Documentation", () => {
 		expect(output).toContain("<header-name>");
 		expect(output).toContain("--scope");
 		expect(output).toContain("--within <parent>");
-		expect(output).toContain("--linked-context");
+		expect(output).toContain("--extract-linked-content [depth]");
 
 		// Then: Examples section included
 		expect(output).toContain("Examples:");
@@ -185,9 +185,9 @@ describe("CLI Help Documentation", () => {
 
 		// Then: Exit codes documented
 		expect(output).toContain("Exit Codes:");
-		expect(output).toContain("0  Header extracted successfully; linked context is complete");
+		expect(output).toContain("0  Header extracted successfully; all linked content resolved");
 		expect(output).toContain(
-			"1  Header failed to resolve, or linked context is incomplete",
+			"1  Header failed to resolve, or some linked content failed to resolve",
 		);
 		expect(output).toContain("2  System error");
 	});

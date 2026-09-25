@@ -1,3 +1,4 @@
+import type ParsedDocument from "../../ParsedDocument.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import type { CliFlags } from "../../types/cli-types.js";
 import type {
@@ -25,13 +26,16 @@ interface ParsedDocumentLifecycleInterface {
 }
 
 /**
- * Consumer-defined interface for ParsedDocument facade.
+ * Consumer-defined view of the ParsedDocument facade: section, block, and full-file extraction with source lines.
  */
-interface ParsedDocumentInterface {
-	extractSection(headingText: string, headingLevel?: number): string | null;
-	extractBlock(blockId: string | null): string | null;
-	extractFullContent(): string;
-}
+type ParsedDocumentInterface = Pick<
+	ParsedDocument,
+	| "resolveHeading"
+	| "getResolvedSection"
+	| "extractBlock"
+	| "extractFullContent"
+	| "data"
+>;
 
 /**
  * Content Extractor component orchestrating extraction eligibility analysis.
@@ -141,22 +145,33 @@ export class ContentExtractor {
 				});
 
 				let extractedContent: string;
+				let startLine: number | undefined;
 				if (link.anchorType === "header") {
 					const decodedAnchor = decodeUrlAnchor(link.target.anchor);
-					const result = targetDoc.extractSection(decodedAnchor ?? "");
-					if (!result) {
+					const resolution = targetDoc.resolveHeading(decodedAnchor ?? "");
+					const section =
+						resolution.status === "unique"
+							? targetDoc.getResolvedSection(resolution.match)
+							: null;
+					if (!section) {
 						throw new Error(`Heading not found: ${decodedAnchor}`);
 					}
-					extractedContent = result;
+					extractedContent = section.content;
+					startLine = section.startLine;
 				} else if (link.anchorType === "block") {
 					const blockId = normalizeBlockId(link.target.anchor);
-					const blockResult = targetDoc.extractBlock(blockId);
+					const blockResult =
+						blockId === null ? null : targetDoc.extractBlock(blockId);
 					if (!blockResult) {
 						throw new Error(`Block not found: ${blockId}`);
 					}
 					extractedContent = blockResult;
+					startLine = targetDoc.data.anchors.find(
+						(anchor) => anchor.anchorType === "block" && anchor.id === blockId,
+					)?.line;
 				} else {
 					extractedContent = targetDoc.extractFullContent();
+					startLine = 1;
 				}
 
 				// Deduplication
@@ -167,7 +182,7 @@ export class ContentExtractor {
 					extractedContentBlocks[contentId] = {
 						content: extractedContent,
 						contentLength,
-						...(link.anchorType === null && { startLine: 1 }),
+						...(startLine !== undefined && { startLine }),
 						sourceLinks: [],
 					};
 					stats.uniqueContent++;

@@ -12,7 +12,7 @@
  * @module cli
  */
 
-import { Argument, Command, Option } from "commander";
+import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import { isDynamicPattern } from "tinyglobby";
 import {
 	checkExtractCache,
@@ -20,13 +20,14 @@ import {
 } from "./cache/checkExtractCache.js";
 import { RenameValidationError } from "./core/rename-markdown-file.js";
 import { createValidationWorkflow } from "./factories/componentFactory.js";
-import { formatExtractResult } from "./formatExtractResult.js";
-import { JactCli } from "./jact-cli.js";
+import { formatContentMap, formatExtractResult } from "./formatExtractResult.js";
+import { JactCli, linkedContentHints } from "./jact-cli.js";
 import type {
 	CliExtractOptions,
 	CliRenameOptions,
 	CliValidateOptions,
 } from "./types/cli-types.js";
+import type { HeaderExtractionResult } from "./types/extraction-types.js";
 import { runBatch, type ValidateOneFn } from "./validate/batch-runner.js";
 import { renderHuman, renderJson } from "./validate/renderers.js";
 import { NotAGitRepositoryError } from "./validate/resolve-changed-files.js";
@@ -612,6 +613,71 @@ Exit Codes:
 		}
 	});
 
+const LINKED_CONTENT_OPTION = "--extract-linked-content [depth]";
+
+/** Commander parser for the optional `--extract-linked-content` depth. */
+function parseLinkedContentDepth(value: string): number {
+	const depth = Number(value);
+	if (!Number.isInteger(depth) || depth < 1) {
+		throw new InvalidArgumentError("depth must be a whole number of 1 or more.");
+	}
+	return depth;
+}
+
+/** Print next-step hints after output; JSON keeps stdout parseable by using stderr. */
+function writeNextStepHints(hints: readonly string[], format: string): void {
+	if (hints.length === 0) return;
+	if (format === "json") console.error(hints.join("\n"));
+	else process.stdout.write(`\n\n${hints.join("\n")}\n`);
+}
+
+/** Fits a default Claude Code Bash result (30,000 characters inline). */
+const DEFAULT_MAX_CHARS = 28_000;
+
+/** Commander parser for `--max-chars`. */
+function parseMaxChars(value: string): number {
+	const maxChars = Number(value);
+	if (!Number.isInteger(maxChars) || maxChars < 1) {
+		throw new InvalidArgumentError("must be a whole number of 1 or more.");
+	}
+	return maxChars;
+}
+
+const MAX_CHARS_OPTION = "--max-chars <n>";
+const MAX_CHARS_DESCRIPTION = `with --extract-linked-content: above this size, print a content map instead of the content (default: ${DEFAULT_MAX_CHARS})`;
+
+/**
+ * Print extraction output plus hints. Linked markdown output above `--max-chars`
+ * becomes a content map so agents load only the blocks they need.
+ */
+function writeExtractOutput(
+	result: HeaderExtractionResult,
+	output: string,
+	options: CliExtractOptions,
+	hints: readonly string[],
+): void {
+	const format = options.format ?? "markdown";
+	const maxChars = options.maxChars ?? DEFAULT_MAX_CHARS;
+	if (
+		format === "markdown" &&
+		options.extractLinkedContent !== undefined &&
+		output.length > maxChars
+	) {
+		process.stdout.write(formatContentMap(result, output.length, maxChars));
+		writeNextStepHints(
+			[
+				`To Print Everything Anyway: rerun with \`--max-chars ${output.length}\``,
+				...hints,
+			],
+			format,
+		);
+		return;
+	}
+	if (format === "markdown" && !options.verbose) process.stdout.write(output);
+	else console.log(output);
+	writeNextStepHints(hints, format);
+}
+
 extractCmd
 	.command("header")
 	.description("Extract specific header section content from a target file")
@@ -623,10 +689,11 @@ extractCmd
 		"limit heading resolution to descendants of one unique parent",
 	)
 	.option(
-		"--linked-context",
-		"include one-hop linked sections and scoped backlinks",
-		false,
+		LINKED_CONTENT_OPTION,
+		"also extract linked sections and files to depth (default: 1), plus scoped backlinks",
+		parseLinkedContentDepth,
 	)
+	.option(MAX_CHARS_OPTION, MAX_CHARS_DESCRIPTION, parseMaxChars)
 	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
 	.addOption(
 		new Option("--format <type>", "Output format")
@@ -641,11 +708,13 @@ Examples:
     $ jact extract header docs/guide.md "Overview" --scope ./docs
     $ jact extract header handbook.md "Install" --within "Guide"
     $ jact extract header file.md "Design" --format json | jq '.extractedContentBlocks'
-    $ jact extract header plan.md "Overview" --linked-context --scope ./docs
+    $ jact extract header plan.md "Overview" --extract-linked-content --scope ./docs
+    $ jact extract header plan.md "Overview" --extract-linked-content 3
+    $ jact extract header plan.md "Overview" --extract-linked-content --max-chars 100000
 
 Exit Codes:
-  0  Header extracted successfully; linked context is complete
-  1  Header failed to resolve, or linked context is incomplete
+  0  Header extracted successfully; all linked content resolved
+  1  Header failed to resolve, or some linked content failed to resolve
   2  System error (file not found, permission denied, incomplete scope scan)
 `,
 	)
@@ -657,6 +726,9 @@ Exit Codes:
 		) => {
 			// Integration: Create JactCli instance
 			const manager = new JactCli();
+			// Commander stores `true` when the optional depth is omitted.
+			const rawDepth: unknown = options.extractLinkedContent;
+			if (rawDepth === true) options.extractLinkedContent = 1;
 
 			try {
 				// Pattern: Delegate to JactCli orchestration method
@@ -674,17 +746,20 @@ Exit Codes:
 						options.verbose ? "verbose" : "minimal",
 						{ lineNumbers: true },
 					);
-					if (format === "markdown" && !options.verbose) {
-						process.stdout.write(output);
-					} else {
-						console.log(output);
-					}
-					process.exitCode =
-						"mode" in result && result.mode === "linked-context"
-							? result.complete
-								? 0
-								: 1
-							: 0;
+					const linked = "mode" in result && result.mode === "linked-context";
+					writeExtractOutput(
+						result,
+						output,
+						options,
+						linked
+							? linkedContentHints(
+									["header", targetFile, headerName],
+									result.depth,
+									result.unfollowedDeeperFiles,
+								)
+							: [],
+					);
+					process.exitCode = linked && !result.complete ? 1 : 0;
 				}
 				// Note: Error exit codes set by extractHeader() method
 			} catch (error) {
@@ -702,6 +777,12 @@ extractCmd
 	.description("Extract entire markdown file content")
 	.argument("<target-file>", "Markdown file to extract")
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.option(
+		LINKED_CONTENT_OPTION,
+		"also extract linked content, following linked files to depth (default: 1)",
+		parseLinkedContentDepth,
+	)
+	.option(MAX_CHARS_OPTION, MAX_CHARS_DESCRIPTION, parseMaxChars)
 	.option("-v, --verbose", VERBOSE_OPTION_DESCRIPTION, false)
 	.addOption(
 		new Option("--format <type>", "Output format")
@@ -716,6 +797,9 @@ Examples:
     $ jact extract file architecture.md --scope ./docs
     $ jact extract file file.md --format json | jq '.extractedContentBlocks'
     $ jact extract file file.md --format json --verbose | jq '.stats'
+    $ jact extract file plan.md --extract-linked-content
+    $ jact extract file plan.md --extract-linked-content 2
+    $ jact extract file plan.md --extract-linked-content --max-chars 100000
 
 Exit Codes:
   0  File extracted successfully
@@ -726,24 +810,26 @@ Exit Codes:
 	.action(async (targetFile: string, options: CliExtractOptions) => {
 		// Integration: Create JactCli instance
 		const manager = new JactCli();
+		// Commander stores `true` when the optional depth is omitted.
+		const rawDepth: unknown = options.extractLinkedContent;
+		if (rawDepth === true) options.extractLinkedContent = 1;
 
 		try {
 			// Pattern: Delegate to JactCli orchestration method
-			const result = await manager.extractFile(targetFile, options);
+			const outcome = await manager.extractFile(targetFile, options);
 
-			if (result) {
+			if (outcome) {
 				const format = options.format ?? "markdown";
 				const output = formatExtractResult(
-					result,
+					outcome.result,
 					format,
 					options.verbose ? "verbose" : "minimal",
-					{ lineNumbers: true },
+					{
+						lineNumbers: true,
+						sourceLabels: options.extractLinkedContent !== undefined,
+					},
 				);
-				if (format === "markdown" && !options.verbose) {
-					process.stdout.write(output);
-				} else {
-					console.log(output);
-				}
+				writeExtractOutput(outcome.result, output, options, outcome.nextStepHints);
 				process.exitCode = 0;
 			}
 			// Note: Error exit codes set by extractFile() method

@@ -99,6 +99,8 @@ export interface LinkedHeaderContextInput {
 	scopePath: string;
 	scopeFiles: readonly string[];
 	respectGitignore: boolean;
+	/** Link depth to follow from the root section (≥ 1). */
+	depth: number;
 }
 
 export interface LinkedContextSourcePosition {
@@ -110,7 +112,7 @@ export interface LinkedContextSourcePosition {
 
 export interface LinkedContentSource {
 	file: string;
-	kind: "header" | "block";
+	kind: "header" | "block" | "file";
 	heading?: string;
 	blockId?: string;
 	startLine: number;
@@ -123,7 +125,7 @@ export interface LinkedExtractedContentBlock extends ExtractedContentBlock {
 
 export interface LinkedContextTarget {
 	file: string;
-	kind: "header" | "block";
+	kind: "header" | "block" | "file";
 	heading?: string;
 	blockId?: string;
 }
@@ -149,6 +151,10 @@ export interface LinkedContextFailure {
 export interface LinkedHeaderContextResult {
 	mode: "linked-context";
 	complete: boolean;
+	/** Link depth followed from the root section. */
+	depth: number;
+	/** Linked files whose own links would add content at the next depth. */
+	unfollowedDeeperFiles: number;
 	scope: {
 		path: string;
 		filesScanned: number;
