@@ -410,7 +410,8 @@ export class CitationValidator {
 				outcome.targetPath,
 			);
 			if (!anchor.valid) {
-				const anchorError = `Anchor not found: #${citation.target.anchor}`;
+				const anchorError =
+					anchor.error ?? `Anchor not found: #${citation.target.anchor}`;
 				const prefix = outcome.anchorFailurePrefix ?? outcome.warning;
 				const error = prefix ? `${prefix}. ${anchorError}` : anchorError;
 				return this.createValidationResult(
@@ -479,7 +480,7 @@ export class CitationValidator {
 			return this.createValidationResult(
 				citation,
 				"error",
-				`Anchor not found: #${anchor}`,
+				anchorExists.error ?? `Anchor not found: #${anchor}`,
 				anchorExists.suggestion,
 				null,
 				anchorExists.anchorConversion ?? null,

@@ -16,6 +16,7 @@ import type {
 	EnrichedLinkObject,
 	FixRecord,
 } from "../types/validationTypes.js";
+import { OBSIDIAN_DROPPED_CHARS_ERROR } from "./CitationValidator/AnchorMatcher.js";
 import type { CitationValidator } from "./CitationValidator/CitationValidator.js";
 import { applyAnchorFix, applyPathConversion } from "./citationFixer.js";
 import { VALIDATION_DISABLED_REASON } from "../validate/validation-disable.js";
@@ -33,11 +34,23 @@ export interface FixFsOverrides {
 	writeFileSync?: (p: string, data: string, enc: BufferEncoding) => void;
 }
 
+/** True when the validator reported an anchor error that `--fix` can rewrite. */
+const isAnchorFixable = (link: EnrichedLinkObject): boolean =>
+	link.validation.status === "error" &&
+	(link.validation.error.includes(OBSIDIAN_DROPPED_CHARS_ERROR) ||
+		(link.validation.suggestion !== undefined &&
+			(link.validation.suggestion.includes(
+				"Use raw header format for better Obsidian compatibility",
+			) ||
+				(link.validation.error.startsWith("Anchor not found") &&
+					link.validation.suggestion.includes("Available headers:")))));
+
 /**
  * Validate citations in filePath, auto-fix path/anchor issues, write in-place.
  *
  * Safety features:
- * - Writes a timestamped `.bak` backup before any file mutation.
+ * - Writes a timestamped `.bak` backup before any file mutation, unless `options.backup` is false.
+ * - Skips fixes that leave a citation unchanged; they are not counted or reported.
  * - When `options.dryRun` is true, returns a diff without writing any files.
  * - Fails fast with a clear error if path corrections are needed but `options.scope` is absent.
  *
@@ -89,13 +102,7 @@ export async function applyCitationFixes(
 			(link: EnrichedLinkObject) =>
 				(link.validation.status === "warning" &&
 					link.validation.pathConversion) ||
-				(link.validation.status === "error" &&
-					link.validation.suggestion &&
-					(link.validation.suggestion.includes(
-						"Use raw header format for better Obsidian compatibility",
-					) ||
-						(link.validation.error.startsWith("Anchor not found") &&
-							link.validation.suggestion.includes("Available headers:")))),
+				isAnchorFixable(link),
 		);
 		if (fixableLinks.length === 0) {
 			return `No auto-fixable citations found in ${filePath}`;
@@ -118,38 +125,30 @@ export async function applyCitationFixes(
 		let anchorFixesApplied = 0;
 		const fixes: FixRecord[] = [];
 		for (const link of fixableLinks) {
-			let newCitation = link.fullMatch;
-			let fixType = "";
-			if (
-				link.validation.status !== "valid" &&
-				link.validation.pathConversion
-			) {
-				newCitation = applyPathConversion(
-					newCitation,
-					link.validation.pathConversion,
-				);
-				pathFixesApplied++;
-				fixType = "path";
-			}
-			if (
-				link.validation.status === "error" &&
-				link.validation.suggestion &&
-				(link.validation.suggestion.includes(
-					"Use raw header format for better Obsidian compatibility",
-				) ||
-					(link.validation.error.startsWith("Anchor not found") &&
-						link.validation.suggestion.includes("Available headers:")))
-			) {
-				newCitation = applyAnchorFix(newCitation, link);
-				anchorFixesApplied++;
-				fixType = fixType ? "path+anchor" : "anchor";
-			}
+			const pathCitation =
+				link.validation.status !== "valid" && link.validation.pathConversion
+					? applyPathConversion(link.fullMatch, link.validation.pathConversion)
+					: link.fullMatch;
+			const newCitation = isAnchorFixable(link)
+				? applyAnchorFix(pathCitation, link)
+				: pathCitation;
+			// A fix that leaves the citation unchanged is not a fix: skip it.
+			if (newCitation === link.fullMatch) continue;
+			const pathChanged = pathCitation !== link.fullMatch;
+			const anchorChanged = newCitation !== pathCitation;
+			if (pathChanged) pathFixesApplied++;
+			if (anchorChanged) anchorFixesApplied++;
 			fileContent = fileContent.replace(link.fullMatch, newCitation);
 			fixes.push({
 				line: link.line,
 				old: link.fullMatch,
 				new: newCitation,
-				type: fixType,
+				type:
+					pathChanged && anchorChanged
+						? "path+anchor"
+						: pathChanged
+							? "path"
+							: "anchor",
 			});
 			fixesApplied++;
 		}
@@ -170,16 +169,19 @@ export async function applyCitationFixes(
 				return output.join("\n");
 			}
 
-			// Write backup before mutating the file
-			const backupPath = `${filePath}.${Date.now()}.bak`;
-			fsWrite(backupPath, originalContent, "utf8");
+			// Write backup before mutating the file, unless --no-backup
+			const backupPath =
+				options.backup === false ? null : `${filePath}.${Date.now()}.bak`;
+			if (backupPath !== null) fsWrite(backupPath, originalContent, "utf8");
 
 			// Apply fix
 			fsWrite(filePath, fileContent, "utf8");
 
 			const output = [
 				`Fixed ${fixesApplied} citation${fixesApplied === 1 ? "" : "s"} in ${filePath}:`,
-				`  Backup written to: ${backupPath}`,
+				backupPath === null
+					? "  No backup written (--no-backup)."
+					: `  Backup written to: ${backupPath}`,
 			];
 			if (pathFixesApplied > 0)
 				output.push(
@@ -198,7 +200,7 @@ export async function applyCitationFixes(
 			}
 			return output.join("\n");
 		}
-		return `WARNING: Found ${fixableLinks.length} fixable citations but could not apply fixes`;
+		return `No auto-fixable citations found in ${filePath}`;
 	} catch (error) {
 		return `ERROR: ${error instanceof Error ? error.message : String(error)}`;
 	}

@@ -17,15 +17,15 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 		const result = await validateDocumentFile(testFile);
 
 		// Then: Validation succeeds via ParsedDocument.hasAnchor() facade method
-		// Find enriched link for link using raw format (should be validated via hasAnchor())
-		const rawFormatLink = result.links.find(
+		// Find enriched link for link using URL-encoded format (should be validated via hasAnchor())
+		const encodedFormatLink = result.links.find(
 			(link) =>
 				link.fullMatch ===
-				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
+				"[Link using URL-encoded format](anchor-matching.md#Story%201.5%20Implement%20Cache)",
 		);
 
-		expect(rawFormatLink).toBeDefined();
-		expect(rawFormatLink.validation.status).toBe("valid");
+		expect(encodedFormatLink).toBeDefined();
+		expect(encodedFormatLink.validation.status).toBe("valid");
 
 		// Verify summary counts - should have valid citations
 		expect(result.summary.total).toBeGreaterThan(0);
@@ -60,7 +60,7 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 		).toBeDefined();
 	});
 
-	it("should validate both raw and URL-encoded anchor formats", async () => {
+	it("should flag the raw colon anchor format and accept the URL-encoded format", async () => {
 		// Given: Factory-created validator with fixture containing both anchor ID formats
 		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "anchor-matching-source.md");
@@ -68,8 +68,7 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 		// When: Validation executes for both raw and URL-encoded format links
 		const result = await validateDocumentFile(testFile);
 
-		// Then: Both formats validate successfully via ParsedDocument.hasAnchor()
-		// The hasAnchor() method should check both id and urlEncodedId properties
+		// Then: The raw format resolves but keeps a colon, which Obsidian drops
 
 		// Raw format link
 		const rawLink = result.links.find(
@@ -78,7 +77,13 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
 		);
 		expect(rawLink).toBeDefined();
-		expect(rawLink.validation.status).toBe("valid");
+		expect(rawLink.validation.status).toBe("error");
+		expect(rawLink.validation.error).toMatch(
+			/^Anchor uses characters Obsidian drops/,
+		);
+		expect(rawLink.validation.suggestion).toBe(
+			"#Story%201.5%20Implement%20Cache",
+		);
 
 		// URL-encoded format link
 		const encodedLink = result.links.find(
@@ -89,8 +94,6 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 		expect(encodedLink).toBeDefined();
 		expect(encodedLink.validation.status).toBe("valid");
 
-		// Both should reference the same anchor object in the target document
-		// This validates that hasAnchor() correctly checks both ID fields
 	});
 
 	it("should maintain validation behavior after facade integration", async () => {

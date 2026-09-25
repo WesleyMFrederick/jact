@@ -40,6 +40,22 @@ export interface ParsedDocumentLifecycleLike {
 	}): Promise<ParsedDocumentLike>;
 }
 
+/** Error prefix for header anchors that contain characters Obsidian drops. */
+export const OBSIDIAN_DROPPED_CHARS_ERROR =
+	"Anchor uses characters Obsidian drops";
+
+/** Characters Obsidian removes from heading-link anchors. */
+const OBSIDIAN_DROPPED_CHARS = /[:#|^[\]]/g;
+
+/**
+ * Replace the characters Obsidian drops from heading-link anchors with a
+ * space, then collapse whitespace: `Q1: Gap` → `Q1 Gap`, `opsx:continue` →
+ * `opsx continue`. Obsidian renders an anchor that keeps these characters as
+ * an external link.
+ */
+const stripObsidianDroppedChars = (text: string): string =>
+	text.replace(OBSIDIAN_DROPPED_CHARS, " ").replace(/\s+/g, " ").trim();
+
 export class AnchorMatcher {
 	private parsedDocumentLifecycle: ParsedDocumentLifecycleLike | null;
 
@@ -262,6 +278,41 @@ export class AnchorMatcher {
 		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
 	}
 
+	/**
+	 * Detect a header anchor that contains characters Obsidian drops (`: # | ^ [ ]`)
+	 * and resolves to a header once those characters are removed. Returns the
+	 * dropped characters and the corrected anchor, or null.
+	 */
+	private findObsidianDroppedChars(
+		anchor: string,
+		availableAnchors: AnchorObject[],
+	): { dropped: string; recommended: string } | null {
+		let decodedAnchor: string;
+		try {
+			decodedAnchor = decodeURIComponent(anchor);
+		} catch {
+			decodedAnchor = anchor;
+		}
+		const dropped = [
+			...new Set(decodedAnchor.match(OBSIDIAN_DROPPED_CHARS) ?? []),
+		].join("");
+		if (dropped === "") return null;
+
+		const header = this.findMatchingAnchors(
+			stripObsidianDroppedChars(decodedAnchor),
+			availableAnchors,
+		).find(({ anchor: candidate }) => candidate.anchorType === "header");
+		if (header === undefined) return null;
+
+		return {
+			dropped,
+			recommended: stripObsidianDroppedChars(header.anchor.id).replace(
+				/ /g,
+				"%20",
+			),
+		};
+	}
+
 	// ── Async anchor validation (requires document lifecycle) ──────────────────
 
 	async validateAnchorExists(
@@ -270,6 +321,7 @@ export class AnchorMatcher {
 		options?: { isBlockRef?: boolean },
 	): Promise<{
 		valid: boolean;
+		error?: string;
 		suggestion?: string;
 		matchedAs?: string;
 		anchorConversion?: AnchorConversion;
@@ -287,6 +339,25 @@ export class AnchorMatcher {
 					kind: "file",
 					filePath: targetFile,
 				});
+
+			if (!anchor.startsWith("^") && !options?.isBlockRef) {
+				const droppedChars = this.findObsidianDroppedChars(
+					anchor,
+					targetParsedDoc.data.anchors,
+				);
+				if (droppedChars) {
+					return {
+						valid: false,
+						error: `${OBSIDIAN_DROPPED_CHARS_ERROR} (${droppedChars.dropped}): #${anchor}`,
+						suggestion: `#${droppedChars.recommended}`,
+						anchorConversion: {
+							type: "anchor-conversion",
+							original: anchor,
+							recommended: droppedChars.recommended,
+						},
+					};
+				}
+			}
 
 			const matches = this.findMatchingAnchors(
 				anchor,
@@ -371,7 +442,7 @@ export class AnchorMatcher {
 				.slice(0, 5);
 
 			const availableHeaders = headerAnchors.map(
-				(a) => `"${a.rawText}" → #${a.id}`,
+				(a) => `"${a.rawText}" → #${stripObsidianDroppedChars(a.id)}`,
 			);
 
 			const availableBlockRefs = targetParsedDoc.data.anchors
@@ -414,7 +485,9 @@ export class AnchorMatcher {
 					anchorConversion: {
 						type: "anchor-conversion" as const,
 						original: anchor,
-						recommended: this.urlEncodeAnchor(bestHeaderMatch.rawText ?? ""),
+						recommended: this.urlEncodeAnchor(
+							stripObsidianDroppedChars(bestHeaderMatch.rawText ?? ""),
+						),
 					},
 				}),
 			};
