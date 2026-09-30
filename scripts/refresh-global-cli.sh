@@ -92,6 +92,14 @@ REFRESH_COMPLETE=1
 rm -rf -- "$BACKUP_DIR"
 trap - EXIT INT TERM
 
+# The package was renamed from `jact` to `@wesleymfrederick/jact`. A link left under
+# the old name still owns bin/jact, so npm link fails with EEXIST. Remove it only
+# when it is a link (never a registry-installed package).
+LEGACY_LINK="$(npm prefix -g)/lib/node_modules/jact"
+if [[ -L "$LEGACY_LINK" ]]; then
+  npm rm -g jact >/dev/null
+fi
+
 if ! npm link; then
   echo "refresh-global-cli: npm link failed; check write permission on the npm global prefix (npm prefix -g)." >&2
   exit 1
