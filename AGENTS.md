@@ -9,16 +9,16 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 ## Issue tracking and case logs
 
-- Issues: local Markdown under `.scratch/{YYYYMMDDTHHMMSS}-{module}-{slug}/` (see [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue tracker: Local Markdown)), not Linear. `design-docs/features/<feature>/` holds the plan/spec/PRD; `/to-issues` slices it into many small tracer-bullet issues — never a 1:1 mapping.
+- Issues: local Markdown under `.scratch/{YYYYMMDDTHHMMSS}-{module}-{slug}/` (see [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue%20tracker%20Local%20Markdown)), not Linear. `design-docs/features/<feature>/` holds the plan/spec/PRD; `/to-issues` slices it into many small tracer-bullet issues — never a 1:1 mapping.
 - `CASE-TRACKER.md` rows use the [ten-column session-log format](docs/agents/issue-tracker.md#CASE-TRACKER session log); outcome cells stay 25–40 words.
 
 ## Spec and issue separation
 
-- **WHEN** running `/to-spec`, **ALWAYS** create and publish only the canonical spec plus its required Pointer or symlink, **NEVER** create implementation issue files, **BECAUSE** `/to-issues` exclusively owns one-to-many tracer-bullet decomposition and issue creation.
+- **WHEN** running `/to-spec`, **ALWAYS** create and publish only the canonical spec plus its required pointer (a link to the canonical file) or symlink, **NEVER** create implementation issue files, **BECAUSE** `/to-issues` exclusively owns one-to-many tracer-bullet decomposition and issue creation.
 
 ## Canonical-source discipline for `.scratch/`
 
-- `.scratch/{YYYYMMDDTHHMMSS}-{module}-{slug}/` is the issue-tracker workspace (naming per [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue tracker: Local Markdown)). Files meant to persist (PRDs, specs) have their **canonical version in `design-docs/features/<feature>/`** and are **symlinked into `.scratch/`** — never copied.
+- `.scratch/{YYYYMMDDTHHMMSS}-{module}-{slug}/` is the issue-tracker workspace (naming per [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue%20tracker%20Local%20Markdown)). Files meant to persist (PRDs, specs) have their **canonical version in `design-docs/features/<feature>/`** and are **symlinked into `.scratch/`** — never copied.
 - **WHEN** a file needs to exist in both `.scratch/` and `design-docs/features/`, **ALWAYS** write the canonical version to `design-docs/features/<feature>/` and `ln -s` into `.scratch/`, **NEVER** `cp`, **BECAUSE** copying creates two files with one truth — they inevitably diverge, and downstream consumers silently read the stale copy while the canonical version moves ahead.
 - `.scratch/`-only files (ad-hoc issues, captured ideas not yet promoted to a feature) live directly in `.scratch/` — no symlink needed until they graduate to `design-docs/features/`.
 
@@ -31,7 +31,7 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 ## Chromium rendering and capture
 
-- **WHEN** browser rendering, DOM inspection, screengrabs, or other headless browser work is required, **ALWAYS** use `ws-chromium` as the [Pointer](CONTEXT.md#Pointer) to Chromium under `~/Applications`; **NEVER** infer Chromium is unavailable from a failed `open`, PATH lookup, or system Chrome launch, **BECAUSE** the Pointer resolves the canonical browser source without copying launch details that drift or become stale.
+- **WHEN** browser rendering, DOM inspection, screengrabs, or other headless browser work is required, **ALWAYS** use `ws-chromium` as the pointer to Chromium under `~/Applications`; **NEVER** infer Chromium is unavailable from a failed `open`, PATH lookup, or system Chrome launch, **BECAUSE** the pointer resolves the canonical browser source without copying launch details that drift or become stale.
 
 ## Delta design research
 
@@ -90,7 +90,10 @@ npm run jact:validate path/to/file.md -- --scope /other/project/docs
 # Auto-fix broken citations
 npm run jact:validate path/to/file.md -- --fix
 
-# View AST and extracted data
+# Orient on a file's heading structure
+node ./dist/cli.js outline path/to/file.md
+
+# View AST and extracted data (debugging)
 npm run jact:ast path/to/file.md
 
 # Extract base paths
@@ -319,7 +322,7 @@ Start at L0 across a directory, zoom to L2 on the one map that matters. Config: 
 
 ### Issue tracker
 
-Issues are tracked as local Markdown files under `.scratch/`. See [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue tracker: Local Markdown).
+Issues are tracked as local Markdown files under `.scratch/`. See [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue%20tracker%20Local%20Markdown).
 
 ### Triage labels
 

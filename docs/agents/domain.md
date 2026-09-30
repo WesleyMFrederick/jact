@@ -4,17 +4,14 @@ How engineering skills should consume this repository's domain documentation.
 
 ## Before exploring, read these
 
-- `CONTEXT.md`, if present
 - ADRs relevant to the work under `docs/adrs/`
 - The [jact Living Specification](../spec/SPEC.md#jact Living Specification)
-
-If `CONTEXT.md` does not exist, proceed silently. Create it only when domain terminology is resolved.
+- The [Domain Model core entities](../spec/004-domain-model.md#Core Entities)
 
 ## File structure
 
 ```text
 /
-├── CONTEXT.md
 ├── docs/
 │   ├── adrs/
 │   ├── agents/
@@ -22,9 +19,9 @@ If `CONTEXT.md` does not exist, proceed silently. Create it only when domain ter
 └── src/
 ```
 
-## Use the glossary's vocabulary
+## Use the domain model's vocabulary
 
-When `CONTEXT.md` defines a domain term, use it consistently. If a needed concept is missing, reconsider the terminology or note the gap for domain modeling.
+When the [Domain Model core entities](../spec/004-domain-model.md#Core Entities) define a term, use it consistently. If a needed concept is missing, reconsider the terminology or note the gap for domain modeling.
 
 ## Flag ADR conflicts
 

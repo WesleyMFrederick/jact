@@ -16,22 +16,16 @@ It understands standard Markdown links and Obsidian syntax (wiki links, block re
 
 You need Node.js 20 or later.
 
-**From npm (recommended):**
-
-```bash
-npm install -g @wesleymfrederick/jact
-jact --help
-```
-
-To try jact without installing it, run `npx @wesleymfrederick/jact --help`.
-
-**From GitHub** (latest `main`, not a release):
+**From GitHub:**
 
 ```bash
 npm install -g --allow-git=all github:WesleyMFrederick/jact
+jact --help
 ```
 
 npm 12 and later block installs from git unless you add `--allow-git=all`. npm builds jact during the install.
+
+**From npm:** not published yet. Once it is, the install will be `npm install -g @wesleymfrederick/jact`.
 
 **From source** (to change the code): see [Development](#Development).
 
