@@ -25,6 +25,8 @@ jact --help
 
 npm 12 and later block installs from git unless you add `--allow-git=all`. npm builds jact during the install.
 
+If the install fails with `EALLOWSCRIPTS`, an `allow-scripts` line in your `~/.npmrc` is the cause. npm 12 rejects that setting while it builds a git dependency. Retry with it disabled: `NPM_CONFIG_USERCONFIG=/dev/null npm install -g --allow-git=all github:WesleyMFrederick/jact`.
+
 **From npm:** not published yet. Once it is, the install will be `npm install -g @wesleymfrederick/jact`.
 
 **From source** (to change the code): see [Development](#Development).
