@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -36,10 +38,9 @@ describe("public CLI behavior baseline", () => {
 		expect(success.exitCode).toBe(0);
 		expect(success.stderr).toBe("");
 		expect(Object.keys(successOutput.extractedContentBlocks)).toHaveLength(3);
-		expect(successOutput.extractedContentBlocks).toHaveProperty(
-			"_totalContentCharacterLength",
-			429,
-		);
+		const { _totalContentCharacterLength, ...blocks } =
+			successOutput.extractedContentBlocks;
+		expect(_totalContentCharacterLength).toBe(JSON.stringify(blocks).length);
 
 		const failure = run([
 			"extract",
@@ -68,9 +69,6 @@ describe("public CLI behavior baseline", () => {
 		const humanSuccess = run(["validate", validPath]);
 		expect(humanSuccess.exitCode).toBe(0);
 		expect(humanSuccess.stderr).toBe("");
-		expect(humanSuccess.stdout).toContain(
-			"indexed it because you targeted a file inside it",
-		);
 		expect(humanSuccess.stdout).toMatch(/OK: 1 citations valid\n$/);
 
 		const humanFailure = run(["validate", invalidPath]);
@@ -104,6 +102,29 @@ describe("public CLI behavior baseline", () => {
 			file: missingPath,
 			success: false,
 		});
+	});
+
+	it("notes when a named file sits inside an ignored folder", () => {
+		const root = mkdtempSync(join(tmpdir(), "jact-ignored-target-"));
+		try {
+			mkdirSync(join(root, ".git"));
+			mkdirSync(join(root, "ignored"));
+			writeFileSync(join(root, ".jactignore"), "ignored/\n");
+			writeFileSync(join(root, "ignored", "a.md"), "# A\n\n[b](b.md#B)\n");
+			writeFileSync(join(root, "ignored", "b.md"), "# B\n");
+			const result = spawnSync(
+				process.execPath,
+				[cliPath, "validate", join("ignored", "a.md")],
+				{ cwd: root, encoding: "utf8" },
+			);
+			expect(result.status).toBe(0);
+			expect(result.stdout).toContain(
+				"indexed it because you targeted a file inside it",
+			);
+			expect(result.stdout).toMatch(/OK: 1 citations valid\n$/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it("characterizes stdin validation success, failure, and usage errors", () => {

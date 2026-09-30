@@ -13,9 +13,10 @@ Feature matrix — what jact can do today. Command/flag details: [005 · Interfa
 | Rename or move Markdown files while updating incoming and moved-file outgoing links | ✅ | [`jact rename`](005-interfaces.md#`jact rename <source-file> <destination>`) |
 | Line-scoped validation | ✅ | `--lines N-M` |
 | Scope override for cross-project resolution | ✅ | `--scope <dir>` (auto-inferred in-repo) |
-| AST + extracted-data view | ✅ | `jact ast <file>` |
+| Heading outline for orient-before-extract | ✅ | [`jact outline`](005-interfaces.md#`jact%20outline%20<file>%20level%20`) |
+| AST + extracted-data view (debugging) | ✅ | `jact ast <file>` |
 | Content extraction (links / header / whole file) | ✅ | `jact extract links|header|file` |
-| Base-path extraction | ✅ | `jact base-paths <file>` |
+| Base-path extraction | ✅ | `npm run jact:base-paths <file>` (npm script over `extract links --verbose`; no `jact base-paths` command) |
 | Obsidian flavor tokenizing (wikilinks, caret anchors, highlights, comments, citations, permissive links) | ✅ | Flavor Extension Collection — `src/core/MarkdownParser/extensions/flavors.ts` |
 | GFM kebab-slug anchor matching | 🔲 designed | Flavor-scoped anchor policy — see design doc §4 in `design-docs/features/20260701T161127-markdown-flavor-extension-collection/` |
 | `anchorKind` threading (field reads over fragment regex) | 🔲 designed | Same design doc §5 |

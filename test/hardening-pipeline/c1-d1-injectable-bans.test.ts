@@ -26,7 +26,10 @@ describe("C1 — D1 named-array ESLint + vitest idiom-guard library", () => {
 		expect(existsSync(ESLINT_CONFIG), "eslint.config.js missing").toBe(true);
 		let exitCode = 0;
 		try {
-			execFileSync("npx", ["eslint", FIXTURE], { cwd: REPO_ROOT, stdio: "pipe" });
+			execFileSync("npx", ["eslint", FIXTURE], {
+				cwd: REPO_ROOT,
+				stdio: "pipe",
+			});
 		} catch (err) {
 			exitCode = (err as { status?: number }).status ?? 1;
 		}
@@ -54,33 +57,40 @@ describe("C1 — D1 named-array ESLint + vitest idiom-guard library", () => {
 		).toBe(true);
 	});
 
-	it("(c) PostToolUse hook auto-runs both layers after edits", () => {
-		const PROJECT_SETTINGS = join(REPO_ROOT, ".claude/settings.json");
-		type SettingsShape = {
-			hooks?: {
-				PostToolUse?: Array<{
-					matcher?: string;
-					hooks?: Array<{ command?: string }>;
-				}>;
+	// Checks the maintainer's local agent setup; `.claude/` is gitignored, so
+	// fresh clones have nothing to check.
+	const PROJECT_SETTINGS = join(REPO_ROOT, ".claude/settings.json");
+	it.skipIf(!existsSync(PROJECT_SETTINGS))(
+		"(c) PostToolUse hook auto-runs both layers after edits",
+		() => {
+			type SettingsShape = {
+				hooks?: {
+					PostToolUse?: Array<{
+						matcher?: string;
+						hooks?: Array<{ command?: string }>;
+					}>;
+				};
 			};
-		};
-		const candidates = [PROJECT_SETTINGS, SETTINGS].filter(existsSync);
-		expect(
-			candidates.length,
-			"no settings.json found (project or global)",
-		).toBeGreaterThan(0);
-		const hasHardeningHook = candidates.some((path) => {
-			const settings = JSON.parse(readFileSync(path, "utf8")) as SettingsShape;
-			const hookList = settings.hooks?.PostToolUse ?? [];
-			return hookList.some((h) =>
-				h.hooks?.some((entry) =>
-					/eslint|idiom-guard|hardening/.test(entry.command ?? ""),
-				),
-			);
-		});
-		expect(
-			hasHardeningHook,
-			"PostToolUse hook entry for hardening pipeline missing",
-		).toBe(true);
-	});
+			const candidates = [PROJECT_SETTINGS, SETTINGS].filter(existsSync);
+			expect(
+				candidates.length,
+				"no settings.json found (project or global)",
+			).toBeGreaterThan(0);
+			const hasHardeningHook = candidates.some((path) => {
+				const settings = JSON.parse(
+					readFileSync(path, "utf8"),
+				) as SettingsShape;
+				const hookList = settings.hooks?.PostToolUse ?? [];
+				return hookList.some((h) =>
+					h.hooks?.some((entry) =>
+						/eslint|idiom-guard|hardening/.test(entry.command ?? ""),
+					),
+				);
+			});
+			expect(
+				hasHardeningHook,
+				"PostToolUse hook entry for hardening pipeline missing",
+			).toBe(true);
+		},
+	);
 });
