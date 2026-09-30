@@ -100,7 +100,8 @@ if [[ -L "$LEGACY_LINK" ]]; then
   npm rm -g jact >/dev/null
 fi
 
-if ! npm link; then
+# dist/ is already built above; skip the package's prepare script.
+if ! npm link --ignore-scripts; then
   echo "refresh-global-cli: npm link failed; check write permission on the npm global prefix (npm prefix -g)." >&2
   exit 1
 fi
