@@ -21,18 +21,14 @@ import type { RenameMarkdownFilesResult } from "../../src/core/rename-markdown-f
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "../..");
 const cliPath = path.join(repoRoot, "dist/cli.js");
-const workDir = path.join(tmpdir(), "jact-rename-cli-test");
-const source = path.join(workDir, "target", "card17-conops.md");
-const destination = path.join(
-	workDir,
-	"target",
-	"card17-concept-of-operations-ConOps.md",
-);
-const incoming = path.join(workDir, "card17-requirements.md");
-const otherTarget = path.join(workDir, "other", "card17-conops.md");
-const movedDirectory = path.join(workDir, "moved", "notes");
-const movedDestination = path.join(movedDirectory, path.basename(source));
-const outgoingTarget = path.join(workDir, "reference", "shared.md");
+let workDir: string;
+let source: string;
+let destination: string;
+let incoming: string;
+let otherTarget: string;
+let movedDirectory: string;
+let movedDestination: string;
+let outgoingTarget: string;
 
 const originalIncoming = `# Requirements
 
@@ -77,7 +73,18 @@ function renameArgs(...extra: string[]): string[] {
 
 describe("jact rename CLI", () => {
 	beforeEach(() => {
-		rmSync(workDir, { recursive: true, force: true });
+		workDir = mkdtempSync(path.join(tmpdir(), "jact-rename-cli-test-"));
+		source = path.join(workDir, "target", "card17-conops.md");
+		destination = path.join(
+			workDir,
+			"target",
+			"card17-concept-of-operations-ConOps.md",
+		);
+		incoming = path.join(workDir, "card17-requirements.md");
+		otherTarget = path.join(workDir, "other", "card17-conops.md");
+		movedDirectory = path.join(workDir, "moved", "notes");
+		movedDestination = path.join(movedDirectory, path.basename(source));
+		outgoingTarget = path.join(workDir, "reference", "shared.md");
 		mkdirSync(path.dirname(source), { recursive: true });
 		mkdirSync(path.dirname(otherTarget), { recursive: true });
 		writeFileSync(source, "# Concept\n\n## Overview\n\nOperations. ^block\n");
@@ -215,7 +222,7 @@ describe("jact rename CLI", () => {
 	});
 });
 
-const batchDir = path.join(tmpdir(), "jact-bulk-rename-cli-test");
+let batchDir: string;
 
 function runBatch(args: string[]): {
 	status: number | null;
@@ -255,8 +262,7 @@ function snapshot(directory = batchDir): Record<string, string | null> {
 
 describe("jact rename CLI batch moves", () => {
 	beforeEach(() => {
-		rmSync(batchDir, { recursive: true, force: true });
-		mkdirSync(batchDir, { recursive: true });
+		batchDir = mkdtempSync(path.join(tmpdir(), "jact-bulk-rename-cli-test-"));
 	});
 
 	afterEach(() => {
