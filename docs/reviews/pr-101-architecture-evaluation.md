@@ -147,6 +147,8 @@ Engineering effort is not agent runtime or guaranteed elapsed time. No implement
 
 Covers every finding in the four principle reports, deduplicated, against PR head `5975560`. Order and grouping were cross-checked by an independent GPT-6.1 advisor that read the reports and current sources; effort figures are planning estimates, not measurements.
 
+Phases 5 and 6 were subsequently reviewed by an Anthropic/OpenAI committee. The agreed corrections below clarify scope; they do not authorize implementation, worker assignments, exported-symbol changes, or a push. Pending user gates remain in force.
+
 ### Finding Disposition
 
 | Finding | Source reports | Disposition |
@@ -158,13 +160,16 @@ Covers every finding in the four principle reports, deduplicated, against PR hea
 | Image-embed wording too broad (README, 005, `src/cli.ts` help) | Core, TypeScript, synthesis | Phase 3, this PR |
 | Fixed temp roots shared across runs | Testing, synthesis | Phase 1, this PR |
 | Missing refusal rows, directory-to-new-path, preview immutability, backup final location | Testing, synthesis | Phase 4, this PR |
-| Discriminated `RenameMove`, destination mode replacing `batch`, single-file pair | Core, TypeScript | Phase 5, follow-up PR |
-| Plural module filename; one Markdown-path helper in tests | Core, TypeScript | Phase 5, follow-up PR |
-| Module preamble, export TSDoc, `Contract:` markers, `MovePlan.moved` comment | OOP, TypeScript | Phase 5, follow-up PR |
-| `CliRenameOptions` in core signature; concrete deps instead of `*Like` interfaces | TypeScript (pre-existing debt) | Phase 5, follow-up PR |
-| Split module by responsibility; mirrored core test file | OOP, Testing | Phase 6, conditional follow-up |
+| Discriminated `RenameMove`, request classification currently named `batch`, paired single-file result fields | Core, TypeScript | Phase 5, follow-up PR; preserve destination handling and JSON shape while choosing the classification name/type separately |
+| Plural module filename; repeated production Markdown-path checks | Core, TypeScript | Phase 5, follow-up PR; plural filename is a candidate matching the existing export; consolidate equivalent checks in one local production predicate |
+| Module preamble, export TSDoc, `Contract:` markers | OOP, TypeScript | Phase 5, follow-up PR |
+| `MovePlan.moved` comment | OOP | Already correct in the current source: canonical old path → canonical new path (`src/core/rename-markdown-file.ts:108-109`); no repair |
+| `CliRenameOptions` in core signature | TypeScript (pre-existing debt) | Phase 5, follow-up PR; core-owned options contain only consumed fields |
+| Concrete deps instead of `*Like` interfaces | TypeScript (pre-existing debt) | Drop automatic conversion; retain concrete types unless a verified consumer need warrants a correctly owned capability contract |
+| Split module by responsibility | OOP | Phase 6, conditional follow-up; private implementation within one caller-facing rename operation |
+| Mirrored core test file | Testing | Replace folder-symmetry obligation with direct-call tests of distinct public behavior; independent of Phase 5 and any split |
 | Interim consumer-side backslash check for embeds | OOP | Dropped: superseded by Phase 2 parser fix |
-| `verifyRelationships` bypasses the DI factory | TypeScript (pre-existing debt) | Disputed: advisor found it already uses the factory (`src/core/rename-markdown-file.ts:658-667`); confirm in Phase 5, no change otherwise |
+| `verifyRelationships` bypasses the DI factory | TypeScript (pre-existing debt) | Closed: source already uses `createFileCache`, `createMarkdownParser`, and `createParsedFileCache` (`src/core/rename-markdown-file.ts:658-667`); preserve fresh post-move caches |
 | Document hygiene | All four | No violations reported; nothing to fix |
 
 ### Phases
@@ -173,11 +178,11 @@ Covers every finding in the four principle reports, deduplicated, against PR hea
 flowchart LR
   P1[1 Isolate test temp roots] --> P2[2 Parser-owned embed detection]
   P1 --> P4[4 Behavioral coverage]
-  P3[3 Align interface and help] --> V[Verify and push PR 101]
+  P3[3 Align interface and help] --> V[Verify PR 101; user approval before push]
   P2 --> V
   P4 --> V
   V --> P5[5 Types, naming, TSDoc follow-up]
-  P5 --> P6[6 Conditional module split]
+  C[Relevant public-contract coverage] --> P6[6 Internal split only if justified]
 ```
 
 | Phase | PR | Work | Acceptance | Effort |
@@ -186,9 +191,10 @@ flowchart LR
 | 2. Parser-owned embed detection | 101 | Throwaway probe first (real embed, fully escaped, escaped `!`, escaped brackets, inline and fenced code, plain wikilink); choose tokenizer-context reuse or a dedicated `!` construct per [ADR-0003](../adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection); expose typed embed output; replace the decoded-text scanner in `brokenEmbeds` in one atomic commit | Escaped prose moves; real unsafe wiki and inline embeds still refuse with exit 1 and no writes; reference-style definitions still rewrite; existing validate/extract wikilink results unchanged | 2–3 h |
 | 3. Align public contracts | 101 | Update the [rename interface](../spec/005-interfaces.md#`jact%20rename%20<source...>%20<destination>`) for literal-path precedence, best-effort recovery with reported backups, symlink refusal, and narrowed image-embed wording; cross-check README, [rename workflow](../spec/006-behavior.md#Rename%20Workflow%20%28%60jact%20rename%60%29), and CLI help | Each documented outcome matches the literal-file, failed-recovery, symlink, and reference-image scenarios; citations validate | 30–45 min |
 | 4. Behavioral coverage | 101 | Add refusal rows (unresolved outgoing link, source inside directory source, destination inside moved directory, destination equals source, missing batch source), directory-to-new-path success, preview immutability for batch/glob/folder, backup at reported final path | Refusals and previews leave the tree byte-identical, including `.bak` and temp artifacts (current `snapshot()` excludes `.bak`); backup path and content exact | 1–1.5 h |
-| Verify and push | 101 | `npm run build`, full `npm test`, actual CLI escaped-vs-real embed probes | All pass; probes match acceptance above | 20–30 min |
-| 5. Types, naming, TSDoc | Follow-up | Commit A: discriminated `RenameMove`, destination mode, core-owned options and `*Like` deps. Commit B: plural filename, imports, spec path, shared test helper. Commit C: preamble, export TSDoc, `Contract:` markers | Build and rename suite pass; JSON and human output unchanged | 2–3 h |
-| 6. Module split and core tests | Conditional follow-up | Split planning, rewriting, and transaction once a concrete change needs it; add mirrored core tests for public behavioral contracts only | End-to-end outcomes, rollback, and backup locations unchanged | 2.5–3.5 h |
+| Verify; request push approval | 101 | `npm run build`, full `npm test`, actual CLI escaped-vs-real embed probes; push only after user approval | All checks pass; probes match acceptance above; approval remains a separate gate | 20–30 min |
+| 5. Types, naming, TSDoc | Follow-up | Commit A: discriminated `RenameMove`, paired single-file result fields, core-owned options, and clearer request classification preserving both destination handling and legacy JSON fields; choose classification name/type separately. Retain concrete dependencies unless an actual consumer need justifies a correctly owned contract; no mechanical `*Like` conversion. Commit B: candidate plural filename matching existing `renameMarkdownFiles`, LSP reference checks and clean import/spec-path migration without renaming the export, and one local production Markdown-path predicate for equivalent checks. Commit C: preamble, export TSDoc, and `Contract:` markers explaining invariants, errors, ordering, recovery, and performance. Keep private helpers local and shared contracts with their owner. | Build, rename Vitest coverage, and actual CLI scenarios pass; JSON, human output, destination rules, refusals, verification, and recovery remain unchanged | 2–3 h, provisional |
+| 6. Conditional internal split | Conditional follow-up | Only split when a concrete change demonstrates improved locality: keep planning, rewriting, and transaction private within one cohesive rename module. Use omp capability-folder conventions if needed, not recursive `src/<module>/src` wrappers. Preserve one caller-facing operation; no pass-through layers, speculative adapters, new public stage interfaces, or new barrels by default. | End-to-end outcomes, rollback, and backup locations unchanged; callers need not coordinate additional stages; relevant public-contract tests precede extraction; build, Vitest, and actual CLI scenarios pass | Re-estimate when triggered; prior 2.5–3.5 h estimate is provisional, not scheduled work |
+| Direct-call core tests | Independent coverage work | Add tests through the existing public `renameMarkdownFiles` operation only for distinct consumer-visible behavior; retain CLI tests for arguments, previews, output, and exit codes. No private-helper exports, copied scenarios, or test-folder matching requirement. | Each test protects a plausible behavioral failure or safety invariant; no split or type migration required. A source-supported candidate is stale cached content refusing before any write while preserving an external edit; verify the gap before adding it. | Estimate after selecting an uncovered public contract |
 
 ### Ordering Rationale
 
@@ -196,8 +202,10 @@ flowchart LR
 - Phase 3 is independent and can run alongside 1 and 2.
 - Phase 2 precedes any module split: extracting today's scanner first would move the wrong boundary twice.
 - Within Phase 5, types precede TSDoc, and the filename change precedes path-bearing docs and tests.
-- Phases 5 and 6 move to follow-up PRs because they change no behavior and would enlarge a safety-critical diff under review.
+- Phase 5 is not a technical prerequisite for core tests or conditional decomposition. Naming/type migration may precede decomposition to reduce churn, but relevant public-contract coverage precedes any extraction.
+- Request classification must not be inferred from destination kind or final move count. A literal single-file request can retain legacy top-level `source`/`destination` fields while a one-match glob omits them, even when both make the same move (`src/core/rename-markdown-file.ts:335-373,848-854`).
+- Phases 5 and 6 remain follow-up work to avoid enlarging the safety-critical diff. The current rename operation already hides substantial behavior behind a small caller-facing interface; file size alone does not justify splitting. Core tests are justified by uncovered behavior, not by the split.
 
 **Biggest risk:** changing wikilink tokenization can alter ordinary link extraction for `validate` and `extract`, not only rename. `src/core/MarkdownParser/extractWikilinks.ts` converts every wikilink node into a link. Phase 2 must prove embed-versus-link classification across those commands before committing to tokenizer reuse.
 
-**Totals:** about 4.5–6 hours to make PR 101 merge-ready (Phases 1–4 plus verification); about 4.5–6.5 hours more for both follow-ups.
+**Estimates:** about 4.5–6 hours to make PR 101 merge-ready (Phases 1–4 plus verification); Phase 5 remains a provisional 2–3 hours. Phase 6 is not scheduled without a concrete trigger, and independent core-test work needs a selected behavioral gap before estimation. There is no fixed total for all follow-up work.
