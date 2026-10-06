@@ -506,6 +506,70 @@ describe("jact rename CLI batch moves", () => {
 		},
 	);
 
+	it.each([
+		{
+			name: "wiki",
+			embed: "![[img/p.png|*Alias]] after*",
+		},
+		{
+			name: "wiki inside an ordinary link caption",
+			embed: "[before _text ![[img/p.png|Alias_]] after](../guide.md)",
+		},
+		{
+			name: "Markdown",
+			embed: "![Diagram](img/p.png)",
+		},
+		{
+			name: "Markdown with formatted wiki-like caption text",
+			embed: "![before [![[img/other.png|**Alias]] after**](../guide.md)](img/p.png)",
+		},
+	])(
+		"Given a source note with a $name embed When moved away from its stationary image Then it refuses and leaves the entire tree unchanged",
+		({ embed }) => {
+			writeTree({
+				"notes/a.md": `# A\n\n${embed}\n`,
+				"notes/img/p.png": "PNG",
+				"guide.md": "# Guide\n",
+				"index.md": "# Index\n\n[A](notes/a.md)\n",
+			});
+			const before = snapshot(batchDir, { includeBackups: true });
+
+			const result = runBatch(["notes/a.md", "archive/deep/", "--fix"]);
+
+			expect(result.status).toBe(1);
+			expect(result.stderr).toContain("image embeds");
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+		},
+	);
+
+	it("Given a wiki embed with cross-boundary formatting elsewhere When renaming an unrelated note Then the move and incoming and outgoing citation rewrites succeed", () => {
+		const diagram = "# Diagram\r\n\r\n![[img/p.png|*Alias]] after*\r\n";
+		writeTree({
+			"notes/a.md": "# A\n\n[Shared](../ref/shared.md)\n",
+			"ref/shared.md": "# Shared\n",
+			"index.md": "# Index\n\n[A](notes/a.md#A)\n",
+			"diagram.md": diagram,
+			"img/p.png": "PNG",
+		});
+
+		const result = runBatch(["notes/a.md", "archive/deep/", "--fix"]);
+
+		expect(result.status).toBe(0);
+		expect(JSON.parse(result.stdout)).toMatchObject({ applied: true });
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/deep/": null,
+			"archive/deep/a.md": "# A\n\n[Shared](../../ref/shared.md)\n",
+			"notes/": null,
+			"ref/": null,
+			"ref/shared.md": "# Shared\n",
+			"index.md": "# Index\n\n[A](archive/deep/a.md#A)\n",
+			"diagram.md": diagram,
+			"img/": null,
+			"img/p.png": "PNG",
+		});
+	});
+
 	it("Given an incoming reference image When moving its directory Then its definition follows the image and its usage stays unchanged", () => {
 		writeTree({
 			"notes/a.md": "# A\n",

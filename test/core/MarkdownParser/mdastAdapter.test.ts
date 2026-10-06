@@ -217,6 +217,21 @@ describe("adaptMdastToParserOutput — mdast → ParserOutput decode", () => {
 			content: "![![[img/`nested`.png]]](outer.png)",
 			alt: "![[img/nested.png]]",
 		},
+		...["_", "*", "**"].flatMap((delimiter) =>
+			[
+				{
+					caption: `before ![[img/p.png|${delimiter}Alias]] after${delimiter} &amp; **bold**`,
+					alt: "before ![[img/p.png|Alias]] after & bold",
+				},
+				{
+					caption: `${delimiter}before ![[img/p.png|Alias${delimiter}]] after &amp; **bold**`,
+					alt: "before ![[img/p.png|Alias]] after & bold",
+				},
+			].flatMap(({ caption, alt }) => [
+				{ content: `![${caption}](outer.png)`, alt },
+				{ content: `![[${caption}](guide.md)](outer.png)`, alt },
+			]),
+		),
 	])("preserves CommonMark caption text in $content", ({ content, alt }) => {
 		const result = adapt(content);
 		expect(result.ast.children[0]).toMatchObject({
@@ -229,20 +244,42 @@ describe("adaptMdastToParserOutput — mdast → ParserOutput decode", () => {
 		expect(result.links).toEqual([]);
 	});
 
-	it("preserves wiki-like caption text in a reference image", () => {
-		const result = adapt(
-			"![before ![[img/nested.png]] after][picture]\n\n[picture]: outer.png",
-		);
-		expect(result.ast.children[0]).toMatchObject({
-			type: "paragraph",
-			children: [{
-				type: "imageReference",
-				identifier: "picture",
-				alt: "before ![[img/nested.png]] after",
-			}],
-		});
+	it.each([
+		{
+			caption: "before ![[img/nested.png]] after",
+			alt: "before ![[img/nested.png]] after",
+		},
+		...["_", "*", "**"].flatMap((delimiter) => [
+			{
+				caption: `before ![[img/p.png|${delimiter}Alias]] after${delimiter} &amp; **bold**`,
+				alt: "before ![[img/p.png|Alias]] after & bold",
+			},
+			{
+				caption: `${delimiter}before ![[img/p.png|Alias${delimiter}]] after &amp; **bold**`,
+				alt: "before ![[img/p.png|Alias]] after & bold",
+			},
+		]),
+	])("preserves wiki-like caption text in a reference image: $caption", ({ caption, alt }) => {
+		const target = "img/outer%20diagram.png#part";
+		const definition = `[picture]: <${target}> "Diagram"`;
+		const result = adapt(`![${caption}][picture]\n\n${definition}`);
+		expect(result.ast.children).toMatchObject([
+			{
+				type: "paragraph",
+				children: [{
+					type: "imageReference",
+					identifier: "picture",
+					alt,
+				}],
+			},
+			{ type: "definition", identifier: "picture", url: target, title: "Diagram" },
+		]);
 		expect(result.embeds).toEqual([]);
-		expect(result.links.map((link) => link.target.path.raw)).toEqual(["outer.png"]);
+		expect(result.links.map((link) => ({
+			target: link.target.path.raw,
+			fullMatch: link.fullMatch,
+			line: link.line,
+		}))).toEqual([{ target: "img/outer%20diagram.png", fullMatch: definition, line: 3 }]);
 	});
 
 	it.each([
@@ -265,6 +302,79 @@ describe("adaptMdastToParserOutput — mdast → ParserOutput decode", () => {
 		]);
 		expect(result.links.map((link) => link.target.path.raw)).toEqual(["guide.md"]);
 	});
+
+	it.each([
+		...["_", "*", "**"].flatMap((delimiter) => [
+			{
+				name: `${delimiter} opens inside the alias`,
+				raw: `img/p.png#part|${delimiter}Alias`,
+				target: "img/p.png",
+				before: "before ",
+				after: ` after${delimiter}`,
+			},
+			{
+				name: `${delimiter} closes inside the alias`,
+				raw: `img/p.png#part|Alias${delimiter}`,
+				target: "img/p.png",
+				before: `${delimiter}before `,
+				after: " after",
+			},
+		]),
+		{
+			name: "underscore opens inside the target",
+			raw: "img/_p.png#part|Alias",
+			target: "img/_p.png",
+			before: "before ",
+			after: " after_",
+		},
+		{
+			name: "underscore closes inside the target",
+			raw: "img/p_.png#part|Alias",
+			target: "img/p_.png",
+			before: "_before ",
+			after: " after",
+		},
+	].flatMap((fixture) => [
+		{ ...fixture, context: "paragraph", inLink: false },
+		{ ...fixture, context: "ordinary link caption", inLink: true },
+	]))(
+		"keeps raw embed boundaries when $name in a $context",
+		({ raw, target, before, after, inLink }) => {
+			const caption = `**bold** &amp; ${before}![[${raw}]]${after}`;
+			const result = adapt(
+				`${inLink ? `[${caption}](guide.md)` : caption} [next](next.md)`,
+			);
+			const captionChildren = [
+				{ type: "strong", children: [{ type: "text", value: "bold" }] },
+				{ type: "text", value: ` & ${before}` },
+				{ type: "obsidianEmbed", value: raw },
+				{ type: "text", value: `${after}${inLink ? "" : " "}` },
+			];
+			const paragraph = result.ast.children[0];
+			expect(paragraph).toMatchObject({
+				type: "paragraph",
+				children: [
+					...(inLink
+						? [
+								{ type: "link", url: "guide.md", children: captionChildren },
+								{ type: "text", value: " " },
+							]
+						: captionChildren),
+					{ type: "link", url: "next.md", children: [{ type: "text", value: "next" }] },
+				],
+			});
+			if (paragraph?.type !== "paragraph") throw new Error("Expected a paragraph");
+			const captionNode = paragraph.children[0];
+			const embed = inLink && captionNode?.type === "link"
+				? captionNode.children[2]
+				: paragraph.children[2];
+			expect(embed).not.toHaveProperty("children");
+			expect(result.embeds).toEqual([{ kind: "wiki", target, line: 1 }]);
+			expect(result.links.map((link) => link.target.path.raw)).toEqual(
+				inLink ? ["guide.md", "next.md"] : ["next.md"],
+			);
+		},
+	);
 
 	it.each([
 		"![[caption]][picture]",
