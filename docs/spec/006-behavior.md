@@ -119,10 +119,15 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 2. **Plan links.** Parse every Markdown file in scope plus every moved Markdown file. A cross-document link is rewritten when its target moves or its file changes directory. The new text is relative to the file's final location and points at the target's final location. Unchanged rewrites are dropped. Inline image embeds (`![alt](path)`) and wiki image embeds (`![[folder/image.png]]`) are not rewritten; moves that would break them refuse the plan with exit code 1 and no writes. Reference-style images such as `![picture][pic]` use ordinary parsed definitions such as `[pic]: notes/p.png`, which follow the same link-rewrite rules.
 3. **Preview** returns the plan. **Apply** (`--fix`) re-checks that sources, destinations, and edited files did not change. It then backs up and stages edits, writes them, creates directories, performs the moves, and re-parses each edited file at its final path to confirm every rewritten link resolves to its expected target. On failure, recovery is best-effort: it attempts to reverse every completed move, remove every created directory, and restore every edited file from backups, continuing after recovery errors, and exits 2. Nonempty directories are retained rather than deleting files created by another process; errors and retained backup paths are reported for manual recovery.
 
+Embed classification comes from parsed syntax, not decoded prose. Escaped examples such as `\!\[\[folder/image.png\]\]` and `!\[\[folder/image.png\]\]`, inline code, and fenced code do not block a move. In `\![[notes/a.md]]`, only the bang is escaped: the ordinary wiki link still follows the link-rewrite rules. A genuine embed that still resolves correctly after a move remains unchanged.
+
+A valid Markdown image with bracketed description text, such as `![[caption]](folder/image.png)`, remains an image. Wiki-like syntax inside an image's description remains description text, including through a nested link; CommonMark still handles its formatting, escapes, entities, and code.
+
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-06 | Parser-owned wiki embed detection distinguishes genuine embeds from escaped prose and code; rename consumes typed embed references without rescanning decoded text |
 | 1.0.0-draft | 2026-10-05 | Folder rename plans reject symlinks (file or folder shortcuts) before reading links or changing files |
 | 1.0.0-draft | 2026-10-05 | Existing rename sources with glob characters remain literal; rollback continues restoring files after directory cleanup errors and reports incomplete recovery |
 | 1.0.0-draft | 2026-10-05 | `jact rename` accepts several sources, globs, and directories as one guarded batch with best-effort recovery; creates missing destination directories; refuses moves that would break inline or wiki image embeds |

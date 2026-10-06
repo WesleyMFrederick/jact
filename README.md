@@ -175,6 +175,8 @@ The whole command is one plan. Parsed links between the moved files, links into 
 
 jact does not rewrite inline image embeds (`![alt](path)`) or wiki image embeds (`![[folder/image.png]]`). If a move would break one, rename refuses with exit code `1` and lists them; nothing changes. Reference-style images such as `![picture][pic]` use ordinary parsed definitions such as `[pic]: notes/p.png`; those definitions are rewritten when their target moves or their file changes directory.
 
+Escaped embed examples such as `\!\[\[folder/image.png\]\]` and examples inside inline or fenced code do not count as embeds and do not block a move. In `\![[notes/a.md]]`, only the bang is escaped, so the ordinary wiki link is still rewritten.
+
 ### `outline` — show the heading tree
 
 ```text

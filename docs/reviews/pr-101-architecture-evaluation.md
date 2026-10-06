@@ -265,3 +265,136 @@ Both workers received the implementer persona and explicit `openai-codex/gpt-6.1
 | Worker totals | Codex only | 575.269 | 0.5912 | 160367 | 10930 | 1611648 | 0 | 1782945 | n/a — no answer key |
 
 Measured with `transcript-reader --usage`; outputs are at checkpoint archive `L641` and `L607`, respectively. Costs are rounded as reported. Recorded spans include idle time between prompts and overlap across workers; their sum is not elapsed project time. These totals exclude parent orchestration, whose session also contains earlier work and was not isolated for this checkpoint.
+
+## Micromark Guidance and Embed-Rule Tradeoffs
+
+**Bottom line:** this is a reproduced, bounded jact correctness bug, not evidence that micromark mishandles escapes. The case blocks a valid rename; it did not lose data. How frequently users encounter it is unknown. A dedicated embed rule remains a proposal requiring approval, not an upstream recommendation or a verified implementation.
+
+### What Upstream Actually Says
+
+- [CommonMark backslash escapes](https://spec.commonmark.org/0.31.2/#backslash-escapes) says escaped punctuation is treated as regular characters without its usual Markdown meaning. Removing escape characters from the resulting text is consistent with that behavior.
+- [Micromark syntax extensions](https://github.com/micromark/micromark#syntaxextension) documents character-code hooks for custom syntax. That supports the mechanism of an embed rule starting at `!`; it does not endorse this specific jact design.
+- [Micromark's extension guidance](https://github.com/micromark/micromark#extending-markdown) explicitly says alternatives are often better. Its examples distinguish transforming already-recognized structure from writing an extension for a separate Markdown-like flavor. It does not say every edge case needs another tokenizer.
+- The [local parser probe](#Parser%20Embed%20Probe%20—%202026-10-06) is the reason a transformation of decoded text is insufficient here: real embeds and fully escaped prose have the same text value. Distinguishing them requires original-syntax information, whether captured during parsing or inspected afterward.
+
+### Is the Edge Case Worth Treating as a Bug?
+
+The [recorded reproduction](#Medium%20—%20Escaped%20prose%20is%20reinterpreted%20as%20an%20image%20embed) uses escaped embed notation in a document, then moves the referenced directory. Rename exits 1 and leaves the files in place even though the notation is literal prose, not a live dependency.
+
+This is narrow: it requires embed-looking literal text and a move that would invalidate that path if it were a real embed. Code spans and fenced examples do not trigger the current decoded-text scanner in the [probe](#Parser%20Embed%20Probe%20—%202026-10-06). There is no measured prevalence, security impact, or demonstrated data loss. Using code formatting for examples can avoid the trigger, but that workaround does not make escaped Markdown invalid.
+
+### Adding a Dedicated Embed Rule
+
+| Benefit | Cost or risk |
+|---|---|
+| Distinguishes syntax before escape information disappears from text values | Adds tokenizer behavior and a structured result that rename must consume |
+| Lets rename check identified embeds instead of interpreting prose with a second regex | Requires removing the existing decoded-text scan, not keeping two competing detectors |
+| Gives real embeds an explicit representation while leaving ordinary wikilinks separately recognizable | Must prove interaction with ordinary `![alt](url)` images, escaped characters, malformed input, and code contexts |
+| Fits the existing parser-owned flavor boundary | Changes shared parsing used outside rename; preserving `validate` and `extract` behavior is a release requirement |
+
+The expected maintenance benefit is one place interpreting syntax. The cost is maintaining another construct and its behavioral boundaries. No implementation-size estimate, runtime overhead measurement, or collision-free guarantee has been established.
+
+### Why Not a Smaller Post-Parse Fix?
+
+Checking the original source around matching text could avoid introducing a new construct. The tradeoff is another syntax interpreter that must respect escapes, code contexts, and source boundaries. The observed bug establishes that decoded text alone is wrong; it does not prove that a dedicated construct is the only correct implementation.
+
+Extending the existing wiki-link rule might share parsing code, but the [probe](#Parser%20Embed%20Probe%20—%202026-10-06) shows real embeds currently produce no wikilink node to annotate. That option also needs a change in recognition, not just an extra flag.
+
+The recommendation remains parser-owned recognition, with a dedicated `!` entry rule as the clearer proposed boundary. Its simplicity relative to reuse is a design hypothesis to verify, not an observed result. No parser implementation is authorized by this clarification.
+
+### Approval Framing
+
+The existing [parser ownership decision](../adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection) settles the architectural boundary: recognize Markdown constructs while parsing, not by scanning decoded prose afterward. The user does not need to choose that boundary again.
+
+The previously presented approval gate still stands. The proposed dedicated `!` recognition rule has not been approved or implemented. Frame approval around the user-visible outcome—stop literal examples from blocking valid moves while retaining the refusal for genuinely broken embedded-file references—and disclose the cost of maintaining the rule and checking image/link behavior. Deferring that proposal leaves the known false refusal in place; it is not an automatic reduction of the agreed scope.
+
+## Approved Embed Fix — 2026-10-06
+
+**Status:** implemented, verified, and saved locally. The user selected the dedicated raw-`!` recognition rule; this supersedes the earlier unapproved checkpoint.[^embed-approval] No push, merge, global-settings change, or excluded phase 5/6 work is authorized.
+
+**Checkout:** `/Users/wesleyfrederick/.paseo/worktrees/3bzq2cjn/jact-bulk-rename`, branch `feat/bulk-rename`. Commands and root-relative evidence paths below use this checkout.
+
+The canonical contracts are the [parser component specification](../spec/002-architecture.md#MarkdownParser%20(%60src/core/MarkdownParser/%60)), [typed embed references](../spec/004-domain-model.md#EmbedReference), and [rename behavior](../spec/006-behavior.md#Rename%20Workflow%20(%60jact%20rename%60)). Rename planning now consumes parser-owned references rather than scanning decoded text. `micromark-core-commonmark` is declared directly for the image-recognition helpers.
+
+### Post-Fix Quality
+
+**Scope:** the 14 fix-owned production, dependency, and test files only. The five documentation files were updated separately. This was a targeted manual correctness review because the branch contains unrelated committed work, not a full-PR CE review pipeline.
+
+**Simplify:** all three scoped Codex reviewers read their full rubrics and inspected the settled implementation. Reuse and quality reported no actionable findings.[^embed-reuse][^embed-quality] Efficiency identified one unused inner lookahead token.[^embed-efficiency] Its enter/exit operations and unused type declaration were removed; the required outer token remains. No speedup measurement is claimed.
+
+**Review:** implementation-time runtime checks exposed image-precedence, event-array-identity, and image-description-decoding regressions. Each was repaired before the source commit. Final tests cover bracketed image descriptions, inline and reference images, formatting, escapes, entities, nested links, raw embed literals, and trailing/following text. Full-tree compatibility comparisons confirm that the new rule does not change the eight checked non-embed image/link/code cases.[^embed-runtime] The three simplify reports are limited to their rubrics, not independent correctness verdicts.
+
+**Residuals:** no known defect remains in the exercised fix scope. Project-wide ESLint still reports **44 errors in 21 files**. All were on unchanged injectable-dependency declarations when compared with added/replaced lines, including deliberately invalid fixtures.[^embed-lint-lines] The final project-wide output is byte-for-byte identical to the earlier output.[^embed-lint-equality] The complete error output is retained, not suppressed.[^embed-full-lint] The new tokenizer's scoped lint check passes.[^embed-tokenizer-lint] These unrelated declarations and the lint configuration were left unchanged; project-wide lint must not be described as clean.
+
+**Re-verification:** after the efficiency cleanup, build, type-check, the full suite, scoped tokenizer lint, and all runtime proof groups passed.[^embed-checks][^embed-tokenizer-lint][^embed-runtime] The new checks use this branch's built CLI, not the globally linked command.
+
+### Verification Results
+
+| Check | Observed result |
+|---|---|
+| Focused parser/adapter/assembly/anchor tests | 4 files; 64 tests passed before the final allocation-only cleanup; included in the final full run[^embed-parser-tests] |
+| Rename integration tests | 34 tests passed; included in the final full run[^embed-rename-tests] |
+| Final `npm run build` | Passed[^embed-checks] |
+| Final `npm run type-check` | Passed[^embed-checks] |
+| Final `npm test` | 132 files passed; 973 tests passed, 1 skipped[^embed-checks] |
+| Final tokenizer ESLint | Passed[^embed-tokenizer-lint] |
+| Project-wide ESLint | 44 unchanged errors; not a clean run[^embed-full-lint][^embed-lint-equality] |
+| Requested real CLI behavior | 8 fixture scenarios passed: literal/code examples remain unchanged; dangerous real embeds refuse without writes; ordinary wiki links and reference definitions rewrite; validation/extraction succeed; stable intratree embeds remain unchanged[^embed-runtime] |
+| Real CLI image-overlap behavior | 4 fixture scenarios passed: inline-image protection, unresolved/invalid suffix protection, and reference-definition-only rewrites[^embed-runtime] |
+| Complete parser-tree compatibility | All 8 checked trees equal the same assembled parser with only the new embed extension excluded[^embed-runtime] |
+
+The full-suite output also prints the following error messages, while reporting the passing result above. The complete output is retained in the final-check receipt.[^embed-checks]
+
+```text
+Validation errors found:
+  Line 11: Anchor not found: #Deep%20Nested%20Section
+ERROR: --stdin requires exactly one <path> (intended path for scope/links); batch selection (multiple paths, glob, --changed, --json) is not supported with --stdin
+```
+
+### Measured Codex Worker Usage
+
+Measured from each completed native session with `transcript-reader --usage`; model names are observed, not assigned labels. Wall time spans each entire worker session, including idle intervals between review or repair prompts. The workers overlap, so their wall times must not be summed into elapsed implementation time. No alternative implementation was benchmarked.
+
+| Role / name | Model(s) actually used | Wall time (s) | Cost (USD) | Caught / Missed / False flag / Correct pass | Tokens in / out / cache read / cache write / total |
+|---|---|---|---|---|---|
+| Test writer[^embed-test-usage] | openai-codex/gpt-6.1-sol | 106.389 | 0.1373 | n/a (no answer key) | 38137 / 3224 / 288256 / 0 / 329617 |
+| Parser implementer[^embed-implementation-usage] | openai-codex/gpt-6.1-sol | 4227.101 | 2.1068 | n/a (no answer key) | 329801 / 71250 / 7347456 / 0 / 7748507 |
+| Reuse reviewer[^embed-reuse-usage] | openai-codex/gpt-6.1-sol | 3951.028 | 0.4560 | n/a (no answer key) | 117264 / 6699 / 1544576 / 0 / 1668539 |
+| Quality reviewer[^embed-quality-usage] | openai-codex/gpt-6.1-sol | 3883.902 | 0.3236 | n/a (no answer key) | 85273 / 4584 / 1072000 / 0 / 1161857 |
+| Efficiency reviewer[^embed-checks] | openai-codex/gpt-6.1-sol | 3914.261 | 0.3622 | n/a (no answer key) | 101277 / 4404 / 1156096 / 0 / 1261777 |
+| Worker subtotal; parent excluded | openai-codex/gpt-6.1-sol | n/a (overlapping sessions) | 3.3859 | n/a (no answer key) | 671752 / 90161 / 11408384 / 0 / 12170297 |
+| Parent orchestration for this phase | openai-codex/gpt-6.1-sol | unknown (not isolated) | unknown (not isolated) | n/a (no answer key) | unknown / unknown / unknown / unknown / unknown |
+
+The subtotal sums the displayed rounded worker costs and token counts; it is not the complete run cost. The long parent session also contains earlier work and user waits, and the usage command cannot combine usage reporting with phase filters. Parent-phase usage remains unknown rather than presenting whole-session usage as this fix's cost. Review findings are reported above; no accuracy score is inferred without an answer key.
+
+### Local Delivery
+
+- `90a4540` — Recognize wiki embeds without blocking escaped examples: 13 production, dependency, and parser-test files.[^embed-parser-commit]
+- `084c8c8` — Cover escaped examples and embed safety during rename: the integration regression file.[^embed-regression-commit]
+- This documentation update records the current contracts, verification, review scope, residual lint errors, and measured usage.
+
+The tracked commit hook intentionally skipped refreshing the global CLI outside canonical main.[^embed-parser-commit][^embed-regression-commit] That did not affect branch-local verification or change the global installation. All workers were Codex; no push or merge was performed.
+
+### Final Evidence Receipts
+
+These are immutable local transcript snapshots. Each pointer names the result or report, not merely the producing call. Full output is available with `transcript-reader --dir <archive> --lines <line> --all`, or raw JSON with its `L3` mode.
+
+[^embed-approval]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L810`
+[^embed-parser-tests]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1170`
+[^embed-rename-tests]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1171`
+[^embed-checks]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1315`
+[^embed-runtime]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1318`
+[^embed-tokenizer-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1314`
+[^embed-full-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1241`
+[^embed-lint-lines]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1071`
+[^embed-lint-equality]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1277`
+[^embed-reuse]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-647Z_01a111bb-727f-7000-9563-0a6fa837bb02.42a48729c023.jsonl:L210`
+[^embed-quality]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-629Z_01a111bb-726d-7000-a98d-6b61f4009b6c.e7f8dc814bdd.jsonl:L167`
+[^embed-efficiency]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-636Z_01a111bb-7274-7000-9d90-e3f74d492011.2c21f4e8587e.jsonl:L153`
+[^embed-test-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L931`
+[^embed-implementation-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1235`
+[^embed-reuse-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1242`
+[^embed-quality-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1243`
+[^embed-parser-commit]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1336`
+[^embed-regression-commit]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1343`
+

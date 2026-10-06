@@ -133,7 +133,7 @@ interface FlavorExtensionGroup {
 const commonmarkFlavor: FlavorExtensionGroup; // baseline: inline/reference links, autolinks,
                                                 // ATX/setext headings — built into micromark itself
 const obsidianFlavor: FlavorExtensionGroup;    // highlight, obsidianComment, citation,
-                                                // caretAnchor, wikilink, obsidianLink
+                                                // caretAnchor, wikilink, obsidianEmbed, obsidianLink
 const allFlavors: FlavorExtensionGroup[] = [commonmarkFlavor, obsidianFlavor];
 ```
 
@@ -149,10 +149,13 @@ const allFlavors: FlavorExtensionGroup[] = [commonmarkFlavor, obsidianFlavor];
 | `obsidianComment.ts` | `%%text%%` | (comment, suppressed from output) |
 | `obsidianLink.ts` | Permissive links whose fragment contains a raw space, e.g. `[t](file#My Heading)` | link with unencoded fragment |
 | `wikilink.ts` | `[[target#anchor\|alias]]`, all parts optional | `wikilink` |
+| `obsidianEmbed.ts` | `![[target#anchor\|alias]]` | `obsidianEmbed` |
 
 `highlight.ts` and `obsidianComment.ts` share a `wrappedInline` helper (delimiter-pair tokenizer), differing only by marker character (`=` vs `%`).
 
-**Post-parse extraction** (`mdastAdapter.ts` → `extractHeadings.ts`, `extractLinks.ts`, `extractAnchors.ts`) walks the single parsed tree via `unist-util-visit` to build `HeadingObject[]`, `LinkObject[]`, `AnchorObject[]` — one parse, three extraction passes over the same tree, never a re-parse.
+**Post-parse extraction** (`mdastAdapter.ts` → `extractHeadings.ts`, `extractLinks.ts`, `extractAnchors.ts`) walks the single parsed tree via `unist-util-visit` to build headings, citation links, anchors, and [typed embed references](004-domain-model.md#EmbedReference). The adapter reads inline `image` and `obsidianEmbed` nodes for embeds. Consumers use these typed results rather than scanning decoded prose — one parse, no re-parse.
+
+The `obsidianEmbed.ts` rule starts at a raw `!` and delegates normal image recognition to CommonMark's `labelStartImage` and `labelEnd` helpers. It retains the existing token events and their array identity. The mdast compiler uses image ancestry to keep wiki-like text inside image descriptions under CommonMark's text rules, including formatting, escapes, entities, and nested links. Only active embeds become custom nodes.
 
 ---
 
