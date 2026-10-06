@@ -145,7 +145,7 @@ Missing destination directories are listed in the preview and created on `--fix`
 
 | Flag | Default | Description |
 |---|---|---|
-| `--scope <folder>` | smart default (inferred from the first source) | Bounds sources, destinations, and backlink discovery |
+| `--scope <folder>` | smart default (inferred from the first source) | Bounds sources, destinations, and the physical locations of notes selected for reference edits |
 | `--fix` | `false` | Apply moves and reference edits; omission is a read-only preview |
 | `--json` | `false` | Emit the structured rename result for the whole batch |
 | `--allow-gitignore` | `false` | Include ignored Markdown notes while discovering incoming links and plain paths |
@@ -157,7 +157,10 @@ The plan is refused (exit `1`, nothing written) when:
 - a destination exists, leaves scope, equals its source, or two sources map to the same destination
 - a directory would move into itself, one source sits inside another directory source, or one destination sits inside another moved directory
 - a moved note's outgoing cross-document link or selected plain path cannot resolve unambiguously, because its post-move path is unknown
+- a note selected for reference edits resolves physically outside scope, including through a file or directory symlink
 - a move would break an image embed (see below)
+
+Reference discovery still follows symlinks. A shortcut to a note physically inside scope is allowed; an external note with no selected edits remains unchanged and does not trigger the containment check. An affected external note refuses the whole plan in preview and apply, before backups, staging files, destination directories, reference writes, or moves.
 
 **Non-Markdown files.** Any existing file can be selected directly or carried by a directory or batch move. Parsed links — `[text](file.pdf)`, `[[dir/file.png]]` — and plain paths in Markdown notes are rewritten when their targets move, including non-Markdown targets. Non-Markdown references retain their plain/code formatting. Image embeds (`![alt](path)`, `![[dir/file]]`) remain outside jact's link model and are not treated as plain paths: rename cannot rewrite them and `jact validate` cannot check them. Before writing, rename scans every Markdown file in scope (and every moved one) for image embeds whose target would no longer resolve after the moves and refuses the plan, listing each `file:line`. Embeds inside a moved directory that point into the same tree keep working because the tree's shape is preserved, and bare-name `![[file.png]]` embeds resolve by name in Obsidian, so neither blocks a move.
 
@@ -328,6 +331,7 @@ Single-file `validate` sets `process.exitCode` and does not call `process.exit()
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-06 | Rename refuses the whole plan before writes when a note selected for reference edits resolves physically outside scope; internal shortcuts and unaffected external notes remain allowed |
 | 1.0.0-draft | 2026-10-06 | Approved plain-path validation and prose Markdown conversion contract; arbitrary-file rename/move with plain-path rewrites, exact resolution, suffix/command preservation, and post-transaction verification |
 | 1.0.0-draft | 2026-09-25 | Added `validate --fix --no-backup`; `--fix` no longer counts or reports fixes that leave a citation unchanged |
 | 1.0.0-draft | 2026-09-25 | Single-file `validate` writes its complete report to a piped stdout; before, output stopped at 64KB |

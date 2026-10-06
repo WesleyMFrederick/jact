@@ -697,6 +697,14 @@ async function planFiles(
 			});
 		}
 		if (edits.length === 0 && expectedPlainPaths.length === 0) continue;
+		if (edits.length > 0) {
+			const canonicalFilePath = canonicalExisting(filePath);
+			if (!isWithin(scope, canonicalFilePath)) {
+				throw new RenameValidationError(
+					`Reference note is outside the rename scope: ${filePath} (resolved to ${canonicalFilePath}). No files were changed.`,
+				);
+			}
+		}
 
 		for (const expected of expectedPlainPaths) {
 			const originalStart = expected.start;

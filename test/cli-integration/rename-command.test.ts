@@ -388,6 +388,121 @@ describe("jact rename CLI batch moves", () => {
 		},
 	);
 
+	it.each([
+		{ shortcutKind: "file", referenceKind: "plain" },
+		{ shortcutKind: "folder", referenceKind: "plain" },
+		{ shortcutKind: "file", referenceKind: "markdown" },
+		{ shortcutKind: "folder", referenceKind: "markdown" },
+	])(
+		"Given an affected external $referenceKind note through a $shortcutKind shortcut When renamed Then preview and apply refuse before any writes",
+		({ shortcutKind, referenceKind }) => {
+			writeTree({
+				"data/old.json": '{"value":1}\n',
+				"a-index.md": "# Index\n\nSee data/old.json.\n",
+			});
+			const outside = mkdtempSync(`${batchDir}-outside-`);
+			const outsideFile = path.join(outside, "outside.md");
+			const movedFile = realpathSync(path.join(batchDir, "data/old.json"));
+			const reference =
+				referenceKind === "plain"
+					? `See ${movedFile}.`
+					: `[Data](${movedFile})`;
+			const content = `# Outside\n\n${reference}\n`;
+			writeFileSync(outsideFile, content);
+			const shortcut = path.join(
+				batchDir,
+				shortcutKind === "file" ? "z-alias.md" : "z-alias",
+			);
+			const shortcutTarget = shortcutKind === "file" ? outsideFile : outside;
+			symlinkSync(shortcutTarget, shortcut);
+			const scopeEntries = readdirSync(batchDir).sort();
+
+			try {
+				for (const extra of [[], ["--fix"]]) {
+					const result = runBatch([
+						"data/old.json",
+						"archive/nested/new.json",
+						...extra,
+					]);
+
+					expect(result.status).toBe(1);
+					expect(result.stderr).toContain(
+						"Reference note is outside the rename scope",
+					);
+					expect(result.stderr).toContain(realpathSync(outsideFile));
+					expect(readFileSync(movedFile, "utf8")).toBe('{"value":1}\n');
+					expect(readFileSync(path.join(batchDir, "a-index.md"), "utf8")).toBe(
+						"# Index\n\nSee data/old.json.\n",
+					);
+					expect(readFileSync(outsideFile, "utf8")).toBe(content);
+					expect(readlinkSync(shortcut)).toBe(shortcutTarget);
+					expect(existsSync(path.join(batchDir, "archive"))).toBe(false);
+					expect(readdirSync(batchDir).sort()).toEqual(scopeEntries);
+					expect(readdirSync(path.join(batchDir, "data"))).toEqual(["old.json"]);
+					expect(readdirSync(outside)).toEqual(["outside.md"]);
+				}
+			} finally {
+				rmSync(outside, { recursive: true, force: true });
+			}
+		},
+	);
+
+	it("Given an internal folder shortcut and an unaffected external note When renamed Then affected in-scope references update and external files stay unchanged", () => {
+		writeTree({
+			".gitignore": "notes/\n",
+			"data/old.json": '{"value":1}\n',
+			"a-index.md": "# Index\n\nSee data/old.json.\n",
+			"notes/linked.md": `# Linked\n\nSee ${path.join(batchDir, "data/old.json")}:12.\n`,
+		});
+		const internalTarget = path.join(batchDir, "notes");
+		const internalShortcut = path.join(batchDir, "z-internal");
+		symlinkSync(internalTarget, internalShortcut);
+		const outside = mkdtempSync(`${batchDir}-outside-`);
+		const outsideFile = path.join(outside, "unaffected.md");
+		const outsideContent = `# Unaffected\n\nSee ${path.join(outside, "untouched.json")}.\n`;
+		writeFileSync(outsideFile, outsideContent);
+		writeFileSync(path.join(outside, "untouched.json"), '{"untouched":true}\n');
+		const externalShortcut = path.join(batchDir, "z-external");
+		symlinkSync(outside, externalShortcut);
+		const outsideEntries = readdirSync(outside).sort();
+
+		try {
+			const preview = runBatch(["data/old.json", "archive/nested/new.json"]);
+			expect(preview.status).toBe(0);
+			expect(readFileSync(path.join(batchDir, "data/old.json"), "utf8")).toBe(
+				'{"value":1}\n',
+			);
+			expect(existsSync(path.join(batchDir, "archive"))).toBe(false);
+
+			const applied = runBatch([
+				"data/old.json",
+				"archive/nested/new.json",
+				"--fix",
+			]);
+			expect(applied.status, applied.stderr).toBe(0);
+			expect(existsSync(path.join(batchDir, "data/old.json"))).toBe(false);
+			const finalTarget = realpathSync(
+				path.join(batchDir, "archive/nested/new.json"),
+			);
+			expect(readFileSync(finalTarget, "utf8")).toBe('{"value":1}\n');
+			expect(readFileSync(path.join(batchDir, "a-index.md"), "utf8")).toBe(
+				"# Index\n\nSee archive/nested/new.json.\n",
+			);
+			expect(readFileSync(path.join(internalShortcut, "linked.md"), "utf8")).toBe(
+				`# Linked\n\nSee ${finalTarget}:12.\n`,
+			);
+			expect(readlinkSync(internalShortcut)).toBe(internalTarget);
+			expect(readlinkSync(externalShortcut)).toBe(outside);
+			expect(readFileSync(outsideFile, "utf8")).toBe(outsideContent);
+			expect(readFileSync(path.join(outside, "untouched.json"), "utf8")).toBe(
+				'{"untouched":true}\n',
+			);
+			expect(readdirSync(outside).sort()).toEqual(outsideEntries);
+		} finally {
+			rmSync(outside, { recursive: true, force: true });
+		}
+	});
+
 	it("Given an existing bracketed filename When renamed Then only that file moves and the destination is a filename", () => {
 		writeTree({
 			"notes/[ab].md": "# Literal\n",
