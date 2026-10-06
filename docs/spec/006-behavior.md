@@ -127,7 +127,7 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 ## Rename Workflow (`jact rename`)
 
-`JactCli.rename()` treats existing source paths literally, including names with glob characters. It expands only non-existing glob sources with the same `resolveFiles()` that batch validate uses (a glob with no Markdown match is a validation error), infers scope from the first source, and calls `renameMarkdownFiles()` (`src/core/rename-markdown-file.ts`), which runs in this order:
+`JactCli.rename()` treats existing source paths literally, including names with glob characters. It expands only non-existing glob sources to regular files, applies ignore rules, and refuses a glob when no eligible files remain. It infers scope from the first source and calls `renameMarkdownFiles()` (`src/core/rename-markdown-file.ts`), which runs in this order:
 
 1. **Plan moves.** Resolve each source's destination with `mv` rules, then refuse invalid or overlapping requests before reading any links. Collect missing destination directories. Expand every directory move into a map from each carried file's current path to its new path. Reject a source directory if it contains a symlink (a file or folder shortcut), including one in a subdirectory. Report the shortcut path with exit code 1. Preview and `--fix` both stop without changing files.
 2. **Plan reference edits.** Parse discovered Markdown notes plus every moved Markdown file. A cross-document link or plain path is rewritten when its target moves or its file changes directory. The new text points at the target's final location. Unchanged rewrites are dropped. For every note whose reference text would change, resolve its physical location and refuse the whole plan with exit code 1 if it is outside canonical scope. This happens before backups, staging, directory creation, writes, or moves. Reference discovery through internal symlinks remains allowed, and an external note with no selected edits does not trigger the containment check. Image embeds that the moves would break refuse the plan, because they are outside the link model.
@@ -137,6 +137,7 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-06 | Corrected rename glob eligibility: regular files after ignore filtering, not Markdown-only matches or batch validate's resolver |
 | 1.0.0-draft | 2026-10-06 | Rename checks the physical scope of every note selected for reference edits before any writes, without banning internal shortcuts or unaffected external notes |
 | 1.0.0-draft | 2026-10-06 | Prose Markdown conversion retains line suffixes only in link text, keeping destinations usable by Markdown clients |
 | 1.0.0-draft | 2026-10-05 | Folder rename plans reject symlinks (file or folder shortcuts) before reading links or changing files |
