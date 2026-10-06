@@ -405,7 +405,7 @@ These are immutable local transcript snapshots. Each pointer names the result or
 
 PR 101 is merged. The follow-up preserves the approved local fixes missing from fetched main `9c5b314be7f4006ea19984d1243b4126e467e34c`. The six-role exact-diff review at `7733070c49c1751fad381be51eb7172473d47ad9` produced three confirmed findings: formatting crossing a raw embed boundary could crash the shared parser; source-only embed movement lacked an explicit refusal regression; and four historical reports linked to workstation-only principle documents. All three are resolved in this follow-up.
 
-The parser defers attention resolution until image ownership is known, removes complete literal embed bodies, and preserves CommonMark image-caption events and event-array identity. No exported signatures or public JSON shapes changed. Source-only image-embed moves are refused without modifying the tree or creating backups. Historical principle links now target their canonical private GitHub repository, with an explicit access notice; historical verdicts remain point-in-time.
+The parser defers attention resolution until image ownership is known, removes complete literal embed bodies, and preserves CommonMark image-caption events and event-array identity. The attention-resolution repair changes no exported signatures or public JSON shapes. Source-only image-embed moves are refused without modifying the tree or creating backups. Historical principle links now target their canonical private GitHub repository, with an explicit access notice; historical verdicts remain point-in-time.
 
 The scoped three-role simplification pass applied one efficiency finding: skip attention resolution when no retained deferred-attention tokens remain. The reuse suggestion was declined because it would import an undeclared direct dependency; package changes were outside the repair scope. The quality pass found no changes to make. No broad cleanup, module splitting, destination changes, or global settings changes were added.
 
@@ -455,4 +455,37 @@ Native usage includes both assistant-message usage and top-level `model_usage` r
 [^followup-ast]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2039`
 [^followup-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2044`
 [^followup-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2091`
+
+
+### Latest-main Integration
+
+Main advanced to `3cdda5652df56d67d707ecfa8a3d02cc211322e0` (merged PR 102) before push. The six conflicting files were resolved without discarding main's landed regular-file moves, exact plain-path rewrites, or physical-scope and Windows safeguards. Destination rules and public CLI JSON shape remain main's contracts. The earlier verification and usage tables are historical snapshots, not the final integrated result.
+
+- Final integrated build and type-check passed. **133 test files passed; 1065 tests passed and 1 was skipped**.[^integrated-checks]
+- The actual shared-parser CLI smoke and all **24 full-AST compatibility comparisons** passed again on the integrated source.[^integrated-runtime]
+- An additional runtime smoke proved arbitrary JSON moves and exact code-path rewrites, read-only preview, active cross-formatted embed refusal before writes or backups, and untouched CommonMark caption text.[^integrated-main-smoke]
+- Inert code examples remain non-embeds, while their exact file paths follow main's plain-reference policy. The retained integration tests now assert those rewrites; escaped-prose examples retain their bytes. No rename-only scanner exception remains.
+- Full repository ESLint now reports only **2 errors**, both in the unchanged optional-dependency guard fixture; no follow-up source or test file has an ESLint error.[^integrated-lint]
+- The citation edit hook still reports pre-existing example-path and symbol-reference errors in historical reports and specifications. The new follow-up evidence section introduces none; this PR does not expand into unrelated document cleanup.
+- Compound qualification was evaluated again after integration. The interaction between inert embed examples and code-path rewrites is covered by final tests and the living specification; no separate learning qualifies.
+
+### Integration Usage Addendum
+
+The two additional Codex workers below are included in the integrated native receipt. The completed-worker subtotal covers **16 workers**. The parent and total remain measured snapshots through 2026-10-06T19:01:47.889Z, not final whole-run totals. Auxiliary Codex harness calls are included; comparison runs and confusion counts remain unavailable for the same reasons as the earlier table.[^integrated-usage]
+
+| Role | Primary Codex model | Wall time (s) | Cost (USD) | Caught / Missed / False flag / Correct pass | Tokens in / out / cache read / cache write / total |
+|---|---|---|---|---|---|
+| merge-docs-main102 | gpt-6.1-sol | 142.145 | 0.243044 | unknown (no answer key) | 61874 / 4724 / 738304 / 0 / 804902 |
+| merge-rename-main102 | gpt-6.1-sol | 198.159 | 0.284001 | unknown (no answer key) | 75371 / 5837 / 779904 / 0 / 861112 |
+| parent-snapshot | gpt-6.1-sol | 6603.129 | 3.214146 | unknown (no answer key) | 471428 / 127449 / 10049792 / 0 / 10648669 |
+| Worker subtotal | Mixed | not additive | 9.602615 | unknown (no answer key) | 1416175 / 92708 / 14243072 / 0 / 15751955 |
+| Measured snapshot total | Mixed | 6603.129 | 12.816762 | unknown (no answer key) | 1887603 / 220157 / 24292864 / 0 / 26400624 |
+| Final run total | Mixed | unknown (parent active) | unknown (parent active) | unknown (no answer key) | unknown (parent active) |
+| Comparison baseline / variant | unknown (not run) | unknown (not run) | unknown (not run) | unknown (no answer key) | unknown (not run) |
+
+[^integrated-checks]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2213`
+[^integrated-runtime]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2222`
+[^integrated-main-smoke]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2225`
+[^integrated-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2220`
+[^integrated-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2246`
 
