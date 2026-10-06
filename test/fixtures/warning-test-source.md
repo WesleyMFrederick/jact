@@ -8,4 +8,4 @@ The following citation uses an incorrect path, but the file cache should resolve
 
 - [Valid file, wrong path](../wrong-path/warning-test-target.md#Test%20Anchor) - Should trigger warning
 
-This citation points to `../wrong-path/warning-test-target.md` but the actual file is at `subdir/warning-test-target.md`. The file cache should find the file by its short name but mark it as a warning because the path is incorrect.
+The citation above has the wrong directory. The file cache should find the target by its short name and report a path-conversion warning.

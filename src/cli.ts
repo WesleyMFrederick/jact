@@ -340,12 +340,12 @@ const VERBOSE_OPTION_DESCRIPTION =
 program
 	.command("rename")
 	.description(
-		"Preview (default) or apply (--fix) a move of Markdown files or directories and update incoming, outgoing, and between-moved-file links in scope",
+		"Preview (default) or apply (--fix) a move of files or directories and update incoming, outgoing, and between-moved-file links and plain paths in scope",
 	)
 	.usage("[options] <source...> <destination>")
 	.argument(
 		"<source-and-destination...>",
-		"one or more sources, then the destination (<source...> <destination>). A source is a .md file, a quoted glob (like `jact validate`), or a directory. With one .md source, the destination is a new .md path, a directory (existing, or ending in /), or a bare filename that renames in place. With one directory source, the tree moves into the destination if it is an existing directory, otherwise to the destination path (like `mv`). With several sources or a glob, the destination is a directory and each source lands at <destination>/<basename>. Missing destination directories are created on --fix.",
+		"one or more sources, then the destination (<source...> <destination>). A source is a file of any type, a quoted glob, or a directory. With one file source, the destination is a new file path, a directory (existing, or ending in /), or a bare filename that renames in place. With one directory source, the tree moves into the destination if it is an existing directory, otherwise to the destination path (like `mv`). With several sources or a glob, the destination is a directory and each source lands at <destination>/<basename>. Missing destination directories are created on --fix.",
 	)
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option(
@@ -369,6 +369,8 @@ Examples:
     $ jact rename a.md b.md new/dir/ --fix
     $ jact rename "concepts/*.md" archive/concepts/
     $ jact rename notes/old-folder archive/ --fix
+    $ jact rename data/results.json output.json --fix
+    $ jact rename "src/*.ts" archive/src/ --fix
 
 Safety:
   Preview is the default and lists every move, every directory to create, and
@@ -376,8 +378,10 @@ Safety:
   backups, verifies inputs did not change, creates missing directories, moves
   the files and directories, updates links, then verifies every relationship;
   any failure triggers rollback. Recovery errors do not stop remaining recovery
-  steps and report retained backups. Files of any type inside a moved directory
-  move with it. Image embeds (![](...), ![[dir/file]]) are not
+  steps and report retained backups. Files of any type can be moved.
+  Plain paths keep their prose, inline-code, and command formatting, including
+  #anchors and :line suffixes. Missing outgoing paths or ambiguous affected paths
+  stop the plan before writing. Image embeds (![](...), ![[dir/file]]) are not
   rewritten: a move that would break one is refused.
   A symlink is a file or folder shortcut. If a source folder contains one,
   including in a subfolder, preview and --fix both stop without changing files.

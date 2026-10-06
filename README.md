@@ -6,7 +6,7 @@ jact is a command-line tool that keeps links between Markdown files healthy and 
 
 - **Validate** — find links that point to missing files or missing headings.
 - **Fix** — rewrite broken heading links to the correct form, with a preview first.
-- **Rename** — move or rename a Markdown file and update every link to it.
+- **Rename** — move or rename files and folders, then update links and plain paths in Markdown notes.
 - **Outline** — show the heading tree of a document.
 - **Extract** — print one section, one file, or every linked section, ready to paste into an AI prompt.
 
@@ -145,7 +145,7 @@ No files were written (--dry-run).
 
 ### `rename` — move files or folders and update their links
 
-`rename` previews by default. Add `--fix` to apply. Give it one or more sources and then a destination, like `mv`. A source can be a `.md` file, a quoted glob, or a folder.
+`rename` previews by default. Add `--fix` to apply. Give it one or more sources and then a destination, like `mv`. A source can be a file of any type, a quoted glob, or a folder.
 
 ```text
 $ jact rename docs/setup.md getting-started.md
@@ -165,13 +165,17 @@ jact rename docs/old.md archive/new.md --json # machine-readable plan
 jact rename a.md b.md new/dir/ --fix          # move several files; creates new/dir
 jact rename "concepts/*.md" archive/          # move every match of a glob
 jact rename notes/old-folder archive/ --fix   # move a whole folder (images included)
+jact rename data/results.json output.json --fix # rename a non-Markdown file
+jact rename "src/*.ts" archive/src/ --fix     # move non-Markdown glob matches
 ```
 
 Existing source paths are treated literally, even when their names contain glob characters such as brackets. With several sources or a glob, the destination is a folder and each file keeps its name. A folder moves into the destination if that folder exists, otherwise it becomes the destination. Missing folders are created on `--fix`.
 
 A symlink is a file or folder shortcut that points to another location. If a source folder contains one, jact stops and reports its path. This rule applies to preview and `--fix`, including shortcuts in subfolders. No files are changed.
 
-The whole command is one plan. Links between the moved files, links into them, and links out of them are all correct afterward. With `--fix`, jact makes backups, moves everything, updates the links, then checks every link again. If a step fails, it attempts to undo every change. A recovery error does not stop the remaining recovery steps; jact reports errors and retained backups for manual recovery. It never deletes another process's files to remove a newly created folder.
+The whole command is one plan. Parsed links and plain paths into moved files, between moved files, and out of moved Markdown notes are updated together. Plain paths stay plain: prose, backticks, quotes and commands keep their format, as do heading and line-number suffixes. jact resolves exact paths relative to the note or scope; it does not guess by filename. An affected path with two possible files, or an unresolved outgoing path in a note that changes folders, stops the plan before writing. Already-broken references that the move does not affect stay unchanged.
+
+With `--fix`, jact backs up edited notes and individually moved files, applies the plan, then checks rewritten links and plain paths against their intended files. If a step fails, it attempts to undo every change. A recovery error does not stop the remaining recovery steps; jact reports errors and retained backups for manual recovery. It never deletes another process's files to remove a newly created folder. Preview never writes files or backups. URLs, glob patterns and path templates are not plain file references.
 
 jact does not rewrite image embeds (`![alt](path)`, `![[folder/image.png]]`). If a move would break one, rename refuses and lists them; nothing changes.
 

@@ -8,8 +8,9 @@
  */
 
 import { existsSync, realpathSync } from "node:fs";
+import * as fs from "node:fs";
 import path from "node:path";
-import { isDynamicPattern } from "tinyglobby";
+import { glob, isDynamicPattern } from "tinyglobby";
 import {
 	checkOutlineReminderCache,
 	resetOutlineReminderCache,
@@ -28,6 +29,7 @@ import {
 import { generateContentId } from "./core/ContentExtractor/generateContentId.js";
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "./core/prepare-scope.js";
+import { buildIgnoreRules } from "./core/ignoreRules.js";
 import {
 	type RenameMarkdownFilesResult,
 	RenameValidationError,
@@ -67,10 +69,6 @@ import type {
 	EnrichedLinkObject,
 	ValidationResult,
 } from "./types/validationTypes.js";
-import {
-	NoFilesMatchedError,
-	resolveFiles,
-} from "./validate/resolve-files.js";
 import type {
 	ValidationWorkflow,
 	ValidationWorkflowOutcome,
@@ -726,9 +724,8 @@ export class JactCli {
 	}
 
 	/**
-	 * Plan or apply a guarded batch move of Markdown files and directories.
-	 * Globs expand like `jact validate`; a glob or several sources make the
-	 * destination a directory.
+	 * Plan or apply a guarded batch move of files and directories.
+	 * A glob or several sources make the destination a directory.
 	 */
 	async rename(
 		sources: string[],
@@ -737,40 +734,38 @@ export class JactCli {
 	): Promise<RenameMarkdownFilesResult> {
 		const resolvedSources: string[] = [];
 		let hasGlob = false;
+		const cwd = process.cwd();
+		const ignoreRules = buildIgnoreRules(
+			fs,
+			path,
+			cwd,
+			options.allowGitignore !== true,
+		);
 		for (const source of sources) {
 			if (existsSync(source) || !isDynamicPattern(source)) {
 				resolvedSources.push(path.resolve(source));
 				continue;
 			}
 			hasGlob = true;
-			try {
-				resolvedSources.push(...(await resolveFiles([source])));
-			} catch (error) {
-				if (error instanceof NoFilesMatchedError) {
-					throw new RenameValidationError(
-						`No Markdown files matched: ${source}`,
-					);
-				}
-				throw error;
+			const matched = await glob(source, {
+				absolute: true,
+				cwd,
+				onlyFiles: true,
+			});
+			const selected = matched.filter((file) => {
+				const relative = path.relative(cwd, file);
+				return (
+					relative.startsWith(`..${path.sep}`) ||
+					!ignoreRules.ignores(relative)
+				);
+			}).sort();
+			if (selected.length === 0) {
+				throw new RenameValidationError(`No files matched: ${source}`);
 			}
+			resolvedSources.push(...selected);
 		}
 
 		const stats = this.applyScope(options, resolvedSources[0]);
-		const onlySource = resolvedSources[0];
-		if (
-			resolvedSources.length === 1 &&
-			!hasGlob &&
-			onlySource !== undefined &&
-			!existsSync(onlySource)
-		) {
-			const cacheResult = this.fileCache.resolveFile(path.basename(onlySource));
-			if (!cacheResult.found) {
-				throw new RenameValidationError(
-					cacheResult.message ?? `Source file not found: ${onlySource}`,
-				);
-			}
-			resolvedSources[0] = cacheResult.path;
-		}
 		return renameMarkdownFiles(
 			{
 				fileCache: this.fileCache,
