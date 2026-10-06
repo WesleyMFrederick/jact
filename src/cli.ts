@@ -379,6 +379,8 @@ Safety:
   steps and report retained backups. Files of any type inside a moved directory
   move with it. Image embeds (![](...), ![[dir/file]]) are not
   rewritten: a move that would break one is refused.
+  A symlink is a file or folder shortcut. If a source folder contains one,
+  including in a subfolder, preview and --fix both stop without changing files.
 
 Exit Codes:
   0  Preview or rename completed successfully

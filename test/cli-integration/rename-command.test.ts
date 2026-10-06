@@ -3,10 +3,13 @@ import {
 	chmodSync,
 	existsSync,
 	mkdirSync,
+	mkdtempSync,
 	readdirSync,
 	readFileSync,
+	readlinkSync,
 	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -352,6 +355,46 @@ describe("jact rename CLI batch moves", () => {
 			"notes/": null,
 		});
 	});
+
+	it.each(["file", "folder"])(
+		"Given a $0 shortcut inside a folder When moving the folder Then jact stops without changing files",
+		(kind) => {
+			writeTree({
+				"notes/sub/one.md": "# One\n",
+				"ref/shared.md": "# Shared\n",
+				"index.md": "# Index\n\n[One](notes/sub/one.md)\n",
+			});
+			const outside = mkdtempSync(path.join(tmpdir(), "jact-rename-outside-"));
+			const content = `# Outside\n\n[Shared](${path.join(batchDir, "ref/shared.md")})\n`;
+			const outsideFile = path.join(outside, "outside.md");
+			const target = kind === "file" ? outsideFile : outside;
+			const shortcut = path.join(
+				batchDir,
+				"notes/sub",
+				kind === "file" ? "alias.md" : "alias",
+			);
+			writeFileSync(outsideFile, content);
+			symlinkSync(target, shortcut);
+
+			try {
+				const result = runBatch(["notes", "archive/notes", "--fix"]);
+
+				expect(result.status).toBe(1);
+				expect(result.stderr).toContain(shortcut);
+				expect(readlinkSync(shortcut)).toBe(target);
+				expect(readFileSync(outsideFile, "utf8")).toBe(content);
+				expect(
+					readFileSync(path.join(batchDir, "notes/sub/one.md"), "utf8"),
+				).toBe("# One\n");
+				expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
+					"# Index\n\n[One](notes/sub/one.md)\n",
+				);
+				expect(existsSync(path.join(batchDir, "archive"))).toBe(false);
+			} finally {
+				rmSync(outside, { recursive: true, force: true });
+			}
+		},
+	);
 
 	it("Given an existing bracketed filename When renamed Then only that file moves and the destination is a filename", () => {
 		writeTree({

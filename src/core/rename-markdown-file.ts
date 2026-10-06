@@ -305,11 +305,16 @@ function isDirectory(filePath: string): boolean {
 	return existsSync(filePath) && statSync(filePath).isDirectory();
 }
 
-/** Every file under `directory`, without following directory symlinks. */
+/** List files in a folder. Reject symlinks (file or folder shortcuts). */
 function filesUnder(directory: string): string[] {
 	const files: string[] = [];
 	for (const entry of readdirSync(directory, { withFileTypes: true })) {
 		const entryPath = path.join(directory, entry.name);
+		if (entry.isSymbolicLink()) {
+			throw new RenameValidationError(
+				`Cannot move a folder that contains a symlink (file or folder shortcut): ${entryPath}. No files were changed.`,
+			);
+		}
 		if (entry.isDirectory()) files.push(...filesUnder(entryPath));
 		else files.push(entryPath);
 	}
