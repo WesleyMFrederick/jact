@@ -398,3 +398,61 @@ These are immutable local transcript snapshots. Each pointer names the result or
 [^embed-parser-commit]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1336`
 [^embed-regression-commit]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1343`
 
+
+## Follow-up Publication — 2026-10-06
+
+### Scope and Review
+
+PR 101 is merged. The follow-up preserves the approved local fixes missing from fetched main `9c5b314be7f4006ea19984d1243b4126e467e34c`. The six-role exact-diff review at `7733070c49c1751fad381be51eb7172473d47ad9` produced three confirmed findings: formatting crossing a raw embed boundary could crash the shared parser; source-only embed movement lacked an explicit refusal regression; and four historical reports linked to workstation-only principle documents. All three are resolved in this follow-up.
+
+The parser defers attention resolution until image ownership is known, removes complete literal embed bodies, and preserves CommonMark image-caption events and event-array identity. No exported signatures or public JSON shapes changed. Source-only image-embed moves are refused without modifying the tree or creating backups. Historical principle links now target their canonical private GitHub repository, with an explicit access notice; historical verdicts remain point-in-time.
+
+The scoped three-role simplification pass applied one efficiency finding: skip attention resolution when no retained deferred-attention tokens remain. The reuse suggestion was declined because it would import an undeclared direct dependency; package changes were outside the repair scope. The quality pass found no changes to make. No broad cleanup, module splitting, destination changes, or global settings changes were added.
+
+### Verification and Limits
+
+- Initial focused red: 22 failures across 109 tests. Seven were new expectation mistakes about fragment-free target paths; those expectations were corrected against the existing contract. The other 15 failures exposed real behavior defects.[^followup-red]
+- Final source: build and strict type-check passed; 132 test files passed, with **1012 tests passed and 1 skipped**.[^followup-checks]
+- Actual CLI smoke: validate and extract succeeded on the former parser-crash input; source-only embed movement refused without tree or backup changes; unrelated rename preview remained read-only and apply performed the exact incoming and outgoing rewrites while leaving the diagram and image unchanged.[^followup-runtime]
+- Differential parser smoke: **24 complete AST comparisons** against the assembled parser without the embed extension matched, including positions, caption formatting, encounter order, ordinary links, and reference images.[^followup-ast]
+- The four source and test repair files passed configured ESLint. Repository-wide ESLint remains at **44 errors in 21 files**; diagnostic output matches the captured earlier baseline after removing only timing and artifact metadata. No unrelated lint cleanup was attempted.[^followup-lint]
+
+### Compound Disposition and Publication Contract
+
+`ce-compound` evaluated the solved, verified fix and stopped at its qualification gate. The non-obvious event-order reasoning, literal-boundary invariant, caption protection, and encounter-order hazards are already recorded in final comments and regression tests. A separate learning would duplicate those artifacts; no new learning document or global instruction was written.
+
+Publish as a focused follow-up PR related to PR 101. Per the user's override, do not request or wait for CodeRabbit review, do not loop on its findings, and do not merge. Own verification above supports reporting the follow-up ready for the user to merge; the known repository-wide lint baseline remains disclosed.
+
+### Measured Follow-up Usage
+
+Native usage includes both assistant-message usage and top-level `model_usage` records, including recorded Codex `gpt-5.6-luna` harness calls. All providers are `openai-codex`. Completed workers are separate from the active parent's measured snapshot, which covers 2026-10-06T17:11:44.760Z through 2026-10-06T18:44:19.543Z. Wall time is the recorded first-user-to-last-usage span and includes gated idle time; parallel worker spans are not added. No answer key or comparison run exists, so confusion metrics and comparison values are not invented. Final whole-run totals remain unknown while the parent is active.[^followup-usage]
+
+| Role | Primary Codex model | Wall time (s) | Cost (USD) | Caught / Missed / False flag / Correct pass | Tokens in / out / cache read / cache write / total |
+|---|---|---|---|---|---|
+| correctness | gpt-6.1-sol | 200.860 | 0.401548 | unknown (no answer key) | 108922 / 5549 / 1297280 / 0 / 1411751 |
+| standards | gpt-5.5 | 39.977 | 1.038918 | unknown (no answer key) | 112068 / 1984 / 841216 / 0 / 955268 |
+| testing | gpt-5.5 | 134.625 | 0.904376 | unknown (no answer key) | 87536 / 4099 / 692224 / 0 / 783859 |
+| maintainability | gpt-5.5 | 96.816 | 1.151389 | unknown (no answer key) | 108801 / 3547 / 1007104 / 0 / 1119452 |
+| performance | gpt-5.5 | 31.415 | 0.456863 | unknown (no answer key) | 55985 / 795 / 309248 / 0 / 366028 |
+| adversarial | gpt-6.1-sol | 177.102 | 0.387345 | unknown (no answer key) | 117812 / 4959 / 1037056 / 0 / 1159827 |
+| merge | gpt-6.1-sol | 192.588 | 0.381896 | unknown (no answer key) | 101162 / 6874 / 1121408 / 0 / 1229444 |
+| validator | gpt-6.1-sol | 111.442 | 0.226742 | unknown (no answer key) | 72769 / 3166 / 507776 / 0 / 583711 |
+| report | gpt-6.1-sol | 602.719 | 0.563030 | unknown (no answer key) | 122424 / 21853 / 1164032 / 0 / 1308309 |
+| test-writer | gpt-6.1-sol | 606.549 | 0.312128 | unknown (no answer key) | 68813 / 6995 / 1059200 / 0 / 1135008 |
+| implementer | gpt-6.1-sol | 846.435 | 0.390882 | unknown (no answer key) | 92435 / 12610 / 839552 / 0 / 944597 |
+| simplify-reuse | gpt-5.5 | 73.921 | 1.046772 | unknown (no answer key) | 72639 / 3030 / 1189376 / 0 / 1265045 |
+| simplify-quality | gpt-5.5 | 134.951 | 1.099102 | unknown (no answer key) | 102029 / 2951 / 1005568 / 0 / 1110548 |
+| simplify-efficiency | gpt-5.5 | 80.997 | 0.714578 | unknown (no answer key) | 55535 / 3735 / 653824 / 0 / 713094 |
+| parent-snapshot | gpt-6.1-sol | 5554.783 | 2.554514 | unknown (no answer key) | 367735 / 101330 / 8126464 / 0 / 8595529 |
+| Worker subtotal | Mixed | not additive (concurrent spans) | 9.075570 | unknown (no answer key) | 1278930 / 82147 / 12724864 / 0 / 14085941 |
+| Measured snapshot total | Mixed | 5554.783 | 11.630084 | unknown (no answer key) | 1646665 / 183477 / 20851328 / 0 / 22681470 |
+| Final run total | Mixed | unknown (parent still active) | unknown (parent still active) | unknown (no answer key) | unknown (parent still active) |
+| Comparison baseline / variant | unknown (not run) | unknown (not run) | unknown (not run) | unknown (no answer key) | unknown (not run) |
+
+[^followup-red]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L1903`
+[^followup-checks]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2019`
+[^followup-runtime]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2035`
+[^followup-ast]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2039`
+[^followup-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2044`
+[^followup-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2091`
+
