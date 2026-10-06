@@ -196,7 +196,8 @@ export async function applyCitationFixes(
 		for (const { reference, resolution } of plainFixes) {
 			// Make the link note-relative even when the original resolved from scope.
 			const relative = path.relative(path.dirname(path.resolve(filePath)), resolution.target ?? "");
-			const destination = relative.split(path.sep).map(encodeURIComponent).join("/") + reference.suffix;
+			const anchor = reference.suffix.startsWith("#") ? reference.suffix : "";
+			const destination = relative.split(path.sep).map(encodeURIComponent).join("/") + anchor;
 			const replacement = `[${reference.raw}](${destination})`;
 			edits.push({ start: reference.start, end: reference.end, replacement });
 			fixes.push({ line: reference.line, old: reference.raw, new: replacement, type: "plain-path" });

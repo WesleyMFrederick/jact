@@ -28,7 +28,7 @@ Resolution checks only exact existing files relative to the note and the scope r
 
 Plain references remain separate from the existing `links` contract in `ValidationResult.plainPaths`. Each entry carries `target`, `candidates`, and validation metadata. Summary counts include both collections. Human, single-file JSON, batch, in-memory, and line-filtered validation include plain-path errors.
 
-`--fix` converts only resolved prose `.md` references to Markdown links, with a destination relative to the note. Anchors and line suffixes are retained. Non-Markdown paths, inline code, code blocks, `/goal` commands, and shell-prompt lines remain plain. Unmarked lowercase command-shaped lines are conservatively preserved to honor the USER's requirement that commands remain usable. Their file targets are still checked and rewritten during moves. Missing and ambiguous references are not converted and are reported in the fix output.
+`--fix` converts only resolved prose `.md` references to Markdown links, with a destination relative to the note. Anchors are retained in both link text and destination; line suffixes such as `:12` and `:L12-L14` are retained only in the link text. Non-Markdown paths, inline code, code blocks, `/goal` commands, and shell-prompt lines remain plain. Unmarked lowercase command-shaped lines are conservatively preserved to honor the USER's requirement that commands remain usable. Their file targets are still checked and rewritten during moves. Missing and ambiguous references are not converted and are reported in the fix output.
 
 Validation and `--fix --dry-run` do not write files or backups. Applied conversions use the same timestamped backup behavior as citation fixes, including `--no-backup`. Edits use original source offsets, so a prose occurrence cannot accidentally replace the same text inside code.
 
@@ -137,6 +137,7 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-06 | Prose Markdown conversion retains line suffixes only in link text, keeping destinations usable by Markdown clients |
 | 1.0.0-draft | 2026-10-05 | Folder rename plans reject symlinks (file or folder shortcuts) before reading links or changing files |
 | 1.0.0-draft | 2026-10-06 | Added exact plain-file-path validation and prose Markdown conversion; code and commands retain plain syntax, including uncertain command-shaped lines |
 | 1.0.0-draft | 2026-10-05 | Existing rename sources with glob characters remain literal; rollback continues restoring files after directory cleanup errors and reports incomplete recovery |

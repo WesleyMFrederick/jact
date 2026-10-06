@@ -94,6 +94,18 @@ describe("plain file paths in Markdown notes", () => {
 		)).toEqual([content]);
 	});
 
+	it.each([":12", ":L12-L14"])("Given a prose Markdown path with %s, When fixed, Then retains the suffix only in link text", (suffix) => {
+		const content = `See ../plans/plan.md${suffix}.\n`;
+		const result = validate(content, ["--fix"]);
+
+		expect(result.status).toBe(0);
+		const updated = readFileSync(notePath, "utf8");
+		expect(updated).toBe(`See [../plans/plan.md${suffix}](../plans/plan.md).\n`);
+		const checked = readReport(updated);
+		expect(checked.result.status).toBe(0);
+		expect(checked.report.links[0].validation.status).toBe("valid");
+	});
+
 	it("Given a fixable prose path, When dry-run is used, Then previews the link without changing files or writing backups", () => {
 		const content = "See ../plans/plan.md.\n";
 		const result = validate(content, ["--fix", "--dry-run"]);
