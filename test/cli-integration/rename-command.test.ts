@@ -244,16 +244,19 @@ function writeTree(files: Record<string, string>): void {
 	}
 }
 
-/** Every file and directory under batchDir (relative), with file contents; backups excluded. */
-function snapshot(directory = batchDir): Record<string, string | null> {
+/** Every file and directory under batchDir (relative), with file contents; backups excluded unless requested. */
+function snapshot(
+	directory = batchDir,
+	options: { includeBackups?: boolean } = {},
+): Record<string, string | null> {
 	const entries: Record<string, string | null> = {};
 	for (const entry of readdirSync(directory, { withFileTypes: true })) {
 		const entryPath = path.join(directory, entry.name);
 		const relative = path.relative(batchDir, entryPath);
 		if (entry.isDirectory()) {
 			entries[`${relative}/`] = null;
-			Object.assign(entries, snapshot(entryPath));
-		} else if (!entry.name.endsWith(".bak")) {
+			Object.assign(entries, snapshot(entryPath, options));
+		} else if (options.includeBackups || !entry.name.endsWith(".bak")) {
 			entries[relative] = readFileSync(entryPath, "utf8");
 		}
 	}
@@ -277,6 +280,7 @@ describe("jact rename CLI batch moves", () => {
 			"ref/shared.md": "# Shared\n",
 			"index.md": "# Index\n\n[A](a.md)\n\n[B](b.md#B)\n",
 		});
+		const before = snapshot(batchDir, { includeBackups: true });
 
 		// When
 		const preview = runBatch(["a.md", "b.md", "new/dir/"]);
@@ -303,6 +307,7 @@ describe("jact rename CLI batch moves", () => {
 			path.join(realpathSync(batchDir), "new/dir"),
 		]);
 		expect(existsSync(path.join(batchDir, "new"))).toBe(false);
+		expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
 
 		// When
 		const applied = runBatch(["a.md", "b.md", "new/dir/", "--fix"]);
@@ -332,6 +337,15 @@ describe("jact rename CLI batch moves", () => {
 				"# Index\n\n[One](notes/old-folder/one.md)\n\n[Two](notes/old-folder/sub/two.md#Two)\n\n[Diagram](notes/old-folder/img/p.png)\n",
 		});
 		mkdirSync(path.join(batchDir, "archive"));
+		const before = snapshot(batchDir, { includeBackups: true });
+
+		// When
+		const preview = runBatch(["notes/old-folder", "archive"]);
+
+		// Then
+		expect(preview.status).toBe(0);
+		expect(JSON.parse(preview.stdout)).toMatchObject({ applied: false });
+		expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
 
 		// When
 		const applied = runBatch(["notes/old-folder", "archive", "--fix"]);
@@ -360,6 +374,64 @@ describe("jact rename CLI batch moves", () => {
 				"# Index\n\n[One](archive/old-folder/one.md)\n\n[Two](archive/old-folder/sub/two.md#Two)\n\n[Diagram](archive/old-folder/img/p.png)\n",
 			"notes/": null,
 		});
+	});
+
+	it("Given a folder When moved to a nonexistent path Then that exact path holds its files, rewritten links, and original backup", () => {
+		const originalOne =
+			"# One\n\n[Two](sub/two.md)\n\n![pic](img/p.png)\n\n[Shared](../../ref/shared.md)\n";
+		writeTree({
+			"notes/old-folder/one.md": originalOne,
+			"notes/old-folder/sub/two.md": "# Two\n\n[One](../one.md)\n",
+			"notes/old-folder/img/p.png": "PNG",
+			"ref/shared.md": "# Shared\n",
+			"index.md":
+				"# Index\n\n[One](notes/old-folder/one.md#One)\n\n[Two](notes/old-folder/sub/two.md)\n\n[Diagram](notes/old-folder/img/p.png)\n",
+		});
+
+		const applied = runBatch([
+			"notes/old-folder",
+			"archive/deep/renamed",
+			"--fix",
+		]);
+
+		expect(applied.status).toBe(0);
+		const result = JSON.parse(applied.stdout) as RenameMarkdownFilesResult;
+		expect(result.moves).toEqual([
+			{
+				kind: "directory",
+				source: path.join(realpathSync(batchDir), "notes/old-folder"),
+				destination: path.join(realpathSync(batchDir), "archive/deep/renamed"),
+				movedFiles: 3,
+			},
+		]);
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/deep/": null,
+			"archive/deep/renamed/": null,
+			"archive/deep/renamed/img/": null,
+			"archive/deep/renamed/img/p.png": "PNG",
+			"archive/deep/renamed/one.md":
+				"# One\n\n[Two](sub/two.md)\n\n![pic](img/p.png)\n\n[Shared](../../../ref/shared.md)\n",
+			"archive/deep/renamed/sub/": null,
+			"archive/deep/renamed/sub/two.md": "# Two\n\n[One](../one.md)\n",
+			"index.md":
+				"# Index\n\n[One](archive/deep/renamed/one.md#One)\n\n[Two](archive/deep/renamed/sub/two.md)\n\n[Diagram](archive/deep/renamed/img/p.png)\n",
+			"notes/": null,
+			"ref/": null,
+			"ref/shared.md": "# Shared\n",
+		});
+		const movedOne = path.join(
+			realpathSync(batchDir),
+			"archive/deep/renamed/one.md",
+		);
+		const backups = result.backups.filter(
+			(backup) => backup.startsWith(`${movedOne}.`) && backup.endsWith(".bak"),
+		);
+		expect(backups).toHaveLength(1);
+		for (const backup of backups) {
+			expect(existsSync(backup)).toBe(true);
+			expect(readFileSync(backup, "utf8")).toBe(originalOne);
+		}
 	});
 
 	it.each(["file", "folder"])(
@@ -428,6 +500,15 @@ describe("jact rename CLI batch moves", () => {
 			"concepts/keep.txt": "text",
 			"index.md": "# Index\n\n[X](concepts/x.md)\n",
 		});
+		const before = snapshot(batchDir, { includeBackups: true });
+
+		// When
+		const preview = runBatch(["concepts/*.md", "archive"]);
+
+		// Then
+		expect(preview.status).toBe(0);
+		expect(JSON.parse(preview.stdout)).toMatchObject({ applied: false });
+		expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
 
 		// When
 		const applied = runBatch(["concepts/*.md", "archive", "--fix"]);
@@ -444,7 +525,12 @@ describe("jact rename CLI batch moves", () => {
 		});
 	});
 
-	it.each([
+	it.each<{
+		name: string;
+		args: string[];
+		message: string;
+		files?: Record<string, string>;
+	}>([
 		{
 			name: "destination collides with an existing file",
 			args: ["a.md", "sub/b.md", "dest"],
@@ -475,21 +561,65 @@ describe("jact rename CLI batch moves", () => {
 			args: ["sub", "elsewhere"],
 			message: "image embeds",
 		},
+		{
+			name: "a moved file has an unresolved outgoing link",
+			args: ["a.md", "b.md", "archive"],
+			message: "does not resolve",
+			files: {
+				"a.md": "# A\n\n[Missing](missing.md)\n",
+				"b.md": "# B\n",
+			},
+		},
+		{
+			name: "a source is inside another directory source",
+			args: ["sub", "sub/b.md", "archive"],
+			message: "Sources overlap",
+			files: {
+				"sub/b.md": "# B\n",
+			},
+		},
+		{
+			name: "a destination is inside another directory being moved",
+			args: ["a.md", "sub", "sub/new"],
+			message: "inside a directory being moved",
+			files: {
+				"a.md": "# A\n",
+				"sub/b.md": "# B\n",
+			},
+		},
+		{
+			name: "the destination equals the source",
+			args: ["a.md", "a.md"],
+			message: "destination is unchanged",
+			files: {
+				"a.md": "# A\n",
+			},
+		},
+		{
+			name: "a source in the batch is missing",
+			args: ["a.md", "missing.md", "archive"],
+			message: "Source file not found",
+			files: {
+				"a.md": "# A\n",
+			},
+		},
 	])(
 		"Given $name When fixing Then it refuses with exit 1 and changes nothing",
-		({ args, message }) => {
+		({ args, message, files }) => {
 			// Given
-			writeTree({
-				"a.md": "# A\n\n[B](sub/b.md)\n",
-				"pic.png": "PNG",
-				"sub/a.md": "# Sub A\n",
-				"sub/b.md": "# B\n\n[A](../a.md)\n",
-				"sub/p.png": "PNG",
-				"sub/inner/c.md": "# C\n",
-				"dest/a.md": "# Existing\n",
-				"embeds.md": "# Embeds\n\n![p](sub/p.png)\n",
-			});
-			const before = snapshot();
+			writeTree(
+				files ?? {
+					"a.md": "# A\n\n[B](sub/b.md)\n",
+					"pic.png": "PNG",
+					"sub/a.md": "# Sub A\n",
+					"sub/b.md": "# B\n\n[A](../a.md)\n",
+					"sub/p.png": "PNG",
+					"sub/inner/c.md": "# C\n",
+					"dest/a.md": "# Existing\n",
+					"embeds.md": "# Embeds\n\n![p](sub/p.png)\n",
+				},
+			);
+			const before = snapshot(batchDir, { includeBackups: true });
 
 			// When
 			const result = runBatch([...args, "--fix"]);
@@ -497,7 +627,7 @@ describe("jact rename CLI batch moves", () => {
 			// Then
 			expect(result.status).toBe(1);
 			expect(result.stderr).toContain(message);
-			expect(snapshot()).toEqual(before);
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
 		},
 	);
 
