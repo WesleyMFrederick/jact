@@ -117,27 +117,51 @@ One complete compact JSON object per line, no summary line (`src/validate/render
 
 ---
 
-## `jact rename <source-file> <destination>`
+## `jact rename <source...> <destination>`
 
 ```
-jact rename <source-file> <destination> [options]
+jact rename <source...> <destination> [options]
 ```
 
-Previews or applies one guarded Markdown rename or move. `<destination>` accepts a `.md` path or an existing directory; a bare filename keeps the source directory. The command rewrites every parsed incoming link in scope. When the source changes directories, it also rewrites every parsed cross-document link inside the moved file relative to its new location.
+Previews or applies one guarded batch move. Each source is a `.md` file, a quoted glob (expanded like `jact validate`), or a directory. The whole request is one plan: links between moved files, parsed incoming links from the rest of scope, and parsed cross-document links inside every moved file that changes directory are all rewritten relative to their new locations. Rewrites that would leave a link's text unchanged (for example, two siblings moved together) are not counted.
+
+Destination rules, matching `mv`:
+
+- One `.md` source: `<destination>` is a `.md` path, a directory (existing, or written with a trailing `/`), or a bare filename that keeps the source directory.
+- One directory source: the tree moves to `<destination>/<dirname>` when `<destination>` is an existing directory, otherwise to `<destination>`. Every file in the tree moves, Markdown or not, and relative paths inside it are preserved.
+- Several sources, or any glob: `<destination>` is a directory; each source lands at `<destination>/<basename>`.
+
+Missing destination directories are listed in the preview and created on `--fix`.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--scope <folder>` | smart default | Bounds source, destination, and backlink discovery |
-| `--fix` | `false` | Apply the file operation and link edits; omission is a read-only preview |
-| `--json` | `false` | Emit the structured rename result |
+| `--scope <folder>` | smart default (inferred from the first source) | Bounds sources, destinations, and backlink discovery |
+| `--fix` | `false` | Apply the moves and link edits; omission is a read-only preview |
+| `--json` | `false` | Emit the structured rename result for the whole batch |
 | `--allow-gitignore` | `false` | Include ignored Markdown files while discovering links |
 
-The destination must remain inside scope and must not exist. Its parent directory must already exist. A cross-directory move fails before writing if an outgoing cross-document link cannot be resolved, because its correct post-move relative path is unknown. On apply, jact backs up every changed file, stages edits, moves the source, verifies all updated relationships, and rolls back on verification failure.
+The plan is refused (exit `1`, nothing written) when:
+
+- a source does not exist, is outside scope, or is neither a `.md` file nor a directory
+- a glob matches no Markdown files
+- a destination exists, leaves scope, equals its source, or two sources map to the same destination
+- a directory would move into itself, one source sits inside another directory source, or one destination sits inside another moved directory
+- a moved file's outgoing cross-document link does not resolve, because its post-move relative path is unknown
+- a move would break an image embed (see below)
+
+**Non-Markdown files.** Links jact parses — `[text](file.pdf)`, `[[dir/file.png]]` — resolve to any existing file, so they are rewritten when that file moves with a directory, the same as Markdown targets. Image embeds (`![alt](path)`, `![[dir/file]]`) are not in jact's link model: rename cannot rewrite them and `jact validate` cannot check them. Before writing, rename scans every Markdown file in scope (and every moved one) for image embeds whose target would no longer resolve after the moves and refuses the plan, listing each `file:line`. Embeds inside a moved directory that point into the same tree keep working because the tree's shape is preserved, and bare-name `![[file.png]]` embeds resolve by name in Obsidian, so neither blocks a move.
+
+On apply, jact backs up every edited file and every moved `.md` source file, stages edits, writes them, creates missing directories, moves files and whole directories, then re-parses and verifies every rewritten relationship. Any failure undoes completed moves, removes the created directories, restores edited files, and exits `2`; backups stay on disk. Backups of files inside a moved directory move with it, and reported backup paths are final locations.
+
+**JSON result.** One object per request: `scope`, `applied`, `moves` (`kind` `file` or `directory`, `source`, `destination`, and `movedFiles` for directories), `directories` (missing directories, outermost first), `links`, `files` (`path` at its final location, `links`), and `backups`. A single `.md` source without a glob also carries the original top-level `source` and `destination` fields; human output for that case keeps its `Source:`/`Destination:` lines, while batches print a `Moves:` list.
 
 ```bash
 jact rename docs/old.md new.md --scope .                 # preview same-directory rename
 jact rename docs/old.md archive/ --scope . --fix         # move, retaining old.md
 jact rename docs/old.md archive/new.md --scope . --fix   # move and rename
+jact rename a.md b.md new/dir/ --fix                     # several files into a new directory
+jact rename "concepts/*.md" archive/concepts/            # glob into a directory
+jact rename notes/old-folder archive/ --fix              # move a whole directory tree
 ```
 
 **Exit codes:** `0` preview or apply succeeded; `1` invalid or unsafe plan with no writes; `2` file-system, parse, commit, or rollback failure.

@@ -340,17 +340,17 @@ const VERBOSE_OPTION_DESCRIPTION =
 program
 	.command("rename")
 	.description(
-		"Preview (default) or apply (--fix) a Markdown file rename or move and update incoming and outgoing links in scope",
+		"Preview (default) or apply (--fix) a move of Markdown files or directories and update incoming, outgoing, and between-moved-file links in scope",
 	)
-	.argument("<source-file>", "path to the Markdown file to rename or move")
+	.usage("[options] <source...> <destination>")
 	.argument(
-		"<destination>",
-		"new .md path or existing directory; a bare filename renames in place",
+		"<source-and-destination...>",
+		"one or more sources, then the destination (<source...> <destination>). A source is a .md file, a quoted glob (like `jact validate`), or a directory. With one .md source, the destination is a new .md path, a directory (existing, or ending in /), or a bare filename that renames in place. With one directory source, the tree moves into the destination if it is an existing directory, otherwise to the destination path (like `mv`). With several sources or a glob, the destination is a directory and each source lands at <destination>/<basename>. Missing destination directories are created on --fix.",
 	)
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option(
 		"--fix",
-		"apply the rename and link updates; without this flag, only preview",
+		"apply the moves and link updates; without this flag, only preview",
 		false,
 	)
 	.option("--json", "emit machine-readable JSON", false)
@@ -366,10 +366,18 @@ Examples:
     $ jact rename docs/old-name.md new-name.md --scope .
     $ jact rename docs/old-name.md archive/renamed.md --scope . --fix
     $ jact rename docs/old-name.md archive/ --scope . --json
+    $ jact rename a.md b.md new/dir/ --fix
+    $ jact rename "concepts/*.md" archive/concepts/
+    $ jact rename notes/old-folder archive/ --fix
 
 Safety:
-  Preview is the default. --fix creates backups, verifies inputs did not change,
-  moves the file, updates incoming and moved-file outgoing links, then verifies every relationship.
+  Preview is the default and lists every move, every directory to create, and
+  every link rewrite. --fix applies the whole batch all-or-nothing: it creates
+  backups, verifies inputs did not change, creates missing directories, moves
+  the files and directories, updates links, then verifies every relationship;
+  any failure rolls every change back. Files of any type inside a moved
+  directory move with it. Image embeds (![](...), ![[dir/file]]) are not
+  rewritten: a move that would break one is refused.
 
 Exit Codes:
   0  Preview or rename completed successfully
@@ -377,45 +385,69 @@ Exit Codes:
   2  File-system, parse, commit, or rollback failure
 `,
 	)
-	.action(
-		async (
-			sourceFile: string,
-			destination: string,
-			options: CliRenameOptions,
-		) => {
-			const manager = new JactCli();
-			try {
-				const result = await manager.rename(sourceFile, destination, options);
-				if (options.json) {
-					console.log(JSON.stringify(result, null, 2));
-					return;
-				}
+	.action(async (paths: string[], options: CliRenameOptions) => {
+		const destination = paths.at(-1);
+		const sources = paths.slice(0, -1);
+		if (destination === undefined || sources.length === 0) {
+			console.error(
+				"ERROR: rename needs at least one <source> and a <destination>",
+			);
+			process.exitCode = 1;
+			return;
+		}
+		const manager = new JactCli();
+		try {
+			const result = await manager.rename(sources, destination, options);
+			if (options.json) {
+				console.log(JSON.stringify(result, null, 2));
+				return;
+			}
 
-				const lines = [
-					result.applied ? "Rename applied." : "Rename preview.",
+			const lines = [result.applied ? "Rename applied." : "Rename preview."];
+			if (result.source !== undefined && result.destination !== undefined) {
+				lines.push(
 					`Source: ${result.source}`,
 					`Destination: ${result.destination}`,
-					`Updated links: ${result.links} in ${result.files.length} file${result.files.length === 1 ? "" : "s"}`,
-				];
-				for (const file of result.files) {
-					lines.push(`  ${file.links}  ${file.path}`);
-				}
-				if (result.applied) {
-					lines.push(`Backups: ${result.backups.length}`);
-					for (const backup of result.backups) lines.push(`  ${backup}`);
-				} else {
-					lines.push("No files written. Re-run with --fix to apply this plan.");
-				}
-				console.log(lines.join("\n"));
-			} catch (error) {
-				console.error(
-					"ERROR:",
-					error instanceof Error ? error.message : String(error),
 				);
-				process.exitCode = error instanceof RenameValidationError ? 1 : 2;
+			} else {
+				lines.push(`Moves: ${result.moves.length}`);
+				for (const move of result.moves) {
+					const carried =
+						move.movedFiles === undefined
+							? ""
+							: ` (directory, ${move.movedFiles} file${move.movedFiles === 1 ? "" : "s"})`;
+					lines.push(`  ${move.source} -> ${move.destination}${carried}`);
+				}
 			}
-		},
-	);
+			if (result.directories.length > 0) {
+				lines.push(
+					`${result.applied ? "Created" : "Will create"} directories: ${result.directories.length}`,
+				);
+				for (const directory of result.directories) {
+					lines.push(`  ${directory}`);
+				}
+			}
+			lines.push(
+				`Updated links: ${result.links} in ${result.files.length} file${result.files.length === 1 ? "" : "s"}`,
+			);
+			for (const file of result.files) {
+				lines.push(`  ${file.links}  ${file.path}`);
+			}
+			if (result.applied) {
+				lines.push(`Backups: ${result.backups.length}`);
+				for (const backup of result.backups) lines.push(`  ${backup}`);
+			} else {
+				lines.push("No files written. Re-run with --fix to apply this plan.");
+			}
+			console.log(lines.join("\n"));
+		} catch (error) {
+			console.error(
+				"ERROR:",
+				error instanceof Error ? error.message : String(error),
+			);
+			process.exitCode = error instanceof RenameValidationError ? 1 : 2;
+		}
+	});
 
 program
 	.command("outline")

@@ -143,9 +143,9 @@ No files were written (--dry-run).
 - `--dry-run` shows the changes and writes nothing.
 - Without `--dry-run`, jact saves a timestamped `.bak` copy of the file before it writes. Add `--no-backup` to skip the copy.
 
-### `rename` — move a file and update its links
+### `rename` — move files or folders and update their links
 
-`rename` previews by default. Add `--fix` to apply.
+`rename` previews by default. Add `--fix` to apply. Give it one or more sources and then a destination, like `mv`. A source can be a `.md` file, a quoted glob, or a folder.
 
 ```text
 $ jact rename docs/setup.md getting-started.md
@@ -162,9 +162,16 @@ No files written. Re-run with --fix to apply this plan.
 jact rename docs/old.md new-name.md --fix     # rename in place
 jact rename docs/old.md archive/ --fix        # move into a folder
 jact rename docs/old.md archive/new.md --json # machine-readable plan
+jact rename a.md b.md new/dir/ --fix          # move several files; creates new/dir
+jact rename "concepts/*.md" archive/          # move every match of a glob
+jact rename notes/old-folder archive/ --fix   # move a whole folder (images included)
 ```
 
-With `--fix`, jact makes backups, moves the file, updates links that point to it, updates links inside it, then checks every link again. If a step fails, it rolls back.
+With several sources or a glob, the destination is a folder and each file keeps its name. A folder moves into the destination if that folder exists, otherwise it becomes the destination. Missing folders are created on `--fix`.
+
+The whole command is one plan. Links between the moved files, links into them, and links out of them are all correct afterward. With `--fix`, jact makes backups, moves everything, updates the links, then checks every link again. If a step fails, it undoes all of it.
+
+jact does not rewrite image embeds (`![alt](path)`, `![[folder/image.png]]`). If a move would break one, rename refuses and lists them; nothing changes.
 
 ### `outline` — show the heading tree
 
