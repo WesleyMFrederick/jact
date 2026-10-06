@@ -209,3 +209,59 @@ flowchart LR
 **Biggest risk:** changing wikilink tokenization can alter ordinary link extraction for `validate` and `extract`, not only rename. `src/core/MarkdownParser/extractWikilinks.ts` converts every wikilink node into a link. Phase 2 must prove embed-versus-link classification across those commands before committing to tokenizer reuse.
 
 **Estimates:** about 4.5–6 hours to make PR 101 merge-ready (Phases 1–4 plus verification); Phase 5 remains a provisional 2–3 hours. Phase 6 is not scheduled without a concrete trigger, and independent core-test work needs a selected behavioral gap before estimation. There is no fixed total for all follow-up work.
+
+## Parser Embed Probe — 2026-10-06
+
+Parent-observed characterization of the current branch parser, before any parser changes. The probe calls `createMarkdownParser().parseContent()` with seven inputs; it does not repeat the already-reported rename failure.
+
+| Input | Current parser result |
+|---|---|
+| Real `![[notes/p.png]]` | Plain text, no wikilink |
+| Fully escaped `\!\[\[notes/p.png\]\]` | Plain text with the same decoded value as the real embed |
+| Escaped `!`: `\![[notes/p.png]]` | Text `!` followed by an ordinary wikilink |
+| Escaped brackets: `!\[\[notes/p.png\]\]` | Plain text with the same decoded value as the real embed |
+| Inline code containing an embed | Inline-code node, no wikilink |
+| Fenced code containing an embed | Code node, no wikilink |
+| Ordinary `[[notes/p.png]]` | Wikilink node and ordinary link output |
+
+Evidence: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c533655ac11a.jsonl:L480`; its producing probe is at `L478`.
+
+**Recommendation, not yet approved:** use a dedicated Obsidian embed construct starting at `!`, then expose the smallest typed embed result to rename. The current `[` wikilink tokenizer never emits a node for the real embed, so annotating only existing wikilink nodes cannot classify that input. Reusing it would require changing the surrounding image-tokenization interaction; a dedicated construct keeps ordinary wikilink recognition separate.
+
+This follows micromark's established [character-code extension hooks](https://github.com/micromark/micromark#syntaxextension), rather than recovering syntax from decoded text. `src/core/MarkdownParser/extensions/wikilink.ts:75-78` shows the existing `[` hook; `src/core/rename-markdown-file.ts:547-554` shows the decoded-text scan to remove.
+
+The existing user gate remains: approve the parser design before production parser edits. Phases 1, 3, and 4 do not depend on that decision; Phases 5 and 6 remain outside this PR's implementation scope.
+
+## Implementation Checkpoint — 2026-10-06
+
+Phases 1, 3, and 4 are implemented, verified, and committed locally on `feat/bulk-rename`. Phase 2 remains at the explicit parser-design approval gate; no parser production edits, settings changes, or push occurred. Phases 5 and 6 remain excluded. This is not a merge-ready receipt: final simplification, independent review, and whole-plan verification still depend on the parser change.
+
+| Phase | Local commit | Completed scope |
+|---|---|---|
+| 1 | `946c244` | Unique temporary roots for each rename test |
+| 3 | `445840e` | README, interface, behavior specification, and CLI help aligned with current safety behavior |
+| 4 | `752e65e` | Unresolved outgoing links; overlapping, missing, unchanged, and self-nested sources; exact missing-directory destination; immutable previews; relocated backup path and original content |
+
+Parent verification:
+
+- `npm run build` passed; the built branch CLI's rename help was inspected.
+- Two simultaneous rename-suite runs each passed all 18 tests after fixture isolation.
+- The expanded rename suite passed all 24 tests.
+- `npm test` passed all 132 files: 931 tests passed, one skipped.
+- Actual built-CLI smoke passed for literal bracketed filenames and reference-image definition rewrites.
+- Actual built-CLI smoke passed for an unchanged directory preview, exact new nested destination, incoming/outgoing link rewrites, and a reported relocated backup retaining original content. The throwaway harness initially failed; normalizing its temporary root with `realpathSync` made the same scenario pass without a production change. Temporary trees were removed.
+- Parent inspected the first-wave and safety-test diffs. No formal final review is claimed.
+
+Checkpoint evidence archive: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.bcb61e92c7de.jsonl`. Observed result lines: build `L520`, concurrent runs `L525`, literal/reference-image smoke `L534`, full suite `L633`, directory/backup smoke `L644`, safety-test commit `L661`. Each result's producing command is recoverable with `transcript-reader --dir <archive> --lines <line> --all --cite`.
+
+### Explicit Codex Worker Measurements
+
+Both workers received the implementer persona and explicit `openai-codex/gpt-6.1-sol` selection through Paseo. The fixture worker handled Phase 1 and was reused for Phase 4 only after Phase 1 passed; the contract worker handled Phase 3 concurrently with Phase 1. Parent owned checks and commits.
+
+| Role | Model | Recorded span (seconds) | Cost (USD) | Input | Output | Cache read | Cache write | Total tokens | Caught / missed / false flag / correct pass |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Fixture and safety-test implementer | `openai-codex/gpt-6.1-sol` | 452.358 | 0.3869 | 109301 | 6918 | 991232 | 0 | 1107451 | n/a — no answer key |
+| Contract/help implementer | `openai-codex/gpt-6.1-sol` | 122.911 | 0.2043 | 51066 | 4012 | 620416 | 0 | 675494 | n/a — no answer key |
+| Worker totals | Codex only | 575.269 | 0.5912 | 160367 | 10930 | 1611648 | 0 | 1782945 | n/a — no answer key |
+
+Measured with `transcript-reader --usage`; outputs are at checkpoint archive `L641` and `L607`, respectively. Costs are rounded as reported. Recorded spans include idle time between prompts and overlap across workers; their sum is not elapsed project time. These totals exclude parent orchestration, whose session also contains earlier work and was not isolated for this checkpoint.
