@@ -113,16 +113,17 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 ## Rename Workflow (`jact rename`)
 
-`JactCli.rename()` expands glob sources with the same `resolveFiles()` that batch validate uses (a glob with no Markdown match is a validation error), infers scope from the first source, and calls `renameMarkdownFiles()` (`src/core/rename-markdown-file.ts`), which runs in this order:
+`JactCli.rename()` treats existing source paths literally, including names with glob characters. It expands only non-existing glob sources with the same `resolveFiles()` that batch validate uses (a glob with no Markdown match is a validation error), infers scope from the first source, and calls `renameMarkdownFiles()` (`src/core/rename-markdown-file.ts`), which runs in this order:
 
 1. **Plan moves.** Resolve each source's destination with `mv` rules, then refuse invalid or overlapping requests before reading any links. Collect missing destination directories. Expand every directory move into a map from each carried file's current path to its new path.
 2. **Plan links.** Parse every Markdown file in scope plus every moved Markdown file. A cross-document link is rewritten when its target moves or its file changes directory. The new text is relative to the file's final location and points at the target's final location. Unchanged rewrites are dropped. Image embeds that the moves would break refuse the plan, because they are outside the link model.
-3. **Preview** returns the plan. **Apply** (`--fix`) re-checks that sources, destinations, and edited files did not change. It then backs up and stages edits, writes them, creates directories, performs the moves, and re-parses each edited file at its final path to confirm every rewritten link resolves to its expected target. A failure at any step reverses completed moves, removes created directories, and restores edited files from backups.
+3. **Preview** returns the plan. **Apply** (`--fix`) re-checks that sources, destinations, and edited files did not change. It then backs up and stages edits, writes them, creates directories, performs the moves, and re-parses each edited file at its final path to confirm every rewritten link resolves to its expected target. A failure at any step attempts to reverse every completed move, remove every created directory, and restore every edited file from backups. Recovery errors do not prevent later recovery steps. Nonempty directories are retained rather than deleting files created by another process; incomplete recovery reports each error and retained backup paths.
 
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-05 | Existing rename sources with glob characters remain literal; rollback continues restoring files after directory cleanup errors and reports incomplete recovery |
 | 1.0.0-draft | 2026-10-05 | `jact rename` accepts several sources, globs, and directories as one all-or-nothing batch; creates missing destination directories; refuses moves that would break image embeds |
 | 1.0.0-draft | 2026-09-25 | Added `--fix --no-backup`; `--fix` skips fixes that leave a citation unchanged |
 | 1.0.0-draft | 2026-09-25 | Added the error and `--fix` correction for header anchors with characters Obsidian drops (`: # \| ^ [ ]`) |

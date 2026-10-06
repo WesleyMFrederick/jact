@@ -353,6 +353,24 @@ describe("jact rename CLI batch moves", () => {
 		});
 	});
 
+	it("Given an existing bracketed filename When renamed Then only that file moves and the destination is a filename", () => {
+		writeTree({
+			"notes/[ab].md": "# Literal\n",
+			"notes/a.md": "# A\n",
+			"notes/b.md": "# B\n",
+		});
+
+		const applied = runBatch(["notes/[ab].md", "new.md", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(snapshot()).toEqual({
+			"notes/": null,
+			"notes/new.md": "# Literal\n",
+			"notes/a.md": "# A\n",
+			"notes/b.md": "# B\n",
+		});
+	});
+
 	it("Given a glob source When moved Then every match lands under the destination directory", () => {
 		// Given
 		writeTree({
@@ -433,6 +451,61 @@ describe("jact rename CLI batch moves", () => {
 			expect(snapshot()).toEqual(before);
 		},
 	);
+
+	it("Given failed directory cleanup during rollback When a later move fails Then edited documents are restored and foreign files survive", () => {
+		writeTree({
+			"a.md": "# A\n\n[Ref](ref/shared.md)\n",
+			"b.md": "# B\n",
+			"ref/shared.md": "# Shared\n",
+			"index.md": "# Index\n\n[A](a.md)\n",
+		});
+		const fault = `
+			import fs from "node:fs";
+			import { syncBuiltinESMExports } from "node:module";
+			import path from "node:path";
+			const rename = fs.renameSync;
+			fs.renameSync = (from, to) => {
+				if (from === path.join(process.cwd(), "b.md")) {
+					fs.writeFileSync(path.join(path.dirname(to), "foreign.txt"), "keep");
+					throw new Error("Injected late move failure");
+				}
+				return rename(from, to);
+			};
+			syncBuiltinESMExports();
+		`;
+
+		const result = spawnSync(
+			process.execPath,
+			[
+				"--import",
+				`data:text/javascript,${encodeURIComponent(fault)}`,
+				cliPath,
+				"rename",
+				"a.md",
+				"b.md",
+				"new/dir",
+				"--scope",
+				batchDir,
+				"--fix",
+				"--json",
+			],
+			{ cwd: batchDir, encoding: "utf8" },
+		);
+
+		expect(result.status).toBe(2);
+		expect(result.stderr).toContain("rollback failed");
+		expect(readFileSync(path.join(batchDir, "a.md"), "utf8")).toBe(
+			"# A\n\n[Ref](ref/shared.md)\n",
+		);
+		expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
+			"# Index\n\n[A](a.md)\n",
+		);
+		expect(readFileSync(path.join(batchDir, "b.md"), "utf8")).toBe("# B\n");
+		expect(
+			readFileSync(path.join(batchDir, "new/dir/foreign.txt"), "utf8"),
+		).toBe("keep");
+		expect(existsSync(path.join(batchDir, "new/dir/a.md"))).toBe(false);
+	});
 
 	it.skipIf(process.getuid?.() === 0)(
 		"Given a move that fails mid-commit When fixing Then every change rolls back and it exits 2",

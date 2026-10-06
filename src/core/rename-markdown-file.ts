@@ -695,10 +695,10 @@ async function verifyRelationships(
 }
 
 /**
- * Applies the plan all-or-nothing: backs up edited files and moved file
- * sources, writes link edits, creates missing directories, performs the moves,
- * then re-parses and verifies every rewritten link. Any failure undoes the
- * moves, removes created directories, and restores edited files.
+ * Backs up edited files and moved file sources, writes link edits, creates
+ * missing directories, performs the moves, then verifies every rewritten link.
+ * Failure triggers independent attempts to undo moves, remove created
+ * directories, and restore edited files; recovery errors retain backups.
  * Returns backup paths at their final location (backups inside a moved
  * directory travel with it).
  */
@@ -766,23 +766,48 @@ async function commitPlan(
 			pathAfterMoves(backup, plan.moves),
 		);
 	} catch (error) {
-		cleanup(staged.values());
-		try {
-			for (const move of completedMoves.reverse()) {
+		const rollbackErrors: unknown[] = [];
+		const remainingMoves: PlannedMove[] = [];
+		for (const temporary of staged.values()) {
+			try {
+				rmSync(temporary, { force: true });
+			} catch (rollbackError) {
+				rollbackErrors.push(rollbackError);
+			}
+		}
+		for (const move of completedMoves.reverse()) {
+			try {
 				if (existsSync(move.to) && !existsSync(move.from)) {
 					renameSync(move.to, move.from);
 				}
+			} catch (rollbackError) {
+				remainingMoves.push(move);
+				rollbackErrors.push(rollbackError);
 			}
-			for (const directory of createdDirectories.reverse()) {
+		}
+		for (const directory of createdDirectories.reverse()) {
+			try {
 				rmdirSync(directory);
+			} catch (rollbackError) {
+				rollbackErrors.push(rollbackError);
 			}
-			for (const filePath of committedFiles.reverse()) {
+		}
+		for (const filePath of committedFiles.reverse()) {
+			try {
 				const backup = backups.get(filePath);
-				if (backup !== undefined) copyFileSync(backup, filePath);
+				if (backup !== undefined) {
+					copyFileSync(
+						pathAfterMoves(backup, remainingMoves),
+						pathAfterMoves(filePath, remainingMoves),
+					);
+				}
+			} catch (rollbackError) {
+				rollbackErrors.push(rollbackError);
 			}
-		} catch (rollbackError) {
+		}
+		if (rollbackErrors.length > 0) {
 			throw new Error(
-				`Rename failed (${String(error)}) and rollback failed (${String(rollbackError)}). Backups: ${[...backups.values()].join(", ")}`,
+				`Rename failed (${String(error)}) and rollback failed (${rollbackErrors.map(String).join("; ")}). Backups: ${[...backups.values()].map((backup) => pathAfterMoves(backup, remainingMoves)).join(", ")}`,
 			);
 		}
 		throw new Error(`Rename failed and was rolled back: ${String(error)}`);

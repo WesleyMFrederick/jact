@@ -738,7 +738,7 @@ export class JactCli {
 		const resolvedSources: string[] = [];
 		let hasGlob = false;
 		for (const source of sources) {
-			if (!isDynamicPattern(source)) {
+			if (existsSync(source) || !isDynamicPattern(source)) {
 				resolvedSources.push(path.resolve(source));
 				continue;
 			}

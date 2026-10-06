@@ -375,8 +375,9 @@ Safety:
   every link rewrite. --fix applies the whole batch all-or-nothing: it creates
   backups, verifies inputs did not change, creates missing directories, moves
   the files and directories, updates links, then verifies every relationship;
-  any failure rolls every change back. Files of any type inside a moved
-  directory move with it. Image embeds (![](...), ![[dir/file]]) are not
+  any failure triggers rollback. Recovery errors do not stop remaining recovery
+  steps and report retained backups. Files of any type inside a moved directory
+  move with it. Image embeds (![](...), ![[dir/file]]) are not
   rewritten: a move that would break one is refused.
 
 Exit Codes:
