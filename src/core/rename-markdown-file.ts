@@ -132,7 +132,9 @@ function isWithin(scope: string, candidate: string): boolean {
 	const relative = path.relative(scope, candidate);
 	return (
 		relative === "" ||
-		(!relative.startsWith(`..${path.sep}`) && relative !== "..")
+		(!path.isAbsolute(relative) &&
+			!relative.startsWith(`..${path.sep}`) &&
+			relative !== "..")
 	);
 }
 

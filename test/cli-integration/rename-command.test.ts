@@ -15,8 +15,18 @@ import {
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { RenameMarkdownFilesResult } from "../../src/core/rename-markdown-file.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	renameMarkdownFiles,
+	RenameValidationError,
+	type RenameMarkdownFilesDeps,
+	type RenameMarkdownFilesResult,
+} from "../../src/core/rename-markdown-file.js";
+import {
+	createFileCache,
+	createMarkdownParser,
+	createParsedFileCache,
+} from "../../src/factories/componentFactory.js";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "../..");
@@ -969,4 +979,170 @@ describe("jact rename CLI batch moves", () => {
 			}
 		},
 	);
+});
+
+describe("rename Windows physical containment", () => {
+	let root: string;
+	let scope: string;
+	let outside: string;
+	let sourceFile: string;
+	let destinationFile: string;
+	let localNote: string;
+	let outsideNote: string;
+	let shortcut: string;
+	let deps: RenameMarkdownFilesDeps;
+	const sourceContent = '{"value":1}\n';
+	let originalReference: string;
+
+	beforeEach(() => {
+		root = realpathSync(mkdtempSync(path.join(tmpdir(), "jact-win32-rename-")));
+		scope = path.join(root, "scope");
+		outside = path.join(root, "outside");
+		mkdirSync(scope);
+		mkdirSync(outside);
+		sourceFile = path.join(scope, "source.json");
+		destinationFile = path.join(scope, "archive", "result.json");
+		localNote = path.join(scope, "a-local.md");
+		outsideNote = path.join(outside, "note.md");
+		shortcut = path.join(scope, "z-external");
+		originalReference = `See ${sourceFile}.\n`;
+		writeFileSync(sourceFile, sourceContent);
+		writeFileSync(localNote, originalReference);
+		writeFileSync(outsideNote, originalReference);
+		symlinkSync(outside, shortcut, "junction");
+		const fileCache = createFileCache();
+		fileCache.buildCache(scope);
+		deps = {
+			fileCache,
+			parsedDocuments: createParsedFileCache(createMarkdownParser(fileCache)),
+		};
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+		rmSync(root, { recursive: true, force: true });
+	});
+
+	function useWindowsRoots(windowsScope: string, windowsOutside: string): void {
+		const nativeRelative = path.relative;
+		const nativeAbsolute = path.isAbsolute;
+		const windowsRelative = path.win32.relative;
+		const windowsAbsolute = path.win32.isAbsolute;
+		const roots = [
+			[scope, windowsScope],
+			[outside, windowsOutside],
+		] as const;
+		const project = (value: string): string => {
+			for (const [nativeRoot, windowsRoot] of roots) {
+				const relative = nativeRelative(nativeRoot, value);
+				if (
+					!nativeAbsolute(relative) &&
+					relative !== ".." &&
+					!relative.startsWith(`..${path.sep}`)
+				) {
+					return path.win32.join(windowsRoot, ...relative.split(path.sep));
+				}
+			}
+			return value;
+		};
+
+		// Keep real filesystem I/O native, but calculate containment with Node's
+		// Windows implementation. Absolute cross-root results stay unmodified.
+		vi.spyOn(path, "relative").mockImplementation((from, to) => {
+			const relative = windowsRelative(project(from), project(to));
+			return windowsAbsolute(relative)
+				? relative
+				: relative.split(path.win32.sep).join(path.sep);
+		});
+		vi.spyOn(path, "isAbsolute").mockImplementation(windowsAbsolute);
+	}
+
+	function rename(fix: boolean, from = sourceFile, to = destinationFile) {
+		return renameMarkdownFiles(
+			deps,
+			{ sources: [from], destination: to, batch: false },
+			scope,
+			{ fix },
+		);
+	}
+
+	function expectUnchanged(): void {
+		expect(readFileSync(sourceFile, "utf8")).toBe(sourceContent);
+		expect(readFileSync(localNote, "utf8")).toBe(originalReference);
+		expect(readFileSync(outsideNote, "utf8")).toBe(originalReference);
+		expect(readlinkSync(shortcut)).toBe(outside);
+		expect(readdirSync(scope).sort()).toEqual([
+			"a-local.md",
+			"source.json",
+			"z-external",
+		]);
+		expect(readdirSync(outside)).toEqual(["note.md"]);
+	}
+
+	it.each([
+		{ kind: "different drives", scope: "C:\\scope", outside: "D:\\external" },
+		{
+			kind: "unrelated UNC roots",
+			scope: "\\\\scope-server\\notes",
+			outside: "\\\\outside-server\\notes",
+		},
+		{
+			kind: "same-drive sibling prefix",
+			scope: "C:\\scope",
+			outside: "C:\\scope-other",
+		},
+	])(
+		"Given an affected note across $kind When previewing or applying Then the consumer refuses before any writes",
+		async (windows) => {
+			useWindowsRoots(windows.scope, windows.outside);
+			for (const fix of [false, true]) {
+				await expect(rename(fix)).rejects.toThrow(RenameValidationError);
+				expectUnchanged();
+			}
+		},
+	);
+
+	it.each(["C:\\scope", "\\\\scope-server\\notes"])(
+		"Given a descendant of Windows scope %s When applying Then references update and unaffected external notes stay unchanged",
+		async (windowsScope) => {
+			const outsideContent = "# Outside\n\nNo moved reference.\n";
+			writeFileSync(outsideNote, outsideContent);
+			useWindowsRoots(windowsScope, "D:\\external");
+			const preview = await rename(false);
+			expect(preview.links).toBe(1);
+			expect(readFileSync(sourceFile, "utf8")).toBe(sourceContent);
+			expect(readFileSync(localNote, "utf8")).toBe(originalReference);
+			expect(existsSync(path.join(scope, "archive"))).toBe(false);
+
+			await rename(true);
+			expect(existsSync(sourceFile)).toBe(false);
+			expect(readFileSync(destinationFile, "utf8")).toBe(sourceContent);
+			expect(readFileSync(localNote, "utf8")).toBe(
+				`See ${destinationFile}.\n`,
+			);
+			expect(readFileSync(outsideNote, "utf8")).toBe(outsideContent);
+			expect(readdirSync(outside)).toEqual(["note.md"]);
+			expect(readlinkSync(shortcut)).toBe(outside);
+		},
+	);
+
+	it("Given a source equal to Windows scope When moved into itself Then containment passes and self-move validation refuses without writes", async () => {
+		rmSync(shortcut);
+		useWindowsRoots("C:\\scope", "D:\\external");
+		await expect(rename(false, scope, path.join(scope, "nested"))).rejects.toThrow(
+			"Cannot move a directory into itself",
+		);
+		expect(readFileSync(sourceFile, "utf8")).toBe(sourceContent);
+		expect(readFileSync(localNote, "utf8")).toBe(originalReference);
+		expect(readdirSync(scope).sort()).toEqual(["a-local.md", "source.json"]);
+		expect(readdirSync(outside)).toEqual(["note.md"]);
+	});
+
+	it("Given a source at the Windows parent root When applying Then parent traversal refuses before any writes", async () => {
+		useWindowsRoots("C:\\scope", "C:\\");
+		await expect(
+			rename(true, outside, path.join(scope, "imported")),
+		).rejects.toThrow(RenameValidationError);
+		expectUnchanged();
+	});
 });
