@@ -124,6 +124,8 @@ describe("injectable dependency lint", () => {
 		["return value", "function make(): FileCache { return cache; }"],
 		["required property", "interface Dependencies { validator: CitationValidator }"],
 		["constructor property", "class Service { constructor(private cache: FileCache) {} }"],
+		["union parameter", "function use(cache: FileCache | undefined) {}"],
+		["union property", "interface Dependencies { validator: undefined | CitationValidator }"],
 	])("Given a required %s, When linting, Then the dependency is accepted", async (_kind, source) => {
 		// Given
 		// When
@@ -137,6 +139,10 @@ describe("injectable dependency lint", () => {
 		["interface property", "interface Dependencies { validator?: CitationValidator }"],
 		["class property", "class Service { cache?: FileCache; }"],
 		["constructor property", "class Service { constructor(private cache?: FileCache) {} }"],
+		["union parameter", "function use(cache?: FileCache | undefined) {}"],
+		["union interface property", "interface Dependencies { validator?: undefined | CitationValidator }"],
+		["union class property", "class Service { cache?: FileCache | undefined; }"],
+		["union constructor property", "class Service { constructor(private cache?: undefined | FileCache) {} }"],
 	])("Given an optional %s, When linting, Then the missing dependency risk is reported", async (_kind, source) => {
 		// Given
 		// When
