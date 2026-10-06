@@ -66,7 +66,7 @@ const TYPE_REGEX = INJECTABLE_TYPES.join("|");
 // Defeats Plan-01 Cheat 1 (dead-code-on-optional injectable).
 const injectableDepBans = [
 	{
-		selector: `TSTypeAnnotation > TSTypeReference > Identifier[name=/^(${TYPE_REGEX})$/]`,
+		selector: `:matches(Identifier, TSPropertySignature, PropertyDefinition)[optional=true] > TSTypeAnnotation > TSTypeReference > Identifier[name=/^(${TYPE_REGEX})$/], :matches(Identifier, TSPropertySignature, PropertyDefinition)[optional=true] > TSTypeAnnotation > TSUnionType > TSTypeReference > Identifier[name=/^(${TYPE_REGEX})$/]`,
 		message:
 			"Injectable dep used (D1). If OPTIONAL (param?: T), use required injection or add `// @inject-optional: <reason>` on prev line. Defeats Plan-01 Cheat 1.",
 	},

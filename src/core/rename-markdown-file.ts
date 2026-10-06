@@ -13,6 +13,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import { homedir } from "node:os";
 import type { FileCache } from "../FileCache.js";
 import {
 	createFileCache,
@@ -22,6 +23,11 @@ import {
 import type { ParsedFileCache } from "../ParsedFileCache.js";
 import type { EmbedReference, LinkObject } from "../types/citationTypes.js";
 import type { CliRenameOptions } from "../types/cli-types.js";
+import {
+	findPlainFilePaths,
+	resolvePlainFilePath,
+} from "./plain-file-paths.js";
+import type { PlainFilePath } from "./plain-file-paths.js";
 
 export interface RenameMarkdownFilesDeps {
 	fileCache: FileCache;
@@ -29,7 +35,7 @@ export interface RenameMarkdownFilesDeps {
 }
 
 /**
- * One rename request. `sources` are absolute paths to `.md` files or
+ * One rename request. `sources` are absolute paths to files or
  * directories (globs already expanded by the caller). `batch` is true when the
  * caller received more than one source or a glob: `destination` is then always
  * a directory and every source lands at `<destination>/<basename>`.
@@ -88,6 +94,11 @@ interface PlannedFile extends RenameFileChange {
 	original: string;
 	updated: string;
 	expectedTargets: string[];
+	expectedPlainPaths: {
+		start: number;
+		raw: string;
+		target: string;
+	}[];
 }
 
 /** Internal move: canonical paths for checks, requested paths for reports. */
@@ -119,7 +130,9 @@ function isWithin(scope: string, candidate: string): boolean {
 	const relative = path.relative(scope, candidate);
 	return (
 		relative === "" ||
-		(!relative.startsWith(`..${path.sep}`) && relative !== "..")
+		(!path.isAbsolute(relative) &&
+			!relative.startsWith(`..${path.sep}`) &&
+			relative !== "..")
 	);
 }
 
@@ -152,7 +165,7 @@ function rewrittenRawPath(
 	} catch {
 		decodedPath = filePath;
 	}
-	const keepsExtension = /\.md$/i.test(decodedBasename(filePath));
+	const keepsExtension = path.extname(decodedBasename(filePath)) !== "";
 	const targetPath = path.isAbsolute(decodedPath)
 		? target
 		: path.relative(path.dirname(sourceAfterMove), target);
@@ -243,6 +256,37 @@ function applyEdits(
 		previousStart = edit.start;
 	}
 	return updated;
+}
+
+function rewritePlainPath(
+	reference: PlainFilePath,
+	currentTarget: string,
+	nextTarget: string,
+	source: string,
+	sourceAfterMove: string,
+	scope: string,
+): string {
+	const rawPath = reference.path;
+	let rewritten: string;
+	if (rawPath.startsWith("~/")) {
+		rewritten = `~/${path.relative(homedir(), nextTarget)}`;
+	} else if (path.isAbsolute(rawPath)) {
+		rewritten = nextTarget;
+	} else {
+		const noteCandidate = path.resolve(path.dirname(source), rawPath);
+		const noteRelative =
+			existsSync(noteCandidate) &&
+			canonicalExisting(noteCandidate) === currentTarget;
+		rewritten = path.relative(
+			noteRelative ? path.dirname(sourceAfterMove) : scope,
+			nextTarget,
+		);
+		if (rawPath.startsWith("./") && !rewritten.startsWith(".")) {
+			rewritten = `./${rewritten}`;
+		}
+	}
+	rewritten = rewritten.split(path.sep).join("/");
+	return `${rewritten}${reference.suffix}`;
 }
 
 function existingTarget(link: LinkObject): string | null {
@@ -362,11 +406,6 @@ function requestedDestination(
 	) {
 		return path.join(resolved, path.basename(source));
 	}
-	if (!/\.md$/i.test(resolved)) {
-		throw new RenameValidationError(
-			"The destination must be a Markdown filename or a directory (existing, or ending in /).",
-		);
-	}
 	return resolved;
 }
 
@@ -405,9 +444,9 @@ function planMoves(
 		if (seenSources.has(from)) continue;
 		seenSources.add(from);
 		const sourceIsDirectory = statSync(from).isDirectory();
-		if (!sourceIsDirectory && !/\.md$/i.test(from)) {
+		if (!sourceIsDirectory && !statSync(from).isFile()) {
 			throw new RenameValidationError(
-				`Source is not a Markdown file or a directory: ${requestedSource}`,
+				`Source is not a regular file or a directory: ${requestedSource}`,
 			);
 		}
 		if (!isWithin(canonicalScope, from)) {
@@ -573,6 +612,7 @@ async function planFiles(
 			path.dirname(sourceAfterMove) !== path.dirname(filePath);
 		const edits: TextEdit[] = [];
 		const expectedTargets: string[] = [];
+		const expectedPlainPaths: PlannedFile["expectedPlainPaths"] = [];
 		const content = document.data.content;
 		const starts = lineStarts(content);
 		embeds.push(...brokenEmbeds(document.data.embeds, filePath, moved, scope));
@@ -601,14 +641,82 @@ async function planFiles(
 			edits.push({ start, end, replacement });
 			expectedTargets.push(nextTarget);
 		}
-		if (edits.length === 0) continue;
+		for (const reference of findPlainFilePaths(content)) {
+			const resolution = resolvePlainFilePath(reference, filePath, scope);
+			const currentTarget =
+				resolution.target === null
+					? null
+					: canonicalExisting(resolution.target);
+			const targetMoves =
+				currentTarget !== null && moved.has(currentTarget);
+			const ambiguousMove = resolution.candidates.some(
+				(candidate) =>
+					existsSync(candidate) && moved.has(canonicalExisting(candidate)),
+			);
+			if (!targetMoves && !changesDirectory && !ambiguousMove) continue;
+			if (currentTarget === null) {
+				const reason =
+					resolution.candidates.length > 1
+						? `is ambiguous: ${resolution.candidates.join(", ")}`
+						: "does not resolve";
+				throw new RenameValidationError(
+					`Cannot safely move ${filePath}: plain path ${reference.raw} at line ${reference.line} ${reason}. No files were changed.`,
+				);
+			}
+			if (content.slice(reference.start, reference.end) !== reference.raw) {
+				throw new RenameValidationError(
+					`Plain path text changed at ${filePath}:${reference.line}. No files were changed.`,
+				);
+			}
+			const nextTarget = moved.get(currentTarget) ?? currentTarget;
+			const replacement = rewritePlainPath(
+				reference,
+				currentTarget,
+				nextTarget,
+				filePath,
+				sourceAfterMove,
+				scope,
+			);
+			expectedPlainPaths.push({
+				start: reference.start,
+				raw: replacement,
+				target: nextTarget,
+			});
+			if (replacement === reference.raw) continue;
+			edits.push({
+				start: reference.start,
+				end: reference.end,
+				replacement,
+			});
+		}
+		if (edits.length === 0 && expectedPlainPaths.length === 0) continue;
+		if (edits.length > 0) {
+			const canonicalFilePath = canonicalExisting(filePath);
+			if (!isWithin(scope, canonicalFilePath)) {
+				throw new RenameValidationError(
+					`Reference note is outside the rename scope: ${filePath} (resolved to ${canonicalFilePath}). No files were changed.\n` +
+					"To Get Authorization: ask USER whether this physical note may be included in scope. Do not widen scope automatically or skip its reference update.\n" +
+					'To Preview an Authorized Scope: rerun this rename with --scope "{{authorized-folder}}" and without --fix.\n' +
+					"To Apply: after the authorized preview succeeds, rerun with --fix.",
+				);
+			}
+		}
 
+		for (const expected of expectedPlainPaths) {
+			const originalStart = expected.start;
+			for (const edit of edits) {
+				if (edit.end <= originalStart) {
+					expected.start += edit.replacement.length - (edit.end - edit.start);
+				}
+			}
+		}
 		planned.push({
 			path: filePath,
 			links: edits.length,
 			original: content,
 			updated: applyEdits(content, edits, filePath),
 			expectedTargets,
+			expectedPlainPaths,
 		});
 	}
 
@@ -687,6 +795,28 @@ async function verifyRelationships(
 				);
 			}
 		}
+		const plainPaths = new Map(
+			findPlainFilePaths(document.data.content).map((reference) => [
+				reference.start,
+				reference,
+			]),
+		);
+		for (const expected of file.expectedPlainPaths) {
+			const reference = plainPaths.get(expected.start);
+			const actual =
+				reference === undefined
+					? null
+					: resolvePlainFilePath(reference, finalPath, scope).target;
+			if (
+				reference?.raw !== expected.raw ||
+				actual === null ||
+				canonicalExisting(actual) !== canonicalExisting(expected.target)
+			) {
+				throw new Error(
+					`Post-rename verification failed in ${finalPath}: plain path ${expected.raw} does not resolve uniquely to ${expected.target}`,
+				);
+			}
+		}
 	}
 }
 
@@ -705,12 +835,13 @@ async function commitPlan(
 	allowGitignore: boolean,
 ): Promise<string[]> {
 	assertUnchanged(plannedFiles, plan);
+	const changedFiles = plannedFiles.filter((file) => file.links > 0);
 	const stamp = Date.now();
 	const originalPaths = new Set([
 		...plan.moves
 			.filter((move) => move.kind === "file")
 			.map((move) => move.from),
-		...plannedFiles.map((file) => file.path),
+		...changedFiles.map((file) => file.path),
 	]);
 	const backups = new Map<string, string>();
 	const staged = new Map<string, string>();
@@ -726,7 +857,7 @@ async function commitPlan(
 			copyFileSync(filePath, backup);
 			backups.set(filePath, backup);
 		}
-		for (const file of plannedFiles) {
+		for (const file of changedFiles) {
 			const temporary = `${file.path}.jact-rename-${process.pid}-${stamp}.tmp`;
 			if (existsSync(temporary))
 				throw new Error(`Temporary file already exists: ${temporary}`);
@@ -741,7 +872,7 @@ async function commitPlan(
 	}
 
 	try {
-		for (const file of plannedFiles) {
+		for (const file of changedFiles) {
 			const temporary = staged.get(file.path);
 			if (temporary === undefined) {
 				throw new Error(`Missing staged file for ${file.path}`);
@@ -855,10 +986,12 @@ export async function renameMarkdownFiles(
 		})),
 		directories: plan.directories,
 		links,
-		files: plannedFiles.map(({ path: filePath, links: fileLinks }) => ({
-			path: plan.reported.get(filePath) ?? filePath,
-			links: fileLinks,
-		})),
+		files: plannedFiles
+			.filter((file) => file.links > 0)
+			.map(({ path: filePath, links: fileLinks }) => ({
+				path: plan.reported.get(filePath) ?? filePath,
+				links: fileLinks,
+			})),
 		backups,
 	};
 }

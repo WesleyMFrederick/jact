@@ -1,238 +1,220 @@
-/**
- * JactCli.fix() safety tests — TDD for issue #31
- *
- * Tests backup creation, dry-run behavior, and scope boundary check
- * at the orchestrator level. Uses the _fs injection parameter on fix()
- * for test isolation without touching the real filesystem.
- *
- * CitationFixer unit tests are in test/unit/core/CitationFixer.test.ts.
- */
-
-import { describe, expect, it, vi } from "vitest";
+import {
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JactCli } from "../../dist/jact-cli.js";
+import type { CitationValidator } from "../../src/core/CitationValidator/CitationValidator.js";
+import type { EnrichedLinkObject } from "../../src/types/validationTypes.js";
 
-// ---------------------------------------------------------------------------
-// Shared fixture helpers
-// ---------------------------------------------------------------------------
+const ORIGINAL_CITATION = "[Design](design.md#Heading)";
+const FIXED_CITATION = "[Design](../designs/design.md#Heading)";
+const FIXTURE_CONTENT = `See ${ORIGINAL_CITATION} for details.\n`;
+const FIXED_CONTENT = `See ${FIXED_CITATION} for details.\n`;
 
-/** Minimal markdown content with one path citation that has a pathConversion */
-const FIXTURE_CONTENT =
-	"See [Design](path/to/design.md#heading) for details.\n";
+let workDir: string;
+let notePath: string;
 
-/** Stub link with a path correction */
-const pathFixableLink = {
-	fullMatch: "[Design](path/to/design.md#heading)",
-	line: 1,
-	validation: {
-		status: "warning" as const,
-		pathConversion: {
-			original: "path/to/design.md",
-			recommended: "corrected/design.md",
-		},
-		error: "",
-		suggestion: "",
-	},
-};
-
-/** Stub link with an anchor correction only (no pathConversion) */
-const anchorFixableLink = {
-	fullMatch: "[Design](file.md#old-anchor)",
-	line: 1,
-	validation: {
-		status: "error" as const,
-		error: "Anchor not found: #old-anchor",
-		suggestion: 'Available headers: "New Heading" → #New Heading',
-		pathConversion: undefined,
-	},
-};
-
-/** Build a JactCli with semantic parsing and validation stubbed. */
-function buildCli(links: unknown[]): JactCli {
+/** Use real parsing and source spans; isolate only the recommended correction. */
+function buildCli(
+	transform: (links: EnrichedLinkObject[]) => EnrichedLinkObject[] = (links) => links,
+): JactCli {
 	const cli = new JactCli();
-	const internal = cli as unknown as {
-		parsedFileCache: { resolveDocument: () => Promise<unknown> };
-		validator: { validateDocument: () => Promise<unknown> };
-	};
-	vi.spyOn(internal.parsedFileCache, "resolveDocument").mockResolvedValue({
-		data: { validationDisabled: false },
-	});
-	vi.spyOn(internal.validator, "validateDocument").mockResolvedValue({ links });
+	const internal = cli as unknown as { validator: CitationValidator };
+	const validateDocument = internal.validator.validateDocument.bind(internal.validator);
+	vi.spyOn(internal.validator, "validateDocument").mockImplementation(
+		async (document, filePath) => {
+			const result = await validateDocument(document, filePath);
+			const links: EnrichedLinkObject[] = result.links.map((link) => ({
+				...link,
+				validation: {
+					status: "warning",
+					message: "Use the note-relative path",
+					pathConversion: {
+						type: "path-conversion",
+						original: "design.md",
+						recommended: "../designs/design.md",
+					},
+				},
+			}));
+			return { ...result, links: transform(links) };
+		},
+	);
 	return cli;
 }
 
-/** Inject fs helpers: readFileSync returns content, writeFileSync is tracked */
-function makeFs(content: string) {
-	const writes: Array<{ path: string; data: string }> = [];
-	return {
-		reads: { content },
-		writes,
-		fsOverride: {
-			readFileSync: (_p: string, _enc: BufferEncoding) => content,
-			writeFileSync: (p: string, data: string, _enc: BufferEncoding) => {
-				writes.push({ path: p, data });
-			},
-		},
-	};
+function backups(): string[] {
+	return readdirSync(path.dirname(notePath))
+		.filter((name) => name.endsWith(".bak"))
+		.map((name) => path.join(path.dirname(notePath), name));
 }
 
-// ---------------------------------------------------------------------------
-// Backup creation tests
-// ---------------------------------------------------------------------------
+function expectUntouched(content = FIXTURE_CONTENT): void {
+	expect(readFileSync(notePath, "utf8")).toBe(content);
+	expect(backups()).toEqual([]);
+}
 
-describe("JactCli.fix() — backup creation", () => {
-	it("writes a .bak file before writing the fixed file", async () => {
-		const { writes, fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
-
-		await cli.fix("/fake/file.md", { scope: "/fake" }, fsOverride);
-
-		// Two writes: backup first, then fixed file
-		expect(writes).toHaveLength(2);
-		expect(writes[0]?.path).toMatch(/\/fake\/file\.md\.\d+\.bak$/);
-		expect(writes[0]?.data).toBe(FIXTURE_CONTENT);
+describe("JactCli.fix() safety", () => {
+	beforeEach(() => {
+		workDir = mkdtempSync(path.join(tmpdir(), "jact-fix-safety-"));
+		mkdirSync(path.join(workDir, "notes"));
+		mkdirSync(path.join(workDir, "designs"));
+		notePath = path.join(workDir, "notes", "note.md");
+		writeFileSync(path.join(workDir, "designs", "design.md"), "# Heading\n");
+		writeFileSync(notePath, FIXTURE_CONTENT);
 	});
 
-	it("backup filename matches pattern: filePath + '.' + timestamp + '.bak'", async () => {
-		const { writes, fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
-
-		await cli.fix("/fake/file.md", { scope: "/fake" }, fsOverride);
-
-		const bakWrite = writes.find((w) => w.path.endsWith(".bak"));
-		expect(bakWrite).toBeDefined();
-		expect(bakWrite?.path).toMatch(/\.md\.\d+\.bak$/);
+	afterEach(() => {
+		vi.restoreAllMocks();
+		rmSync(workDir, { recursive: true, force: true });
 	});
 
-	it("does NOT write a .bak file when no fixes are applied", async () => {
-		const { writes, fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([]); // no fixable links
+	it("Given a path correction, When fixed, Then saves the original backup before replacing the note", async () => {
+		const writes: string[] = [];
+		let backupAtMutation: string | undefined;
+		const result = await buildCli().fix(notePath, { scope: workDir }, {
+			writeFileSync: (filePath, content, encoding) => {
+				if (filePath === notePath) {
+					const backupPath = backups()[0];
+					if (backupPath !== undefined) {
+						backupAtMutation = readFileSync(backupPath, "utf8");
+					}
+				}
+				writeFileSync(filePath, content, encoding);
+				writes.push(filePath);
+			},
+		});
 
-		await cli.fix("/fake/file.md", { scope: "/fake" }, fsOverride);
-
-		expect(writes).toHaveLength(0);
+		expect(result).toContain("Fixed 1 citation");
+		expect(readFileSync(notePath, "utf8")).toBe(FIXED_CONTENT);
+		const backupPaths = backups();
+		expect(backupPaths).toHaveLength(1);
+		expect(backupPaths[0]).toMatch(/note\.md\.\d+\.bak$/);
+		expect(writes).toEqual([backupPaths[0], notePath]);
+		expect(backupAtMutation).toBe(FIXTURE_CONTENT);
+		expect(backupPaths.map((backupPath) => readFileSync(backupPath, "utf8"))).toEqual([FIXTURE_CONTENT]);
 	});
 
-	it("backup data is the original file content before any modification", async () => {
-		const { writes, fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
+	it("Given a path correction, When dry-run is used, Then previews the correction and count without writing", async () => {
+		const result = await buildCli().fix(notePath, { scope: workDir, dryRun: true });
 
-		await cli.fix("/fake/file.md", { scope: "/fake" }, fsOverride);
-
-		const bakWrite = writes.find((w) => w.path.endsWith(".bak"));
-		// Backup must contain original content, not the fixed version
-		expect(bakWrite?.data).toBe(FIXTURE_CONTENT);
+		expect(result).toContain("DRY RUN — 1 fix");
+		expect(result).toContain(`    - ${ORIGINAL_CITATION}`);
+		expect(result).toContain(`    + ${FIXED_CITATION}`);
+		expectUntouched();
 	});
-});
 
-// ---------------------------------------------------------------------------
-// Dry-run tests
-// ---------------------------------------------------------------------------
+	it("Given adjacent citation and plain-path fixes after code and Unicode, When fixed, Then changes only their original source spans", async () => {
+		const content = `Intro 🌿\r\n\`${ORIGINAL_CITATION}\` then ${ORIGINAL_CITATION} and ../designs/design.md#Heading.\r\n`;
+		writeFileSync(notePath, content);
 
-describe("JactCli.fix() — dry-run mode", () => {
-	it("does not write any files when dryRun: true", async () => {
-		const { writes, fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
+		const result = await buildCli().fix(notePath, { scope: workDir });
 
-		await cli.fix(
-			"/fake/file.md",
-			{ scope: "/fake", dryRun: true },
-			fsOverride,
+		expect(result).toContain("Fixed 2 citations");
+		expect(readFileSync(notePath, "utf8")).toBe(
+			`Intro 🌿\r\n\`${ORIGINAL_CITATION}\` then ${FIXED_CITATION} and [../designs/design.md#Heading](../designs/design.md#Heading).\r\n`,
 		);
-
-		expect(writes).toHaveLength(0);
+		expect(backups().map((backupPath) => readFileSync(backupPath, "utf8"))).toEqual([content]);
 	});
 
-	it("does not create a .bak file when dryRun: true", async () => {
-		const { writes, fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
+	it("Given a path correction, When backups are disabled, Then fixes the note without creating a backup", async () => {
+		const result = await buildCli().fix(notePath, { scope: workDir, backup: false });
 
-		await cli.fix(
-			"/fake/file.md",
-			{ scope: "/fake", dryRun: true },
-			fsOverride,
-		);
-
-		const bakWrite = writes.find((w) => w.path.endsWith(".bak"));
-		expect(bakWrite).toBeUndefined();
+		expect(result).toContain("Fixed 1 citation");
+		expect(readFileSync(notePath, "utf8")).toBe(FIXED_CONTENT);
+		expect(backups()).toEqual([]);
 	});
 
-	it("returns output containing '- ' and '+ ' diff lines when dryRun: true", async () => {
-		const { fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
+	it("Given an already-correct citation, When its recommendation is unchanged, Then writes neither note nor backup", async () => {
+		const cli = buildCli((links) => links.map((link) => ({
+			...link,
+			validation: {
+				status: "warning",
+				message: "Already note-relative",
+				pathConversion: {
+					type: "path-conversion",
+					original: "design.md",
+					recommended: "design.md",
+				},
+			},
+		})));
 
-		const result = await cli.fix(
-			"/fake/file.md",
-			{ scope: "/fake", dryRun: true },
-			fsOverride,
-		);
+		const result = await cli.fix(notePath, { scope: workDir });
 
-		expect(result).toContain("    - ");
-		expect(result).toContain("    + ");
-		expect(result).toMatch(/dry.?run/i);
+		expect(result).toContain("No auto-fixable citations");
+		expectUntouched();
 	});
 
-	it("diff output contains old and new citation text", async () => {
-		const { fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
+	it("Given a path correction without scope, When fixed, Then reports the scope requirement and leaves files untouched", async () => {
+		const result = await buildCli().fix(notePath);
 
-		const result = await cli.fix(
-			"/fake/file.md",
-			{ scope: "/fake", dryRun: true },
-			fsOverride,
-		);
-
-		expect(result).toContain(pathFixableLink.fullMatch);
+		expect(result).toContain("ERROR: Path corrections require --scope");
+		expectUntouched();
 	});
 
-	it("reports fix count in dry-run output", async () => {
-		const { fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
+	it("Given an anchor-only correction without scope, When fixed, Then updates the anchor and backs up the original", async () => {
+		const content = "See [Design](../designs/design.md#old-anchor) for details.\n";
+		writeFileSync(notePath, content);
+		const cli = buildCli((links) => links.map((link) => ({
+			...link,
+			validation: {
+				status: "error",
+				error: "Anchor not found: #old-anchor",
+				suggestion: 'Available headers: "Heading" → #Heading',
+				anchorConversion: {
+					type: "anchor-conversion",
+					original: "old-anchor",
+					recommended: "Heading",
+				},
+			},
+		})));
 
-		const result = await cli.fix(
-			"/fake/file.md",
-			{ scope: "/fake", dryRun: true },
-			fsOverride,
-		);
+		const result = await cli.fix(notePath);
 
-		expect(result).toContain("1 fix");
-	});
-});
-
-// ---------------------------------------------------------------------------
-// Scope boundary check tests
-// ---------------------------------------------------------------------------
-
-describe("JactCli.fix() — scope boundary check", () => {
-	it("returns scope error when path corrections needed but options.scope is absent", async () => {
-		const { fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
-
-		// No scope provided — should fail fast
-		const result = await cli.fix("/fake/file.md", {}, fsOverride);
-
-		expect(result).toMatch(/scope/i);
-		expect(result).toMatch(/error/i);
+		expect(result).toContain("Fixed 1 citation");
+		expect(readFileSync(notePath, "utf8")).toBe(FIXED_CONTENT);
+		expect(backups().map((backupPath) => readFileSync(backupPath, "utf8"))).toEqual([content]);
 	});
 
-	it("does not write any files when scope boundary check triggers", async () => {
-		const { writes, fsOverride } = makeFs(FIXTURE_CONTENT);
-		const cli = buildCli([pathFixableLink]);
+	it("Given a citation changed after parsing, When fixed, Then refuses to overwrite the changed note or create a backup", async () => {
+		const changed = "See [Design](change.md#Heading) for details.\n";
+		const cli = buildCli((links) => {
+			writeFileSync(notePath, changed);
+			return links;
+		});
 
-		await cli.fix("/fake/file.md", {}, fsOverride);
+		const result = await cli.fix(notePath, { scope: workDir });
 
-		expect(writes).toHaveLength(0);
+		expect(result).toContain("ERROR: Citation changed at line 1; no files were written.");
+		expectUntouched(changed);
 	});
 
-	it("does NOT return scope error when only anchor corrections present and scope absent", async () => {
-		const { fsOverride } = makeFs(
-			"See [Design](file.md#old-anchor) for details.\n",
-		);
-		const cli = buildCli([anchorFixableLink]);
+	it.each([
+		{ line: 0, column: 4 },
+		{ line: 1, column: -1 },
+		{ line: 1, column: Number.NaN },
+		{ line: 2, column: 4 },
+	])("Given invalid coordinates $line:$column, When fixed, Then refuses edits without guessing another occurrence", async (position) => {
+		const cli = buildCli((links) => links.map((link) => ({ ...link, ...position })));
 
-		const result = await cli.fix("/fake/file.md", {}, fsOverride);
+		const result = await cli.fix(notePath, { scope: workDir });
 
-		// Anchor-only fixes are allowed without scope
-		expect(result).not.toMatch(/scope.*required/i);
-		expect(result).not.toContain("ERROR: Path corrections require");
+		expect(result).toContain("ERROR: Citation changed at line");
+		expectUntouched();
+	});
+
+	it.each([false, true])("Given overlapping correction spans, When dryRun is %s, Then refuses the plan without writing", async (dryRun) => {
+		const cli = buildCli((links) => [...links, ...links]);
+
+		const result = await cli.fix(notePath, { scope: workDir, dryRun });
+
+		expect(result).toContain("ERROR: Citation fixes overlap; no files were written.");
+		expectUntouched();
 	});
 });

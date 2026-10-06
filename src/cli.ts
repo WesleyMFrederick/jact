@@ -340,12 +340,12 @@ const VERBOSE_OPTION_DESCRIPTION =
 program
 	.command("rename")
 	.description(
-		"Preview (default) or apply (--fix) a move of Markdown files or directories and update incoming, outgoing, and between-moved-file links in scope",
+		"Preview (default) or apply (--fix) a move of files or directories and update incoming, outgoing, and between-moved-file links and plain paths in scope",
 	)
 	.usage("[options] <source...> <destination>")
 	.argument(
 		"<source-and-destination...>",
-		"one or more sources, then the destination (<source...> <destination>). A source is a .md file, a quoted glob, or a directory. Existing source paths take literal precedence over glob expansion, including bracketed names; only non-existing glob sources are expanded like `jact validate`. With one .md source, the destination is a new .md path, a directory (existing, or ending in /), or a bare filename that renames in place. With one directory source, the tree moves into the destination if it is an existing directory, otherwise to the destination path (like `mv`). With several sources or a glob, the destination is a directory and each source lands at <destination>/<basename>. Missing destination directories are created on --fix.",
+		"one or more sources, then the destination (<source...> <destination>). A source is a file of any type, a quoted glob, or a directory. Existing source paths take literal precedence over glob expansion, including bracketed names; only non-existing glob sources are expanded. With one file source, the destination is a new file path, a directory (existing, or ending in /), or a bare filename that renames in place. With one directory source, the tree moves into the destination if it is an existing directory, otherwise to the destination path (like `mv`). With several sources or a glob, the destination is a directory and each source lands at <destination>/<basename>. Missing destination directories are created on --fix.",
 	)
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option(
@@ -369,16 +369,20 @@ Examples:
     $ jact rename a.md b.md new/dir/ --fix
     $ jact rename "concepts/*.md" archive/concepts/
     $ jact rename notes/old-folder archive/ --fix
+    $ jact rename data/results.json output.json --fix
+    $ jact rename "src/*.ts" archive/src/ --fix
 
 Safety:
   Preview is the default and lists every move, every directory to create, and
-  every link rewrite. --fix applies the whole batch: it verifies inputs did not
-  change, creates backups, applies the moves and link edits, then verifies every
-  rewritten relationship. On failure, recovery is best-effort: every completed
-  move, created directory, and edited file gets a recovery attempt. Recovery
-  errors do not stop remaining steps; errors and retained backup paths are
-  reported for manual recovery, and the command exits 2.
-  Files of any type inside a moved directory move with it.
+  every link or plain-path rewrite. --fix applies the whole batch: it verifies
+  inputs did not change, creates backups, applies moves and reference edits,
+  then verifies every rewritten relationship. On failure, recovery is
+  best-effort: every completed move, created directory, and edited file gets a
+  recovery attempt. Recovery errors do not stop remaining steps; errors and
+  retained backup paths are reported for manual recovery, and the command exits 2.
+  Files of any type can be moved. Plain paths keep their prose, inline-code,
+  and command formatting, including #anchors and :line suffixes. Missing outgoing
+  paths or ambiguous affected paths stop the plan before writing.
   Inline image embeds (![alt](path)) and wiki image embeds
   (![[folder/image.png]]) are not rewritten: a move that would break one is
   refused with exit 1 and no writes. Reference-style images (![picture][pic])

@@ -1,13 +1,28 @@
 // Runtime idiom-guard layer (lbnl 3-layer pattern, runtime tier).
-// Catches violations ESLint AST selectors cannot easily express (e.g., the
-// upward traversal from a TSTypeReference to find optional=true on the parent).
+// Checks repository-wide exceptions alongside ESLint's optional dependency selectors.
 // One test per cheat pattern from §9f threat model.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { ESLint } from "eslint";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 const REPO_ROOT = join(import.meta.dirname, "..");
+
+vi.stubEnv("HARDENING_INJECTABLE_TYPES", "FileCache,CitationValidator");
+afterAll(() => vi.unstubAllEnvs());
+
+const ESLINT = new ESLint({
+	cwd: REPO_ROOT,
+	overrideConfigFile: join(REPO_ROOT, "eslint.config.js"),
+});
+
+async function lint(source: string) {
+	const [result] = await ESLINT.lintText(source, {
+		filePath: join(REPO_ROOT, "src/lint-regression.ts"),
+	});
+	return result.messages;
+}
 
 const INJECTABLE_TYPES = [
 	"FileCache",
@@ -101,5 +116,52 @@ describe("Idiom-guards — runtime layer for hardening pipeline", () => {
 		// violatingFn (no escape-hatch) → 1 violation. allowedFn (has escape-hatch) → 0.
 		expect(violations.length, "guard must catch violatingFn").toBe(1);
 		expect(violations[0]?.match).toMatch(/violatingFn|fileCache\?/);
+	});
+});
+describe("injectable dependency lint", () => {
+	it.each([
+		["parameter", "function use(cache: FileCache) {}"],
+		["return value", "function make(): FileCache { return cache; }"],
+		["required property", "interface Dependencies { validator: CitationValidator }"],
+		["constructor property", "class Service { constructor(private cache: FileCache) {} }"],
+		["union parameter", "function use(cache: FileCache | undefined) {}"],
+		["union property", "interface Dependencies { validator: undefined | CitationValidator }"],
+	])("Given a required %s, When linting, Then the dependency is accepted", async (_kind, source) => {
+		// Given
+		// When
+		const messages = await lint(source);
+		// Then
+		expect(messages).toEqual([]);
+	});
+
+	it.each([
+		["parameter", "function use(cache?: FileCache) {}"],
+		["interface property", "interface Dependencies { validator?: CitationValidator }"],
+		["class property", "class Service { cache?: FileCache; }"],
+		["constructor property", "class Service { constructor(private cache?: FileCache) {} }"],
+		["union parameter", "function use(cache?: FileCache | undefined) {}"],
+		["union interface property", "interface Dependencies { validator?: undefined | CitationValidator }"],
+		["union class property", "class Service { cache?: FileCache | undefined; }"],
+		["union constructor property", "class Service { constructor(private cache?: undefined | FileCache) {} }"],
+	])("Given an optional %s, When linting, Then the missing dependency risk is reported", async (_kind, source) => {
+		// Given
+		// When
+		const messages = await lint(source);
+		// Then
+		expect(messages).toEqual([
+			expect.objectContaining({
+				ruleId: "no-restricted-syntax",
+				severity: 2,
+			}),
+		]);
+	});
+
+	it("Given an optional nondependency, When linting, Then it is accepted", async () => {
+		// Given
+		const source = "function use(label?: string) {}";
+		// When
+		const messages = await lint(source);
+		// Then
+		expect(messages).toEqual([]);
 	});
 });
