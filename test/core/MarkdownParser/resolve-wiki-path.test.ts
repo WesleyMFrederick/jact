@@ -335,4 +335,26 @@ describe("resolveWikiPath — D4 Levenshtein suggestion layer (P4 — [H-D4-sugg
 		expect(result.resolved).toBe(true);
 		expect(getEntriesCalls).toBe(0);
 	});
+
+	it.each([
+		{ nameLength: 256, suggested: true },
+		{ nameLength: 257, suggested: false },
+	])(
+		"fuzzy suggestion with $nameLength-char file names: suggested=$suggested",
+		({ nameLength, suggested }) => {
+			// Slug "aaa…a.md" and basename "aaa…b.md" differ by one character.
+			const basename = `${"a".repeat(nameLength - 4)}b.md`;
+			const relativePath = `wiki/${basename}`;
+			const cache = makeLevTestFileCache([{ basename, relativePath }]);
+			const result = resolveWikiPath(
+				"a".repeat(nameLength - 3),
+				SRC_PATH,
+				cache,
+			);
+			expect(result.resolved).toBe(false);
+			if (!result.resolved) {
+				expect(result.suggestions).toEqual(suggested ? [relativePath] : []);
+			}
+		},
+	);
 });

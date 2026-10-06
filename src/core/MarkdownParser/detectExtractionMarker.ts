@@ -17,7 +17,7 @@
 
 import type { Root } from "mdast";
 import type { Position } from "unist";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 
 export interface ExtractionMarker {
 	fullMatch: string;
@@ -57,7 +57,7 @@ export function collectExtractionMarkers(
 			: fallback;
 	};
 
-	visit(ast, (node) => {
+	visitParents(ast, (node) => {
 		const n = node as unknown as ValueNode;
 		const startLine = n.position?.start.line;
 		const startCol = n.position?.start.column;

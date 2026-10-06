@@ -1,5 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import { describe, expect, it } from "vitest";
 import {
 	highlightFromMarkdown,
@@ -16,7 +16,7 @@ function parse(md: string) {
 function collectHighlights(md: string) {
 	const tree = parse(md);
 	const found: { value: string; offset: [number, number] }[] = [];
-	visit(tree, "highlight", (node) => {
+	visitParents(tree, "highlight", (node) => {
 		// biome-ignore lint/suspicious/noExplicitAny: custom node
 		const n = node as any;
 		found.push({

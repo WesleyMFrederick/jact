@@ -56,14 +56,31 @@ cd -- "$CANONICAL_ROOT"
 
 BACKUP_DIR="$(mktemp -d "$CANONICAL_ROOT/.jact-refresh.XXXXXX")"
 REFRESH_COMPLETE=0
+# Paths that this run moved into BACKUP_DIR. Rollback touches only these paths
+# and paths that did not exist before the run.
+MOVED=()
+CREATED=()
+
+backup() {
+  local path="$1"
+  if [[ -e "$path" || -L "$path" ]]; then
+    mv -- "$path" "$BACKUP_DIR/$path"
+    MOVED+=("$path")
+  else
+    CREATED+=("$path")
+  fi
+}
 
 rollback() {
-  local status="$1"
+  local status="$1" path
   if (( ! REFRESH_COMPLETE )); then
-    rm -rf -- node_modules
-    if [[ -e "$BACKUP_DIR/node_modules" || -L "$BACKUP_DIR/node_modules" ]]; then
-      mv -- "$BACKUP_DIR/node_modules" node_modules
-    fi
+    for path in "${MOVED[@]+"${MOVED[@]}"}"; do
+      rm -rf -- "$path"
+      mv -- "$BACKUP_DIR/$path" "$path"
+    done
+    for path in "${CREATED[@]+"${CREATED[@]}"}"; do
+      rm -rf -- "$path"
+    done
   fi
   rm -rf -- "$BACKUP_DIR"
   trap - EXIT INT TERM
@@ -74,17 +91,18 @@ trap 'rollback $?' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-if [[ -e node_modules || -L node_modules ]]; then
-  mv -- node_modules "$BACKUP_DIR/node_modules"
-fi
+backup node_modules
+backup dist
 
-if ! npm ci; then
-  echo "refresh-global-cli: dependency sync failed in $CANONICAL_ROOT; the previous CLI dependencies will be restored." >&2
+# Install without dependency lifecycle scripts. Only the compiler runs below.
+if ! npm ci --ignore-scripts; then
+  echo "refresh-global-cli: dependency sync failed in $CANONICAL_ROOT; the previous CLI dependencies and build will be restored." >&2
   exit 1
 fi
 
+# The build deletes dist/ and tsconfig.tsbuildinfo, then compiles from source.
 if ! npm run build; then
-  echo "refresh-global-cli: build failed in $CANONICAL_ROOT; the previous CLI dependencies will be restored." >&2
+  echo "refresh-global-cli: build failed in $CANONICAL_ROOT; the previous CLI dependencies and build will be restored." >&2
   exit 1
 fi
 

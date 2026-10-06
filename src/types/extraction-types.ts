@@ -3,6 +3,7 @@
  */
 
 import type ParsedDocument from "../ParsedDocument.js";
+import type { ReadBoundary } from "../core/ContentExtractor/readBoundary.js";
 import type { HeadingMatch } from "../ParsedDocument.js";
 import type { LinkObject } from "./citationTypes.js";
 import type { EnrichedLinkObject } from "./validationTypes.js";
@@ -84,6 +85,8 @@ export interface OutgoingLinksExtractedContent {
 
 export interface ExtractionRunOptions {
 	includeInternal?: boolean;
+	/** Directories that link-derived targets may be read from. */
+	readBoundary: ReadBoundary;
 }
 
 export interface ResolvedSection {
@@ -99,6 +102,8 @@ export interface LinkedHeaderContextInput {
 	scopePath: string;
 	scopeFiles: readonly string[];
 	respectGitignore: boolean;
+	/** Directories that linked targets may be read from. */
+	readBoundary: ReadBoundary;
 	/** Link depth to follow from the root section (≥ 1). */
 	depth: number;
 }

@@ -1,5 +1,5 @@
 import type { Heading } from "mdast";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import { headingText as getHeadingText } from "./core/MarkdownParser/extractHeadings.js";
 import { normalizeAnchorText } from "./core/MarkdownParser/normalizeInlineText.js";
 import { buildHeadingTree } from "./outline/render-outline.js";
@@ -10,6 +10,13 @@ import type {
 } from "./types/citationTypes.js";
 import { levenshteinDistance } from "./utils/stringDistance.js";
 import type { ResolvedSection } from "./types/extraction-types.js";
+
+// Fuzzy anchor suggestions skip strings longer than this. Edit distance cost grows with length squared.
+export const MAX_FUZZY_ANCHOR_LENGTH = 256;
+// Fuzzy anchor suggestions compare at most this many anchors per lookup.
+export const MAX_FUZZY_ANCHOR_CANDIDATES = 1000;
+// Fuzzy anchor suggestions compare at most this many character pairs per document. After that, suggestions stop.
+export const MAX_FUZZY_ANCHOR_WORK = 20_000_000;
 
 export interface HeadingMatch {
 	index: number;
@@ -49,6 +56,7 @@ export type HeadingResolution =
 class ParsedDocument {
 	private _data: ParserOutput;
 	private _cachedAnchorIds: string[] | null;
+	private _fuzzyWorkLeft = MAX_FUZZY_ANCHOR_WORK;
 
 	/**
 	 * Create a ParsedDocument facade wrapping parser output
@@ -291,7 +299,7 @@ class ParsedDocument {
 		if (!ast) return null;
 
 		const headingNodes: Heading[] = [];
-		visit(ast, "heading", (node) => {
+		visitParents(ast, "heading", (node) => {
 			headingNodes.push(node);
 		});
 		const targetNode = headingNodes[match.index];
@@ -440,9 +448,17 @@ class ParsedDocument {
 	 * @returns Array of similar strings sorted by similarity (max 5)
 	 */
 	private _fuzzyMatch(target: string, candidates: string[]): string[] {
-		// Calculate similarity scores for all candidates
+		if (target.length > MAX_FUZZY_ANCHOR_LENGTH) return [];
+		// Calculate similarity scores for bounded candidates
 		const matches: Array<{ candidate: string; score: number }> = [];
+		let compared = 0;
 		for (const candidate of candidates) {
+			if (candidate.length > MAX_FUZZY_ANCHOR_LENGTH) continue;
+			if (compared === MAX_FUZZY_ANCHOR_CANDIDATES) break;
+			const work = target.length * candidate.length;
+			if (work > this._fuzzyWorkLeft) break;
+			this._fuzzyWorkLeft -= work;
+			compared++;
 			const similarity = this._calculateSimilarity(target, candidate);
 
 			// Filter by threshold (0.3 for fuzzy matching)

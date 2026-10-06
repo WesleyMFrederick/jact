@@ -5,7 +5,7 @@
 import type { Root } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import type { Position } from "unist";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
@@ -63,7 +63,7 @@ export function extractWikilinks(
 	const markers = sharedMarkers ?? collectExtractionMarkers(tree, source);
 	const lines = source.split(/\r?\n/);
 
-	visit(tree, "wikilink", (node) => {
+	visitParents(tree, "wikilink", (node) => {
 		const wiki = node as unknown as WikilinkNode;
 
 		// Parse the tokenized inner text `page#anchor|alias` (every part optional)

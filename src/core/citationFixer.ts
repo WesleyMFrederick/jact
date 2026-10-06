@@ -77,7 +77,7 @@ export class CitationFixer {
 		for (const fix of fixes) {
 			if (modified.includes(fix.old)) {
 				if (!dryRun) {
-					modified = modified.replace(fix.old, fix.new);
+					modified = modified.replace(fix.old, () => fix.new);
 				}
 				fixesApplied++;
 			}
@@ -101,7 +101,10 @@ export function applyPathConversion(
 	citation: string,
 	pathConversion: PathConversion,
 ): string {
-	return citation.replace(pathConversion.original, pathConversion.recommended);
+	return citation.replace(
+		pathConversion.original,
+		() => pathConversion.recommended,
+	);
 }
 
 /**

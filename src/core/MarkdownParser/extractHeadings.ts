@@ -8,7 +8,7 @@
  */
 import type { Heading, Root } from "mdast";
 import { toString as mdastToString } from "mdast-util-to-string";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import type { HeadingObject } from "../../types/citationTypes.js";
 
 /** Raw markdown slice for a heading node (falls back to empty string). */
@@ -41,7 +41,7 @@ export function headingText(node: Heading, content: string): string {
 export function extractHeadings(ast: Root, content: string): HeadingObject[] {
 	const headings: HeadingObject[] = [];
 
-	visit(ast, "heading", (node) => {
+	visitParents(ast, "heading", (node) => {
 		headings.push({
 			level: node.depth,
 			text: headingText(node, content),

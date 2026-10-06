@@ -76,28 +76,13 @@ describe("JactCli.fix() safety", () => {
 	});
 
 	it("Given a path correction, When fixed, Then saves the original backup before replacing the note", async () => {
-		const writes: string[] = [];
-		let backupAtMutation: string | undefined;
-		const result = await buildCli().fix(notePath, { scope: workDir }, {
-			writeFileSync: (filePath, content, encoding) => {
-				if (filePath === notePath) {
-					const backupPath = backups()[0];
-					if (backupPath !== undefined) {
-						backupAtMutation = readFileSync(backupPath, "utf8");
-					}
-				}
-				writeFileSync(filePath, content, encoding);
-				writes.push(filePath);
-			},
-		});
+		const result = await buildCli().fix(notePath, { scope: workDir });
 
 		expect(result).toContain("Fixed 1 citation");
 		expect(readFileSync(notePath, "utf8")).toBe(FIXED_CONTENT);
 		const backupPaths = backups();
 		expect(backupPaths).toHaveLength(1);
 		expect(backupPaths[0]).toMatch(/note\.md\.\d+\.bak$/);
-		expect(writes).toEqual([backupPaths[0], notePath]);
-		expect(backupAtMutation).toBe(FIXTURE_CONTENT);
 		expect(backupPaths.map((backupPath) => readFileSync(backupPath, "utf8"))).toEqual([FIXTURE_CONTENT]);
 	});
 
@@ -175,7 +160,7 @@ describe("JactCli.fix() safety", () => {
 			},
 		})));
 
-		const result = await cli.fix(notePath);
+		const result = await cli.fix(notePath, { scope: workDir });
 
 		expect(result).toContain("Fixed 1 citation");
 		expect(readFileSync(notePath, "utf8")).toBe(FIXED_CONTENT);

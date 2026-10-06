@@ -170,10 +170,22 @@ export class PathResolver {
 		sourceFile: string,
 	): PathResolutionOutcome {
 		const rawPath = citation.target.path.raw ?? "";
-		const decodedPath = decodeURIComponent(rawPath);
+		let decodedPath: string;
+		try {
+			decodedPath = decodeURIComponent(rawPath);
+		} catch {
+			return {
+				kind: "error",
+				error: `Malformed percent-encoding in link path: ${rawPath}`,
+			};
+		}
 		const sourceDir = dirname(sourceFile);
 		const standardPath = resolve(sourceDir, decodedPath);
-		const candidatePath = this.findCandidatePath(rawPath, sourceFile);
+		const candidatePath = this.findCandidatePath(
+			rawPath,
+			decodedPath,
+			sourceFile,
+		);
 		const context = {
 			citation,
 			sourceFile,
@@ -194,9 +206,11 @@ export class PathResolver {
 		};
 	}
 
-	private findCandidatePath(relativePath: string, sourceFile: string): string {
-		const decodedRelativePath = decodeURIComponent(relativePath);
-
+	private findCandidatePath(
+		relativePath: string,
+		decodedRelativePath: string,
+		sourceFile: string,
+	): string {
 		// Strategy 0: Expand tilde to home directory
 		if (decodedRelativePath.startsWith("~/")) {
 			const expandedPath = resolve(homedir(), decodedRelativePath.slice(2));

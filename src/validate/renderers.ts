@@ -6,6 +6,7 @@
  * machine consumers.
  */
 
+import { terminalText } from "../shellArgument.js";
 import type { BatchSummary, FileResult } from "../types/cli-types.js";
 
 const DEFAULT_ERROR_DETAIL_LIMIT = 5;
@@ -56,7 +57,7 @@ function renderCollapsedHuman(
 	for (const result of summary.results) {
 		if (!result.ok) {
 			const noun = result.errors.length === 1 ? "error" : "errors";
-			lines.push(`❌ ${result.path} (${result.errors.length} ${noun})`);
+			lines.push(`❌ ${terminalText(result.path)} (${result.errors.length} ${noun})`);
 		}
 	}
 
@@ -93,16 +94,16 @@ function appendSummary(lines: string[], summary: BatchSummary): void {
 /** Render one file's pass, fail, or skipped status line. */
 function renderFileLine(result: FileResult): string {
 	if (result.skipped) {
-		return `SKIPPED: ${result.path} (validation disabled by document directive)`;
+		return `SKIPPED: ${terminalText(result.path)} (validation disabled by document directive)`;
 	}
 	const icon = result.ok ? "✅" : "❌";
-	return `${icon} ${result.path}`;
+	return `${icon} ${terminalText(result.path)}`;
 }
 
 /** Render one indented error line under a failing file. */
 function renderErrorLine(error: FileResult["errors"][number]): string {
 	const location = error.line === null ? "" : `Line ${error.line}: `;
-	return `   ${location}${error.message}`;
+	return `   ${location}${terminalText(error.message)}`;
 }
 
 /**

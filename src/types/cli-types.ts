@@ -47,6 +47,8 @@ export interface CliRenameOptions {
  */
 export interface CliExtractOptions {
 	scope?: string;
+	/** Extra directories that link-derived targets may be read from. */
+	allowRead?: string[];
 	format?: "markdown" | "json";
 	fullFiles?: boolean;
 	session?: string;

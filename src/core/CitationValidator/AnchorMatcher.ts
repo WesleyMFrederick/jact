@@ -56,6 +56,48 @@ const OBSIDIAN_DROPPED_CHARS = /[:#|^[\]]/g;
 const stripObsidianDroppedChars = (text: string): string =>
 	text.replace(OBSIDIAN_DROPPED_CHARS, " ").replace(/\s+/g, " ").trim();
 
+/** Anchor text forms that matching compares against a search string. */
+interface AnchorComparisonForms {
+	cleaned: string;
+	normalizedId: string | null;
+	decodedUrlEncodedId: string | null;
+	kebabCase: string | null;
+}
+
+// Parsed anchors do not change after parsing. This cache computes each form one
+// time per anchor, so a lookup does not normalize every heading again.
+const comparisonFormsCache = new WeakMap<AnchorObject, AnchorComparisonForms>();
+
+/** Anchor positions keyed by each text form that a match compares. */
+interface AnchorIndex {
+	byMatchKey: Map<string, number[]>;
+	byKebabCase: Map<string, number[]>;
+}
+
+// One index for each parsed anchor list. A lookup reads only the anchors that
+// share a text form with the search, not every anchor in the document.
+const anchorIndexCache = new WeakMap<AnchorObject[], AnchorIndex>();
+
+/** Add a position one time. Positions arrive in ascending order. */
+const addPosition = (
+	map: Map<string, number[]>,
+	key: string,
+	position: number,
+): void => {
+	const positions = map.get(key);
+	if (positions === undefined) map.set(key, [position]);
+	else if (positions.at(-1) !== position) positions.push(position);
+};
+
+/** Decode URL escapes. Keep the text as-is when the escapes are malformed. */
+const decodeOrKeep = (text: string): string => {
+	try {
+		return decodeURIComponent(text);
+	} catch {
+		return text;
+	}
+};
+
 export class AnchorMatcher {
 	private parsedDocumentLifecycle: ParsedDocumentLifecycleLike | null;
 
@@ -86,81 +128,147 @@ export class AnchorMatcher {
 		});
 	}
 
+	private comparisonForms(anchor: AnchorObject): AnchorComparisonForms {
+		const cached = comparisonFormsCache.get(anchor);
+		if (cached !== undefined) return cached;
+		const isHeader = anchor.anchorType === "header";
+		const forms: AnchorComparisonForms = {
+			cleaned: this.cleanMarkdownForComparison(anchor.rawText || anchor.id),
+			normalizedId: isHeader
+				? normalizeAnchorText(anchor.id, {
+						stripMarkdown: false,
+						colons: "strip",
+					})
+				: null,
+			decodedUrlEncodedId: isHeader ? decodeOrKeep(anchor.urlEncodedId) : null,
+			kebabCase: isHeader
+				? anchor.rawText.toLowerCase().replace(/\s+/g, "-")
+				: null,
+		};
+		comparisonFormsCache.set(anchor, forms);
+		return forms;
+	}
+
+	private anchorIndex(anchors: AnchorObject[]): AnchorIndex {
+		const cached = anchorIndexCache.get(anchors);
+		if (cached !== undefined) return cached;
+		const index: AnchorIndex = { byMatchKey: new Map(), byKebabCase: new Map() };
+		anchors.forEach((anchor, position) => {
+			const forms = this.comparisonForms(anchor);
+			const keys = [anchor.id, forms.cleaned];
+			if (anchor.anchorType === "header") {
+				keys.push(anchor.rawText, anchor.urlEncodedId);
+			}
+			if (forms.normalizedId !== null) keys.push(forms.normalizedId);
+			if (forms.decodedUrlEncodedId !== null) {
+				keys.push(forms.decodedUrlEncodedId);
+			}
+			for (const key of keys) addPosition(index.byMatchKey, key, position);
+			if (forms.kebabCase !== null) {
+				addPosition(index.byKebabCase, forms.kebabCase, position);
+			}
+		});
+		anchorIndexCache.set(anchors, index);
+		return index;
+	}
+
 	findFlexibleAnchorMatch(
 		searchAnchor: string,
 		availableAnchors: AnchorObject[],
 	): { found: boolean; matchType?: string } {
-		let cleanSearchAnchor: string;
-		try {
-			cleanSearchAnchor = decodeURIComponent(searchAnchor);
-		} catch {
-			cleanSearchAnchor = searchAnchor;
-		}
+		const cleanSearchAnchor = decodeOrKeep(searchAnchor);
 		// Cleaned once per lookup, not once per candidate anchor — cleaning is
 		// the expensive tokenizer-backed path and the search string is constant.
 		const cleanedSearch = this.cleanMarkdownForComparison(cleanSearchAnchor);
 
 		for (const anchorObj of availableAnchors) {
-			const anchorText = anchorObj.id;
-			const rawText = anchorObj.rawText;
-
-			// 1. Exact match
-			if (anchorText === cleanSearchAnchor) {
-				return { found: true, matchType: "exact" };
-			}
-
-			// 2. Raw text match
-			if (rawText === cleanSearchAnchor) {
-				return { found: true, matchType: "raw-text" };
-			}
-
-			// 3. Backtick-wrapped search unwrapped
-			if (
-				cleanSearchAnchor.startsWith("`") &&
-				cleanSearchAnchor.endsWith("`")
-			) {
-				const withoutBackticks = cleanSearchAnchor.slice(1, -1);
-				if (rawText === withoutBackticks || anchorText === withoutBackticks) {
-					return { found: true, matchType: "backtick-unwrapped" };
-				}
-			}
-
-			// 4. Wrap search in backticks to match header that has them
-			if (rawText?.includes("`")) {
-				const wrappedSearch = `\`${cleanSearchAnchor}\``;
-				if (rawText === wrappedSearch) {
-					return { found: true, matchType: "backtick-wrapped" };
-				}
-			}
-
-			// 5. Markdown-cleaned comparison
-			const cleanedHeader = this.cleanMarkdownForComparison(
-				rawText || anchorText,
+			const matchType = this.flexibleMatchType(
+				cleanSearchAnchor,
+				cleanedSearch,
+				anchorObj,
 			);
-
-			if (cleanedHeader === cleanedSearch) {
-				return { found: true, matchType: "markdown-cleaned" };
-			}
+			if (matchType !== null) return { found: true, matchType };
 		}
 
 		return { found: false };
+	}
+
+	private flexibleMatchType(
+		cleanSearchAnchor: string,
+		cleanedSearch: string,
+		anchorObj: AnchorObject,
+	): string | null {
+		const anchorText = anchorObj.id;
+		const rawText = anchorObj.rawText;
+
+		// 1. Exact match
+		if (anchorText === cleanSearchAnchor) return "exact";
+
+		// 2. Raw text match
+		if (rawText === cleanSearchAnchor) return "raw-text";
+
+		// 3. Backtick-wrapped search unwrapped
+		if (cleanSearchAnchor.startsWith("`") && cleanSearchAnchor.endsWith("`")) {
+			const withoutBackticks = cleanSearchAnchor.slice(1, -1);
+			if (rawText === withoutBackticks || anchorText === withoutBackticks) {
+				return "backtick-unwrapped";
+			}
+		}
+
+		// 4. Wrap search in backticks to match header that has them
+		if (rawText?.includes("`") && rawText === `\`${cleanSearchAnchor}\``) {
+			return "backtick-wrapped";
+		}
+
+		// 5. Markdown-cleaned comparison
+		if (this.comparisonForms(anchorObj).cleaned === cleanedSearch) {
+			return "markdown-cleaned";
+		}
+
+		return null;
 	}
 
 	findMatchingAnchors(
 		searchAnchor: string,
 		availableAnchors: AnchorObject[],
 	): Array<{ anchor: AnchorObject; matchType?: string }> {
-		let decodedSearchAnchor: string;
-		try {
-			decodedSearchAnchor = decodeURIComponent(searchAnchor);
-		} catch {
-			decodedSearchAnchor = searchAnchor;
-		}
+		const decodedSearchAnchor = decodeOrKeep(searchAnchor);
 		const blockSearchAnchor = decodedSearchAnchor.startsWith("^")
 			? decodedSearchAnchor.slice(1)
 			: decodedSearchAnchor;
+		const normalizedSearch = normalizeAnchorText(decodedSearchAnchor, {
+			stripMarkdown: false,
+			colons: "strip",
+		});
+		// The flexible match decodes the search text one more time. Keep that.
+		const flexibleSearch = decodeOrKeep(decodedSearchAnchor);
+		const flexibleCleanedSearch =
+			this.cleanMarkdownForComparison(flexibleSearch);
 
-		return availableAnchors.flatMap((anchor) => {
+		// Every match rule compares one anchor text form with one of these keys.
+		// The index gives the anchors that can match. The rules below still decide.
+		const searchKeys = [
+			searchAnchor,
+			decodedSearchAnchor,
+			blockSearchAnchor,
+			normalizedSearch,
+			flexibleSearch,
+			flexibleCleanedSearch,
+			`\`${flexibleSearch}\``,
+		];
+		if (flexibleSearch.startsWith("`") && flexibleSearch.endsWith("`")) {
+			searchKeys.push(flexibleSearch.slice(1, -1));
+		}
+		const { byMatchKey } = this.anchorIndex(availableAnchors);
+		const positions = new Set<number>();
+		for (const key of searchKeys) {
+			for (const position of byMatchKey.get(key) ?? []) positions.add(position);
+		}
+		const candidates = [...positions]
+			.sort((a, b) => a - b)
+			.flatMap((position) => availableAnchors[position] ?? []);
+
+		return candidates.flatMap((anchor) => {
 			if (
 				anchor.id === searchAnchor ||
 				anchor.id === decodedSearchAnchor ||
@@ -179,42 +287,25 @@ export class AnchorMatcher {
 			}
 
 			if (anchor.anchorType === "header") {
-				let decodedUrlEncodedId: string;
-				try {
-					decodedUrlEncodedId = decodeURIComponent(anchor.urlEncodedId);
-				} catch {
-					decodedUrlEncodedId = anchor.urlEncodedId;
-				}
+				const forms = this.comparisonForms(anchor);
 				if (
 					anchor.urlEncodedId === searchAnchor ||
-					decodedUrlEncodedId === decodedSearchAnchor
+					forms.decodedUrlEncodedId === decodedSearchAnchor
 				) {
 					return [{ anchor, matchType: "url-encoded" }];
 				}
 
-				const normalizedId = normalizeAnchorText(anchor.id, {
-					stripMarkdown: false,
-					colons: "strip",
-				});
-				const normalizedSearch = normalizeAnchorText(decodedSearchAnchor, {
-					stripMarkdown: false,
-					colons: "strip",
-				});
-				if (normalizedId === normalizedSearch) {
+				if (forms.normalizedId === normalizedSearch) {
 					return [{ anchor, matchType: "normalized" }];
 				}
 			}
 
-			const match = this.findFlexibleAnchorMatch(decodedSearchAnchor, [anchor]);
-			if (!match.found) return [];
-			return [
-				{
-					anchor,
-					...(match.matchType !== undefined && {
-						matchType: match.matchType,
-					}),
-				},
-			];
+			const matchType = this.flexibleMatchType(
+				flexibleSearch,
+				flexibleCleanedSearch,
+				anchor,
+			);
+			return matchType === null ? [] : [{ anchor, matchType }];
 		});
 	}
 
@@ -222,18 +313,15 @@ export class AnchorMatcher {
 		usedAnchor: string,
 		availableAnchors: AnchorObject[],
 	): string | null {
-		for (const anchorObj of availableAnchors) {
-			if (anchorObj.anchorType === "header") {
-				const kebabCase = anchorObj.rawText.toLowerCase().replace(/\s+/g, "-");
-				if (kebabCase === usedAnchor) {
-					const suggestion = encodeURIComponent(anchorObj.id).replace(
-						/'/g,
-						"%27",
-					);
-					if (suggestion !== usedAnchor) {
-						return suggestion;
-					}
-				}
+		const positions =
+			this.anchorIndex(availableAnchors).byKebabCase.get(usedAnchor) ?? [];
+		// Only header anchors have a kebab-case form in the index.
+		for (const position of positions) {
+			const anchorObj = availableAnchors[position];
+			if (anchorObj === undefined) continue;
+			const suggestion = encodeURIComponent(anchorObj.id).replace(/'/g, "%27");
+			if (suggestion !== usedAnchor) {
+				return suggestion;
 			}
 		}
 		return null;

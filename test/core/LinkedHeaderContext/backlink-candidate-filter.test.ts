@@ -7,6 +7,7 @@ import {
 	type BacklinkCandidateFilterLike,
 } from "../../../src/core/LinkedHeaderContext/BacklinkCandidateFilter.js";
 import { LinkedHeaderContextQuery } from "../../../src/core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
+import { ReadBoundary } from "../../../src/core/ContentExtractor/readBoundary.js";
 import { createParsedFileCache } from "../../../src/factories/componentFactory.js";
 import type ParsedDocument from "../../../src/ParsedDocument.js";
 
@@ -134,6 +135,7 @@ describe("LinkedHeaderContextQuery backlink filtering", () => {
 				scopePath: testDirectory,
 				scopeFiles,
 				respectGitignore: true,
+				readBoundary: new ReadBoundary(["/"]),
 			});
 			return { parsedFiles, result };
 		};
@@ -182,6 +184,7 @@ describe("LinkedHeaderContextQuery backlink filtering", () => {
 			scopePath: testDirectory,
 			scopeFiles: [root],
 			respectGitignore: true,
+			readBoundary: new ReadBoundary(["/"]),
 		});
 
 		expect(resolveDocument).toHaveBeenCalledOnce();
@@ -235,6 +238,7 @@ describe("LinkedHeaderContextQuery backlink filtering", () => {
 			scopePath: testDirectory,
 			scopeFiles: [root, good],
 			respectGitignore: true,
+			readBoundary: new ReadBoundary(["/"]),
 			depth: 1,
 		});
 
@@ -328,6 +332,7 @@ describe("LinkedHeaderContextQuery backlink filtering", () => {
 				scopePath: testDirectory,
 				scopeFiles: [root],
 				respectGitignore: true,
+				readBoundary: new ReadBoundary(["/"]),
 				depth: 1,
 			}),
 		).rejects.toThrow("link processing failed");

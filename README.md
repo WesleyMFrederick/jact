@@ -19,13 +19,22 @@ You need Node.js 20 or later.
 **From GitHub:**
 
 ```bash
-npm install -g --allow-git=all github:WesleyMFrederick/jact
+npm install -g --allow-git=root github:WesleyMFrederick/jact
 jact --help
 ```
 
-npm 12 and later block installs from git unless you add `--allow-git=all`. npm builds jact during the install.
+npm 12 and later block installs from git by default. `--allow-git=root` allows only the git package that you name in the command. It does not allow git packages that other packages request. npm builds jact during the install.
 
-If the install fails with `EALLOWSCRIPTS`, an `allow-scripts` line in your `~/.npmrc` is the cause. npm 12 rejects that setting while it builds a git dependency. Retry with it disabled: `NPM_CONFIG_USERCONFIG=/dev/null npm install -g --allow-git=all github:WesleyMFrederick/jact`.
+If the install fails with `EALLOWSCRIPTS`, an `allow-scripts` line in your `~/.npmrc` is the cause. npm 12 rejects that setting while it builds a git package. Remove only that setting for the install, then put it back:
+
+```bash
+npm config get allow-scripts          # Write down this value.
+npm config delete allow-scripts --location=user
+npm install -g --allow-git=root github:WesleyMFrederick/jact
+npm config set allow-scripts=<value you wrote down> --location=user
+```
+
+Do not clear your whole npm user configuration. It can hold your registry, certificate, and authentication settings.
 
 **From npm:** not published yet. Once it is, the install will be `npm install -g @wesleymfrederick/jact`.
 
@@ -142,6 +151,7 @@ No files were written (--dry-run).
 
 - `--dry-run` shows the changes and writes nothing.
 - Without `--dry-run`, jact saves a timestamped `.bak` copy of the file before it writes. Add `--no-backup` to skip the copy.
+- `--fix` writes only to a regular file inside the scope. It refuses a symbolic link, a file whose real path is outside the scope, and a backup path that already exists. It writes a temporary file in the same folder and then renames it over the original.
 
 ### `rename` — move files or folders and update their links
 
@@ -243,6 +253,15 @@ By default, `extract links` includes links to sections and skips links to whole 
 - [whole guide](guide.md) %%force-extract%%
 - [not needed](setup.md#Troubleshooting) %%stop-extract-link%%
 ```
+
+**Links stay inside the project.** When jact follows a link, it reads the target only if the target is inside the project (the scope root). A link to `/etc/...`, `~/...`, `../../...`, or a symbolic link that points out of the project is skipped. jact prints `Blocked: target is outside the project. To allow, add --allow-read <dir>.` on stderr. To permit more folders, add `--allow-read <dir>` once for each folder:
+
+```bash
+jact extract links docs/design.md --allow-read ../shared-docs
+jact extract file docs/plan.md --extract-linked-content --allow-read ~/notes
+```
+
+A file that you name on the command line is always read. `validate` does not use this rule.
 
 ### `ast` — debug the parser
 

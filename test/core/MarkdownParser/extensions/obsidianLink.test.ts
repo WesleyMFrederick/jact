@@ -1,5 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import { describe, expect, it } from "vitest";
 import {
 	obsidianLinkFromMarkdown,
@@ -15,7 +15,7 @@ function parse(md: string) {
 
 function collect(md: string) {
 	const found: { value: string; span: [number, number] }[] = [];
-	visit(parse(md), "obsidianLink", (node) => {
+	visitParents(parse(md), "obsidianLink", (node) => {
 		// biome-ignore lint/suspicious/noExplicitAny: custom node
 		const n = node as any;
 		found.push({

@@ -204,8 +204,8 @@ describe("jact outline CLI", () => {
 
 		expect(ambiguous.status).toBe(1);
 		expect(ambiguous.stderr).toContain('under "Guide" > "Section"');
-		expect(ambiguous.stderr).toContain('--within "Guide"');
-		expect(ambiguous.stderr).not.toContain('--within "Section"');
+		expect(ambiguous.stderr).toContain("--within Guide");
+		expect(ambiguous.stderr).not.toContain("--within Section");
 		expect(narrowed.status).toBe(0);
 		expect(narrowed.stdout).toContain('"Setup"');
 		expect(narrowed.stdout).not.toContain('"Appendix"');

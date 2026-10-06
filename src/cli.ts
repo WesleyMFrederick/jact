@@ -604,12 +604,22 @@ const extractCmd = program
 	.command("extract")
 	.description("Extract content from citations");
 
+const ALLOW_READ_OPTION = "--allow-read <dir>";
+const ALLOW_READ_DESCRIPTION =
+	"also let links read files in <dir> (repeatable; default: only the project scope)";
+
+/** Commander collector: each `--allow-read` adds one directory. */
+function collectAllowRead(dir: string, previous: string[] = []): string[] {
+	return [...previous, dir];
+}
+
 extractCmd
 	.command("links <source-file>")
 	.description(
 		"Extract content from all links in source document with validation and deduplication",
 	)
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.option(ALLOW_READ_OPTION, ALLOW_READ_DESCRIPTION, collectAllowRead)
 	.option("--format <type>", "Output format (reserved for future)", "json")
 	.option(
 		"--full-files",
@@ -744,6 +754,7 @@ extractCmd
 	.argument("<target-file>", "Markdown file to extract from")
 	.argument("<header-name>", "Exact header text to extract")
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.option(ALLOW_READ_OPTION, ALLOW_READ_DESCRIPTION, collectAllowRead)
 	.option(
 		"--within <parent>",
 		"limit heading resolution to descendants of one unique parent",
@@ -837,6 +848,7 @@ extractCmd
 	.description("Extract entire markdown file content")
 	.argument("<target-file>", "Markdown file to extract")
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
+	.option(ALLOW_READ_OPTION, ALLOW_READ_DESCRIPTION, collectAllowRead)
 	.option(
 		LINKED_CONTENT_OPTION,
 		"also extract linked content, following linked files to depth (default: 1)",

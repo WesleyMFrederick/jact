@@ -16,10 +16,7 @@ import {
 	resetOutlineReminderCache,
 	writeOutlineReminderCache,
 } from "./cache/check-outline-reminder-cache.js";
-import {
-	applyCitationFixes,
-	type FixFsOverrides,
-} from "./core/apply-citation-fixes.js";
+import { applyCitationFixes } from "./core/apply-citation-fixes.js";
 import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
 import {
@@ -27,6 +24,10 @@ import {
 	type LinkedHeaderContextQuery,
 } from "./core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
 import { generateContentId } from "./core/ContentExtractor/generateContentId.js";
+import {
+	BLOCKED_READ_REASON,
+	ReadBoundary,
+} from "./core/ContentExtractor/readBoundary.js";
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "./core/prepare-scope.js";
 import { buildIgnoreRules } from "./core/ignoreRules.js";
@@ -52,7 +53,12 @@ import { renderOutline } from "./outline/render-outline.js";
 import type ParsedDocument from "./ParsedDocument.js";
 import type { HeadingMatch, HeadingResolution } from "./ParsedDocument.js";
 import type { ParsedFileCache } from "./ParsedFileCache.js";
-import { quote, shellFileArgument } from "./shellArgument.js";
+import {
+	shellArgument,
+	shellCommand,
+	terminalQuote,
+	terminalText,
+} from "./shellArgument.js";
 import type { ParserOutput } from "./types/citationTypes.js";
 import type {
 	CliExtractOptions,
@@ -83,25 +89,25 @@ const OUTLINE_CACHE_DIR = ".jact/claude-cache";
 
 function headingLocation(match: HeadingMatch): string {
 	if (match.ancestors.length === 0) return "at document root";
-	return `under ${match.ancestors.map((heading) => quote(heading.text)).join(" > ")}`;
+	return `under ${match.ancestors.map((heading) => terminalQuote(heading.text)).join(" > ")}`;
 }
 
 function formatHeadingResolution(resolution: HeadingResolution): string {
 	if (resolution.status === "unique") return "";
 	if (resolution.status === "ambiguous") {
 		return [
-			`${quote(resolution.query)} is ambiguous:`,
+			`${terminalQuote(resolution.query)} is ambiguous:`,
 			...resolution.matches.map((match) => `- ${headingLocation(match)}`),
 		].join("\n");
 	}
 
-	const lines = [`${quote(resolution.query)} was not found.`];
+	const lines = [`${terminalQuote(resolution.query)} was not found.`];
 	if (resolution.alternatives.length > 0) {
 		lines.push(
 			"",
 			"Close alternatives:",
 			...resolution.alternatives.map(
-				(match) => `- ${quote(match.heading.text)} ${headingLocation(match)}`,
+				(match) => `- ${terminalQuote(match.heading.text)} ${headingLocation(match)}`,
 			),
 		);
 	}
@@ -322,7 +328,9 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<void> {
 		try {
-			const sourceDocument = await this.resolveDocument(sourceFile, options);
+			const scopeStats = this.applyScope(options, sourceFile);
+			const sourceDocument =
+				await this.resolveDocumentFromPreparedScope(sourceFile);
 			const validationResult = await this.validator.validateDocument(
 				sourceDocument,
 				sourceFile,
@@ -341,7 +349,14 @@ export class JactCli {
 			const extractionResult = await this.contentExtractor.extractContent(
 				enrichedLinks,
 				{ fullFiles: options.fullFiles ?? false },
+				{
+					readBoundary: new ReadBoundary(
+						[scopeStats.realScopeFolder, ...(options.allowRead ?? [])],
+						[sourceDocument.data.filePath],
+					),
+				},
 			);
+			reportBlockedReads(extractionResult);
 			console.log(
 				formatExtractResult(
 					extractionResult,
@@ -396,7 +411,7 @@ export class JactCli {
 				if (commaHeading.status !== "missing") {
 					return {
 						success: false,
-						output: `${quote(options.expand)} contains a comma and cannot be selected with --expand because commas separate heading names. Narrow with --within or choose a heading without a comma.`,
+						output: `${terminalQuote(options.expand)} contains a comma and cannot be selected with --expand because commas separate heading names. Narrow with --within or choose a heading without a comma.`,
 					};
 				}
 			}
@@ -424,7 +439,14 @@ export class JactCli {
 						lines.push(
 							"",
 							"Retry with a unique parent:",
-							`jact outline ${shellFileArgument(filePath)} H${maxLevel} --expand ${quote(selector)} --within ${quote(parent)}`,
+							shellCommand(
+								"jact outline",
+								[filePath, `H${maxLevel}`],
+								[
+									["--expand", selector],
+									["--within", parent],
+								],
+							),
 						);
 					}
 					return { success: false, output: lines.join("\n") };
@@ -506,7 +528,7 @@ export class JactCli {
 					path.isAbsolute(relativeTarget)
 				) {
 					console.error(
-						`Target file is outside the resolved scope. Retry with --scope ${quote(path.dirname(canonicalTarget))}.`,
+						`Target file is outside the resolved scope. Retry with --scope ${shellArgument(path.dirname(canonicalTarget))}.`,
 					);
 					process.exitCode = 1;
 					return undefined;
@@ -528,7 +550,11 @@ export class JactCli {
 					if (parent) {
 						console.error("\nRetry with a unique parent:");
 						console.error(
-							`jact extract header ${shellFileArgument(targetFile)} ${quote(headerName)} --within ${quote(parent)}`,
+							shellCommand(
+								"jact extract header",
+								[targetFile, headerName],
+								[["--within", parent]],
+							),
 						);
 					}
 				}
@@ -545,6 +571,10 @@ export class JactCli {
 					scopePath: scopeStats.scopeFolder,
 					scopeFiles: this.fileCache.getAllFiles().map((entry) => entry.path),
 					respectGitignore: true,
+					readBoundary: new ReadBoundary(
+						[scopeStats.realScopeFolder, ...(options.allowRead ?? [])],
+						[document.data.filePath],
+					),
 					depth: options.extractLinkedContent,
 				});
 				if (!result.complete) process.exitCode = 1;
@@ -553,7 +583,7 @@ export class JactCli {
 			const startLine = resolution.match.heading.position?.start.line;
 			if (startLine === undefined) {
 				throw new Error(
-					`Cannot render line numbers: heading ${quote(headerName)} has no parser source position.`,
+					`Cannot render line numbers: heading ${terminalQuote(headerName)} has no parser source position.`,
 				);
 			}
 
@@ -624,7 +654,7 @@ export class JactCli {
 		options: CliExtractOptions,
 	): Promise<FileExtractionOutcome | undefined> {
 		try {
-			this.applyScope(options, targetFile);
+			const scopeStats = this.applyScope(options, targetFile);
 			// Fix(#63): Resolve to absolute before factory so target.path.raw is absolute.
 			const absoluteTargetFile = path.resolve(targetFile);
 			const syntheticLink = new LinkObjectFactory().createFileLink(
@@ -656,6 +686,10 @@ export class JactCli {
 			const links: EnrichedLinkObject[] = [enrichedLink];
 			let unfollowedLinkedFileCount = 0;
 			const rootPath = syntheticLink.target.path.absolute;
+			const readBoundary = new ReadBoundary(
+				[scopeStats.realScopeFolder, ...(options.allowRead ?? [])],
+				rootPath ? [rootPath] : [],
+			);
 			if (depth !== undefined && rootPath) {
 				const visited = new Set<string>([rootPath]);
 				let frontier = [rootPath];
@@ -678,7 +712,7 @@ export class JactCli {
 							const hasNewContent = validation.links.some((link) => {
 								const linkedPath = followableMarkdownFile(link);
 								return linkedPath
-									? !visited.has(linkedPath)
+									? !visited.has(linkedPath) && readBoundary.permits(linkedPath)
 									: link.scope === "cross-document" &&
 											link.anchorType !== null &&
 											link.validation.status !== "error" &&
@@ -690,7 +724,11 @@ export class JactCli {
 						for (const link of validation.links) {
 							links.push(link);
 							const linkedPath = followableMarkdownFile(link);
-							if (linkedPath && !visited.has(linkedPath)) {
+							if (
+								linkedPath &&
+								!visited.has(linkedPath) &&
+								readBoundary.permits(linkedPath)
+							) {
 								visited.add(linkedPath);
 								next.push(linkedPath);
 							}
@@ -699,10 +737,12 @@ export class JactCli {
 					frontier = next;
 				}
 			}
-			const result = await this.contentExtractor.extractContent(links, {
-				...options,
-				fullFiles: true,
-			});
+			const result = await this.contentExtractor.extractContent(
+				links,
+				{ ...options, fullFiles: true },
+				{ readBoundary },
+			);
+			reportBlockedReads(result);
 			if (depth === undefined) return { result, nextStepHints: [], failures: [] };
 			return {
 				result,
@@ -790,13 +830,11 @@ export class JactCli {
 	 *
 	 * @param filePath - Path to the markdown file to fix
 	 * @param options - Fix options (scope, dryRun, etc.)
-	 * @param _fs - Optional fs overrides for testing (read/write functions)
 	 * @returns Fix report string, dry-run diff string, or error string
 	 */
 	async fix(
 		filePath: string,
 		options: CliValidateOptions = {},
-		_fs?: FixFsOverrides,
 	): Promise<string> {
 		return applyCitationFixes(
 			{
@@ -806,7 +844,6 @@ export class JactCli {
 			},
 			filePath,
 			options,
-			_fs,
 		);
 	}
 }
@@ -834,8 +871,24 @@ function linkFailures(result: OutgoingLinksExtractedContent): string[] {
 		const location = source
 			? `${path.relative(process.cwd(), source)}:${entry.sourceLink.line}`
 			: "linked content";
-		return [`${location} — ${entry.failureDetails?.reason ?? "unknown error"}`];
+		return [
+			terminalText(
+				`${location} — ${entry.failureDetails?.reason ?? "unknown error"}`,
+			),
+		];
 	});
+}
+
+/** Tell the user which link targets the read boundary blocked. Output goes to stderr. */
+function reportBlockedReads(result: OutgoingLinksExtractedContent): void {
+	for (const entry of result.outgoingLinksReport.processedLinks) {
+		if (entry.failureDetails?.reason !== BLOCKED_READ_REASON) continue;
+		const source = entry.sourceLink.source.path.absolute;
+		const location = source
+			? `${path.relative(process.cwd(), source)}:${entry.sourceLink.line}`
+			: "linked content";
+		console.error(`${location} — ${BLOCKED_READ_REASON}`);
+	}
 }
 
 /**
@@ -848,17 +901,21 @@ export function linkedContentHints(
 	unfollowedDeeperFiles: number,
 ): string[] {
 	const [subcommand, targetFile, ...rest] = commandArgs;
-	const file = shellFileArgument(targetFile);
-	const command = [`jact extract ${subcommand} ${file}`, ...rest.map(quote)].join(" ");
+	const deeper = shellCommand(
+		`jact extract ${subcommand}`,
+		[targetFile, ...rest],
+		[["--extract-linked-content", String(depth + 1)]],
+	);
+	const review = shellCommand("jact extract links", [targetFile], [["--verbose"]]);
 	return [
 		...(unfollowedDeeperFiles > 0
 			? [
 					`[+] ${unfollowedDeeperFiles} linked file(s) contain further links not extracted (depth limit ${depth})`,
-					`To Go Deeper: run \`${command} --extract-linked-content ${depth + 1}\``,
+					`To Go Deeper: run \`${deeper}\``,
 				]
 			: []),
 		'To Extract One Link Target: run `jact extract file "{{linked-file-path}}" --extract-linked-content`',
-		`To Review Links First: run \`jact extract links ${file} --verbose\``,
+		`To Review Links First: run \`${review}\``,
 		"To Read Around a Source or Via Line: open that `file:line` with your file-read tool (e.g. Read with offset = line)",
 	];
 }

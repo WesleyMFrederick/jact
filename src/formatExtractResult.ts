@@ -1,11 +1,12 @@
 import path from "node:path";
+import { decodeUrlAnchor } from "./core/ContentExtractor/normalizeAnchor.js";
 import type {
 	HeaderExtractionResult,
 	LinkedContentSource,
 	LinkedHeaderContextResult,
 	OutgoingLinksExtractedContent,
 } from "./types/extraction-types.js";
-import { shellFileArgument, shellTextArgument } from "./shellArgument.js";
+import { shellCommand, terminalText } from "./shellArgument.js";
 export interface FormatExtractOptions {
 	lineNumbers?: boolean;
 	/** Prefix each markdown block with `Source:` (and `Via:` for linked blocks) lines. */
@@ -33,7 +34,9 @@ function blockLocation(
 	);
 	const target = entry?.sourceLink.target.path.absolute;
 	if (!entry || !target) return undefined;
-	const targetPath = path.relative(process.cwd(), decodeURIComponent(target));
+	// Malformed percent-encoding keeps the raw text instead of throwing.
+	const decodedTarget = decodeUrlAnchor(target) ?? target;
+	const targetPath = path.relative(process.cwd(), decodedTarget);
 	const lineCount =
 		content.split("\n").length - (content.endsWith("\n") ? 1 : 0);
 	const lines =
@@ -47,18 +50,20 @@ function blockLocation(
 	const viaLabel =
 		via &&
 		entry.sourceLink.line > 0 &&
-		path.resolve(via) !== path.resolve(decodeURIComponent(target))
+		path.resolve(via) !== path.resolve(decodedTarget)
 			? `${path.relative(process.cwd(), via)}:${entry.sourceLink.line}`
 			: undefined;
-	const file = shellFileArgument(targetPath);
 	const { anchorType } = entry.sourceLink;
 	const { anchor } = entry.sourceLink.target;
 	const load =
 		anchorType === "header" && anchor
-			? `jact extract header ${file} ${shellTextArgument(decodeURIComponent(anchor))}`
+			? shellCommand("jact extract header", [
+					targetPath,
+					decodeUrlAnchor(anchor) ?? anchor,
+				])
 			: anchorType === null
-				? `jact extract file ${file}`
-				: `read ${targetPath}${lines}`;
+				? shellCommand("jact extract file", [targetPath])
+				: `read ${terminalText(targetPath)}${lines}`;
 	return { source: `${targetPath}${lines}`, via: viaLabel, load };
 }
 
@@ -89,9 +94,9 @@ function loadCommand(
 	lines: string,
 ): string {
 	if (kind === "header" && heading)
-		return `jact extract header ${shellFileArgument(file)} ${shellTextArgument(heading)}`;
-	if (kind === "file") return `jact extract file ${shellFileArgument(file)}`;
-	return `read ${file}${lines}`;
+		return shellCommand("jact extract header", [file, heading]);
+	if (kind === "file") return shellCommand("jact extract file", [file]);
+	return `read ${terminalText(file)}${lines}`;
 }
 
 function linkedContentMapRows(result: LinkedHeaderContextResult): string[] {
@@ -281,7 +286,7 @@ function formatLinkedContext(
 			notFollowed
 				.map(
 					(link) =>
-						`- ${link.source.file}:${link.source.line} — ${link.reason ?? "not followed"} — ${link.source.raw}`,
+						`- ${link.source.file}:${link.source.line} — ${link.reason ?? "not followed"} — ${terminalText(link.source.raw)}`,
 				)
 				.join("\n"),
 		);
@@ -305,7 +310,7 @@ function backlinksMarkdown(result: LinkedHeaderContextResult): string {
 	return result.backlinks
 		.map(
 			(backlink) =>
-				`- ${backlink.source.file}:${backlink.source.line} — ${backlink.source.raw}`,
+				`- ${backlink.source.file}:${backlink.source.line} — ${terminalText(backlink.source.raw)}`,
 		)
 		.join("\n");
 }
@@ -317,7 +322,7 @@ function failuresMarkdown(result: LinkedHeaderContextResult): string {
 				failure.source === undefined
 					? "linked context"
 					: `${failure.source.file}:${failure.source.line}`;
-			return `- ${location} — ${failure.reason}`;
+			return `- ${location} — ${terminalText(failure.reason)}`;
 		})
 		.join("\n");
 }

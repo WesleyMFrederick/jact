@@ -199,12 +199,11 @@ export class CitationValidator {
 				kind: "file",
 				filePath: targetFile,
 			});
-			const matches = this.anchorMatcher.findMatchingAnchors(
-				citation.target.anchor,
-				document.data.anchors.filter(
-					(anchor) => anchor.anchorType === citation.anchorType,
-				),
-			);
+			// Match against the parsed list so the matcher reuses its anchor index.
+			// Each anchor matches on its own, so filtering after the match is the same.
+			const matches = this.anchorMatcher
+				.findMatchingAnchors(citation.target.anchor, document.data.anchors)
+				.filter(({ anchor }) => anchor.anchorType === citation.anchorType);
 			const targets: ResolvedCitationTarget[] = [];
 			for (const { anchor } of matches) {
 				if (anchor.anchorType === "block") {

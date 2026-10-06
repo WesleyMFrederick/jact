@@ -14,6 +14,7 @@ import type { EnrichedLinkObject } from "../../types/validationTypes.js";
 import { analyzeEligibility } from "./analyzeEligibility.js";
 import { generateContentId } from "./generateContentId.js";
 import { decodeUrlAnchor, normalizeBlockId } from "./normalizeAnchor.js";
+import { BLOCKED_READ_REASON } from "./readBoundary.js";
 
 /**
  * Consumer-defined interface for the parsed-document lifecycle dependency.
@@ -69,11 +70,12 @@ export class ContentExtractor {
 	/**
 	 * Extract content from pre-validated enriched links.
 	 * Validation completes before the CLI passes enriched links here.
+	 * Targets outside `runOptions.readBoundary` are skipped and not read.
 	 */
 	async extractContent(
 		enrichedLinks: EnrichedLinkObject[],
 		cliFlags: CliFlags,
-		runOptions: ExtractionRunOptions = {},
+		runOptions: ExtractionRunOptions,
 	): Promise<OutgoingLinksExtractedContent> {
 		const candidateLinks = runOptions.includeInternal
 			? enrichedLinks
@@ -138,7 +140,19 @@ export class ContentExtractor {
 					});
 					continue;
 				}
-				const decodedPath = decodeURIComponent(link.target.path.absolute);
+				// Malformed percent-encoding keeps the raw path instead of throwing.
+				const decodedPath =
+					decodeUrlAnchor(link.target.path.absolute) ??
+					link.target.path.absolute;
+				if (!runOptions.readBoundary.permits(decodedPath)) {
+					processedLinks.push({
+						sourceLink: link,
+						contentId: null,
+						status: "skipped",
+						failureDetails: { reason: BLOCKED_READ_REASON },
+					});
+					continue;
+				}
 				const targetDoc = await this.parsedDocuments.resolveDocument({
 					kind: "file",
 					filePath: decodedPath,

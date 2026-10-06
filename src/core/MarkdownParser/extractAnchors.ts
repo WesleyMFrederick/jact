@@ -1,6 +1,6 @@
 import type { Root } from "mdast";
 import type { Position } from "unist";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import type { AnchorObject } from "../../types/citationTypes.js";
 import { headingRaw, headingText } from "./extractHeadings.js";
 
@@ -54,7 +54,7 @@ export function extractAnchors(ast: Root, content: string): AnchorObject[] {
 	// caret run left-to-right, then emphasis-marked highlights.
 	const caretByLine = new Map<number, PositionedNode[]>();
 	const highlightByLine = new Map<number, PositionedNode[]>();
-	visit(ast, (node) => {
+	visitParents(ast, (node) => {
 		const positioned = node as unknown as PositionedNode;
 		const startLine = positioned.position?.start.line;
 		if (startLine === undefined) return;
@@ -146,7 +146,7 @@ export function extractAnchors(ast: Root, content: string): AnchorObject[] {
 	// Header anchors from the mdast tree. Only ATX headings (`# …`) produce a
 	// header anchor — matching the prior contract, where setext headings were
 	// skipped by the `^#+\s` line probe.
-	visit(ast, "heading", (node) => {
+	visitParents(ast, "heading", (node) => {
 		const raw = headingRaw(node, content);
 		if (!/^#{1,6}[ \t]/.test(raw)) return;
 

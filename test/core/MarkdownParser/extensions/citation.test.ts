@@ -1,5 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import { describe, expect, it } from "vitest";
 import {
 	citationFromMarkdown,
@@ -15,7 +15,7 @@ function parse(md: string) {
 
 function collectCitations(md: string) {
 	const found: { value: string; span: [number, number] }[] = [];
-	visit(parse(md), "citation", (node) => {
+	visitParents(parse(md), "citation", (node) => {
 		// biome-ignore lint/suspicious/noExplicitAny: custom node
 		const n = node as any;
 		found.push({
@@ -45,7 +45,7 @@ describe("citation extension ([cite: path])", () => {
 
 	it("leaves normal links parseable when citation syntax is active", () => {
 		let links = 0;
-		visit(parse("[text](file.md) and [cite: x.md]"), "link", () => {
+		visitParents(parse("[text](file.md) and [cite: x.md]"), "link", () => {
 			links += 1;
 		});
 		expect(links).toBe(1);

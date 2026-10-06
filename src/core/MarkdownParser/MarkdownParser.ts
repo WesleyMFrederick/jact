@@ -20,6 +20,9 @@ import { extractHeadings } from "./extractHeadings.js";
 import { extractLinks } from "./extractLinks.js";
 import { adaptMdastToParserOutput } from "./mdastAdapter.js";
 
+// Largest Markdown input jact parses. Parse time and memory grow fast with size.
+export const MAX_MARKDOWN_FILE_BYTES = 8 * 1024 * 1024;
+
 /**
  * File system interface for dependency injection.
  * Matches Node.js fs module subset used by MarkdownParser.
@@ -119,6 +122,11 @@ export class MarkdownParser {
 	 * @param filePath - Source path used for link resolution (defaults to "inline.md")
 	 */
 	parseContent(content: string, filePath = "inline.md"): ParserOutput {
+		if (Buffer.byteLength(content, "utf8") > MAX_MARKDOWN_FILE_BYTES) {
+			throw new Error(
+				`Skipped ${filePath}: file is larger than ${MAX_MARKDOWN_FILE_BYTES / 1024 / 1024} MiB.`,
+			);
+		}
 		const ast = this.parse(content);
 		const parsed = adaptMdastToParserOutput(
 			ast,

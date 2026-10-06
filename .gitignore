@@ -113,3 +113,6 @@ tmp/appmap/
 
 # Tracked git hooks (re-included against dot-file ignore rules)
 !.githooks/
+
+# GitHub Actions workflows and Dependabot config (re-included against dot-file ignore rules)
+!.github/

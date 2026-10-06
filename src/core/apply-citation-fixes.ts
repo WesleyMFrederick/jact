@@ -8,7 +8,15 @@
  * here; no behavior change.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import {
+	lstatSync,
+	readFileSync,
+	realpathSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import type { FileCache } from "../FileCache.js";
 import type { ParsedFileCache } from "../ParsedFileCache.js";
@@ -31,12 +39,6 @@ export interface ApplyCitationFixesDeps {
 	parsedDocuments: ParsedFileCache;
 }
 
-/** fs functions fix() can override for test isolation, matching JactCli.fix()'s `_fs` param. */
-export interface FixFsOverrides {
-	readFileSync?: (p: string, enc: BufferEncoding) => string;
-	writeFileSync?: (p: string, data: string, enc: BufferEncoding) => void;
-}
-
 /** True when the validator reported an anchor error that `--fix` can rewrite. */
 const isAnchorFixable = (link: EnrichedLinkObject): boolean =>
 	link.validation.status === "error" &&
@@ -49,9 +51,74 @@ const isAnchorFixable = (link: EnrichedLinkObject): boolean =>
 					link.validation.suggestion.includes("Available headers:")))));
 
 /**
+ * Write the fixed content safely and return the backup path, or null.
+ *
+ * The target must be a regular file, not a symbolic link. Its real path must
+ * be inside the real scope root. The backup never replaces an existing path.
+ * The new content goes to a temporary file in the same folder. A rename then
+ * replaces the target in one step.
+ */
+function writeFixedFile(
+	filePath: string,
+	scopeRoot: string,
+	originalContent: string,
+	fixedContent: string,
+	backup: boolean,
+): string | null {
+	const stats = lstatSync(filePath);
+	if (stats.isSymbolicLink()) {
+		throw new Error(
+			`Refused: ${filePath} is a symbolic link. jact --fix does not write through links.`,
+		);
+	}
+	const realFile = realpathSync(filePath);
+	const realRoot = realpathSync(scopeRoot);
+	const relative = path.relative(realRoot, realFile);
+	if (
+		relative === ".." ||
+		relative.startsWith(`..${path.sep}`) ||
+		path.isAbsolute(relative)
+	) {
+		throw new Error(
+			`Refused: ${filePath} is outside the scope ${realRoot}. Pass --scope with a folder that contains the file.`,
+		);
+	}
+	const mode = stats.mode & 0o777;
+
+	// The "wx" flag fails when the path exists, also when it is a symbolic link.
+	const backupPath = backup ? `${filePath}.${Date.now()}.bak` : null;
+	if (backupPath !== null) {
+		try {
+			writeFileSync(backupPath, originalContent, { flag: "wx", mode });
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+				throw new Error(
+					`Refused: backup path ${backupPath} already exists. jact --fix does not replace it.`,
+				);
+			}
+			throw error;
+		}
+	}
+
+	const tempPath = path.join(
+		path.dirname(realFile),
+		`.${path.basename(realFile)}.${randomUUID()}.tmp`,
+	);
+	try {
+		writeFileSync(tempPath, fixedContent, { flag: "wx", mode });
+		renameSync(tempPath, realFile);
+	} catch (error) {
+		rmSync(tempPath, { force: true });
+		throw error;
+	}
+	return backupPath;
+}
+
+/**
  * Validate citations in filePath, auto-fix path/anchor issues, write in-place.
  *
  * Safety features:
+ * - Refuses to write through symbolic links or outside the scope root.
  * - Writes a timestamped `.bak` backup before any file mutation, unless `options.backup` is false.
  * - Skips fixes that leave a citation unchanged; they are not counted or reported.
  * - When `options.dryRun` is true, returns a diff without writing any files.
@@ -60,17 +127,14 @@ const isAnchorFixable = (link: EnrichedLinkObject): boolean =>
  * @param deps - Shared JactCli instances (validator, fileCache) this needs
  * @param filePath - Path to the markdown file to fix
  * @param options - Fix options (scope, dryRun, etc.)
- * @param _fs - Optional fs overrides for testing (read/write functions)
  * @returns Fix report string, dry-run diff string, or error string
  */
 export async function applyCitationFixes(
 	deps: ApplyCitationFixesDeps,
 	filePath: string,
 	options: CliValidateOptions = {},
-	_fs?: FixFsOverrides,
 ): Promise<string> {
-	const fsRead = _fs?.readFileSync ?? readFileSync;
-	const fsWrite = _fs?.writeFileSync ?? writeFileSync;
+	const fsRead = readFileSync;
 	try {
 		if (options.scope) {
 			const cacheStats = deps.fileCache.buildCache(
@@ -143,6 +207,7 @@ export async function applyCitationFixes(
 		if (needsPathFix && !options.scope) {
 			return `ERROR: Path corrections require --scope. Re-run with --scope <folder> to enable filename resolution.`;
 		}
+
 
 		let fileContent = originalContent;
 		let fixesApplied = 0;
@@ -228,13 +293,19 @@ export async function applyCitationFixes(
 				return output.join("\n") + diagnostics;
 			}
 
-			// Write backup before mutating the file, unless --no-backup
-			const backupPath =
-				options.backup === false ? null : `${filePath}.${Date.now()}.bak`;
-			if (backupPath !== null) fsWrite(backupPath, originalContent, "utf8");
-
-			// Apply fix
-			fsWrite(filePath, fileContent, "utf8");
+			const scopeRoot =
+				options.scope ??
+				resolveScope({ cwd: process.cwd(), targetFile: filePath }).scope;
+			if (scopeRoot === "") {
+				return `ERROR: Refused: cannot resolve a scope for ${filePath}. Pass --scope <folder>.`;
+			}
+			const backupPath = writeFixedFile(
+				filePath,
+				scopeRoot,
+				originalContent,
+				fileContent,
+				options.backup !== false,
+			);
 
 			const output = [
 				`Fixed ${fixesApplied} citation${fixesApplied === 1 ? "" : "s"} in ${filePath}:`,

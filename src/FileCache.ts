@@ -135,6 +135,7 @@ export class FileCache {
 			targetScanFolder,
 			targetScanFolder,
 			ignoreRules,
+			new Set<string>(),
 			includeDir,
 			defaultRules,
 		);
@@ -245,10 +246,15 @@ export class FileCache {
 		dirPath: string,
 		scanRoot: string,
 		ignoreRules: Ignore,
+		visitedRealDirs: Set<string>,
 		alwaysIncludeDir?: string,
 		defaultRules?: Ignore,
 	): void {
 		try {
+			// Scan each real directory once. This stops symlink loops.
+			const realDir = this.fs.realpathSync(dirPath);
+			if (visitedRealDirs.has(realDir)) return;
+			visitedRealDirs.add(realDir);
 			const entries = this.fs.readdirSync(dirPath);
 
 			for (const entry of entries) {
@@ -288,6 +294,7 @@ export class FileCache {
 						fullPath,
 						scanRoot,
 						ignoreRules,
+						visitedRealDirs,
 						alwaysIncludeDir,
 						defaultRules,
 					);

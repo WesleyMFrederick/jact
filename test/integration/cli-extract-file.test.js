@@ -232,7 +232,7 @@ describe("CLI extract file --extract-linked-content", () => {
 		expect(stdout).toContain("# Content map");
 		expect(stdout).not.toContain("Part body");
 		expect(stdout).toContain("`jact extract file a.md`");
-		expect(stdout).toContain('`jact extract header b.md "Part"`');
+		expect(stdout).toContain("`jact extract header b.md Part`");
 		const { stdout: section } = await execAsync(
 			`node "${CLI_PATH}" extract header b.md "Part"`,
 			{ cwd: dir },
@@ -247,11 +247,11 @@ describe("CLI extract file --extract-linked-content", () => {
 		writeFileSync(join(scope, "package.json"), "{}");
 		writeFileSync(
 			join(scope, "root.md"),
-			"# Root\n\n[Locked](../locked.md) [Gone](gone.md) [A](a.md)\n",
+			"# Root\n\n[Locked](locked.md) [Gone](gone.md) [A](a.md)\n",
 		);
 		writeFileSync(join(scope, "a.md"), "# A\n\nA body\n");
-		writeFileSync(join(dir, "locked.md"), "# Locked\n");
-		chmodSync(join(dir, "locked.md"), 0o000);
+		writeFileSync(join(scope, "locked.md"), "# Locked\n");
+		chmodSync(join(scope, "locked.md"), 0o000);
 
 		try {
 			const failure = await run(scope, "--extract-linked-content").catch(
@@ -271,7 +271,7 @@ describe("CLI extract file --extract-linked-content", () => {
 			expect(() => JSON.parse(json.stdout)).not.toThrow();
 			expect(json.stderr).toMatch(/Failures:\n- root\.md:3 — EACCES/);
 		} finally {
-			chmodSync(join(dir, "locked.md"), 0o600);
+			chmodSync(join(scope, "locked.md"), 0o600);
 		}
 	});
 });

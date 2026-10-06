@@ -5,6 +5,10 @@ import {
 	createMarkdownParser,
 	createParsedFileCache,
 } from "../../src/factories/componentFactory.js";
+import { ReadBoundary } from "../../src/core/ContentExtractor/readBoundary.js";
+
+/** Boundary that permits every path. Unit tests do not exercise confinement. */
+export const OPEN_READ_BOUNDARY = new ReadBoundary(["/"]);
 
 export function createCitationHarness(overrides = {}) {
 	const fileCache = overrides.fileCache ?? createFileCache();
@@ -45,7 +49,9 @@ export async function extractDocumentLinks(
 		parsedDocuments,
 		sourceFile,
 	);
-	return extractor.extractContent(validation.links, flags);
+	return extractor.extractContent(validation.links, flags, {
+		readBoundary: OPEN_READ_BOUNDARY,
+	});
 }
 
 export function createExtractionHarness(overrides = {}) {

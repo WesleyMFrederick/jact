@@ -1,4 +1,5 @@
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
+import { terminalText } from "./shellArgument.js";
 import type {
 	DuplicatePathSuggestion,
 	ValidationMetadata,
@@ -48,9 +49,9 @@ export function formatForCLI(
 		for (const [index, link] of errorLinks.entries()) {
 			const isLast = index === errorLinks.length - 1;
 			const prefix = isLast ? "└─" : "├─";
-			lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
+			lines.push(`${prefix} Line ${link.line}: ${terminalText(link.fullMatch)}`);
 			if (link.validation.status === "error") {
-				lines.push(`│  └─ ${link.validation.error}`);
+				lines.push(`│  └─ ${terminalText(link.validation.error)}`);
 				const suggestion = renderValidationSuggestion(link.validation, true);
 				if (suggestion) {
 					lines.push(`│  └─ Suggestion: ${suggestion}`);
@@ -69,10 +70,10 @@ export function formatForCLI(
 		for (const [index, link] of warnLinks.entries()) {
 			const isLast = index === warnLinks.length - 1;
 			const prefix = isLast ? "└─" : "├─";
-			lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
+			lines.push(`${prefix} Line ${link.line}: ${terminalText(link.fullMatch)}`);
 			if (link.validation.status === "warning") {
 				if (link.validation.message) {
-					lines.push(`│  └─ ${link.validation.message}`);
+					lines.push(`│  └─ ${terminalText(link.validation.message)}`);
 				}
 				const suggestion = renderValidationSuggestion(link.validation, true);
 				if (suggestion) {
@@ -92,7 +93,7 @@ export function formatForCLI(
 		for (const [index, link] of validLinks.entries()) {
 			const isLast = index === validLinks.length - 1;
 			const prefix = isLast ? "└─" : "├─";
-			lines.push(`${prefix} Line ${link.line}: ${link.fullMatch}`);
+			lines.push(`${prefix} Line ${link.line}: ${terminalText(link.fullMatch)}`);
 		}
 		lines.push("");
 	}
@@ -167,9 +168,9 @@ export function formatForCLIMinimal(
 			(link) => link.validation.status === "error",
 		);
 		for (const link of errorLinks) {
-			lines.push(`- Line ${link.line}: ${link.fullMatch}`);
+			lines.push(`- Line ${link.line}: ${terminalText(link.fullMatch)}`);
 			if (link.validation.status === "error") {
-				lines.push(`  error: ${link.validation.error}`);
+				lines.push(`  error: ${terminalText(link.validation.error)}`);
 				const suggestion = renderValidationSuggestion(link.validation, false);
 				if (suggestion) {
 					lines.push(`  suggestion: ${suggestion}`);
@@ -188,10 +189,10 @@ export function formatForCLIMinimal(
 			(link) => link.validation.status === "warning",
 		);
 		for (const link of warnLinks) {
-			lines.push(`- Line ${link.line}: ${link.fullMatch}`);
+			lines.push(`- Line ${link.line}: ${terminalText(link.fullMatch)}`);
 			if (link.validation.status === "warning") {
 				if (link.validation.message) {
-					lines.push(`  message: ${link.validation.message}`);
+					lines.push(`  message: ${terminalText(link.validation.message)}`);
 				}
 				const suggestion = renderValidationSuggestion(link.validation, false);
 				if (suggestion) {
@@ -234,14 +235,14 @@ function renderDuplicatePathSuggestion(
 ): string {
 	const candidates = verbose ? details.candidates : details.candidates.slice(0, 5);
 	const candidateLines = candidates
-		.map((candidate) => `  ${candidate}`)
+		.map((candidate) => `  ${terminalText(candidate)}`)
 		.join("\n");
 	const omitted = details.total - candidates.length;
 	const omittedLine =
 		!verbose && omitted > 0
 			? `\n  ... ${omitted} more matches; use --verbose to show all or --scope to narrow`
 			: "";
-	return `'${details.filename}' matched ${details.total} files; closest matches:\n${candidateLines}${omittedLine} ${details.debugInfo}`;
+	return `'${terminalText(details.filename)}' matched ${details.total} files; closest matches:\n${candidateLines}${omittedLine} ${terminalText(details.debugInfo)}`;
 }
 
 function renderValidationSuggestion(
@@ -255,7 +256,9 @@ function renderValidationSuggestion(
 			verbose,
 		);
 	}
-	return validation.suggestion;
+	return validation.suggestion === undefined
+		? undefined
+		: terminalText(validation.suggestion);
 }
 
 /**

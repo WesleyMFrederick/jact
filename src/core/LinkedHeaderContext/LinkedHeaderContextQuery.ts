@@ -10,6 +10,7 @@ import type {
 	LinkedContextTarget,
 	LinkedHeaderContextInput,
 	LinkedHeaderContextResult,
+	ExtractionRunOptions,
 	OutgoingLinksExtractedContent,
 } from "../../types/extraction-types.js";
 import type {
@@ -19,6 +20,7 @@ import type {
 } from "../../types/validationTypes.js";
 import { enrichLinkObject } from "../CitationValidator/CitationValidator.js";
 import { generateContentId } from "../ContentExtractor/generateContentId.js";
+import { BLOCKED_READ_REASON } from "../ContentExtractor/readBoundary.js";
 import type { BacklinkCandidateFilterLike } from "./BacklinkCandidateFilter.js";
 
 interface ParsedDocumentLifecycleLike {
@@ -40,7 +42,7 @@ interface ContentExtractorLike {
 	extractContent(
 		links: EnrichedLinkObject[],
 		cliFlags: CliFlags,
-		options?: { includeInternal?: boolean },
+		options: ExtractionRunOptions,
 	): Promise<OutgoingLinksExtractedContent>;
 }
 
@@ -145,6 +147,14 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 							});
 							continue;
 						}
+						if (!input.readBoundary.permits(targetFile)) {
+							outgoingLinks.push({
+								source,
+								status: "not-followed",
+								reason: BLOCKED_READ_REASON,
+							});
+							continue;
+						}
 						let document: ParsedDocument;
 						try {
 							document = await this.parsedDocuments.resolveDocument({
@@ -195,6 +205,14 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 						failures.push({ source, reason });
 						continue;
 					}
+					if (!input.readBoundary.permits(resolution.target.filePath)) {
+						outgoingLinks.push({
+							source,
+							status: "not-followed",
+							reason: BLOCKED_READ_REASON,
+						});
+						continue;
+					}
 					const enriched = enrichLinkObject(link, { status: "valid" });
 					const extraction = await this.contentExtractor.extractContent(
 						[
@@ -211,7 +229,7 @@ export class LinkedHeaderContextQuery implements LinkedHeaderContextQueryLike {
 							},
 						],
 						{},
-						{ includeInternal: true },
+						{ includeInternal: true, readBoundary: input.readBoundary },
 					);
 					const target = this.publicTarget(input.scopePath, resolution.target);
 					const processed = extraction.outgoingLinksReport.processedLinks[0];

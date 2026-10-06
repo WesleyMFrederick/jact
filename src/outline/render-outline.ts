@@ -1,3 +1,4 @@
+import { terminalQuote } from "../shellArgument.js";
 import type { HeadingObject } from "../types/citationTypes.js";
 
 export interface HeadingTreeNode {
@@ -143,14 +144,14 @@ export function renderOutline(
 		const node = nodes[index];
 		if (!node || !visible.has(index)) return;
 		const marker = collapsed.has(index) ? " [*]" : "";
-		const headingText = `${prefix}${connector}${JSON.stringify(node.heading.text)}${marker}`;
+		const headingText = `${prefix}${connector}${terminalQuote(node.heading.text)}${marker}`;
 		if (!options.lineNumber) {
 			lines.push(headingText);
 		} else {
 			const line = node.heading.position?.start.line;
 			if (line === undefined) {
 				throw new Error(
-					`Cannot render line numbers: heading ${JSON.stringify(node.heading.text)} has no parser source position.`,
+					`Cannot render line numbers: heading ${terminalQuote(node.heading.text)} has no parser source position.`,
 				);
 			}
 			lines.push(`${String(line).padStart(6)}  ${headingText}`);

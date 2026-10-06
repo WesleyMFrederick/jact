@@ -32,6 +32,9 @@ export type ResolvedPath =
 const SUGGESTION_THRESHOLD_FLOOR = 3;
 const SUGGESTION_THRESHOLD_CEIL = 10;
 const SUGGESTION_THRESHOLD_RATIO = 0.2;
+// Longest file name that fuzzy matching compares. Edit-distance cost grows with
+// the product of both lengths, so longer names get no suggestion.
+const MAX_FUZZY_NAME_LENGTH = 256;
 
 /**
  * Constrain a number to the inclusive range [lo, hi].
@@ -80,7 +83,10 @@ export function resolveWikiPath(
 	let bestLocal: { path: string; distance: number } | null = null;
 	const candidatesWithDistance: Array<{ path: string; distance: number }> = [];
 
-	for (const entry of fileCache.getEntries()) {
+	const fuzzyEntries =
+		slugPath.length > MAX_FUZZY_NAME_LENGTH ? [] : fileCache.getEntries();
+	for (const entry of fuzzyEntries) {
+		if (entry.basename.length > MAX_FUZZY_NAME_LENGTH) continue;
 		const lenDiff = Math.abs(slugPath.length - entry.basename.length);
 		// Ceiling pre-filter: skip entries that cannot match at any threshold (max is CEIL × 1.5)
 		if (lenDiff > SUGGESTION_THRESHOLD_CEIL * 1.5) continue;

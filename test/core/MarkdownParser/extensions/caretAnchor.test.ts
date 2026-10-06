@@ -1,5 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import { describe, expect, it } from "vitest";
 import {
 	caretAnchorFromMarkdown,
@@ -12,7 +12,7 @@ function collectAnchors(md: string) {
 		mdastExtensions: [caretAnchorFromMarkdown],
 	});
 	const found: { value: string; span: [number, number] }[] = [];
-	visit(tree, "caretAnchor", (node) => {
+	visitParents(tree, "caretAnchor", (node) => {
 		// biome-ignore lint/suspicious/noExplicitAny: custom node
 		const n = node as any;
 		found.push({

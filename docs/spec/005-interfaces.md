@@ -245,6 +245,7 @@ jact extract links <source-file> [options]
 | Flag | Default | Description |
 |---|---|---|
 | `--scope <folder>` | smart default | Folder search matches |
+| `--allow-read <dir>` | - | Also let links read files in `<dir>`. Repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction Read Boundary) |
 | `--format <type>` | `json` | Output format (reserved for future) |
 | `--full-files` | - | Enable full-file link extraction (default: sections only) |
 | `--session <id>` | - | Session ID for cache deduplication (skips extraction on cache hit) |
@@ -273,6 +274,8 @@ Builds a synthetic header link via `LinkObjectFactory.createHeaderLink()`, valid
 
 `--extract-linked-content [depth]` also extracts linked sections, blocks, and whole markdown files, following links to `depth` (default `1`, minimum `1`), and lists backlinks to the header across the scope. The markdown output labels every block with `Source: file:start-end` and, for linked blocks, `Via: file:line` (the link that pulled it in). The same next-step hints and `--max-chars` content map as [`jact extract file <target-file>`](#`jact extract file <target-file>`) apply; the header map keeps the backlinks and failures lists.
 
+`--allow-read <dir>` works as in [`jact extract links <source-file>`](#`jact extract links <source-file>`). Without it, linked targets outside the scope root are not read.
+
 **Exit codes:** `0` header extracted (and all linked content resolved); `1` header not found, validation failed, or some linked content failed to resolve; `2` system error.
 
 ```bash
@@ -293,6 +296,8 @@ jact extract file <target-file> [options]
 Builds a synthetic full-file link via `LinkObjectFactory.createFileLink()`, validates it, and extracts the entire file content. The default `markdown` output prefixes every line in `cat -n` format using its original one-based source line. `--format json` returns the structured extraction contract with raw, unnumbered content.
 
 `--extract-linked-content [depth]` also extracts what the file links to, following linked files up to `depth` levels (whole number ≥ 1; default `1`). Linked section and block links extract that section or block; full-file links to `.md` files extract the file and, while depth remains, its links. Each file is followed once, so link cycles end. Links marked `%%stop-extract-link%%` are neither extracted nor followed. Without the option, only the target file is extracted.
+
+Linked targets outside the scope root are not read or followed. `--allow-read <dir>` permits one more directory and is repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction Read Boundary).
 
 If a linked target cannot be extracted (file not found, anchor not found, or file not readable), jact still extracts the other links, lists each failed link as `file:line — reason` under `## Failures` (on stderr as `Failures:` for `json`), and exits `1`. Stop-marker links are intentional skips, not failures.
 
@@ -316,6 +321,14 @@ jact extract file docs/plan.md --extract-linked-content --max-chars 100000
 
 ---
 
+## Terminal Output Safety
+
+Commands that jact prints for you to run are safe to paste into Bash or Zsh. Retry commands, next-step hints, and content-map load commands put each document-derived argument in single quotes. A plain token such as `Guide` or `docs/a.md` stays bare. A control character goes in an octal `$'\ooo'` escape. If a positional argument starts with `-`, the options come first and `--` ends option parsing.
+
+Human-readable messages do not print raw control characters from documents or paths. jact shows each one as a visible `\uXXXX` escape. This stops document text from sending terminal escape sequences (ANSI codes) or fake extra lines. JSON and JSONL output is not changed. Extracted Markdown content is printed as it is in the source file.
+
+---
+
 ## Exit Codes
 
 | Code | When |
@@ -336,6 +349,7 @@ Single-file `validate` sets `process.exitCode` and does not call `process.exit()
 |---------|------|---------|
 | 1.0.0-draft | 2026-10-06 | Rename refuses the whole plan before writes when a note selected for reference edits resolves physically outside scope; internal shortcuts and unaffected external notes remain allowed |
 | 1.0.0-draft | 2026-10-06 | Approved plain-path validation and prose Markdown conversion contract; arbitrary-file rename/move with plain-path rewrites, exact resolution, suffix/command preservation, and post-transaction verification |
+| 1.0.0-draft | 2026-09-30 | Printed commands use single-quote shell quoting instead of JSON strings, so document text cannot run shell commands when pasted; human-readable messages escape control characters |
 | 1.0.0-draft | 2026-09-25 | Added `validate --fix --no-backup`; `--fix` no longer counts or reports fixes that leave a citation unchanged |
 | 1.0.0-draft | 2026-09-25 | Single-file `validate` writes its complete report to a piped stdout; before, output stopped at 64KB |
 | 1.0.0-draft | 2026-09-25 | `extract file --extract-linked-content` lists links it could not extract under `## Failures` and exits `1`, instead of skipping them without a message |

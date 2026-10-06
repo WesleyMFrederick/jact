@@ -118,7 +118,7 @@ describe("extract header --extract-linked-content", () => {
 		expect(execution.stdout).toContain("# Content map");
 		expect(execution.stdout).not.toContain("     3\t## Root");
 		expect(execution.stdout).toContain(
-			'`jact extract header test/fixtures/linked-header-context/root.md "Root"`',
+			"`jact extract header test/fixtures/linked-header-context/root.md Root`",
 		);
 		expect(execution.stdout).toContain("- backlinks.md:3 —");
 	});

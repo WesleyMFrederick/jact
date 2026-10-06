@@ -5,7 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 import { ContentExtractor } from "../../../src/core/ContentExtractor/ContentExtractor.js";
 import { SectionLinkStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/SectionLinkStrategy.js";
 import { StopMarkerStrategy } from "../../../src/core/ContentExtractor/eligibilityStrategies/StopMarkerStrategy.js";
-import { createExtractionHarness } from "../../helpers/workflow-harness.js";
+import {
+	createExtractionHarness,
+	OPEN_READ_BOUNDARY,
+} from "../../helpers/workflow-harness.js";
+
+const openRun = { readBoundary: OPEN_READ_BOUNDARY };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,7 +76,11 @@ describe("ContentExtractor", () => {
 			column: 1,
 		};
 
-		const result = await extractor.extractContent([link], { fullFiles: true });
+		const result = await extractor.extractContent(
+			[link],
+			{ fullFiles: true },
+			openRun,
+		);
 
 		expect(resolveDocument).toHaveBeenCalledWith({
 			kind: "file",
@@ -106,11 +115,15 @@ describe("ContentExtractor", () => {
 			extractionMarker: null,
 		};
 
-		const defaultResult = await extractor.extractContent([internalLink], {});
+		const defaultResult = await extractor.extractContent(
+			[internalLink],
+			{},
+			openRun,
+		);
 		const linkedResult = await extractor.extractContent(
 			[internalLink],
 			{},
-			{ includeInternal: true },
+			{ ...openRun, includeInternal: true },
 		);
 
 		expect(defaultResult.stats.totalLinks).toBe(0);
@@ -121,7 +134,11 @@ describe("ContentExtractor", () => {
 	it("exposes one extraction operation with the production result contract", async () => {
 		const extractor = new ContentExtractor([], { resolveDocument: vi.fn() });
 
-		const result = await extractor.extractContent([], { fullFiles: false });
+		const result = await extractor.extractContent(
+			[],
+			{ fullFiles: false },
+			openRun,
+		);
 
 		expect(result).toHaveProperty("extractedContentBlocks");
 		expect(result).toHaveProperty("outgoingLinksReport");
@@ -287,7 +304,11 @@ describe("ContentExtractor", () => {
 		it("should return _totalContentCharacterLength of 2 for empty extraction", async () => {
 			const extractor = new ContentExtractor([], { resolveDocument: vi.fn() });
 
-			const output = await extractor.extractContent([], { fullFiles: false });
+			const output = await extractor.extractContent(
+				[],
+				{ fullFiles: false },
+				openRun,
+			);
 
 			expect(output.extractedContentBlocks._totalContentCharacterLength).toBe(
 				2,
@@ -348,7 +369,7 @@ describe("ContentExtractor", () => {
 			);
 
 			// When: Extract content
-			const result = await extractor.extractContent(enrichedLinks, {});
+			const result = await extractor.extractContent(enrichedLinks, {}, openRun);
 
 			// Then: Calculate actual final JSON size
 			const actualJsonSize = JSON.stringify(

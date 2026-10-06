@@ -103,7 +103,7 @@ describe("CLI - extract header command", () => {
 		expect(output).toContain('"Install" is ambiguous');
 		expect(output).toContain('under "Guide"');
 		expect(output).toContain('under "Appendix"');
-		expect(output).toContain('--within "Guide"');
+		expect(output).toContain("--within Guide");
 		expect(output).not.toContain("Install on Linux.");
 	});
 

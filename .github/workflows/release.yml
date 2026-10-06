@@ -1,0 +1,81 @@
+name: Release
+
+# Publishes to npm when a maintainer publishes a GitHub release.
+# Configure npm trusted publishing for this file (release.yml) and the
+# npm-publish environment. Add a required reviewer to that environment.
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      # npm trusted publishing and provenance use the OpenID Connect token.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          # Never restore a cache in a release build.
+          package-manager-cache: false
+
+      # Trusted publishing needs npm 11.5.1 or later. Use the version that
+      # package.json packageManager names.
+      - name: Install the pinned npm version
+        run: |
+          NPM_VERSION="$(node -p "require('./package.json').packageManager.split('@')[1]")"
+          npm install --global --ignore-scripts "npm@${NPM_VERSION}"
+          npm --version
+
+      - name: Check that the release tag matches package.json
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "v${VERSION}" ]; then
+            echo "Release tag '$TAG' does not match package version 'v${VERSION}'." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies without install scripts
+        run: npm ci --ignore-scripts
+
+      - name: Clean build
+        run: npm run build
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Test
+        run: npm test
+
+      - name: Audit all dependencies
+        run: npm audit
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
+      - name: Verify registry signatures
+        run: npm audit signatures
+
+      - name: Smoke-test the packed package
+        run: bash scripts/smoke-pack.sh
+
+      # Scripts are off so npm publishes the exact build that passed the checks
+      # above. npm uses the OpenID Connect token; no npm token secret exists.
+      - name: Publish with provenance
+        run: npm publish --ignore-scripts --provenance --access public

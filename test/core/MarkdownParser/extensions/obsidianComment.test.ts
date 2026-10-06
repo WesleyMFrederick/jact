@@ -1,5 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import { describe, expect, it } from "vitest";
 import {
 	obsidianCommentFromMarkdown,
@@ -12,7 +12,7 @@ function collect(md: string) {
 		mdastExtensions: [obsidianCommentFromMarkdown],
 	});
 	const found: { value: string; span: [number, number] }[] = [];
-	visit(tree, "obsidianComment", (node) => {
+	visitParents(tree, "obsidianComment", (node) => {
 		// biome-ignore lint/suspicious/noExplicitAny: custom node
 		const n = node as any;
 		found.push({

@@ -1,5 +1,5 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import { describe, expect, it } from "vitest";
 import {
 	jactMdastExtensions,
@@ -15,7 +15,7 @@ function parseWithAll(md: string) {
 
 function typesIn(md: string) {
 	const found = new Set<string>();
-	visit(parseWithAll(md), (node) => {
+	visitParents(parseWithAll(md), (node) => {
 		found.add(node.type);
 	});
 	return found;
@@ -37,7 +37,7 @@ describe("assemble — combined Obsidian-style extension set", () => {
 
 	it("leaves standard markdown links intact alongside custom syntaxes", () => {
 		let links = 0;
-		visit(parseWithAll("[text](file.md) plus ==hi=="), "link", () => {
+		visitParents(parseWithAll("[text](file.md) plus ==hi=="), "link", () => {
 			links += 1;
 		});
 		expect(links).toBe(1);

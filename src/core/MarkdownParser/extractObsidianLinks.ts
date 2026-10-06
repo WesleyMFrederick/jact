@@ -6,7 +6,7 @@
 import type { Root } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import type { Position } from "unist";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
@@ -71,7 +71,7 @@ export function extractObsidianLinks(
 	const markers = sharedMarkers ?? collectExtractionMarkers(tree, source);
 	const lines = source.split(/\r?\n/);
 
-	visit(tree, "obsidianLink", (node) => {
+	visitParents(tree, "obsidianLink", (node) => {
 		const link = node as unknown as ObsidianLinkNode;
 
 		// Parse the tokenized raw match `[label](dest)` by slicing — a string

@@ -108,6 +108,27 @@ If no header matches after the replacement, the normal `Anchor not found` result
 
 Links that fail validation (`status === "error"`) are skipped before eligibility is even checked. Eligible links dispatch to `ParsedDocument.extractSection()`, `.extractBlock()`, or `.extractFullContent()` depending on `anchorType`, then get deduplicated by a SHA-256 content hash — a second link to already-extracted content increments `duplicateContentDetected`/`tokensSaved` instead of re-emitting the content.
 
+## Extraction Read Boundary
+
+Extraction reads a link target only when the target is inside a permitted directory. This rule applies to every target that comes from a link in Markdown: `extract links` (including `--full-files` and force markers), and `extract file` or `extract header` with `--extract-linked-content`. A file that the user names on the command line (`extract file <path>`, `extract header <path>`) is always permitted.
+
+- **Permitted directories.** The scope root (the `--scope` value or the inferred project root) is permitted. Each `--allow-read <dir>` adds one more directory. The flag is repeatable.
+- **Check.** jact resolves symlinks in the target and in each directory with `realpath`, then compares them with `path.relative`. Absolute paths, `~/` paths, `../` traversal, symbolic links to files or parent directories outside the root, and sibling folders that share a name prefix (`/proj-evil` next to `/proj`) are all outside.
+- **Result.** jact does not read a blocked target. The link gets status `skipped` with the reason `Blocked: target is outside the project. To allow, add --allow-read <dir>.` jact prints that reason on stderr with the source `file:line`. `extract file` does not follow links in a blocked file. In linked header output, the link shows as `not-followed` with the same reason. A blocked link is an intentional skip, so exit codes follow the existing rules for skipped links.
+- **Validation.** `validate` does not use this boundary.
+
+A link path with malformed percent-encoding (for example, `%E0%A4%A`) does not crash jact. Validation reports `Malformed percent-encoding in link path`. Output formatting keeps the raw text.
+
+## Input Size Limits
+
+jact uses fixed limits so that hostile or very large input cannot stop the process. Each limit is a constant in the module that owns it.
+
+- **Markdown file size.** jact does not parse a Markdown file larger than 8 MiB (`MAX_MARKDOWN_FILE_BYTES` in `src/core/MarkdownParser/MarkdownParser.ts`). The error is `Skipped <path>: file is larger than 8 MiB.` For a file named on the command line, the command exits with code `2`. For a link target, the link fails with that reason. Parse cost still grows with file size. A 4 MiB file that contains only links validates in about 13 seconds and uses about 3 GB of memory. A file of that kind near 8 MiB can need more memory than Node.js allows. Then the process stops with an out-of-memory error.
+- **Similar-anchor suggestions.** `ParsedDocument.findSimilarAnchors()` in `src/ParsedDocument.ts` skips an anchor longer than 256 characters (`MAX_FUZZY_ANCHOR_LENGTH`). It compares at most 1,000 anchors for each lookup (`MAX_FUZZY_ANCHOR_CANDIDATES`). It compares at most 20,000,000 character pairs for each target document (`MAX_FUZZY_ANCHOR_WORK`). After a limit, jact gives fewer suggestions or none. The `Anchor not found` error stays the same.
+- **Anchor lookup.** `AnchorMatcher` in `src/core/CitationValidator/AnchorMatcher.ts` normalizes each anchor one time for each parsed document. A link lookup reads only the anchors that share a text form with the link. Many broken links to a document with many headings stay fast.
+- **Similar wiki page names.** `resolveWikiPath()` in `src/core/MarkdownParser/resolveWikiPath.ts` does not compare a file name longer than 256 characters (`MAX_FUZZY_NAME_LENGTH`). Such a wiki link gets no page-name suggestion.
+- **Directory scan.** The `FileCache` scan in `src/FileCache.ts` reads each real directory (after `realpath`) one time. A symbolic link loop in the scope does not repeat the scan. A directory that two paths reach is scanned only through the first path.
+
 ## Citation Patterns Supported
 
 | Pattern | Example | Classification |
@@ -150,6 +171,7 @@ A valid Markdown image with bracketed description text, such as `![[caption]](fo
 | 1.0.0-draft | 2026-10-06 | Added exact plain-file-path validation and prose Markdown conversion; code and commands retain plain syntax, including uncertain command-shaped lines |
 | 1.0.0-draft | 2026-10-05 | Existing rename sources with glob characters remain literal; rollback continues restoring files after directory cleanup errors and reports incomplete recovery |
 | 1.0.0-draft | 2026-10-05 | `jact rename` accepts several sources, globs, and directories as one guarded batch with best-effort recovery; creates missing destination directories; refuses moves that would break inline or wiki image embeds |
+| 1.0.0-draft | 2026-09-30 | Added the extraction read boundary and `--allow-read`; malformed percent-encoding no longer crashes |
 | 1.0.0-draft | 2026-09-25 | Added `--fix --no-backup`; `--fix` skips fixes that leave a citation unchanged |
 | 1.0.0-draft | 2026-09-25 | Added the error and `--fix` correction for header anchors with characters Obsidian drops (`: # \| ^ [ ]`) |
 | 1.0.0-draft | 2026-08-24 | Added byte-screened backlink candidates with exhaustive fallback and unchanged output semantics |

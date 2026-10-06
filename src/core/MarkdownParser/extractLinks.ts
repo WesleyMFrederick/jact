@@ -2,7 +2,7 @@ import type { Root } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { toString as mdastToString } from "mdast-util-to-string";
 import type { Position } from "unist";
-import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
 import type { FileCache } from "../../FileCache.js";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
@@ -131,7 +131,7 @@ function extractLinksFromAst(
 	};
 
 	// Inline links: [text](url)
-	visit(ast, "link", (node) => {
+	visitParents(ast, "link", (node) => {
 		const text = mdastToString(node);
 		handleHref(node.url, text, sliceRaw(node, text), node.position);
 	});
@@ -139,7 +139,7 @@ function extractLinksFromAst(
 	// Link reference definitions: [label]: dest — micromark stores these as
 	// `definition` nodes (marked previously produced resolved link tokens). The dest carries
 	// the cross-document path (e.g. footnote definitions like `[^S-001]: path`).
-	visit(ast, "definition", (node) => {
+	visitParents(ast, "definition", (node) => {
 		handleHref(
 			node.url,
 			node.label ?? null,
@@ -182,7 +182,7 @@ function extractCiteAndCaretLinks(
 		else map.set(line, [node]);
 	};
 
-	visit(ast, (node) => {
+	visitParents(ast, (node) => {
 		const positioned = node as unknown as PositionedNode;
 		const startLine = positioned.position?.start.line;
 		if (startLine === undefined) return;
