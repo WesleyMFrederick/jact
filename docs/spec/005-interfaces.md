@@ -123,7 +123,7 @@ One complete compact JSON object per line, no summary line (`src/validate/render
 jact rename <source...> <destination> [options]
 ```
 
-Previews or applies one guarded batch move. Each source is a `.md` file, a quoted glob (expanded like `jact validate`), or a directory. The whole request is one plan: links between moved files, parsed incoming links from the rest of scope, and parsed cross-document links inside every moved file that changes directory are all rewritten relative to their new locations. Rewrites that would leave a link's text unchanged (for example, two siblings moved together) are not counted.
+Previews or applies one guarded batch move. Each source is a `.md` file, a quoted glob, or a directory. Existing source paths take literal precedence over glob expansion, including names containing brackets; only non-existing glob sources are expanded like `jact validate`. The whole request is one plan: links between moved files, parsed incoming links from the rest of scope, and parsed cross-document links inside every moved file that changes directory are all rewritten relative to their new locations. Rewrites that would leave a link's text unchanged (for example, two siblings moved together) are not counted.
 
 Destination rules, matching `mv`:
 
@@ -143,15 +143,16 @@ Missing destination directories are listed in the preview and created on `--fix`
 The plan is refused (exit `1`, nothing written) when:
 
 - a source does not exist, is outside scope, or is neither a `.md` file nor a directory
+- a source directory contains a symlink descendant, including a nested file or folder symlink; preview and `--fix` both report its path and refuse without writes
 - a glob matches no Markdown files
 - a destination exists, leaves scope, equals its source, or two sources map to the same destination
 - a directory would move into itself, one source sits inside another directory source, or one destination sits inside another moved directory
 - a moved file's outgoing cross-document link does not resolve, because its post-move relative path is unknown
 - a move would break an image embed (see below)
 
-**Non-Markdown files.** Links jact parses — `[text](file.pdf)`, `[[dir/file.png]]` — resolve to any existing file, so they are rewritten when that file moves with a directory, the same as Markdown targets. Image embeds (`![alt](path)`, `![[dir/file]]`) are not in jact's link model: rename cannot rewrite them and `jact validate` cannot check them. Before writing, rename scans every Markdown file in scope (and every moved one) for image embeds whose target would no longer resolve after the moves and refuses the plan, listing each `file:line`. Embeds inside a moved directory that point into the same tree keep working because the tree's shape is preserved, and bare-name `![[file.png]]` embeds resolve by name in Obsidian, so neither blocks a move.
+**Non-Markdown files.** Links jact parses — `[text](file.pdf)`, `[[dir/file.png]]` — resolve to any existing file, so they are rewritten when that file moves with a directory, the same as Markdown targets. Inline image embeds (`![alt](path)`) and wiki image embeds (`![[folder/image.png]]`) are not rewritten by rename. Rename scans every Markdown file in scope (and every moved one) for those embeds whose target would no longer resolve after the moves and refuses the plan before writing, listing each `file:line`. Reference-style images such as `![picture][pic]` use ordinary parsed definitions such as `[pic]: notes/p.png`; those definitions are rewritten when their target moves or their file changes directory. Embeds inside a moved directory that point into the same tree keep working because the tree's shape is preserved, and bare-name `![[file.png]]` embeds resolve by name in Obsidian, so neither blocks a move.
 
-On apply, jact backs up every edited file and every moved `.md` source file, stages edits, writes them, creates missing directories, moves files and whole directories, then re-parses and verifies every rewritten relationship. Any failure undoes completed moves, removes the created directories, restores edited files, and exits `2`; backups stay on disk. Backups of files inside a moved directory move with it, and reported backup paths are final locations.
+On apply, jact backs up every edited file and every moved `.md` source file, stages edits, writes them, creates missing directories, moves files and whole directories, then re-parses and verifies every rewritten relationship. On failure, recovery is best-effort: jact attempts to reverse every completed move, remove every created directory, and restore every edited file, continuing after recovery errors, and exits `2`. Nonempty created directories are retained rather than deleting files created by another process. Errors and retained backup paths are reported for manual recovery; successful recovery is not guaranteed. Backups of files inside a moved directory move with it, and reported backup paths reflect their retained locations.
 
 **JSON result.** One object per request: `scope`, `applied`, `moves` (`kind` `file` or `directory`, `source`, `destination`, and `movedFiles` for directories), `directories` (missing directories, outermost first), `links`, `files` (`path` at its final location, `links`), and `backups`. A single `.md` source without a glob also carries the original top-level `source` and `destination` fields; human output for that case keeps its `Source:`/`Destination:` lines, while batches print a `Moves:` list.
 

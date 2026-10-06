@@ -167,13 +167,13 @@ jact rename "concepts/*.md" archive/          # move every match of a glob
 jact rename notes/old-folder archive/ --fix   # move a whole folder (images included)
 ```
 
-Existing source paths are treated literally, even when their names contain glob characters such as brackets. With several sources or a glob, the destination is a folder and each file keeps its name. A folder moves into the destination if that folder exists, otherwise it becomes the destination. Missing folders are created on `--fix`.
+Existing source paths take literal precedence over glob expansion, even when their names contain glob characters such as brackets. Only non-existing glob sources are expanded. With several sources or a glob, the destination is a folder and each file keeps its name. A folder moves into the destination if that folder exists, otherwise it becomes the destination. Missing folders are created on `--fix`.
 
-A symlink is a file or folder shortcut that points to another location. If a source folder contains one, jact stops and reports its path. This rule applies to preview and `--fix`, including shortcuts in subfolders. No files are changed.
+A symlink is a file or folder shortcut that points to another location. If a source folder contains one, jact stops with exit code `1` and reports its path. This rule applies to preview and `--fix`, including file and folder shortcuts in subfolders. No files are changed.
 
-The whole command is one plan. Links between the moved files, links into them, and links out of them are all correct afterward. With `--fix`, jact makes backups, moves everything, updates the links, then checks every link again. If a step fails, it attempts to undo every change. A recovery error does not stop the remaining recovery steps; jact reports errors and retained backups for manual recovery. It never deletes another process's files to remove a newly created folder.
+The whole command is one plan. Parsed links between the moved files, links into them, and links out of them are rewritten relative to their final locations. With `--fix`, jact makes backups, applies the moves and link edits, then verifies every rewritten relationship. If a step fails, recovery is best-effort: jact attempts to undo every change and exits `2`. A recovery error does not stop the remaining recovery steps; jact reports errors and retained backup paths for manual recovery. It never deletes another process's files to remove a newly created folder.
 
-jact does not rewrite image embeds (`![alt](path)`, `![[folder/image.png]]`). If a move would break one, rename refuses and lists them; nothing changes.
+jact does not rewrite inline image embeds (`![alt](path)`) or wiki image embeds (`![[folder/image.png]]`). If a move would break one, rename refuses with exit code `1` and lists them; nothing changes. Reference-style images such as `![picture][pic]` use ordinary parsed definitions such as `[pic]: notes/p.png`; those definitions are rewritten when their target moves or their file changes directory.
 
 ### `outline` — show the heading tree
 
