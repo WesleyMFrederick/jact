@@ -12,8 +12,6 @@ declare module "micromark-util-types" {
 	interface Token {
 		/** Raw end of a wiki embed candidate on a CommonMark image opener. */
 		_obsidianEmbedEnd?: Point;
-		/** Trailing source when a retained token crosses a raw embed's end. */
-		_obsidianEmbedTail?: Token;
 	}
 
 	interface TokenTypeMap {
@@ -28,6 +26,8 @@ declare module "micromark-util-types" {
 		wikilink: "wikilink";
 		wikilinkData: "wikilinkData";
 		obsidianEmbed: "obsidianEmbed";
+		obsidianEmbedCandidate: "obsidianEmbedCandidate";
+		obsidianEmbedAttentionSequence: "obsidianEmbedAttentionSequence";
 		obsidianLink: "obsidianLink";
 		obsidianLinkData: "obsidianLinkData";
 	}
