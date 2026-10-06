@@ -111,10 +111,21 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 
 `JactCli.fix()` parses before selecting fixes. A document with the validation-disable directive returns the same successful skip result as validation and is not read again, backed up, or written. Other documents validate, filter to fixable links, require `--scope` for path fixes, and then either print a dry-run diff or write the fixes. Before it writes, `--fix` creates a timestamped `.bak` backup; `--no-backup` skips the backup. Anchor fixes cover the kebab-case-to-raw-header conversion, a fuzzy header match for a missing anchor, and anchors with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged (for example, a missing anchor with no close header match) is not applied, counted, or reported. If no fix changes a citation, `--fix` prints `No auto-fixable citations found in <file>` and writes nothing.
 
+## Rename Workflow (`jact rename`)
+
+`JactCli.rename()` treats existing source paths literally, including names with glob characters. It expands only non-existing glob sources with the same `resolveFiles()` that batch validate uses (a glob with no Markdown match is a validation error), infers scope from the first source, and calls `renameMarkdownFiles()` (`src/core/rename-markdown-file.ts`), which runs in this order:
+
+1. **Plan moves.** Resolve each source's destination with `mv` rules, then refuse invalid or overlapping requests before reading any links. Collect missing destination directories. Expand every directory move into a map from each carried file's current path to its new path. Reject a source directory if it contains a symlink (a file or folder shortcut), including one in a subdirectory. Report the shortcut path with exit code 1. Preview and `--fix` both stop without changing files.
+2. **Plan links.** Parse every Markdown file in scope plus every moved Markdown file. A cross-document link is rewritten when its target moves or its file changes directory. The new text is relative to the file's final location and points at the target's final location. Unchanged rewrites are dropped. Image embeds that the moves would break refuse the plan, because they are outside the link model.
+3. **Preview** returns the plan. **Apply** (`--fix`) re-checks that sources, destinations, and edited files did not change. It then backs up and stages edits, writes them, creates directories, performs the moves, and re-parses each edited file at its final path to confirm every rewritten link resolves to its expected target. A failure at any step attempts to reverse every completed move, remove every created directory, and restore every edited file from backups. Recovery errors do not prevent later recovery steps. Nonempty directories are retained rather than deleting files created by another process; incomplete recovery reports each error and retained backup paths.
+
 ## Version History
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-05 | Folder rename plans reject symlinks (file or folder shortcuts) before reading links or changing files |
+| 1.0.0-draft | 2026-10-05 | Existing rename sources with glob characters remain literal; rollback continues restoring files after directory cleanup errors and reports incomplete recovery |
+| 1.0.0-draft | 2026-10-05 | `jact rename` accepts several sources, globs, and directories as one all-or-nothing batch; creates missing destination directories; refuses moves that would break image embeds |
 | 1.0.0-draft | 2026-09-25 | Added `--fix --no-backup`; `--fix` skips fixes that leave a citation unchanged |
 | 1.0.0-draft | 2026-09-25 | Added the error and `--fix` correction for header anchors with characters Obsidian drops (`: # \| ^ [ ]`) |
 | 1.0.0-draft | 2026-08-24 | Added byte-screened backlink candidates with exhaustive fallback and unchanged output semantics |

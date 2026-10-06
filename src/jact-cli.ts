@@ -9,6 +9,7 @@
 
 import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
+import { isDynamicPattern } from "tinyglobby";
 import {
 	checkOutlineReminderCache,
 	resetOutlineReminderCache,
@@ -28,9 +29,9 @@ import { generateContentId } from "./core/ContentExtractor/generateContentId.js"
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "./core/prepare-scope.js";
 import {
-	type RenameMarkdownFileResult,
+	type RenameMarkdownFilesResult,
 	RenameValidationError,
-	renameMarkdownFile,
+	renameMarkdownFiles,
 } from "./core/rename-markdown-file.js";
 import type { FileCache } from "./FileCache.js";
 import {
@@ -66,6 +67,10 @@ import type {
 	EnrichedLinkObject,
 	ValidationResult,
 } from "./types/validationTypes.js";
+import {
+	NoFilesMatchedError,
+	resolveFiles,
+} from "./validate/resolve-files.js";
 import type {
 	ValidationWorkflow,
 	ValidationWorkflowOutcome,
@@ -720,31 +725,62 @@ export class JactCli {
 		}
 	}
 
-	/** Plan or apply a guarded Markdown file rename or move. */
+	/**
+	 * Plan or apply a guarded batch move of Markdown files and directories.
+	 * Globs expand like `jact validate`; a glob or several sources make the
+	 * destination a directory.
+	 */
 	async rename(
-		sourceFile: string,
+		sources: string[],
 		destination: string,
 		options: CliRenameOptions = {},
-	): Promise<RenameMarkdownFileResult> {
-		const stats = this.applyScope(options, sourceFile);
-		let resolvedSource = path.resolve(sourceFile);
-		if (!existsSync(resolvedSource)) {
-			const cacheResult = this.fileCache.resolveFile(path.basename(sourceFile));
-			if (!cacheResult.found) {
-				const error = new RenameValidationError(
-					cacheResult.message ?? `Source file not found: ${resolvedSource}`,
-				);
+	): Promise<RenameMarkdownFilesResult> {
+		const resolvedSources: string[] = [];
+		let hasGlob = false;
+		for (const source of sources) {
+			if (existsSync(source) || !isDynamicPattern(source)) {
+				resolvedSources.push(path.resolve(source));
+				continue;
+			}
+			hasGlob = true;
+			try {
+				resolvedSources.push(...(await resolveFiles([source])));
+			} catch (error) {
+				if (error instanceof NoFilesMatchedError) {
+					throw new RenameValidationError(
+						`No Markdown files matched: ${source}`,
+					);
+				}
 				throw error;
 			}
-			resolvedSource = cacheResult.path;
 		}
-		return renameMarkdownFile(
+
+		const stats = this.applyScope(options, resolvedSources[0]);
+		const onlySource = resolvedSources[0];
+		if (
+			resolvedSources.length === 1 &&
+			!hasGlob &&
+			onlySource !== undefined &&
+			!existsSync(onlySource)
+		) {
+			const cacheResult = this.fileCache.resolveFile(path.basename(onlySource));
+			if (!cacheResult.found) {
+				throw new RenameValidationError(
+					cacheResult.message ?? `Source file not found: ${onlySource}`,
+				);
+			}
+			resolvedSources[0] = cacheResult.path;
+		}
+		return renameMarkdownFiles(
 			{
 				fileCache: this.fileCache,
 				parsedDocuments: this.parsedFileCache,
 			},
-			resolvedSource,
-			destination,
+			{
+				sources: resolvedSources,
+				destination,
+				batch: hasGlob || resolvedSources.length > 1,
+			},
 			stats.realScopeFolder,
 			options,
 		);
