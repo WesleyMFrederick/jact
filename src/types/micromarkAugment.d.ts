@@ -6,8 +6,16 @@
  *   used by the extensions under core/MarkdownParser/extensions/.
  */
 import type { Literal } from "mdast";
+import type { Point } from "micromark-util-types";
 
 declare module "micromark-util-types" {
+	interface Token {
+		/** Raw end of a wiki embed candidate on a CommonMark image opener. */
+		_obsidianEmbedEnd?: Point;
+		/** Trailing source when a retained token crosses a raw embed's end. */
+		_obsidianEmbedTail?: Token;
+	}
+
 	interface TokenTypeMap {
 		highlight: "highlight";
 		highlightData: "highlightData";
@@ -19,6 +27,7 @@ declare module "micromark-util-types" {
 		caretAnchorData: "caretAnchorData";
 		wikilink: "wikilink";
 		wikilinkData: "wikilinkData";
+		obsidianEmbed: "obsidianEmbed";
 		obsidianLink: "obsidianLink";
 		obsidianLinkData: "obsidianLinkData";
 	}
@@ -45,6 +54,10 @@ declare module "mdast" {
 	interface Wikilink extends Literal {
 		type: "wikilink";
 	}
+	/** Obsidian embed `![[target#anchor|alias]]`; `value` is the raw inner text. */
+	interface ObsidianEmbed extends Literal {
+		type: "obsidianEmbed";
+	}
 	/** Obsidian permissive markdown link `[label](dest#anchor)`; `value` is the raw match. */
 	interface ObsidianLink extends Literal {
 		type: "obsidianLink";
@@ -56,6 +69,7 @@ declare module "mdast" {
 		citation: Citation;
 		caretAnchor: CaretAnchor;
 		wikilink: Wikilink;
+		obsidianEmbed: ObsidianEmbed;
 		obsidianLink: ObsidianLink;
 	}
 
@@ -65,6 +79,7 @@ declare module "mdast" {
 		citation: Citation;
 		caretAnchor: CaretAnchor;
 		wikilink: Wikilink;
+		obsidianEmbed: ObsidianEmbed;
 		obsidianLink: ObsidianLink;
 	}
 }

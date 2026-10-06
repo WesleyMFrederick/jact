@@ -56,7 +56,7 @@ interface FileSystemInterface {
  * @example
  * const parser = new MarkdownParser(fs);
  * const result = await parser.parseFile('/path/to/file.md');
- * // Returns { filePath, content, ast, links, headings, anchors }
+ * // Returns { filePath, content, ast, validationDisabled, links, embeds, headings, anchors }
  */
 export class MarkdownParser {
 	private fs: FileSystemInterface;
@@ -98,11 +98,11 @@ export class MarkdownParser {
 	 * Parse markdown file and extract all metadata
 	 *
 	 * Main entry point for file parsing. Reads file, parses to mdast with fromMarkdown,
-	 * and extracts links, headings, and anchors. Passes source path to link
-	 * extraction for relative path resolution.
+	 * and extracts links, embeds, headings, and anchors. Passes source path to
+	 * link extraction for relative path resolution.
 	 *
 	 * @param filePath - Absolute or relative path to markdown file
-	 * @returns Object containing parsed markdown metadata including filePath, content, ast, links, headings, and anchors
+	 * @returns Parsed metadata including filePath, content, ast, links, embeds, headings, and anchors
 	 */
 	async parseFile(filePath: string): Promise<ParserOutput> {
 		const content = this.fs.readFileSync(filePath, "utf8");

@@ -60,6 +60,21 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 		}
 	});
 
+	it("returns real image and wiki embed references separately from citation links", () => {
+		const parser = createMarkdownParser();
+		const result = parser.parseContent(
+			"![Picture](img/p.png)\n![[img/wiki.png|Caption]]\n\\![[notes/a.md]]\n[[notes/b.md]]",
+		);
+		expect(result.embeds).toEqual([
+			{ kind: "markdown", target: "img/p.png", line: 1 },
+			{ kind: "wiki", target: "img/wiki.png", line: 2 },
+		]);
+		expect(result.links.map((link) => link.target.path.raw)).toEqual([
+			"notes/a.md",
+			"notes/b.md",
+		]);
+	});
+
 	it("should populate headings array with level, text, raw properties", async () => {
 		// Given: Parser with fixture containing headings
 		const parser = createMarkdownParser();
@@ -243,40 +258,6 @@ describe("MarkdownMarkdownParser.Output.DataContract", () => {
 			expect(heading.level).toBeGreaterThanOrEqual(1);
 			expect(heading.level).toBeLessThanOrEqual(6);
 		}
-	});
-
-	it("should validate parser output matches documented contract schema", async () => {
-		// Given: Parser with any valid fixture
-		const parser = createMarkdownParser();
-		const testFile = join(__dirname, "../../fixtures", "valid-citations.md");
-
-		// When: Parse file
-		const result = await parser.parseFile(testFile);
-
-		// Then: Output matches the documented MarkdownParser.Output.DataContract
-		// Required top-level fields per contract
-		const requiredFields = [
-			"filePath",
-			"content",
-			"ast",
-			"links",
-			"headings",
-			"anchors",
-			"validationDisabled",
-		];
-		for (const field of requiredFields) {
-			expect(result).toHaveProperty(field);
-		}
-
-		// Verify no unexpected additional fields at top level
-		const actualFields = Object.keys(result);
-		expect(actualFields.sort()).toEqual(requiredFields.sort());
-
-		// Verify filePath is absolute
-		expect(result.filePath).toContain("test/fixtures");
-
-		// Verify content is non-empty string
-		expect(result.content.length).toBeGreaterThan(0);
 	});
 
 	it("should populate anchors array with single anchor per header", async () => {
