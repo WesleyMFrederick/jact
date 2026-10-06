@@ -434,6 +434,124 @@ describe("jact rename CLI batch moves", () => {
 		}
 	});
 
+	it.each([
+		{
+			name: "fully escaped prose",
+			example: String.raw`\!\[\[notes/p.png\]\]`,
+		},
+		{
+			name: "escaped brackets",
+			example: String.raw`!\[\[notes/p.png\]\]`,
+		},
+		{
+			name: "inline code",
+			example: "`![[notes/p.png]]`",
+		},
+		{
+			name: "backtick fenced code",
+			example: "```markdown\r\n![[notes/p.png]]\r\n```",
+		},
+		{
+			name: "tilde fenced code",
+			example: "~~~markdown\r\n![[notes/p.png]]\r\n~~~",
+		},
+	])(
+		"Given a wiki embed example in $name When moving its mentioned directory Then real wiki links follow and example bytes stay unchanged",
+		({ example }) => {
+			const examples = `# Syntax examples\r\n\r\n${example}\r\n`;
+			writeTree({
+				"notes/a.md": "# A\n",
+				"notes/p.png": "PNG",
+				"index.md": "# Index\n\n[[notes/a.md]]\n\n\\![[notes/a.md]]\n",
+				"examples.md": examples,
+			});
+			const originalExamples = readFileSync(path.join(batchDir, "examples.md"));
+
+			const applied = runBatch(["notes", "archive", "--fix"]);
+
+			expect(applied.status).toBe(0);
+			expect(snapshot()).toEqual({
+				"archive/": null,
+				"archive/a.md": "# A\n",
+				"archive/p.png": "PNG",
+				"index.md": "# Index\n\n[[archive/a.md]]\n\n\\![[archive/a.md]]\n",
+				"examples.md": examples,
+			});
+			expect(readFileSync(path.join(batchDir, "examples.md"))).toEqual(
+				originalExamples,
+			);
+		},
+	);
+
+	it.each([
+		{ name: "wiki", embed: "![[notes/p.png]]" },
+		{ name: "Markdown", embed: "![p](notes/p.png)" },
+		{ name: "bracketed-caption Markdown", embed: "![[caption]](notes/p.png)" },
+	])(
+		"Given a real incoming $name image embed When moving its directory Then it refuses with exit 1 and leaves the entire tree unchanged",
+		({ embed }) => {
+			writeTree({
+				"notes/a.md": "# A\n",
+				"notes/p.png": "PNG",
+				"index.md": "# Index\n\n[[notes/a.md]]\n",
+				"embeds.md": `# Diagram\n\n${embed}\n`,
+			});
+			const before = snapshot(batchDir, { includeBackups: true });
+
+			const result = runBatch(["notes", "archive", "--fix"]);
+
+			expect(result.status).toBe(1);
+			expect(result.stderr).toContain("image embeds");
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+		},
+	);
+
+	it("Given an incoming reference image When moving its directory Then its definition follows the image and its usage stays unchanged", () => {
+		writeTree({
+			"notes/a.md": "# A\n",
+			"notes/p.png": "PNG",
+			"index.md": "# Index\n\n[[notes/a.md]]\n",
+			"diagram.md":
+				'# Diagram\n\n![p][diagram]\n\n[diagram]: notes/p.png "Diagram"\n',
+		});
+
+		const applied = runBatch(["notes", "archive", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/a.md": "# A\n",
+			"archive/p.png": "PNG",
+			"index.md": "# Index\n\n[[archive/a.md]]\n",
+			"diagram.md":
+				'# Diagram\n\n![p][diagram]\n\n[diagram]: archive/p.png "Diagram"\n',
+		});
+	});
+
+	it("Given a real wiki image embed within a directory When moving the whole directory Then the embed bytes stay unchanged beside its target", () => {
+		const originalNote = "# A\r\n\r\n![[img/p.png]]\r\n";
+		writeTree({
+			"notes/a.md": originalNote,
+			"notes/img/p.png": "PNG",
+			"index.md": "# Index\n\n[[notes/a.md]]\n",
+		});
+		const originalBytes = readFileSync(path.join(batchDir, "notes/a.md"));
+
+		const applied = runBatch(["notes", "archive", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/a.md": originalNote,
+			"archive/img/": null,
+			"archive/img/p.png": "PNG",
+			"index.md": "# Index\n\n[[archive/a.md]]\n",
+		});
+		expect(readFileSync(path.join(batchDir, "archive/a.md"))).toEqual(
+			originalBytes,
+		);
+	});
+
 	it.each(["file", "folder"])(
 		"Given a $0 shortcut inside a folder When moving the folder Then jact stops without changing files",
 		(kind) => {
