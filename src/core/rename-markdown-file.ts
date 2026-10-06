@@ -701,7 +701,10 @@ async function planFiles(
 			const canonicalFilePath = canonicalExisting(filePath);
 			if (!isWithin(scope, canonicalFilePath)) {
 				throw new RenameValidationError(
-					`Reference note is outside the rename scope: ${filePath} (resolved to ${canonicalFilePath}). No files were changed.`,
+					`Reference note is outside the rename scope: ${filePath} (resolved to ${canonicalFilePath}). No files were changed.\n` +
+					"To Get Authorization: ask USER whether this physical note may be included in scope. Do not widen scope automatically or skip its reference update.\n" +
+					'To Preview an Authorized Scope: rerun this rename with --scope "{{authorized-folder}}" and without --fix.\n' +
+					"To Apply: after the authorized preview succeeds, rerun with --fix.",
 				);
 			}
 		}
