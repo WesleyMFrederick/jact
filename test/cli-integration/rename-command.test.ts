@@ -31,18 +31,14 @@ import {
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "../..");
 const cliPath = path.join(repoRoot, "dist/cli.js");
-const workDir = path.join(tmpdir(), "jact-rename-cli-test");
-const source = path.join(workDir, "target", "card17-conops.md");
-const destination = path.join(
-	workDir,
-	"target",
-	"card17-concept-of-operations-ConOps.md",
-);
-const incoming = path.join(workDir, "card17-requirements.md");
-const otherTarget = path.join(workDir, "other", "card17-conops.md");
-const movedDirectory = path.join(workDir, "moved", "notes");
-const movedDestination = path.join(movedDirectory, path.basename(source));
-const outgoingTarget = path.join(workDir, "reference", "shared.md");
+let workDir: string;
+let source: string;
+let destination: string;
+let incoming: string;
+let otherTarget: string;
+let movedDirectory: string;
+let movedDestination: string;
+let outgoingTarget: string;
 
 const originalIncoming = `# Requirements
 
@@ -87,7 +83,18 @@ function renameArgs(...extra: string[]): string[] {
 
 describe("jact rename CLI", () => {
 	beforeEach(() => {
-		rmSync(workDir, { recursive: true, force: true });
+		workDir = mkdtempSync(path.join(tmpdir(), "jact-rename-cli-test-"));
+		source = path.join(workDir, "target", "card17-conops.md");
+		destination = path.join(
+			workDir,
+			"target",
+			"card17-concept-of-operations-ConOps.md",
+		);
+		incoming = path.join(workDir, "card17-requirements.md");
+		otherTarget = path.join(workDir, "other", "card17-conops.md");
+		movedDirectory = path.join(workDir, "moved", "notes");
+		movedDestination = path.join(movedDirectory, path.basename(source));
+		outgoingTarget = path.join(workDir, "reference", "shared.md");
 		mkdirSync(path.dirname(source), { recursive: true });
 		mkdirSync(path.dirname(otherTarget), { recursive: true });
 		writeFileSync(source, "# Concept\n\n## Overview\n\nOperations. ^block\n");
@@ -217,7 +224,7 @@ describe("jact rename CLI", () => {
 	});
 });
 
-const batchDir = path.join(tmpdir(), "jact-bulk-rename-cli-test");
+let batchDir: string;
 
 function runBatch(args: string[]): {
 	status: number | null;
@@ -239,16 +246,19 @@ function writeTree(files: Record<string, string>): void {
 	}
 }
 
-/** Every file and directory under batchDir (relative), with file contents; backups excluded. */
-function snapshot(directory = batchDir): Record<string, string | null> {
+/** Every file and directory under batchDir (relative), with file contents; backups excluded unless requested. */
+function snapshot(
+	directory = batchDir,
+	options: { includeBackups?: boolean } = {},
+): Record<string, string | null> {
 	const entries: Record<string, string | null> = {};
 	for (const entry of readdirSync(directory, { withFileTypes: true })) {
 		const entryPath = path.join(directory, entry.name);
 		const relative = path.relative(batchDir, entryPath);
 		if (entry.isDirectory()) {
 			entries[`${relative}/`] = null;
-			Object.assign(entries, snapshot(entryPath));
-		} else if (!entry.name.endsWith(".bak")) {
+			Object.assign(entries, snapshot(entryPath, options));
+		} else if (options.includeBackups || !entry.name.endsWith(".bak")) {
 			entries[relative] = readFileSync(entryPath, "utf8");
 		}
 	}
@@ -257,8 +267,7 @@ function snapshot(directory = batchDir): Record<string, string | null> {
 
 describe("jact rename CLI batch moves", () => {
 	beforeEach(() => {
-		rmSync(batchDir, { recursive: true, force: true });
-		mkdirSync(batchDir, { recursive: true });
+		batchDir = mkdtempSync(path.join(tmpdir(), "jact-bulk-rename-cli-test-"));
 	});
 
 	afterEach(() => {
@@ -273,6 +282,7 @@ describe("jact rename CLI batch moves", () => {
 			"ref/shared.md": "# Shared\n",
 			"index.md": "# Index\n\n[A](a.md)\n\n[B](b.md#B)\n",
 		});
+		const before = snapshot(batchDir, { includeBackups: true });
 
 		// When
 		const preview = runBatch(["a.md", "b.md", "new/dir/"]);
@@ -299,6 +309,7 @@ describe("jact rename CLI batch moves", () => {
 			path.join(realpathSync(batchDir), "new/dir"),
 		]);
 		expect(existsSync(path.join(batchDir, "new"))).toBe(false);
+		expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
 
 		// When
 		const applied = runBatch(["a.md", "b.md", "new/dir/", "--fix"]);
@@ -328,6 +339,15 @@ describe("jact rename CLI batch moves", () => {
 				"# Index\n\n[One](notes/old-folder/one.md)\n\n[Two](notes/old-folder/sub/two.md#Two)\n\n[Diagram](notes/old-folder/img/p.png)\n",
 		});
 		mkdirSync(path.join(batchDir, "archive"));
+		const before = snapshot(batchDir, { includeBackups: true });
+
+		// When
+		const preview = runBatch(["notes/old-folder", "archive"]);
+
+		// Then
+		expect(preview.status).toBe(0);
+		expect(JSON.parse(preview.stdout)).toMatchObject({ applied: false });
+		expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
 
 		// When
 		const applied = runBatch(["notes/old-folder", "archive", "--fix"]);
@@ -356,6 +376,253 @@ describe("jact rename CLI batch moves", () => {
 				"# Index\n\n[One](archive/old-folder/one.md)\n\n[Two](archive/old-folder/sub/two.md#Two)\n\n[Diagram](archive/old-folder/img/p.png)\n",
 			"notes/": null,
 		});
+	});
+
+	it("Given a folder When moved to a nonexistent path Then that exact path holds its files, rewritten links, and original backup", () => {
+		const originalOne =
+			"# One\n\n[Two](sub/two.md)\n\n![pic](img/p.png)\n\n[Shared](../../ref/shared.md)\n";
+		writeTree({
+			"notes/old-folder/one.md": originalOne,
+			"notes/old-folder/sub/two.md": "# Two\n\n[One](../one.md)\n",
+			"notes/old-folder/img/p.png": "PNG",
+			"ref/shared.md": "# Shared\n",
+			"index.md":
+				"# Index\n\n[One](notes/old-folder/one.md#One)\n\n[Two](notes/old-folder/sub/two.md)\n\n[Diagram](notes/old-folder/img/p.png)\n",
+		});
+
+		const applied = runBatch([
+			"notes/old-folder",
+			"archive/deep/renamed",
+			"--fix",
+		]);
+
+		expect(applied.status).toBe(0);
+		const result = JSON.parse(applied.stdout) as RenameMarkdownFilesResult;
+		expect(result.moves).toEqual([
+			{
+				kind: "directory",
+				source: path.join(realpathSync(batchDir), "notes/old-folder"),
+				destination: path.join(realpathSync(batchDir), "archive/deep/renamed"),
+				movedFiles: 3,
+			},
+		]);
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/deep/": null,
+			"archive/deep/renamed/": null,
+			"archive/deep/renamed/img/": null,
+			"archive/deep/renamed/img/p.png": "PNG",
+			"archive/deep/renamed/one.md":
+				"# One\n\n[Two](sub/two.md)\n\n![pic](img/p.png)\n\n[Shared](../../../ref/shared.md)\n",
+			"archive/deep/renamed/sub/": null,
+			"archive/deep/renamed/sub/two.md": "# Two\n\n[One](../one.md)\n",
+			"index.md":
+				"# Index\n\n[One](archive/deep/renamed/one.md#One)\n\n[Two](archive/deep/renamed/sub/two.md)\n\n[Diagram](archive/deep/renamed/img/p.png)\n",
+			"notes/": null,
+			"ref/": null,
+			"ref/shared.md": "# Shared\n",
+		});
+		const movedOne = path.join(
+			realpathSync(batchDir),
+			"archive/deep/renamed/one.md",
+		);
+		const backups = result.backups.filter(
+			(backup) => backup.startsWith(`${movedOne}.`) && backup.endsWith(".bak"),
+		);
+		expect(backups).toHaveLength(1);
+		for (const backup of backups) {
+			expect(existsSync(backup)).toBe(true);
+			expect(readFileSync(backup, "utf8")).toBe(originalOne);
+		}
+	});
+
+	it.each([
+		{
+			name: "fully escaped prose",
+			example: String.raw`\!\[\[notes/p.png\]\]`,
+			plainPath: false,
+		},
+		{
+			name: "escaped brackets",
+			example: String.raw`!\[\[notes/p.png\]\]`,
+			plainPath: false,
+		},
+		{
+			name: "inline code",
+			example: "`![[notes/p.png]]`",
+			plainPath: true,
+		},
+		{
+			name: "backtick fenced code",
+			example: "```markdown\r\n![[notes/p.png]]\r\n```",
+			plainPath: true,
+		},
+		{
+			name: "tilde fenced code",
+			example: "~~~markdown\r\n![[notes/p.png]]\r\n~~~",
+			plainPath: true,
+		},
+	])(
+		"Given a wiki embed example in $name When moving its mentioned directory Then it does not block the move and exact code paths follow",
+		({ example, plainPath }) => {
+			const examples = `# Syntax examples\r\n\r\n${example}\r\n`;
+			const expectedExamples = plainPath
+				? examples.replace("notes/p.png", "archive/p.png")
+				: examples;
+			writeTree({
+				"notes/a.md": "# A\n",
+				"notes/p.png": "PNG",
+				"index.md": "# Index\n\n[[notes/a.md]]\n\n\\![[notes/a.md]]\n",
+				"examples.md": examples,
+			});
+
+			const applied = runBatch(["notes", "archive", "--fix"]);
+
+			expect(applied.status).toBe(0);
+			expect(snapshot()).toEqual({
+				"archive/": null,
+				"archive/a.md": "# A\n",
+				"archive/p.png": "PNG",
+				"index.md": "# Index\n\n[[archive/a.md]]\n\n\\![[archive/a.md]]\n",
+				"examples.md": expectedExamples,
+			});
+			expect(readFileSync(path.join(batchDir, "examples.md"))).toEqual(
+				Buffer.from(expectedExamples),
+			);
+		},
+	);
+
+	it.each([
+		{ name: "wiki", embed: "![[notes/p.png]]" },
+		{ name: "Markdown", embed: "![p](notes/p.png)" },
+		{ name: "bracketed-caption Markdown", embed: "![[caption]](notes/p.png)" },
+	])(
+		"Given a real incoming $name image embed When moving its directory Then it refuses with exit 1 and leaves the entire tree unchanged",
+		({ embed }) => {
+			writeTree({
+				"notes/a.md": "# A\n",
+				"notes/p.png": "PNG",
+				"index.md": "# Index\n\n[[notes/a.md]]\n",
+				"embeds.md": `# Diagram\n\n${embed}\n`,
+			});
+			const before = snapshot(batchDir, { includeBackups: true });
+
+			const result = runBatch(["notes", "archive", "--fix"]);
+
+			expect(result.status).toBe(1);
+			expect(result.stderr).toContain("image embeds");
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+		},
+	);
+
+	it.each([
+		{
+			name: "wiki",
+			embed: "![[img/p.png|*Alias]] after*",
+		},
+		{
+			name: "wiki inside an ordinary link caption",
+			embed: "[before _text ![[img/p.png|Alias_]] after](../guide.md)",
+		},
+		{
+			name: "Markdown",
+			embed: "![Diagram](img/p.png)",
+		},
+		{
+			name: "Markdown with formatted wiki-like caption text",
+			embed: "![before [![[img/other.png|**Alias]] after**](../guide.md)](img/p.png)",
+		},
+	])(
+		"Given a source note with a $name embed When moved away from its stationary image Then it refuses and leaves the entire tree unchanged",
+		({ embed }) => {
+			writeTree({
+				"notes/a.md": `# A\n\n${embed}\n`,
+				"notes/img/p.png": "PNG",
+				"guide.md": "# Guide\n",
+				"index.md": "# Index\n\n[A](notes/a.md)\n",
+			});
+			const before = snapshot(batchDir, { includeBackups: true });
+
+			const result = runBatch(["notes/a.md", "archive/deep/", "--fix"]);
+
+			expect(result.status).toBe(1);
+			expect(result.stderr).toContain("image embeds");
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+		},
+	);
+
+	it("Given a wiki embed with cross-boundary formatting elsewhere When renaming an unrelated note Then the move and incoming and outgoing citation rewrites succeed", () => {
+		const diagram = "# Diagram\r\n\r\n![[img/p.png|*Alias]] after*\r\n";
+		writeTree({
+			"notes/a.md": "# A\n\n[Shared](../ref/shared.md)\n",
+			"ref/shared.md": "# Shared\n",
+			"index.md": "# Index\n\n[A](notes/a.md#A)\n",
+			"diagram.md": diagram,
+			"img/p.png": "PNG",
+		});
+
+		const result = runBatch(["notes/a.md", "archive/deep/", "--fix"]);
+
+		expect(result.status).toBe(0);
+		expect(JSON.parse(result.stdout)).toMatchObject({ applied: true });
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/deep/": null,
+			"archive/deep/a.md": "# A\n\n[Shared](../../ref/shared.md)\n",
+			"notes/": null,
+			"ref/": null,
+			"ref/shared.md": "# Shared\n",
+			"index.md": "# Index\n\n[A](archive/deep/a.md#A)\n",
+			"diagram.md": diagram,
+			"img/": null,
+			"img/p.png": "PNG",
+		});
+	});
+
+	it("Given an incoming reference image When moving its directory Then its definition follows the image and its usage stays unchanged", () => {
+		writeTree({
+			"notes/a.md": "# A\n",
+			"notes/p.png": "PNG",
+			"index.md": "# Index\n\n[[notes/a.md]]\n",
+			"diagram.md":
+				'# Diagram\n\n![p][diagram]\n\n[diagram]: notes/p.png "Diagram"\n',
+		});
+
+		const applied = runBatch(["notes", "archive", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/a.md": "# A\n",
+			"archive/p.png": "PNG",
+			"index.md": "# Index\n\n[[archive/a.md]]\n",
+			"diagram.md":
+				'# Diagram\n\n![p][diagram]\n\n[diagram]: archive/p.png "Diagram"\n',
+		});
+	});
+
+	it("Given a real wiki image embed within a directory When moving the whole directory Then the embed bytes stay unchanged beside its target", () => {
+		const originalNote = "# A\r\n\r\n![[img/p.png]]\r\n";
+		writeTree({
+			"notes/a.md": originalNote,
+			"notes/img/p.png": "PNG",
+			"index.md": "# Index\n\n[[notes/a.md]]\n",
+		});
+		const originalBytes = readFileSync(path.join(batchDir, "notes/a.md"));
+
+		const applied = runBatch(["notes", "archive", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/a.md": originalNote,
+			"archive/img/": null,
+			"archive/img/p.png": "PNG",
+			"index.md": "# Index\n\n[[archive/a.md]]\n",
+		});
+		expect(readFileSync(path.join(batchDir, "archive/a.md"))).toEqual(
+			originalBytes,
+		);
 	});
 
 	it.each(["file", "folder"])(
@@ -539,6 +806,15 @@ describe("jact rename CLI batch moves", () => {
 			"concepts/keep.txt": "text",
 			"index.md": "# Index\n\n[X](concepts/x.md)\n",
 		});
+		const before = snapshot(batchDir, { includeBackups: true });
+
+		// When
+		const preview = runBatch(["concepts/*.md", "archive"]);
+
+		// Then
+		expect(preview.status).toBe(0);
+		expect(JSON.parse(preview.stdout)).toMatchObject({ applied: false });
+		expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
 
 		// When
 		const applied = runBatch(["concepts/*.md", "archive", "--fix"]);
@@ -810,7 +1086,12 @@ describe("jact rename CLI batch moves", () => {
 		expect(snapshot()).toEqual(before);
 	});
 
-	it.each([
+	it.each<{
+		name: string;
+		args: string[];
+		message: string;
+		files?: Record<string, string>;
+	}>([
 		{
 			name: "destination collides with an existing file",
 			args: ["a.md", "sub/b.md", "dest"],
@@ -836,21 +1117,65 @@ describe("jact rename CLI batch moves", () => {
 			args: ["sub", "elsewhere"],
 			message: "image embeds",
 		},
+		{
+			name: "a moved file has an unresolved outgoing link",
+			args: ["a.md", "b.md", "archive"],
+			message: "does not resolve",
+			files: {
+				"a.md": "# A\n\n[Missing](missing.md)\n",
+				"b.md": "# B\n",
+			},
+		},
+		{
+			name: "a source is inside another directory source",
+			args: ["sub", "sub/b.md", "archive"],
+			message: "Sources overlap",
+			files: {
+				"sub/b.md": "# B\n",
+			},
+		},
+		{
+			name: "a destination is inside another directory being moved",
+			args: ["a.md", "sub", "sub/new"],
+			message: "inside a directory being moved",
+			files: {
+				"a.md": "# A\n",
+				"sub/b.md": "# B\n",
+			},
+		},
+		{
+			name: "the destination equals the source",
+			args: ["a.md", "a.md"],
+			message: "destination is unchanged",
+			files: {
+				"a.md": "# A\n",
+			},
+		},
+		{
+			name: "a source in the batch is missing",
+			args: ["a.md", "missing.md", "archive"],
+			message: "Source file not found",
+			files: {
+				"a.md": "# A\n",
+			},
+		},
 	])(
 		"Given $name When fixing Then it refuses with exit 1 and changes nothing",
-		({ args, message }) => {
+		({ args, message, files }) => {
 			// Given
-			writeTree({
-				"a.md": "# A\n\n[B](sub/b.md)\n",
-				"pic.png": "PNG",
-				"sub/a.md": "# Sub A\n",
-				"sub/b.md": "# B\n\n[A](../a.md)\n",
-				"sub/p.png": "PNG",
-				"sub/inner/c.md": "# C\n",
-				"dest/a.md": "# Existing\n",
-				"embeds.md": "# Embeds\n\n![p](sub/p.png)\n",
-			});
-			const before = snapshot();
+			writeTree(
+				files ?? {
+					"a.md": "# A\n\n[B](sub/b.md)\n",
+					"pic.png": "PNG",
+					"sub/a.md": "# Sub A\n",
+					"sub/b.md": "# B\n\n[A](../a.md)\n",
+					"sub/p.png": "PNG",
+					"sub/inner/c.md": "# C\n",
+					"dest/a.md": "# Existing\n",
+					"embeds.md": "# Embeds\n\n![p](sub/p.png)\n",
+				},
+			);
+			const before = snapshot(batchDir, { includeBackups: true });
 
 			// When
 			const result = runBatch([...args, "--fix"]);
@@ -858,7 +1183,7 @@ describe("jact rename CLI batch moves", () => {
 			// Then
 			expect(result.status).toBe(1);
 			expect(result.stderr).toContain(message);
-			expect(snapshot()).toEqual(before);
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
 		},
 	);
 

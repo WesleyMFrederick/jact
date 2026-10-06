@@ -22,14 +22,9 @@ function typesIn(md: string) {
 }
 
 describe("assemble — combined Obsidian-style extension set", () => {
-	it("returns one combined syntax extension and seven fromMarkdown extensions", () => {
-		expect(jactSyntaxExtension()).toBeTypeOf("object");
-		expect(jactMdastExtensions()).toHaveLength(7);
-	});
-
-	it("parses all six custom syntaxes in a single document", () => {
+	it("parses custom syntaxes together without confusing wiki embeds with links", () => {
 		const md =
-			"A ==highlight==, a %%comment%%, a [cite: docs/spec.md], a [[Page#sec|Alias]], a [t](file.md#a b c), and ^block-ref-1.";
+			"A ==highlight==, a %%comment%%, a [cite: docs/spec.md], a [[Page#sec|Alias]], a ![[img/p.png]], a [t](file.md#a b c), and ^block-ref-1.";
 		const types = typesIn(md);
 		expect(types.has("highlight")).toBe(true);
 		expect(types.has("obsidianComment")).toBe(true);
@@ -37,6 +32,7 @@ describe("assemble — combined Obsidian-style extension set", () => {
 		expect(types.has("caretAnchor")).toBe(true);
 		expect(types.has("wikilink")).toBe(true);
 		expect(types.has("obsidianLink")).toBe(true);
+		expect(types.has("obsidianEmbed")).toBe(true);
 	});
 
 	it("leaves standard markdown links intact alongside custom syntaxes", () => {

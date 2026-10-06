@@ -14,8 +14,6 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { homedir } from "node:os";
-import type { Root } from "mdast";
-import { visit } from "unist-util-visit";
 import type { FileCache } from "../FileCache.js";
 import {
 	createFileCache,
@@ -23,7 +21,7 @@ import {
 	createParsedFileCache,
 } from "../factories/componentFactory.js";
 import type { ParsedFileCache } from "../ParsedFileCache.js";
-import type { LinkObject } from "../types/citationTypes.js";
+import type { EmbedReference, LinkObject } from "../types/citationTypes.js";
 import type { CliRenameOptions } from "../types/cli-types.js";
 import {
 	findPlainFilePaths,
@@ -546,7 +544,7 @@ function planMoves(
  * `![[file]]` embeds resolve by name in Obsidian and survive any move.
  */
 function brokenEmbeds(
-	ast: Root,
+	embeds: EmbedReference[],
 	filePath: string,
 	moved: Map<string, string>,
 	scope: string,
@@ -580,17 +578,10 @@ function brokenEmbeds(
 			return;
 		}
 	};
-	visit(ast, "image", (node) => {
-		check(node.url, node.position?.start.line ?? 0, false);
-	});
-	visit(ast, "text", (node) => {
-		for (const match of node.value.matchAll(/!\[\[([^\]|#^]+)/g)) {
-			const target = match[1] ?? "";
-			if (target.includes("/")) {
-				check(target, node.position?.start.line ?? 0, true);
-			}
-		}
-	});
+	for (const embed of embeds) {
+		if (embed.kind === "wiki" && !embed.target.includes("/")) continue;
+		check(embed.target, embed.line, embed.kind === "wiki");
+	}
 	return broken;
 }
 
@@ -624,7 +615,7 @@ async function planFiles(
 		const expectedPlainPaths: PlannedFile["expectedPlainPaths"] = [];
 		const content = document.data.content;
 		const starts = lineStarts(content);
-		embeds.push(...brokenEmbeds(document.data.ast, filePath, moved, scope));
+		embeds.push(...brokenEmbeds(document.data.embeds, filePath, moved, scope));
 
 		for (const link of document.data.links) {
 			if (link.scope !== "cross-document") continue;

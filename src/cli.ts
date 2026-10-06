@@ -345,7 +345,7 @@ program
 	.usage("[options] <source...> <destination>")
 	.argument(
 		"<source-and-destination...>",
-		"one or more sources, then the destination (<source...> <destination>). A source is a file of any type, a quoted glob, or a directory. With one file source, the destination is a new file path, a directory (existing, or ending in /), or a bare filename that renames in place. With one directory source, the tree moves into the destination if it is an existing directory, otherwise to the destination path (like `mv`). With several sources or a glob, the destination is a directory and each source lands at <destination>/<basename>. Missing destination directories are created on --fix.",
+		"one or more sources, then the destination (<source...> <destination>). A source is a file of any type, a quoted glob, or a directory. Existing source paths take literal precedence over glob expansion, including bracketed names; only non-existing glob sources are expanded. With one file source, the destination is a new file path, a directory (existing, or ending in /), or a bare filename that renames in place. With one directory source, the tree moves into the destination if it is an existing directory, otherwise to the destination path (like `mv`). With several sources or a glob, the destination is a directory and each source lands at <destination>/<basename>. Missing destination directories are created on --fix.",
 	)
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option(
@@ -374,17 +374,23 @@ Examples:
 
 Safety:
   Preview is the default and lists every move, every directory to create, and
-  every link rewrite. --fix applies the whole batch all-or-nothing: it creates
-  backups, verifies inputs did not change, creates missing directories, moves
-  the files and directories, updates links, then verifies every relationship;
-  any failure triggers rollback. Recovery errors do not stop remaining recovery
-  steps and report retained backups. Files of any type can be moved.
-  Plain paths keep their prose, inline-code, and command formatting, including
-  #anchors and :line suffixes. Missing outgoing paths or ambiguous affected paths
-  stop the plan before writing. Image embeds (![](...), ![[dir/file]]) are not
-  rewritten: a move that would break one is refused.
+  every link or plain-path rewrite. --fix applies the whole batch: it verifies
+  inputs did not change, creates backups, applies moves and reference edits,
+  then verifies every rewritten relationship. On failure, recovery is
+  best-effort: every completed move, created directory, and edited file gets a
+  recovery attempt. Recovery errors do not stop remaining steps; errors and
+  retained backup paths are reported for manual recovery, and the command exits 2.
+  Files of any type can be moved. Plain paths keep their prose, inline-code,
+  and command formatting, including #anchors and :line suffixes. Missing outgoing
+  paths or ambiguous affected paths stop the plan before writing.
+  Inline image embeds (![alt](path)) and wiki image embeds
+  (![[folder/image.png]]) are not rewritten: a move that would break one is
+  refused with exit 1 and no writes. Reference-style images (![picture][pic])
+  use ordinary parsed definitions ([pic]: notes/p.png), which are rewritten
+  when their target moves or their file changes directory.
   A symlink is a file or folder shortcut. If a source folder contains one,
-  including in a subfolder, preview and --fix both stop without changing files.
+  including a nested file or folder symlink, preview and --fix both report its
+  path and stop with exit 1 without changing files.
 
 Exit Codes:
   0  Preview or rename completed successfully

@@ -169,15 +169,17 @@ jact rename data/results.json output.json --fix # rename a non-Markdown file
 jact rename "src/*.ts" archive/src/ --fix     # move non-Markdown glob matches
 ```
 
-Existing source paths are treated literally, even when their names contain glob characters such as brackets. With several sources or a glob, the destination is a folder and each file keeps its name. A folder moves into the destination if that folder exists, otherwise it becomes the destination. Missing folders are created on `--fix`.
+Existing source paths take literal precedence over glob expansion, even when their names contain glob characters such as brackets. Only non-existing glob sources are expanded. With several sources or a glob, the destination is a folder and each file keeps its name. A folder moves into the destination if that folder exists, otherwise it becomes the destination. Missing folders are created on `--fix`.
 
-A symlink is a file or folder shortcut that points to another location. If a source folder contains one, jact stops and reports its path. This rule applies to preview and `--fix`, including shortcuts in subfolders. No files are changed.
+A symlink is a file or folder shortcut that points to another location. If a source folder contains one, jact stops with exit code `1` and reports its path. This rule applies to preview and `--fix`, including file and folder shortcuts in subfolders. No files are changed.
 
 The whole command is one plan. Parsed links and plain paths into moved files, between moved files, and out of moved Markdown notes are updated together. Plain paths stay plain: prose, backticks, quotes and commands keep their format, as do heading and line-number suffixes. jact resolves exact paths relative to the note or scope; it does not guess by filename. An affected path with two possible files, or an unresolved outgoing path in a note that changes folders, stops the plan before writing. Already-broken references that the move does not affect stay unchanged.
 
-With `--fix`, jact backs up edited notes and individually moved files, applies the plan, then checks rewritten links and plain paths against their intended files. If a step fails, it attempts to undo every change. A recovery error does not stop the remaining recovery steps; jact reports errors and retained backups for manual recovery. It never deletes another process's files to remove a newly created folder. Preview never writes files or backups. URLs, glob patterns and path templates are not plain file references.
+With `--fix`, jact backs up edited notes and individually moved files, applies the plan, then checks rewritten links and plain paths against their intended files. If a step fails, recovery is best-effort: jact attempts to undo every change and exits `2`. A recovery error does not stop the remaining recovery steps; jact reports errors and retained backup paths for manual recovery. It never deletes another process's files to remove a newly created folder. Preview never writes files or backups. URLs, glob patterns and path templates are not plain file references.
 
-jact does not rewrite image embeds (`![alt](path)`, `![[folder/image.png]]`). If a move would break one, rename refuses and lists them; nothing changes.
+jact does not rewrite inline image embeds (`![alt](path)`) or wiki image embeds (`![[folder/image.png]]`). If a move would break one, rename refuses with exit code `1` and lists them; nothing changes. Reference-style images such as `![picture][pic]` use ordinary parsed definitions such as `[pic]: notes/p.png`; those definitions are rewritten when their target moves or their file changes directory.
+
+Escaped embed examples such as `\!\[\[folder/image.png\]\]` and examples inside inline or fenced code do not count as embeds and do not block a move. In `\![[notes/a.md]]`, only the bang is escaped, so the ordinary wiki link is still rewritten.
 
 ### `outline` — show the heading tree
 

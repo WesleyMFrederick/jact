@@ -137,6 +137,14 @@ export interface HeadingObject {
 	position?: Position | undefined;
 }
 
+/** An inline image or Obsidian embed destination, separate from citation links. */
+export interface EmbedReference {
+	kind: "markdown" | "wiki";
+	target: string;
+	/** 1-based; 0 if the parsed node has no position. */
+	line: number;
+}
+
 /**
  * Parser output contract from MarkdownParser.parseFile().
  * Contains complete structural representation of a markdown document.
@@ -153,6 +161,9 @@ export interface ParserOutput {
 	validationDisabled: boolean;
 
 	links: LinkObject[];
+
+	/** Inline images and wiki embeds; reference images use their link definitions. */
+	embeds: EmbedReference[];
 
 	headings: HeadingObject[];
 

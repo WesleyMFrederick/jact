@@ -22,6 +22,10 @@ import {
 	obsidianCommentSyntax,
 } from "./obsidianComment.js";
 import {
+	obsidianEmbedFromMarkdown,
+	obsidianEmbedSyntax,
+} from "./obsidianEmbed.js";
+import {
 	obsidianLinkFromMarkdown,
 	obsidianLinkSyntax,
 } from "./obsidianLink.js";
@@ -55,13 +59,13 @@ export const commonmarkFlavor: FlavorExtensionGroup = {
 /**
  * Obsidian flavor — everything Obsidian adds on top of CommonMark that jact
  * must tokenize: `==highlight==`, `%%comment%%`, `[cite]` citation format,
- * `^caret-anchor`, `[[wikilink]]`, and permissive `[t](path with spaces)`
- * links (obsidianLink).
+ * `^caret-anchor`, `[[wikilink]]`, `![[embed]]`, and permissive
+ * `[t](path with spaces)` links (obsidianLink).
  */
 export const obsidianFlavor: FlavorExtensionGroup = {
 	flavor: "obsidian",
 	description:
-		"Obsidian additions: highlight, comment, citation, caret anchor, wikilink, permissive link",
+		"Obsidian additions: highlight, comment, citation, caret anchor, wikilink, embed, permissive link",
 	syntax: [
 		frontmatter(["yaml"]),
 		highlightSyntax,
@@ -69,6 +73,7 @@ export const obsidianFlavor: FlavorExtensionGroup = {
 		citationSyntax,
 		caretAnchorSyntax,
 		wikilinkSyntax,
+		obsidianEmbedSyntax,
 		obsidianLinkSyntax,
 	],
 	fromMarkdown: [
@@ -78,6 +83,7 @@ export const obsidianFlavor: FlavorExtensionGroup = {
 		citationFromMarkdown,
 		caretAnchorFromMarkdown,
 		wikilinkFromMarkdown,
+		obsidianEmbedFromMarkdown,
 		obsidianLinkFromMarkdown,
 	],
 };

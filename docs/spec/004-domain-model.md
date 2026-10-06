@@ -87,6 +87,22 @@ A heading extracted from the mdast tree (`src/types/citationTypes.ts:127-138`). 
 
 ---
 
+### EmbedReference
+
+`src/types/citationTypes.ts`. A parsed inline image or Obsidian wiki embed, separate from citation links.
+
+```ts
+export interface EmbedReference {
+	kind: "markdown" | "wiki";
+	target: string;
+	line: number; // 1-based starting line; 0 if the parsed node has no position
+}
+```
+
+For wiki embeds, `target` excludes the anchor and alias suffixes. Reference-style images remain represented by their ordinary link definitions, not this collection.
+
+---
+
 ### ParserOutput
 
 The complete contract returned by `MarkdownParser.parseFile()` (`src/types/citationTypes.ts`).
@@ -98,6 +114,7 @@ export interface ParserOutput {
 	ast: Root;
 	validationDisabled: boolean; // exact first-body HTML directive, after optional YAML
 	links: LinkObject[];
+	embeds: EmbedReference[];
 	headings: HeadingObject[];
 	anchors: AnchorObject[];
 }
@@ -269,6 +286,7 @@ Duplicate candidates are ranked by tree distance from `expectedPath`'s directory
 
 ```
 ParserOutput 1───N LinkObject
+ParserOutput 1───N EmbedReference
 ParserOutput 1───N HeadingObject
 ParserOutput 1───N AnchorObject
 LinkObject   1───1 ValidationMetadata (added during validation → EnrichedLinkObject)
@@ -285,6 +303,7 @@ ProcessedLinkEntry 1───1 EnrichedLinkObject (sourceLink)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-06 | Added typed inline-image and wiki-embed references to the required parser output contract |
 | 1.0.0-draft | 2026-08-13 | Added optional extracted-content start lines for source-numbered command output |
 | 1.0.0-draft | 2026-08-02 | Added parser disable state, structured duplicate-path diagnostics, and skipped batch results |
 | 1.0.0-draft | 2026-07-01 | Initial domain model, grounded in `src/types/*.ts` |
