@@ -1,7 +1,6 @@
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import type {
 	DuplicatePathSuggestion,
-	EnrichedLinkObject,
 	ValidationMetadata,
 	ValidationResult,
 } from "./types/validationTypes.js";
@@ -27,6 +26,10 @@ export function formatForCLI(
 		return formatForCLIMinimal(result, nestedCodeblockWarnings);
 	}
 
+	const references = [
+		...result.links,
+		...(result.plainPaths ?? []).map((reference) => ({ ...reference, fullMatch: reference.raw })),
+	];
 	const lines: string[] = [];
 	lines.push("Citation Validation Report");
 	lines.push("==========================");
@@ -39,7 +42,7 @@ export function formatForCLI(
 
 	if (result.summary.errors > 0) {
 		lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
-		const errorLinks = result.links.filter(
+		const errorLinks = references.filter(
 			(link) => link.validation.status === "error",
 		);
 		for (const [index, link] of errorLinks.entries()) {
@@ -60,7 +63,7 @@ export function formatForCLI(
 
 	if (result.summary.warnings > 0) {
 		lines.push(`WARNINGS (${result.summary.warnings})`);
-		const warnLinks = result.links.filter(
+		const warnLinks = references.filter(
 			(link) => link.validation.status === "warning",
 		);
 		for (const [index, link] of warnLinks.entries()) {
@@ -83,7 +86,7 @@ export function formatForCLI(
 
 	if (result.summary.valid > 0) {
 		lines.push(`VALID CITATIONS (${result.summary.valid})`);
-		const validLinks = result.links.filter(
+		const validLinks = references.filter(
 			(link) => link.validation.status === "valid",
 		);
 		for (const [index, link] of validLinks.entries()) {
@@ -152,11 +155,15 @@ export function formatForCLIMinimal(
 	result: ValidationResult & { lineRange?: string },
 	nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
 ): string {
+	const references = [
+		...result.links,
+		...(result.plainPaths ?? []).map((reference) => ({ ...reference, fullMatch: reference.raw })),
+	];
 	const lines: string[] = [];
 
 	if (result.summary.errors > 0) {
 		lines.push(`ERRORS (${result.summary.errors})`);
-		const errorLinks = result.links.filter(
+		const errorLinks = references.filter(
 			(link) => link.validation.status === "error",
 		);
 		for (const link of errorLinks) {
@@ -177,8 +184,8 @@ export function formatForCLIMinimal(
 
 	if (totalWarnings > 0) {
 		lines.push(`WARNINGS (${totalWarnings})`);
-		const warnLinks = result.links.filter(
-			(link: EnrichedLinkObject) => link.validation.status === "warning",
+		const warnLinks = references.filter(
+			(link) => link.validation.status === "warning",
 		);
 		for (const link of warnLinks) {
 			lines.push(`- Line ${link.line}: ${link.fullMatch}`);

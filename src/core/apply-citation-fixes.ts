@@ -9,6 +9,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import type { FileCache } from "../FileCache.js";
 import type { ParsedFileCache } from "../ParsedFileCache.js";
 import type { CliValidateOptions } from "../types/cli-types.js";
@@ -20,6 +21,8 @@ import { OBSIDIAN_DROPPED_CHARS_ERROR } from "./CitationValidator/AnchorMatcher.
 import type { CitationValidator } from "./CitationValidator/CitationValidator.js";
 import { applyAnchorFix, applyPathConversion } from "./citationFixer.js";
 import { VALIDATION_DISABLED_REASON } from "../validate/validation-disable.js";
+import { findPlainFilePaths, resolvePlainFilePath } from "./plain-file-paths.js";
+import { resolveScope } from "./resolveScope.js";
 
 /** Dependencies apply-citation-fixes reads from JactCli — same instances, not copies. */
 export interface ApplyCitationFixesDeps {
@@ -98,14 +101,37 @@ export async function applyCitationFixes(
 			document,
 			filePath,
 		);
+		const originalContent = fsRead(filePath, "utf8");
+		const plainReferences = findPlainFilePaths(originalContent);
+		const scope = resolveScope({
+			cwd: process.cwd(), targetFile: filePath,
+			...(options.scope !== undefined && { explicit: options.scope }),
+		});
+		if (plainReferences.length > 0 && scope.source === "none") {
+			throw new Error("Cannot resolve plain file paths without a scope. Pass --scope <dir>.");
+		}
+		const plainPaths = plainReferences.map((reference) => ({
+			reference,
+			resolution: resolvePlainFilePath(reference, filePath, scope.scope),
+		}));
+		const unresolved = plainPaths.filter(({ resolution }) => resolution.target === null);
+		const diagnostics = unresolved.length === 0 ? "" : `\n\nUnresolved plain file paths:\n${unresolved.map(({ reference, resolution }) =>
+			`  Line ${reference.line}: ${resolution.candidates.length > 1
+				? `Ambiguous plain file path: ${reference.raw}. Candidates: ${resolution.candidates.join(", ")}`
+				: `File not found: ${reference.path}`}`,
+		).join("\n")}`;
+		const plainFixes = plainPaths.filter(({ reference, resolution }) =>
+			reference.context === "prose" && reference.path.toLowerCase().endsWith(".md") &&
+			resolution.target !== null,
+		);
 		const fixableLinks = validationResults.links.filter(
 			(link: EnrichedLinkObject) =>
 				(link.validation.status === "warning" &&
 					link.validation.pathConversion) ||
 				isAnchorFixable(link),
 		);
-		if (fixableLinks.length === 0) {
-			return `No auto-fixable citations found in ${filePath}`;
+		if (fixableLinks.length === 0 && plainFixes.length === 0) {
+			return `No auto-fixable citations found in ${filePath}${diagnostics}`;
 		}
 
 		// Scope boundary check: path corrections require scope to resolve filenames.
@@ -118,12 +144,16 @@ export async function applyCitationFixes(
 			return `ERROR: Path corrections require --scope. Re-run with --scope <folder> to enable filename resolution.`;
 		}
 
-		const originalContent = fsRead(filePath, "utf8");
 		let fileContent = originalContent;
 		let fixesApplied = 0;
 		let pathFixesApplied = 0;
 		let anchorFixesApplied = 0;
 		const fixes: FixRecord[] = [];
+		const edits: { start: number; end: number; replacement: string }[] = [];
+		const lineStarts = [0];
+		for (let index = 0; index < originalContent.length; index++) {
+			if (originalContent[index] === "\n") lineStarts.push(index + 1);
+		}
 		for (const link of fixableLinks) {
 			const pathCitation =
 				link.validation.status !== "valid" && link.validation.pathConversion
@@ -138,7 +168,18 @@ export async function applyCitationFixes(
 			const anchorChanged = newCitation !== pathCitation;
 			if (pathChanged) pathFixesApplied++;
 			if (anchorChanged) anchorFixesApplied++;
-			fileContent = fileContent.replace(link.fullMatch, newCitation);
+			const lineStart = lineStarts[link.line - 1];
+			const start = lineStart === undefined ? -1 : lineStart + link.column;
+			if (
+				!Number.isInteger(link.line) || link.line < 1 ||
+				!Number.isInteger(link.column) || link.column < 0 ||
+				lineStart === undefined ||
+				start >= (lineStarts[link.line] ?? originalContent.length) ||
+				originalContent.slice(start, start + link.fullMatch.length) !== link.fullMatch
+			) {
+				throw new Error(`Citation changed at line ${link.line}; no files were written.`);
+			}
+			edits.push({ start, end: start + link.fullMatch.length, replacement: newCitation });
 			fixes.push({
 				line: link.line,
 				old: link.fullMatch,
@@ -151,6 +192,23 @@ export async function applyCitationFixes(
 							: "anchor",
 			});
 			fixesApplied++;
+		}
+		for (const { reference, resolution } of plainFixes) {
+			// Make the link note-relative even when the original resolved from scope.
+			const relative = path.relative(path.dirname(path.resolve(filePath)), resolution.target ?? "");
+			const destination = relative.split(path.sep).map(encodeURIComponent).join("/") + reference.suffix;
+			const replacement = `[${reference.raw}](${destination})`;
+			edits.push({ start: reference.start, end: reference.end, replacement });
+			fixes.push({ line: reference.line, old: reference.raw, new: replacement, type: "plain-path" });
+			fixesApplied++;
+		}
+		let nextEditStart = originalContent.length;
+		for (const edit of edits.sort((left, right) => right.start - left.start)) {
+			if (edit.end > nextEditStart) {
+				throw new Error("Citation fixes overlap; no files were written.");
+			}
+			nextEditStart = edit.start;
+			fileContent = fileContent.slice(0, edit.start) + edit.replacement + fileContent.slice(edit.end);
 		}
 		if (fixesApplied > 0) {
 			if (options.dryRun) {
@@ -166,7 +224,7 @@ export async function applyCitationFixes(
 					output.push("");
 				}
 				output.push("No files were written (--dry-run).");
-				return output.join("\n");
+				return output.join("\n") + diagnostics;
 			}
 
 			// Write backup before mutating the file, unless --no-backup
@@ -198,9 +256,9 @@ export async function applyCitationFixes(
 				output.push(`    + ${fix.new}`);
 				output.push("");
 			}
-			return output.join("\n");
+			return output.join("\n") + diagnostics;
 		}
-		return `No auto-fixable citations found in ${filePath}`;
+		return `No auto-fixable citations found in ${filePath}${diagnostics}`;
 	} catch (error) {
 		return `ERROR: ${error instanceof Error ? error.message : String(error)}`;
 	}

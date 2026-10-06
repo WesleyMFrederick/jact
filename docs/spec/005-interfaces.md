@@ -10,6 +10,12 @@ The CLI is the entire public surface — jact ships no HTTP API and no plugin AB
 jact validate [paths...] [options]
 ```
 
+Reads Markdown notes and validates their existing citations plus plain file references to Markdown and non-Markdown files. Plain references include prose paths, inline and fenced code paths, and command arguments; non-Markdown targets are checked on disk, not parsed as Markdown.
+
+Plain-path resolution checks exact note-relative and scope-relative candidates, including explicit absolute and tilde paths. It never infers a target by basename or fuzzy filename matching. Missing files and ambiguous exact candidates are reported, not silently repaired or selected. Existing links, definitions, wiki references, and citations are not scanned again as plain paths; URLs, globs, and template placeholders are excluded.
+
+Validation is read-only unless `--fix` is supplied; `--fix --dry-run` also writes nothing. For plain references, `--fix` converts prose `.md` paths into Markdown links while preserving any `#anchor` or `:line` suffix. Commands, inline code, fenced code, and non-Markdown references retain their text formatting; their file targets are still checked. The conversion policy for generic unmarked command lines awaits USER approval and is not finalized here.
+
 **Arguments:**
 
 | Arg | Meaning |
@@ -22,11 +28,11 @@ jact validate [paths...] [options]
 |---|---|---|
 | `--format <type>` | `cli` | Output format: `cli` or `json` (single-file mode only) |
 | `--lines <range>` | - | Validate a specific line range, e.g. `150-160` or `157` |
-| `--scope <folder>` | smart default | Limit file resolution to a folder (enables smart filename matching) |
-| `--fix` | - | Auto-fix citation anchors/paths, including kebab-case conversions |
+| `--scope <folder>` | smart default | Bounds file resolution; plain paths use exact note-relative and scope-relative candidates, without fuzzy guessing |
+| `--fix` | - | Apply existing citation anchor/path fixes and convert prose `.md` paths into links; preserve command/code and non-Markdown text formatting |
 | `--dry-run` | - | Preview `--fix` changes without writing files |
 | `--no-backup` | backup on | With `--fix`, do not write the timestamped `.bak` backup |
-| `--verbose` | `false` | Full validation report (all valid citations, every ranked duplicate-filename candidate, summary block) instead of minimal errors/warnings-only output |
+| `--verbose` | `false` | Full validation report, including valid references and all diagnostic candidates, instead of minimal errors/warnings-only output |
 | `--allow-gitignore` | `false` | Include `.gitignore`-excluded files in the scope scan |
 | `--changed` | `false` | Union git working-tree-modified markdown into the selection (batch mode) |
 | `--json` | `false` | Batch mode: emit one compact JSON object per file (JSONL) |
@@ -77,6 +83,8 @@ FAILED: X errors, Y warnings
 
 Duplicate-filename errors show at most five ranked scope-relative candidates by default, followed by the omitted count and guidance to use `--verbose` or narrow `--scope`. `--verbose` shows every ranked candidate. The same limit applies to the rich single-file JSON suggestion string; internal ranking metadata is not serialized.
 
+Plain-path diagnostics identify the source location and missing target or ambiguous exact candidates. Candidate display does not authorize choosing a target; existing citation duplicate-filename ranking is not a plain-path resolution fallback.
+
 ### Output — batch, human (default)
 
 When a batch has at most five errors in total, output retains one status line per file, full error details, and the file-count summary (`src/validate/renderers.ts`):
@@ -123,11 +131,13 @@ One complete compact JSON object per line, no summary line (`src/validate/render
 jact rename <source...> <destination> [options]
 ```
 
-Previews or applies one guarded batch move. Each source is a `.md` file, a quoted glob (expanded like `jact validate`), or a directory. The whole request is one plan: links between moved files, parsed incoming links from the rest of scope, and parsed cross-document links inside every moved file that changes directory are all rewritten relative to their new locations. Rewrites that would leave a link's text unchanged (for example, two siblings moved together) are not counted.
+Previews or applies one guarded batch move. Each source is an arbitrary existing file, a quoted glob, or a directory; existing paths are treated literally before glob expansion. The whole request is one plan: parsed links and incoming plain paths from Markdown notes in scope, relationships between moved notes, and outgoing references in moved Markdown notes are rewritten relative to their final locations. Non-Markdown source files can move without their contents being parsed or rewritten. Rewrites that leave reference text unchanged (for example, two siblings moved together) are not counted.
+
+Plain references use exact pre-move disk resolution, not basename or fuzzy guessing. Rewrites preserve `#anchor` and `:line` suffixes, enclosing quotes/backticks, code formatting, and executable command syntax, including command prefixes such as `/goal plan:`. Rename changes path text; it does not convert plain references into Markdown links. Already-broken references unaffected by the move remain unchanged; an outgoing reference needed for a safe rewrite must have an unambiguous target.
 
 Destination rules, matching `mv`:
 
-- One `.md` source: `<destination>` is a `.md` path, a directory (existing, or written with a trailing `/`), or a bare filename that keeps the source directory.
+- One file source, Markdown or not: `<destination>` is a file path, a directory (existing, or written with a trailing `/`), or a bare filename that keeps the source directory.
 - One directory source: the tree moves to `<destination>/<dirname>` when `<destination>` is an existing directory, otherwise to `<destination>`. Every file in the tree moves, Markdown or not, and relative paths inside it are preserved.
 - Several sources, or any glob: `<destination>` is a directory; each source lands at `<destination>/<basename>`.
 
@@ -136,24 +146,24 @@ Missing destination directories are listed in the preview and created on `--fix`
 | Flag | Default | Description |
 |---|---|---|
 | `--scope <folder>` | smart default (inferred from the first source) | Bounds sources, destinations, and backlink discovery |
-| `--fix` | `false` | Apply the moves and link edits; omission is a read-only preview |
+| `--fix` | `false` | Apply moves and reference edits; omission is a read-only preview |
 | `--json` | `false` | Emit the structured rename result for the whole batch |
-| `--allow-gitignore` | `false` | Include ignored Markdown files while discovering links |
+| `--allow-gitignore` | `false` | Include ignored Markdown notes while discovering incoming links and plain paths |
 
 The plan is refused (exit `1`, nothing written) when:
 
-- a source does not exist, is outside scope, or is neither a `.md` file nor a directory
-- a glob matches no Markdown files
+- a source does not exist, is outside scope, or is neither a file nor a directory
+- a glob matches no eligible files
 - a destination exists, leaves scope, equals its source, or two sources map to the same destination
 - a directory would move into itself, one source sits inside another directory source, or one destination sits inside another moved directory
-- a moved file's outgoing cross-document link does not resolve, because its post-move relative path is unknown
+- a moved note's outgoing cross-document link or selected plain path cannot resolve unambiguously, because its post-move path is unknown
 - a move would break an image embed (see below)
 
-**Non-Markdown files.** Links jact parses — `[text](file.pdf)`, `[[dir/file.png]]` — resolve to any existing file, so they are rewritten when that file moves with a directory, the same as Markdown targets. Image embeds (`![alt](path)`, `![[dir/file]]`) are not in jact's link model: rename cannot rewrite them and `jact validate` cannot check them. Before writing, rename scans every Markdown file in scope (and every moved one) for image embeds whose target would no longer resolve after the moves and refuses the plan, listing each `file:line`. Embeds inside a moved directory that point into the same tree keep working because the tree's shape is preserved, and bare-name `![[file.png]]` embeds resolve by name in Obsidian, so neither blocks a move.
+**Non-Markdown files.** Any existing file can be selected directly or carried by a directory or batch move. Parsed links — `[text](file.pdf)`, `[[dir/file.png]]` — and plain paths in Markdown notes are rewritten when their targets move, including non-Markdown targets. Non-Markdown references retain their plain/code formatting. Image embeds (`![alt](path)`, `![[dir/file]]`) remain outside jact's link model and are not treated as plain paths: rename cannot rewrite them and `jact validate` cannot check them. Before writing, rename scans every Markdown file in scope (and every moved one) for image embeds whose target would no longer resolve after the moves and refuses the plan, listing each `file:line`. Embeds inside a moved directory that point into the same tree keep working because the tree's shape is preserved, and bare-name `![[file.png]]` embeds resolve by name in Obsidian, so neither blocks a move.
 
-On apply, jact backs up every edited file and every moved `.md` source file, stages edits, writes them, creates missing directories, moves files and whole directories, then re-parses and verifies every rewritten relationship. Any failure undoes completed moves, removes the created directories, restores edited files, and exits `2`; backups stay on disk. Backups of files inside a moved directory move with it, and reported backup paths are final locations.
+On apply, jact preserves the existing backup behavior: it backs up every edited file and every moved `.md` source file, stages edits, writes them, creates missing directories, and moves files and whole directories. It then verifies every rewritten relationship at its final location against the planned target: parsed links are re-parsed, and plain paths are checked with exact disk resolution rather than relying on the citation parser. Any failure undoes completed moves, removes the created directories, restores edited files, and exits `2`; backups stay on disk. Backups of files inside a moved directory move with it, and reported backup paths are final locations.
 
-**JSON result.** One object per request: `scope`, `applied`, `moves` (`kind` `file` or `directory`, `source`, `destination`, and `movedFiles` for directories), `directories` (missing directories, outermost first), `links`, `files` (`path` at its final location, `links`), and `backups`. A single `.md` source without a glob also carries the original top-level `source` and `destination` fields; human output for that case keeps its `Source:`/`Destination:` lines, while batches print a `Moves:` list.
+**JSON result.** One object per request: `scope`, `applied`, `moves` (`kind` `file` or `directory`, `source`, `destination`, and `movedFiles` for directories), `directories` (missing directories, outermost first), `links`, `files` (`path` at its final location, `links`), and `backups`. A single file source without a glob also carries the original top-level `source` and `destination` fields; human output for that case keeps its `Source:`/`Destination:` lines, while batches print a `Moves:` list.
 
 ```bash
 jact rename docs/old.md new.md --scope .                 # preview same-directory rename
@@ -162,6 +172,9 @@ jact rename docs/old.md archive/new.md --scope . --fix   # move and rename
 jact rename a.md b.md new/dir/ --fix                     # several files into a new directory
 jact rename "concepts/*.md" archive/concepts/            # glob into a directory
 jact rename notes/old-folder archive/ --fix              # move a whole directory tree
+jact rename data/results.json archive/ --scope . --fix   # move a non-Markdown file
+jact rename plan.md data/results.json archive/ --fix     # mixed file types in one batch
+jact rename "data/*.json" archive/data/ --scope .        # non-Markdown glob preview
 ```
 
 **Exit codes:** `0` preview or apply succeeded; `1` invalid or unsafe plan with no writes; `2` file-system, parse, commit, or rollback failure.
@@ -301,7 +314,7 @@ jact extract file docs/plan.md --extract-linked-content --max-chars 100000
 
 | Code | When |
 |---|---|
-| `0` | Success — citations valid, files passed, extraction produced content, or outline rendered |
+| `0` | Success — citations and plain file references valid, files passed, extraction produced content, or outline rendered |
 | `1` | Validation/extraction/selection failure — errors found, no eligible links, header not found, or outline selector unresolved |
 | `2` | System/usage error — file not found, permission denied, parse error, missing requested source position, bad flag combination, glob matched nothing and nothing else was selected, or not a git repository |
 
@@ -315,6 +328,7 @@ Single-file `validate` sets `process.exitCode` and does not call `process.exit()
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-06 | Approved plain-path validation and prose Markdown conversion contract; arbitrary-file rename/move with plain-path rewrites, exact resolution, suffix/command preservation, and post-transaction verification |
 | 1.0.0-draft | 2026-09-25 | Added `validate --fix --no-backup`; `--fix` no longer counts or reports fixes that leave a citation unchanged |
 | 1.0.0-draft | 2026-09-25 | Single-file `validate` writes its complete report to a piped stdout; before, output stopped at 64KB |
 | 1.0.0-draft | 2026-09-25 | `extract file --extract-linked-content` lists links it could not extract under `## Failures` and exits `1`, instead of skipping them without a message |

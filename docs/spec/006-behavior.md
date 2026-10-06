@@ -9,14 +9,28 @@
 1. **Resolve scope** via `prepareScope()`. Seeds the shared `FileCache` even when `--scope` is omitted, so bare wiki page names resolve.
 2. **Emit scope notices** (non-JSON format only), such as an automatically selected Obsidian vault.
 3. **Parse** through `ParsedFileCache`. If `ParserOutput.validationDisabled` is true, return a successful skipped outcome before citation validation, nested-codeblock detection, line filtering, or fixes.
-4. **Validate links** with `CitationValidator.validateDocument()` and detect nested-codeblock warnings.
-5. **Apply `--lines` filter** if present. `filterResultsByLineRange()` re-slices `links` and recomputes `summary`.
+4. **Validate links** with `CitationValidator.validateDocument()`, check plain file paths against disk, and detect nested-codeblock warnings.
+5. **Apply `--lines` filter** if present. Filter both `links` and `plainPaths`, then recompute `summary` from both collections.
 6. **Format**: `--format json` uses `formatAsJSON()`; human output uses the verbose tree or minimal formatter.
 7. **Append gitignore hint** if a wiki page was not found and the active scope has a `.gitignore`.
 
 `JactCli.validateContent(content, options & {filePath})` is the in-memory analogue for `--stdin`: it skips the disk read and parses the supplied content, while `filePath` remains the intended path for scope resolution and relative links.
 
 The disable state is parser-derived, not found by a source-text scan. `<!-- jact-validate-disable -->` must be the exact first mdast HTML body node; one mdast YAML frontmatter node may precede it. Blank lines do not create body nodes. Comments after other content, inside code fences or blockquotes, or with additional text do not disable validation.
+
+### Plain File Paths
+
+`src/core/plain-file-paths.ts` exposes `findPlainFilePaths(content)` and `resolvePlainFilePath(reference, sourceFile, scope)` for validation and rename. The scanner uses the Markdown parser's syntax tree to select prose, inline-code, and code-block spans. It does not scan existing links, reference definitions, wiki links, citations, images, HTML, YAML, or Obsidian comments. URLs, globs, and template paths are excluded.
+
+Each reference carries its original text, file path, optional `#anchor` or `:line` suffix, source offsets, line, column, and prose/code context. Offsets cover only the path and suffix; enclosing quotes, backticks, and fences remain outside the edit span. Bare filenames require an extension; slash paths, absolute paths, and `~/` paths are also supported. A `/goal` command verb is not a file reference; its path operands are checked.
+
+Resolution checks only exact existing files relative to the note and the scope root. Absolute paths use their own location; `~/` expands from the home directory. Directories are not file targets. One distinct existing candidate succeeds; two distinct candidates produce an ambiguity error listing both. Missing targets produce a file-not-found error. No basename search or fuzzy matching is used.
+
+Plain references remain separate from the existing `links` contract in `ValidationResult.plainPaths`. Each entry carries `target`, `candidates`, and validation metadata. Summary counts include both collections. Human, single-file JSON, batch, in-memory, and line-filtered validation include plain-path errors.
+
+`--fix` converts only resolved prose `.md` references to Markdown links, with a destination relative to the note. Anchors and line suffixes are retained. Non-Markdown paths, inline code, code blocks, `/goal` commands, and shell-prompt lines remain plain. Unmarked lowercase command-shaped lines are conservatively preserved to honor the USER's requirement that commands remain usable. Their file targets are still checked and rewritten during moves. Missing and ambiguous references are not converted and are reported in the fix output.
+
+Validation and `--fix --dry-run` do not write files or backups. Applied conversions use the same timestamped backup behavior as citation fixes, including `--no-backup`. Edits use original source offsets, so a prose occurrence cannot accidentally replace the same text inside code.
 
 ## Validate Workflow (batch)
 
@@ -124,6 +138,7 @@ All six are tokenized by the Flavor Extension Collection (see the Architecture s
 | Version | Date | Changes |
 |---|---|---|
 | 1.0.0-draft | 2026-10-05 | Folder rename plans reject symlinks (file or folder shortcuts) before reading links or changing files |
+| 1.0.0-draft | 2026-10-06 | Added exact plain-file-path validation and prose Markdown conversion; code and commands retain plain syntax, including uncertain command-shaped lines |
 | 1.0.0-draft | 2026-10-05 | Existing rename sources with glob characters remain literal; rollback continues restoring files after directory cleanup errors and reports incomplete recovery |
 | 1.0.0-draft | 2026-10-05 | `jact rename` accepts several sources, globs, and directories as one all-or-nothing batch; creates missing destination directories; refuses moves that would break image embeds |
 | 1.0.0-draft | 2026-09-25 | Added `--fix --no-backup`; `--fix` skips fixes that leave a citation unchanged |

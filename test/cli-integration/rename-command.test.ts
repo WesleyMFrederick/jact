@@ -12,7 +12,7 @@ import {
 	symlinkSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -89,7 +89,7 @@ describe("jact rename CLI", () => {
 		rmSync(workDir, { recursive: true, force: true });
 	});
 
-	it("previews without writing and applies parser-owned destination edits", () => {
+	it("Given parsed links and plain paths When previewed and renamed Then all references follow without changing their formats", () => {
 		const preview = run(renameArgs());
 		expect(preview.status).toBe(0);
 		const previewResult = JSON.parse(
@@ -99,10 +99,10 @@ describe("jact rename CLI", () => {
 			source,
 			destination,
 			applied: false,
-			links: 4,
+			links: 6,
 		});
 		expect(previewResult.files).toEqual([
-			{ path: realpathSync(incoming), links: 4 },
+			{ path: realpathSync(incoming), links: 6 },
 		]);
 		expect(existsSync(destination)).toBe(false);
 		expect(readFileSync(incoming, "utf8")).toBe(originalIncoming);
@@ -110,7 +110,7 @@ describe("jact rename CLI", () => {
 		const applied = run(renameArgs("--fix"));
 		expect(applied.status).toBe(0);
 		const result = JSON.parse(applied.stdout) as RenameMarkdownFilesResult;
-		expect(result).toMatchObject({ applied: true, links: 4 });
+		expect(result).toMatchObject({ applied: true, links: 6 });
 		expect(result.backups).toHaveLength(2);
 		for (const backup of result.backups) expect(existsSync(backup)).toBe(true);
 		expect(existsSync(source)).toBe(false);
@@ -125,14 +125,6 @@ describe("jact rename CLI", () => {
 				.replace(
 					"[[target/card17-conops#Overview|ConOps]]",
 					"[[target/card17-concept-of-operations-ConOps#Overview|ConOps]]",
-				)
-				.replace(
-					"Literal path: target/card17-concept-of-operations-ConOps.md",
-					"Literal path: target/card17-conops.md",
-				)
-				.replace(
-					"`[Code example](target/card17-concept-of-operations-ConOps.md)`",
-					"`[Code example](target/card17-conops.md)`",
 				),
 		);
 		expect(readFileSync(otherTarget, "utf8")).toBe("# Other concept\n");
@@ -160,7 +152,7 @@ describe("jact rename CLI", () => {
 			source,
 			destination: movedDestination,
 			applied: false,
-			links: 7,
+			links: 9,
 		});
 		expect(existsSync(movedDestination)).toBe(false);
 
@@ -438,16 +430,266 @@ describe("jact rename CLI batch moves", () => {
 		});
 	});
 
+	it("Given a non-Markdown file When previewed and renamed Then plain paths retain code, command and line suffixes", () => {
+		const note = [
+			"# Guide",
+			"",
+			"Read ../data/results.json.",
+			"`../data/results.json:12`",
+			"```sh",
+			"cat \"../data/results.json\"",
+			"```",
+			"/goal plan:../data/results.json",
+			"[Results](../data/results.json)",
+			"",
+		].join("\n");
+		writeTree({
+			"docs/note.md": note,
+			"data/results.json": "{\"ok\":true}\n",
+		});
+		const before = snapshot();
+
+		const preview = runBatch(["data/results.json", "output.json"]);
+
+		expect(preview.status).toBe(0);
+		expect(JSON.parse(preview.stdout)).toMatchObject({
+			applied: false,
+			links: 5,
+			backups: [],
+		});
+		expect(snapshot()).toEqual(before);
+
+		const applied = runBatch(["data/results.json", "output.json", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(readFileSync(path.join(batchDir, "docs/note.md"), "utf8")).toBe(
+			note.replaceAll("../data/results.json", "../data/output.json"),
+		);
+		expect(readFileSync(path.join(batchDir, "data/output.json"), "utf8")).toBe(
+			"{\"ok\":true}\n",
+		);
+		expect(existsSync(path.join(batchDir, "data/results.json"))).toBe(false);
+		const result = JSON.parse(applied.stdout) as RenameMarkdownFilesResult;
+		expect(result.backups).toHaveLength(2);
+		expect(result.backups.map((backup) => readFileSync(backup, "utf8")).sort())
+			.toEqual([note, "{\"ok\":true}\n"].sort());
+	});
+
+	it("Given absolute and tilde paths to a binary file When renamed Then path styles and file bytes survive", () => {
+		const target = path.join(realpathSync(batchDir), "data/blob.bin");
+		const nextTarget = path.join(realpathSync(batchDir), "data/moved.bin");
+		const tilde = `~/${path.relative(homedir(), target)}`;
+		const nextTilde = `~/${path.relative(homedir(), nextTarget)}`;
+		const note = `# Binary\n\n\`${target}:12\`\n\n\`${tilde}\`\n`;
+		const bytes = Buffer.from([0, 255, 128, 10, 0]);
+		writeTree({ "index.md": note, "data/blob.bin": "" });
+		writeFileSync(target, bytes);
+
+		const applied = runBatch(["data/blob.bin", "moved.bin", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(readFileSync(nextTarget)).toEqual(bytes);
+		expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
+			`# Binary\n\n\`${nextTarget}:12\`\n\n\`${nextTilde}\`\n`,
+		);
+		const result = JSON.parse(applied.stdout) as RenameMarkdownFilesResult;
+		const binaryBackup = result.backups.find((backup) =>
+			backup.startsWith(`${target}.`),
+		);
+		expect(binaryBackup).toBeDefined();
+		expect(readFileSync(binaryBackup!)).toEqual(bytes);
+	});
+
+	it("Given a moved Markdown note When its folder changes Then outgoing plain references keep anchors, line suffixes and scope-relative bases", () => {
+		const note = [
+			"# Note",
+			"",
+			"Read ../plans/plan.md#Overview.",
+			"`../data/results.json`",
+			"```sh",
+			"jact extract header ../plans/plan.md \"Overview\"",
+			"```",
+			"/goal plan:../plans/plan.md",
+			"`../src/tool.ts:12`",
+			"Scope path: data/results.json",
+			"",
+		].join("\n");
+		writeTree({
+			"docs/note.md": note,
+			"plans/plan.md": "# Overview\n",
+			"data/results.json": "{}\n",
+			"src/tool.ts": "export const value = 1;\n",
+			"index.md": "Read docs/note.md#Note.\n",
+		});
+
+		const applied = runBatch(["docs/note.md", "archive/deep/note.md", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(readFileSync(path.join(batchDir, "archive/deep/note.md"), "utf8")).toBe(
+			note
+				.replaceAll("../plans/", "../../plans/")
+				.replaceAll("../data/", "../../data/")
+				.replaceAll("../src/", "../../src/"),
+		);
+		expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
+			"Read archive/deep/note.md#Note.\n",
+		);
+	});
+
+	it("Given Markdown and data sources When moved as one batch Then between-file plain references remain usable", () => {
+		writeTree({
+			"note.md": "# Note\n\n`./results.json:3`\n",
+			"results.json": "{\"value\":3}\n",
+			"index.md": "Read note.md#Note and `results.json`.\n",
+		});
+
+		const applied = runBatch(["note.md", "results.json", "archive/deep/", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(snapshot()).toEqual({
+			"archive/": null,
+			"archive/deep/": null,
+			"archive/deep/note.md": "# Note\n\n`./results.json:3`\n",
+			"archive/deep/results.json": "{\"value\":3}\n",
+			"index.md": "Read archive/deep/note.md#Note and `archive/deep/results.json`.\n",
+		});
+	});
+
+	it("Given a directory with Markdown and data When moved Then incoming and outgoing plain paths follow the whole tree", () => {
+		writeTree({
+			"notes/one.md": "# One\n\n`sub/results.json:7`\n\nRead ../ref/plan.md#Overview.\n",
+			"notes/sub/results.json": "{}\n",
+			"ref/plan.md": "# Overview\n",
+			"index.md": "Read notes/one.md#One and `notes/sub/results.json`.\n",
+		});
+
+		const applied = runBatch(["notes", "archive/notes", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(readFileSync(path.join(batchDir, "archive/notes/one.md"), "utf8")).toBe(
+			"# One\n\n`sub/results.json:7`\n\nRead ../../ref/plan.md#Overview.\n",
+		);
+		expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
+			"Read archive/notes/one.md#One and `archive/notes/sub/results.json`.\n",
+		);
+		expect(readFileSync(path.join(batchDir, "archive/notes/sub/results.json"), "utf8"))
+			.toBe("{}\n");
+	});
+
+	it("Given non-Markdown glob matches and ignored files When moved Then ignore rules apply and matching references follow", () => {
+		writeTree({
+			".gitignore": "src/ignored.ts\n",
+			"src/tool.ts": "tool\n",
+			"src/ignored.ts": "ignored\n",
+			"index.md": "`src/tool.ts:12`\n",
+		});
+
+		const applied = runBatch(["src/*.ts", "archive", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(readFileSync(path.join(batchDir, "archive/tool.ts"), "utf8")).toBe("tool\n");
+		expect(readFileSync(path.join(batchDir, "src/ignored.ts"), "utf8")).toBe("ignored\n");
+		expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe("`archive/tool.ts:12`\n");
+	});
+
+	it("Given URLs, patterns and templates When a real target is renamed Then excluded text and unrelated broken paths stay unchanged", () => {
+		const excluded = [
+			"https://example.com/data/results.json",
+			"`data/*.json`",
+			"`data/${name}.json`",
+			"`data/{name}.json`",
+			"Unrelated missing path: missing/old.json",
+			"",
+		].join("\n");
+		writeTree({
+			"data/results.json": "{}\n",
+			"index.md": `Read data/results.json.\n${excluded}`,
+		});
+
+		const applied = runBatch(["data/results.json", "output.json", "--fix"]);
+
+		expect(applied.status).toBe(0);
+		expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
+			`Read data/output.json.\n${excluded}`,
+		);
+	});
+
+	it("Given two exact targets for an incoming plain path When one moves Then the ambiguous plan is refused without changes", () => {
+		writeTree({
+			"data/results.json": "scope\n",
+			"docs/data/results.json": "note\n",
+			"docs/note.md": "Read data/results.json.\n",
+		});
+		const before = snapshot();
+
+		const applied = runBatch(["data/results.json", "output.json", "--fix"]);
+
+		expect(applied.status).toBe(1);
+		expect(applied.stderr).toContain("is ambiguous");
+		expect(applied.stderr).toContain("data/results.json");
+		expect(snapshot()).toEqual(before);
+	});
+
+	it("Given a missing outgoing plain path When its Markdown note changes folders Then preview and apply refuse before writing", () => {
+		writeTree({
+			"docs/note.md": "# Note\n\n`../data/missing.json:12`\n",
+		});
+		const before = snapshot();
+
+		for (const extra of [[], ["--fix"]]) {
+			const result = runBatch(["docs/note.md", "archive/note.md", ...extra]);
+
+			expect(result.status).toBe(1);
+			expect(result.stderr).toContain("does not resolve");
+			expect(result.stderr).toContain("../data/missing.json:12");
+			expect(snapshot()).toEqual(before);
+		}
+	});
+
+	it("Given an edited plain reference corrupted after a move When verification runs Then the move and note changes roll back", () => {
+		writeTree({
+			"data/results.json": "{}\n",
+			"index.md": "`data/results.json:12`\n",
+		});
+		const before = snapshot();
+		const fault = `
+			import fs from "node:fs";
+			import { syncBuiltinESMExports } from "node:module";
+			import path from "node:path";
+			const rename = fs.renameSync;
+			fs.renameSync = (from, to) => {
+				const result = rename(from, to);
+				if (from === path.join(process.cwd(), "data/results.json")) {
+					fs.writeFileSync(path.join(process.cwd(), "index.md"), "\`missing.json:12\`\\n");
+				}
+				return result;
+			};
+			syncBuiltinESMExports();
+		`;
+
+		const result = spawnSync(process.execPath, [
+			"--import",
+			`data:text/javascript,${encodeURIComponent(fault)}`,
+			cliPath,
+			"rename",
+			"data/results.json",
+			"output.json",
+			"--scope",
+			batchDir,
+			"--fix",
+		], { cwd: batchDir, encoding: "utf8" });
+
+		expect(result.status).toBe(2);
+		expect(result.stderr).toContain("Post-rename verification failed");
+		expect(result.stderr).toContain("rolled back");
+		expect(snapshot()).toEqual(before);
+	});
+
 	it.each([
 		{
 			name: "destination collides with an existing file",
 			args: ["a.md", "sub/b.md", "dest"],
 			message: "Destination already exists",
-		},
-		{
-			name: "source is neither Markdown nor a directory",
-			args: ["a.md", "pic.png", "dest"],
-			message: "not a Markdown file or a directory",
 		},
 		{
 			name: "two sources map to the same destination",
@@ -462,7 +704,7 @@ describe("jact rename CLI batch moves", () => {
 		{
 			name: "a glob matches nothing",
 			args: ["nothing/*.md", "dest"],
-			message: "No Markdown files matched",
+			message: "No files matched",
 		},
 		{
 			name: "an image embed outside the move would break",
@@ -549,6 +791,42 @@ describe("jact rename CLI batch moves", () => {
 		).toBe("keep");
 		expect(existsSync(path.join(batchDir, "new/dir/a.md"))).toBe(false);
 	});
+
+	it.each([false, true])(
+		"Given ignored incoming notes When renamed with allow-gitignore=%s Then discovery respects ignore policy",
+		(allowGitignore) => {
+			const oldReference = "`../data/results.json:12`\n";
+			writeTree({
+				".gitignore": "ignored/\n",
+				".jactignore": "excluded/\n",
+				"data/results.json": "{}\n",
+				"index.md": "`data/results.json`\n",
+				"ignored/note.md": oldReference,
+				"excluded/note.md": oldReference,
+				"node_modules/note.md": oldReference,
+			});
+
+			const applied = runBatch([
+				"data/results.json",
+				"output.json",
+				"--fix",
+				...(allowGitignore ? ["--allow-gitignore"] : []),
+			]);
+
+			expect(applied.status).toBe(0);
+			expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
+				"`data/output.json`\n",
+			);
+			expect(readFileSync(path.join(batchDir, "ignored/note.md"), "utf8")).toBe(
+				allowGitignore ? "`../data/output.json:12`\n" : oldReference,
+			);
+			for (const untouched of ["excluded/note.md", "node_modules/note.md"]) {
+				expect(readFileSync(path.join(batchDir, untouched), "utf8")).toBe(
+					oldReference,
+				);
+			}
+		},
+	);
 
 	it.skipIf(process.getuid?.() === 0)(
 		"Given a move that fails mid-commit When fixing Then every change rolls back and it exits 2",
