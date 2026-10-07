@@ -152,8 +152,9 @@ describe("plain text paths in Markdown notes", () => {
 			"[cite: ../plans/plan.md]",
 			"",
 		].join("\n");
-		validate(content, ["--fix"]);
+		const fixed = validate(content, ["--fix"]);
 
+		expect(fixed.status).toBe(0);
 		expect(readFileSync(notePath, "utf8")).toBe(content);
 		expect(backups()).toEqual([]);
 	});
