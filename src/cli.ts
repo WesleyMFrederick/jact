@@ -135,7 +135,7 @@ program
 	)
 	.option(
 		"--fix",
-		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections",
+		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections; one on-disk file only (not with batch selection or --stdin)",
 	)
 	.option(
 		"--dry-run",
@@ -201,10 +201,15 @@ With --stdin:
   selection (multiple paths, glob, --changed, --json) is not supported together
   with --stdin.
 
+With --fix, --dry-run, or --no-backup:
+  Exactly one on-disk file. Batch selection and --stdin are usage errors (exit 2);
+  nothing runs and nothing is written. The exit code reflects the errors left in
+  the file after fixing (or, with --dry-run, the errors still in it).
+
 Exit Codes:
   0  All validated files passed (or --changed matched nothing)
-  1  At least one file failed validation
-  2  A glob/path matched nothing and nothing else was selected, or a system error (missing file, git unavailable, conflicting --json/--format json)
+  1  At least one file failed validation (with --fix: errors remain after fixing)
+  2  A glob/path matched nothing and nothing else was selected, a usage error (--fix/--dry-run/--no-backup with batch selection or --stdin), or a system error (missing file, git unavailable, conflicting --json/--format json)
 `,
 	)
 	.action(async (paths: string[], options: CliBatchValidateOptions) => {
@@ -216,26 +221,31 @@ Exit Codes:
 			return;
 		}
 
-		if (options.stdin) {
-			const isBatchSelection =
-				paths.length > 1 ||
-				Boolean(options.changed) ||
-				Boolean(options.json) ||
-				paths.some((p) => isDynamicPattern(p));
-			if (paths.length !== 1 || isBatchSelection) {
-				console.error(
-					"ERROR: --stdin requires exactly one <path> (intended path for scope/links); batch selection (multiple paths, glob, --changed, --json) is not supported with --stdin",
-				);
-				process.exitCode = 2;
-				return;
-			}
-		}
-
 		const isBatch =
 			paths.length > 1 ||
 			Boolean(options.changed) ||
 			Boolean(options.json) ||
 			paths.some((p) => isDynamicPattern(p));
+
+		const fixFlagsSet =
+			Boolean(options.fix) ||
+			Boolean(options.dryRun) ||
+			options.backup === false;
+		if (fixFlagsSet && (isBatch || options.stdin)) {
+			console.error(
+				"ERROR: --fix, --dry-run, and --no-backup work on exactly one on-disk file; batch selection (multiple paths, glob, --changed, --json) and --stdin are not supported with them",
+			);
+			process.exitCode = 2;
+			return;
+		}
+
+		if (options.stdin && (paths.length !== 1 || isBatch)) {
+			console.error(
+				"ERROR: --stdin requires exactly one <path> (intended path for scope/links); batch selection (multiple paths, glob, --changed, --json) is not supported with --stdin",
+			);
+			process.exitCode = 2;
+			return;
+		}
 
 		if (!isBatch) {
 			const file = paths[0];
@@ -258,33 +268,47 @@ Exit Codes:
 			} else if (options.fix) {
 				result = await manager.fix(file, options);
 				console.log(result);
+				if (result.startsWith("ERROR:")) {
+					process.exitCode = 2;
+					return;
+				}
+				// Exit on the errors left in the file as it now stands on disk
+				// (unchanged after --dry-run). A fresh workflow re-reads the file.
+				const remaining = await createValidationWorkflow().validate(
+					{ kind: "file", filePath: file },
+					options,
+				);
+				process.exitCode =
+					remaining.kind === "failed"
+						? 2
+						: remaining.kind === "completed" &&
+								remaining.result.summary.errors > 0
+							? 1
+							: 0;
+				return;
 			} else {
 				result = await manager.validate(file, options);
 				console.log(result);
 			}
 
-			// Set exit code based on validation result (only for validation, not fix).
+			// Set exit code based on validation result.
 			// Use process.exitCode, not process.exit(): exit() ends the process
 			// before a piped stdout drains and truncates output at 64KB.
-			if (!options.fix) {
-				if (options.format === "json") {
-					const parsed = JSON.parse(result);
-					if (parsed.error) {
-						process.exitCode = 2; // File not found or other errors
-					} else {
-						process.exitCode = parsed.summary?.errors > 0 ? 1 : 0;
-					}
+			if (options.format === "json") {
+				const parsed = JSON.parse(result);
+				if (parsed.error) {
+					process.exitCode = 2; // File not found or other errors
 				} else {
-					if (result.includes("ERROR:")) {
-						process.exitCode = 2; // File not found or other errors
-					} else {
-						// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
-						process.exitCode =
-							result.includes("FAILED:") || result.includes("VALIDATION FAILED")
-								? 1
-								: 0;
-					}
+					process.exitCode = parsed.summary?.errors > 0 ? 1 : 0;
 				}
+			} else if (result.includes("ERROR:")) {
+				process.exitCode = 2; // File not found or other errors
+			} else {
+				// Minimal: "FAILED:" / Verbose: "VALIDATION FAILED"
+				process.exitCode =
+					result.includes("FAILED:") || result.includes("VALIDATION FAILED")
+						? 1
+						: 0;
 			}
 			return;
 		}

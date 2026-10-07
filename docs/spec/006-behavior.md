@@ -178,14 +178,14 @@ jact parses six link patterns with its Markdown syntax extensions, not with regu
 |---|---|---|
 | Cross-document link | `[Text](path/to/file.md#anchor)` | File, then anchor, per the two orders above |
 | Internal anchor link | `[Text](#anchor)` | Anchor in the same file |
-| Wiki-style link | `[[file.md#anchor\|text]]` or `[[#anchor\|text]]` | Cross-document form: file, then anchor. Same-file form: always valid |
+| Wiki-style link | `[[file.md#anchor\|text]]` or `[[#anchor\|text]]` | Cross-document form: file, then anchor. Same-file form (`[[#anchor]]`, `[[#^block]]`): anchor in the same file, matched and suggested like a cross-document anchor |
 | Caret / block reference | `^FR1`, `^US1-1AC1` | ID format only |
 | Emphasis-marked anchor | `==**Component Name**==` | Anchor format only |
 | Citation format | `[cite: path]` | Target file, as a cross-document link |
 
 ## Fix Workflow (`--fix`)
 
-`--fix` repairs broken citations and converts resolved prose `.md` paths in one file. It writes only that file and its backup.
+`--fix` repairs broken citations and converts resolved prose `.md` paths in one file. It writes only that file and its backup. `--fix`, `--dry-run`, or `--no-backup` with batch selection or `--stdin` is a usage error: jact prints `ERROR:` on stderr, validates and writes nothing, and exits `2`.
 
 ```text
 1. Parse ── disable directive ──▶ SKIPPED: … (file not read again, backed up, or written)
@@ -201,9 +201,12 @@ jact parses six link patterns with its Markdown syntax extensions, not with regu
 5. Write a timestamped .bak backup (skipped with --no-backup), then replace the file in one step
    ▼
 6. Print each fix and the backup path
+   ▼
+7. Validate the file as it now stands on disk (unchanged after --dry-run)
+   └─ exit 0 (no link errors left) or 1 (link errors left)
 ```
 
-Fix kinds: a path conversion, a kebab-case anchor to its raw heading, a close heading for a missing anchor, and an anchor with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged is not applied, counted, or reported. A changed citation or two overlapping edits stop the fix before any write. `--fix` exits `0`, including when it prints `ERROR:`.
+Fix kinds: a path conversion, a kebab-case anchor to its raw heading, a close heading for a missing anchor, and an anchor with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged is not applied, counted, or reported. A changed citation or two overlapping edits stop the fix before any write. Every path that ends in `ERROR:` (missing file, missing `--scope` for a path fix, refused write, changed or overlapping citations) exits `2`. Every other path, including `SKIPPED:`, "No auto-fixable citations found", and `--dry-run`, ends at step 7.
 
 ## Rename Workflow (`jact rename`)
 
@@ -247,6 +250,8 @@ A valid Markdown image with bracketed description text, such as `![[caption]](fo
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-07 | `--fix` exits `0` when no link errors are left, `1` when errors remain after fixing or during `--dry-run`, and `2` on `ERROR:`. `--fix`, `--dry-run`, and `--no-backup` with batch selection or `--stdin` are usage errors (exit `2`) |
+| 1.0.0-draft | 2026-10-07 | Same-file wiki links are checked against the file's own headings and block anchors; an unknown anchor is an error with anchor suggestions |
 | 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift. Batch abort on a failed file, scope-notice output, and same-file wiki-link handling stated as observed behavior |
 | 1.0.0-draft | 2026-10-07 | Validation checks link syntax only; `plainPaths` removed from `ValidationResult`, so plain text and code never produce errors (issue #110). `--fix` no longer reports unresolved plain text and skips plain conversion without a scope |
 | 1.0.0-draft | 2026-10-06 | Parser-owned wiki embed detection distinguishes genuine embeds from escaped prose and code; rename consumes typed embed references without rescanning decoded text |
