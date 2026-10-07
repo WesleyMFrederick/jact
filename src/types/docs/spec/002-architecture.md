@@ -15,7 +15,7 @@ src/core/ ───────────────────┼── imp
 src/validate/, src/outline/ ─┤
 test/ ───────────────────────┘
 
-src/types/componentInterfaces.ts ── export type ──► *Like interfaces defined in src/core/
+src/types/componentInterfaces.ts ── export type ──► injection interfaces defined in src/core/
 src/types/fileCacheTypes.ts,
 src/types/extraction-types.ts ───── import type ──► shapes from src/core/ and src/ParsedDocument.ts
 src/types/micromarkAugment.d.ts ─── declare module ─► micromark-util-types, mdast
@@ -45,7 +45,7 @@ Boundary: the strategy order and each rule live in `src/core/ContentExtractor/`,
 
 This file declares the parsed options of each CLI command and the batch-validate result shapes. Batch fields: [Batch-Validate Types](../../../../docs/spec/004-domain-model.md#Batch-Validate%20Types%20%28%60src/types/cli-types.ts%60%29).
 
-- **Options carry flag values.** Option fields hold parsed flags from the [Interfaces](../../../../docs/spec/005-interfaces.md#005.%20Interfaces) section. One exception: `CliOutlineOptions.sessionId` comes from an integration, not a public flag.
+- **Options carry flag values.** Option fields hold parsed flags from the [Interfaces](../../../../docs/spec/005-interfaces.md#005.%20Interfaces) section. One exception: the outline session ID comes from an environment variable that an integration sets, not from a flag.
 
 Boundary: argument parsing and exit codes live in `src/cli.ts` and `src/jact-cli.ts`.
 
@@ -53,13 +53,13 @@ Boundary: argument parsing and exit codes live in `src/cli.ts` and `src/jact-cli
 
 This file declares the success and failure results of a file-cache lookup. Fields: [FileCache Types](../../../../docs/spec/004-domain-model.md#FileCache%20Types%20%28%60src/types/fileCacheTypes.ts%60%29).
 
-- **Discriminated result.** The `found` field separates success from failure; only a failure carries a reason and diagnostics.
+- **Discriminated result.** One flag separates success from failure; only a failure carries a reason and diagnostics.
 
 Boundary: candidate ranking and display limits live in `src/FileCache.ts` and the output formatter.
 
 ### `componentInterfaces.ts` — dependency-injection import point
 
-This file re-exports the narrow interfaces that the factory accepts in place of concrete classes. Each interface is defined next to the core component that consumes it.
+This file re-exports the narrow dependency-injection interfaces that callers and the factory accept in place of concrete classes. Each interface is defined next to the core component that consumes it.
 
 - **No definitions.** The file holds only `export type` lines; it adds no members.
 - **Test doubles fit.** A plain object that satisfies an interface passes into the factory without a production class import. `test/unit/factories/component-factory-interfaces.test.ts` enforces this.
@@ -70,7 +70,7 @@ Boundary: a change to an interface happens in its defining core file. Why the fa
 
 This file uses TypeScript module augmentation to add jact's names to two library type maps. Module augmentation adds members to another package's declared types without changing that package.
 
-- **Token names.** Micromark is the Markdown tokenizer. Each custom micromark token name is a key of its token type map, and the compiler rejects an unregistered name in `effects.enter`.
+- **Token names.** Micromark is the Markdown tokenizer. Each custom micromark token name is a key of its token type map, so the compiler rejects an unregistered token name.
 - **Node types.** Each custom node type joins the phrasing and root content maps of mdast, the Markdown syntax tree. Tree walkers see the nodes without casts.
 - **Compile-time only.** The build emits no copy of this file; it changes type checks, not `dist/` output.
 
@@ -91,3 +91,4 @@ Each row records one version of this architecture document.
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | Initial architecture for `src/types` |
+| 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |

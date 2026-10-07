@@ -19,8 +19,8 @@ The module selects files, checks links, and reports one result per file.
 
 The module orchestrates; other modules hold the logic.
 
-- Not a link checker — `CitationValidator` decides if a link is valid
-- Not a parser — `MarkdownParser` builds the syntax tree and finds links
+- Not a link checker — the checker in `src/core/CitationValidator/` decides if a link is valid
+- Not a parser — the parser in `src/core/MarkdownParser/` builds the syntax tree and finds links
 - Not a fixer — `--fix` lives in `src/core/apply-citation-fixes.ts`
 - Not a plain-text path scanner — `src/core/plain-file-paths.ts` serves `--fix` and `jact rename` only
 - Not the command-line interface (CLI) — `src/cli.ts` owns flags, mode selection, and exit codes
@@ -40,7 +40,7 @@ Three principles keep the module safe to run on any note.
 
 ### 2. One Workflow, Many Entry Points
 
-**Principle:** File, `--stdin`, and batch validation share one `ValidationWorkflow`.
+**Principle:** File, `--stdin`, and batch validation share one single-input workflow.
 
 **Implications:**
 - A batch file gets the same result as the same file run alone
@@ -56,12 +56,11 @@ Three principles keep the module safe to run on any note.
 
 ## Core Guarantees
 
-Six guarantees hold for every caller; the architecture section names the enforcing tests.
+Five guarantees hold for every caller; the architecture section names the enforcing tests.
 
 | Guarantee | Description |
 |-----------|-------------|
 | **Never writes** | No module file writes to disk; the workflow reads, parses, and returns |
-| **Link syntax only** | Prose and code that look like paths produce no error |
 | **Exact opt-out** | Only the parser-derived disable flag skips a document |
 | **Skips are not passes** | A skipped file counts as `skipped`, never as `passed` |
 | **Stable order** | Every file list is absolute, deduplicated, and sorted |
@@ -78,8 +77,9 @@ Two caller groups use the module.
 
 ## Version History
 
-The vision is at version 1.0.0.
+The vision is at version 1.1.0.
 
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | First module vision |
+| 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |

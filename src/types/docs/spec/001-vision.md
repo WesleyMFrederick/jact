@@ -72,3 +72,4 @@ Each row records one version of this vision.
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | Initial vision for `src/types` |
+| 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |

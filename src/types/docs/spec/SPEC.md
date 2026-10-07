@@ -1,6 +1,6 @@
 # `src/types` Living Specification
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** done
 
 `src/types` is the shared type vocabulary of jact: TypeScript declarations that every layer imports to agree on data shapes. It holds no runtime code. The repository spec owns the meaning of each data shape; see the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -70,3 +70,4 @@ Each row records one version of this module spec.
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | Initial module spec for `src/types` |
+| 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |

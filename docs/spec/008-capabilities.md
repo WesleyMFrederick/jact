@@ -2,26 +2,30 @@
 
 **Status:** done
 
-Feature matrix — implemented capabilities in this checkout. Command/flag details: [005 · Interfaces](005-interfaces.md#005. Interfaces).
+This feature matrix lists what jact does and where a user reaches each capability. Command and flag details live in [005. Interfaces](005-interfaces.md#005.%20Interfaces).
 
-| Capability | Status | Where |
-|---|---|---|
-| Validate cross-document markdown links + anchors | ✅ | `jact validate <file>` |
-| Validate link syntax only; plain text, inline code, and fenced code never produce errors | ✅ | [`jact validate`](005-interfaces.md#`jact validate`) |
-| Validate from stdin (hook/pipe usage) | ✅ | `jact validate --stdin` |
-| Batch validation with file selection + reporting | ✅ | `src/validate/batch-runner.ts` |
-| Auto-fix broken anchors + path conversions | ✅ | `jact validate --fix` (structured `PathConversion`/`AnchorConversion`) |
-| Convert resolved prose `.md` paths into Markdown links only with `--fix`; exact resolution without fuzzy/basename guessing; retain code/command and non-Markdown text formatting, suffixes, and existing backup behavior; dry-run stays read-only | ✅ | [`jact validate`](005-interfaces.md#`jact validate`) |
-| Rename or move arbitrary existing files, directories, batches, and globs while rewriting incoming plain paths and parsed links, outgoing references in moved Markdown notes, and relationships between moved notes | ✅ | [`jact rename`](005-interfaces.md#`jact rename <source...> <destination>`) |
-| Preserve `#anchor`, `:line`, code formatting, and executable command syntax during moves; resolve plain paths against pre-move disk state and verify rewritten relationships after the transaction, with rollback on failure | ✅ | [`jact rename`](005-interfaces.md#`jact rename <source...> <destination>`) |
-| Line-scoped validation | ✅ | `--lines N-M` |
-| Scope override for cross-project resolution | ✅ | `--scope <dir>` (auto-inferred in-repo) |
-| Heading outline for orient-before-extract | ✅ | [`jact outline`](005-interfaces.md#`jact%20outline%20<file>%20level%20`) |
-| AST + extracted-data view (debugging) | ✅ | `jact ast <file>` |
-| Content extraction (links / header / whole file) | ✅ | `jact extract links|header|file` |
-| Base-path extraction | ✅ | `npm run jact:base-paths <file>` (npm script over `extract links --verbose`; no `jact base-paths` command) |
-| Obsidian flavor tokenizing (wikilinks, caret anchors, highlights, comments, citations, permissive links) | ✅ | Flavor Extension Collection — `src/core/MarkdownParser/extensions/flavors.ts` |
-| GFM kebab-slug anchor matching | 🔲 designed | Flavor-scoped anchor policy — see design doc §4 in `design-docs/features/20260701T161127-markdown-flavor-extension-collection/` |
-| `anchorKind` threading (field reads over fragment regex) | 🔲 designed | Same design doc §5 |
+## Feature Matrix
 
-Commands retain runnable plain-path syntax, including uncertain unmarked command-shaped lines. Their targets are rewritten during moves; prose Markdown paths are converted only with `--fix`.
+Every capability below ships in this checkout.
+
+| Capability | Where |
+|---|---|
+| Check cross-document Markdown links and their anchors | [`jact validate`](005-interfaces.md#%60jact%20validate%60) |
+| Check link syntax only: plain text, inline code, and fenced code never produce an error | `jact validate` |
+| Check unsaved content that arrives on standard input, for hooks and pipes | `jact validate --stdin` |
+| Check many files at once, chosen by path, glob, or git changes, with one summary | `jact validate <paths...>`, `--changed`, `--json` |
+| Check only the links inside a line range | `jact validate --lines N-M` |
+| Repair broken citation paths and anchors, with a dry-run preview and an optional backup | `jact validate --fix` |
+| Turn a prose `.md` path into a Markdown link when it resolves to exactly one file; code and commands keep their text | `jact validate --fix` |
+| Move files, folders, batches, and globs, and rewrite every link and plain path that the move changes | [`jact rename`](005-interfaces.md#%60jact%20rename%20%3Csource...%3E%20%3Cdestination%3E%60) |
+| Keep `#anchor`, `:line` suffixes, code formatting, and runnable command text during a move; verify the result and roll back on failure | `jact rename --fix` |
+| Resolve links across another project | `--scope <dir>` (inferred from the working folder inside a repository) |
+| Print a file's heading tree before an extract | [`jact outline`](005-interfaces.md#%60jact%20outline%20%3Cfile%3E%20level%20%60) |
+| Show the parsed syntax tree and link data, for debugging | `jact ast <file>` |
+| Extract linked content, one section, or one whole file | `jact extract links`, `jact extract header`, `jact extract file` |
+| List the target paths that a file links to | `npm run jact:base-paths <file>` (an npm script, not a `jact` command) |
+| Parse Obsidian syntax: wiki links, caret anchors, highlights, comments, citations, and permissive links | [ADR-0003 — Flavor Extension Collection](../adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection) |
+
+## Plain Paths in Commands
+
+A move rewrites plain paths in prose and in commands; `--fix` converts only prose paths. A command line, including an unmarked line that looks like a command, keeps its runnable plain-path text. `jact rename` still updates the path inside it.

@@ -6,26 +6,26 @@ This section maps the six files in `src/validate/`, the guarantees each holds, a
 
 ## System Overview
 
-The validate module is an orchestration layer over the shared link checker. Single-file and `--stdin` runs call the workflow through `JactCli`. Batch runs select files first, then call the same workflow once per file.
+The validate module is an orchestration layer over the shared link checker. Single-file and `--stdin` runs call the workflow through the CLI orchestrator in `src/jact-cli.ts`. Batch runs select files first, then call the same workflow once per file.
 
 ```
 single file / --stdin:
-  JactCli ──► ValidationWorkflow ──► outcome ──► JactCli renders report
+  src/jact-cli.ts ──► workflow ──► outcome ──► src/jact-cli.ts renders report
 
 batch:
-  cli.ts ──► resolveFileSet ──► sorted .md list
-                │  (globs, paths, --changed via git status)
-                ▼
-         runBatch ──► ValidationWorkflow (one file at a time)
-                │
-                ▼
-         BatchSummary ──► renderHuman | renderJson
+  src/cli.ts ──► file-set selection ──► sorted .md list
+                   │  (globs, paths, --changed via git status)
+                   ▼
+            batch run ──► workflow (one file at a time)
+                   │
+                   ▼
+            batch summary ──► human report | JSONL report
 
-ValidationWorkflow:
-  prepareScope ──► ParsedFileCache ──► disabled? ──yes──► skipped
-                                          │no
-                                          ▼
-                      CitationValidator ──► --lines filter ──► completed
+workflow:
+  scope ──► parsed document ──► disabled? ──yes──► skipped
+                                   │no
+                                   ▼
+                      link checker ──► --lines filter ──► completed
   any thrown error ──► failed
 ```
 
@@ -39,36 +39,36 @@ Each file owns one job and states the guarantees it holds.
 
 ### `validation-workflow.ts` — single-input workflow
 
-`ValidationWorkflow` checks one file or one in-memory document and returns a `completed`, `skipped`, or `failed` outcome.
+The workflow checks one file or one in-memory document and returns a `completed`, `skipped`, or `failed` outcome.
 
 - **Never throws.** Every error becomes a `failed` outcome with the message, so each caller picks its own exit code.
-- **Skip before check.** A disabled document returns `skipped` before link checks, nested-codeblock checks, or the line filter.
+- **Skip before check.** A disabled document returns `skipped` before link checks, nested-code-block checks, or the line filter.
 - **Intended path for memory input.** `--stdin` content resolves scope and relative links from its stated path, and the module never reads that path from disk.
 - **Line filter recomputes totals.** `--lines` filters links, then rebuilds the summary from the kept links only.
 
 Tests: `test/unit/jact-validate-stdin.test.ts`, `test/validate/validate-integration.test.ts`, `test/cli-integration/plain-path-validate.test.ts`.
 
-Boundary: the workflow returns data and never formats output; `JactCli` renders notices, reports, and hints.
+Boundary: the workflow returns data and never formats output; `src/jact-cli.ts` renders notices, reports, and hints.
 
 ### `validation-disable.ts` — opt-out directive
 
 This file holds the disable directive text, the skip reason, and the tree check that finds the directive.
 
 - **Exact first body node.** Only an exact `<!-- jact-validate-disable -->` HTML node counts, with at most one YAML frontmatter node before it.
-- **One skip reason.** Validation and `--fix` print the same reason string.
+- **One skip reason.** Validation and `--fix` print the same reason text.
 
 Tests: `test/core/MarkdownParser/parser-output-contract.test.js`, `test/validate/validate-integration.test.ts`.
 
-Boundary: it imports only syntax-tree types, so the parser adapter (`src/core/MarkdownParser/mdastAdapter.ts`) and `src/core/apply-citation-fixes.ts` can import it without a cycle.
+Boundary: it imports only syntax-tree types, so the parser adapter in `src/core/MarkdownParser/` and the citation fixer in `src/core/` can import it without a cycle.
 
 ### `resolve-files.ts` — file-set selection
 
-`resolveFileSet` turns explicit paths, globs, and `--changed` into one list of absolute `.md` paths.
+File-set selection turns explicit paths, globs, and `--changed` into one list of absolute `.md` paths.
 
 - **Named files bypass ignore rules.** An existing file named on the command line is kept even if `.gitignore` or `.jactignore` excludes it.
-- **Sweeps obey ignore rules.** Globs, folders, and `--changed` results drop ignored paths.
+- **Sweeps obey ignore rules.** Globs, folders, and `--changed` results drop ignored paths under the working folder.
 - **`--changed` only adds.** It never removes a path-selected file. A glob that matches nothing is tolerated when `--changed` adds a file.
-- **Empty is an error, with one exception.** An empty selection throws `NoFilesMatchedError`, except `--changed` alone with no changes.
+- **Empty is an error, with one exception.** An empty selection is an error (exit 2), except `--changed` alone with no changes.
 
 Tests: `test/validate/resolve-files.test.ts`, `test/validate/resolve-changed-files.test.ts`.
 
@@ -76,18 +76,18 @@ Boundary: it selects files and never opens them; non-Markdown matches drop out s
 
 ### `resolve-changed-files.ts` — git-changed files
 
-`resolveChangedFiles` reads `git status --porcelain` and returns staged, unstaged, and untracked `.md` paths.
+This file reads `git status --porcelain` and returns staged, unstaged, and untracked `.md` paths.
 
 - **Rename resolves to the new path.** A renamed entry yields its destination.
-- **Not a repository is an error.** A failed `git` call throws `NotAGitRepositoryError`.
+- **Not a repository is an error.** A failed `git` call is an error (exit 2).
 
 Tests: `test/validate/resolve-changed-files.test.ts`.
 
-Boundary: tests replace `git` through the injected `RunGit` function, never by mocking `node:child_process`.
+Boundary: tests replace `git` through an injected function, never by mocking `node:child_process`.
 
 ### `batch-runner.ts` — batch run
 
-`runBatch` calls an injected single-file function on each file in order and totals the results into a `BatchSummary`.
+The batch run calls an injected single-file function on each file in order and totals the results into one batch summary.
 
 - **Sequential.** One file at a time; the shared file cache and parsed-document cache never race.
 - **Pass means zero errors.** A file passes when its error count is zero; warnings never fail a file.
@@ -96,15 +96,15 @@ Boundary: tests replace `git` through the injected `RunGit` function, never by m
 
 Tests: `test/validate/batch-runner.test.ts`, `test/validate/validate-integration.test.ts`.
 
-Boundary: it never imports `CitationValidator`; the caller builds one workflow per batch run and passes it in.
+Boundary: it never imports the checker; the caller builds one workflow per batch run and passes it in.
 
 ### `renderers.ts` — batch reports
 
-`renderHuman` and `renderJson` are two views of one `BatchSummary`. Shapes: [Output — batch, human (default)](../../../../docs/spec/005-interfaces.md#Output%20—%20batch,%20human%20(default)).
+The human report and the JSON Lines (JSONL) report are two views of one batch summary. Shapes: [Output — batch, human (default)](../../../../docs/spec/005-interfaces.md#Output%20—%20batch,%20human%20(default)).
 
 - **Collapse changes display only.** Above five total errors, human output collapses; the summary and exit code stay the same.
-- **JSON Lines (JSONL) stays complete.** `renderJson` never collapses.
-- **Terminal-safe text.** Human output passes each file path and error message through `terminalText` before it prints.
+- **JSONL stays complete.** The JSONL report never collapses.
+- **Terminal-safe text.** Human output escapes each file path and error message before it prints; rules: [Terminal Output Safety](../../../../docs/spec/005-interfaces.md#Terminal%20Output%20Safety).
 
 Tests: `test/validate/renderers.test.ts`.
 
@@ -125,3 +125,4 @@ Each row records one version of this architecture section.
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | First module architecture |
+| 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |

@@ -6,12 +6,10 @@
 
 jact ("Just Another Context Tool") is a **markdown citation validation and context-extraction CLI**, written in strict TypeScript (ESM, Node.js). It has two jobs:
 
-1. **Validate** — check that every cross-document link, wiki-link, and anchor reference in a markdown file resolves to something real: a file that exists, a heading that exists, a block reference that exists.
+1. **Validate** — check that every cross-document link, wiki-link, and anchor reference in a markdown file resolves to something real: a file that exists, a heading that exists, a block reference that exists. Validation reads link syntax only; plain text and inline code are never checked.
 2. **Extract** — given a validated document, pull only the content its links actually point to (a section, a block, or a whole file), deduplicated, so an LLM/agent consuming the document gets the cited content without re-reading everything by hand.
 
 It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not a regex scanner and not `marked.js` — see [002-architecture.md](002-architecture.md#MarkdownParser%20%28%60src/core/MarkdownParser/%60%29) for the parser and [003-adrs.md](../adrs/003-adrs.md#ADR-0002%20—%20Regex%20→%20mdast-token%20migration%20%28WMF-35%29) for why. 
-
-[ADR-0002 — Regex → mdast-token migration (WMF-35)](../adrs/003-adrs.md#ADR-0002%20—%20Regex%20→%20mdast-token%20migration%20%28WMF-35%29)
 
 ### Core Value Proposition
 
@@ -25,7 +23,7 @@ It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not 
 - **Not a prose linter** — no style rules, no line-length checks, no MD013-style formatting linting
 - **Not a renderer** — never produces HTML; it only reads and (with `--fix`) rewrites markdown source
 - **Not an Obsidian plugin** — runs outside Obsidian, with no dependency on the Obsidian runtime
-- **Not a general markdown-to-AST library** — the parser's extension set (the Flavor Extension Collection, see [002-architecture.md](002-architecture.md#MarkdownParser%20%28%60src/core/MarkdownParser/%60%29)) is scoped to what jact's own citation/anchor syntax needs, not a general-purpose CommonMark+GFM+Obsidian parser
+- **Not a general markdown-to-AST library** — the parser's extension set (the Flavor Extension Collection) is scoped to what jact's own citation/anchor syntax needs, not a general-purpose CommonMark+GFM+Obsidian parser
 
 ---
 
@@ -36,9 +34,9 @@ It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not 
 **Principle:** Anything that lives in markdown syntax gets a micromark/mdast extension; regex is reserved for strings that are *not* markdown documents (file paths, CLI error text, slugs, synthetic anchor strings).
 
 **Implications:**
-- Citation links, wiki-links, caret/block anchors, `==highlights==`, and `%%comments%%` are each a dedicated micromark syntax + mdast `fromMarkdown` extension, grouped by flavor in `src/core/MarkdownParser/extensions/flavors.ts`
-- Heading line numbers come from `node.position` on the mdast tree, not a regex re-find (see `HeadingObject.position` in [004-domain-model.md](004-domain-model.md#HeadingObject))
-- Regex still governs: path/URL string shape checks, CLI error-message parsing, filename typo correction, and synthetic `LinkObject`s built from CLI arguments that never pass through the parser
+- Citation links, wiki-links, caret/block anchors, `==highlights==`, and `%%comments%%` each have a dedicated micromark syntax extension and mdast builder, grouped by Markdown flavor in one registry under `src/core/MarkdownParser/`
+- Heading line numbers come from the syntax tree's source positions, not a regex re-find (see [HeadingObject](004-domain-model.md#HeadingObject))
+- Regex still governs: path/URL string shape checks, CLI error-message parsing, filename typo correction, and synthetic links built from CLI arguments that never pass through the parser
 - A small number of residual regex sites remain, documented as known debt — see [003-adrs.md Known Tech Debt](../adrs/003-adrs.md#Known%20Tech%20Debt)
 
 ### 2. Single Parse Per File
@@ -46,12 +44,12 @@ It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not 
 **Principle:** A given markdown file is parsed at most once per process run, even when multiple validations reference it concurrently.
 
 **Implications:**
-- `ParsedFileCache` caches the parse **Promise**, not the resolved value, so concurrent `resolveParsedFile()` calls for the same path share one in-flight parse
+- The parsed-document cache stores the in-flight parse, not the finished result, so concurrent requests for the same path share one parse
 - Validating file A, which cites file B, which is also being validated directly, never triggers two parses of B
 
 ### 3. Read-Only by Default
 
-**Principle:** `jact validate` never mutates a file. Only `--fix` writes, and it always writes a timestamped `.bak` backup first.
+**Principle:** `jact validate` never mutates a file. Only `--fix` writes (`validate --fix` and `rename --fix`). By default `--fix` writes a timestamped `.bak` backup first; `--no-backup` turns the backup off.
 
 **Implications:**
 - `--dry-run` (only meaningful with `--fix`) prints the would-be diff without touching disk
@@ -72,11 +70,11 @@ It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not 
 
 | Guarantee | Description |
 |-----------|-------------|
-| **Never mutates without `--fix`** | `validate`, `ast`, `extract` are read-only |
-| **Backup before write** | `--fix` always writes a `.bak` before modifying the target file |
+| **Never mutates without `--fix`** | `validate`, `ast`, `outline`, `extract` never change a Markdown file; `rename` previews unless `--fix` is set |
+| **Backup before write** | `--fix` writes a timestamped `.bak` before it changes the target file, unless `--no-backup` is set |
 | **Deterministic exit codes** | `0`/`1`/`2` consistent across `validate`, `ast`, `extract` |
-| **Single parse per file** | `ParsedFileCache` promise-caches by absolute path |
-| **Original objects never mutated** | `EnrichedLinkObject` is built via object spread over `LinkObject`, never in-place mutation — see [004-domain-model.md](004-domain-model.md#ValidationMetadata%20/%20EnrichedLinkObject) |
+| **Single parse per file** | The parsed-document cache parses each absolute path at most once per process |
+| **Original objects never mutated** | Link checking returns a new enriched link and leaves the parsed link unchanged — see [004-domain-model.md](004-domain-model.md#ValidationMetadata%20/%20EnrichedLinkObject) |
 | **Type-safe** | Strict TypeScript: `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitReturns` |
 
 ---
@@ -96,4 +94,5 @@ It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
 | 1.0.0-draft | 2026-07-01 | Initial vision document, replacing component-guides narrative |

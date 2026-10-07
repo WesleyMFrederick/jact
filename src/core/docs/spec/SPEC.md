@@ -1,6 +1,6 @@
 # `src/core` Living Specification
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** done
 
 `src/core` is the domain layer of jact: it parses Markdown, checks links, extracts linked content, and plans or applies file edits. It has no command registration, no output formatting, and no exit codes. Those belong to the command-line interface (CLI) layer in the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -53,8 +53,8 @@ These summaries show what core is, is not, and guarantees.
 ### What `src/core` Is Not
 
 - Not a CLI: it never parses arguments, picks an exit code, or formats a report
-- Not a wiring layer: `src/factories/componentFactory.ts` builds and connects the components
-- Not a cache owner: `src/FileCache.ts` and `src/ParsedFileCache.ts` sit outside core and are injected
+- Not a wiring layer: the component factory in `src/factories/` builds and connects the components
+- Not a cache owner: the file index (`src/FileCache.ts`) and the parsed-document cache (`src/ParsedFileCache.ts`) sit outside core and are injected
 
 ### Core Guarantees
 
@@ -70,3 +70,4 @@ Each row records one version of this module spec.
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | Initial module spec for `src/core` |
+| 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |

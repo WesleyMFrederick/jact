@@ -19,8 +19,8 @@ Core gives each command the same parser, the same link checks, and the same safe
 ### What `src/core` Is Not
 
 - Not a CLI — it never parses arguments, sets exit codes, or prints formatted reports
-- Not a dependency wiring layer — `src/factories/componentFactory.ts` builds components
-- Not a file index — `src/FileCache.ts` and `src/ParsedFileCache.ts` are injected from outside core
+- Not a dependency wiring layer — the component factory in `src/factories/` builds components
+- Not a file index — the file index and the parsed-document cache sit outside core and are injected
 
 ## Design Principles
 
@@ -39,7 +39,6 @@ Three principles decide where new core code goes.
 
 **Implications:**
 - The rule and its extension registry: [ADR-0003 — Flavor Extension Collection](../../../../docs/adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection)
-- The plain-path scanner parses with the same extensions as the parser
 
 ### 3. Writes Are Opt-In and All-or-Nothing
 
@@ -55,12 +54,12 @@ Core guarantees one verdict per link, bounded reads, and safe writes.
 
 | Guarantee | Description | Enforced by |
 |-----------|-------------|-------------|
-| **Parser links stay unchanged** | The checker returns a new enriched link and never mutates the parser's link | `test/regressions/37-enrichLinkObject-immutability.test.ts` |
+| **Parser links stay unchanged** | The checker returns a new enriched link | `test/regressions/37-enrichLinkObject-immutability.test.ts` |
 | **Plain text is not a link** | Validation checks parsed links only; plain paths and code never fail validation | `test/cli-integration/plain-path-validate.test.ts` |
 | **Bounded extraction reads** | Extraction reads a linked target only inside the permitted directories | `test/integration/extract-read-boundary.test.ts` |
-| **Safe fix writes** | `--fix` refuses symbolic links, out-of-scope files, and changed citations | `test/cli-integration/validate-fix-write-safety.test.ts`, `test/unit/jact-cli-fix-safety.test.ts` |
+| **Safe fix writes** | `--fix` refuses symbolic links, out-of-scope files, and changed citations | `test/cli-integration/validate-fix-write-safety.test.ts` |
 | **Rename is one batch** | `jact rename` refuses an unsafe plan before it writes, and rolls back a failed apply | `test/cli-integration/rename-command.test.ts` |
-| **Excludes-only backlink screen** | The backlink filter only removes parse candidates; it never adds a backlink | `test/core/LinkedHeaderContext/backlink-candidate-filter.test.ts` |
+| **Excludes-only backlink screen** | The backlink filter only removes parse candidates | `test/core/LinkedHeaderContext/backlink-candidate-filter.test.ts` |
 
 ## Target Users
 
@@ -70,7 +69,7 @@ Core serves jact's own orchestration code and its tests, not end users.
 |------|----------|
 | **`src/jact-cli.ts`** | Runs extract, fix, and rename through core components |
 | **`src/validate/`** | Runs single-file and batch validation through the checker |
-| **Test suites** | Inject fakes through the `*Like` interfaces |
+| **Test suites** | Inject fakes through narrow interfaces in place of production classes |
 
 ## Version History
 
@@ -79,3 +78,4 @@ Each row records one version of this vision.
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | Initial vision for `src/core` |
+| 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |

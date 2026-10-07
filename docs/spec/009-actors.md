@@ -2,13 +2,17 @@
 
 **Status:** done
 
-Who (and what) interacts with jact, and how their needs differ.
+Four actors use jact: people, AI agents, editor hooks, and batch scripts. Their needs make text output, JSON output, and exit codes stable contracts.
 
 | Actor | Interaction | What they need |
 |---|---|---|
-| **Human developer** | Direct CLI (`jact validate`, `jact outline`, `jact rename`) in a vault or code repo | Readable CLI output, actionable fix suggestions, exit codes for scripting |
-| **LLM agent (Claude Code session)** | `jact outline` to orient on a markdown file, `jact extract header` for narrow context slices, `jact validate --stdin` | JSON output (`--format json`), deterministic exit codes, token-lean extraction (orient-before-extract workflow) |
-| **PostToolUse hook** | Auto-runs `jact validate` after every Write/Edit on `.md` files | Fast single-file validation, stdin mode, exit code 1 with parseable error list to block bad writes |
-| **Batch/CI scripts** | Batch validation over changed or selected files | File-selection flags, aggregate reporting, exit-code contract (0/1/2 — see [Exit Codes](005-interfaces.md#Exit Codes)) |
+| **Human developer** | Runs `jact validate`, `jact outline`, and `jact rename` in a note vault or code repository | Readable output, fix suggestions, and exit codes for scripts |
+| **AI agent (large language model, LLM, session)** | Runs `jact outline` to see a file's headings, `jact extract header` for one section, and `jact validate --stdin` for unsaved text | JSON output (`--format json`), stable exit codes, and small extracts |
+| **Editor hook** | Runs `jact validate` after each write or edit of a `.md` file | Fast single-file checks, standard-input mode, and exit code 1 with an error list that blocks a bad write |
+| **Batch and continuous integration (CI) scripts** | Run `jact validate` over selected or git-changed files | File selection flags, one summary, one JSON Lines (JSONL) object per file (`--json`), and the exit code contract in [Exit Codes](005-interfaces.md#Exit%20Codes) |
 
-Actor-driven constraints: output must stay dual-mode (human text + `--format json`); exit codes are API surface (hooks depend on them); single-file validation latency matters more than batch throughput (hook on every save).
+These needs set three constraints:
+
+- Output has two modes: human text and JSON.
+- Exit codes are part of the public interface, because hooks act on them.
+- Single-file speed matters more than batch throughput, because a hook runs on every save.
