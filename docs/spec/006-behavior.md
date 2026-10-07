@@ -9,8 +9,8 @@
 1. **Resolve scope** via `prepareScope()`. Seeds the shared `FileCache` even when `--scope` is omitted, so bare wiki page names resolve.
 2. **Emit scope notices** (non-JSON format only), such as an automatically selected Obsidian vault.
 3. **Parse** through `ParsedFileCache`. If `ParserOutput.validationDisabled` is true, return a successful skipped outcome before citation validation, nested-codeblock detection, line filtering, or fixes.
-4. **Validate links** with `CitationValidator.validateDocument()`, check plain file paths against disk, and detect nested-codeblock warnings.
-5. **Apply `--lines` filter** if present. Filter both `links` and `plainPaths`, then recompute `summary` from both collections.
+4. **Validate links** with `CitationValidator.validateDocument()` and detect nested-codeblock warnings. Plain text and code are not validated.
+5. **Apply `--lines` filter** if present, then recompute `summary` from the filtered `links`.
 6. **Format**: `--format json` uses `formatAsJSON()`; human output uses the verbose tree or minimal formatter.
 7. **Append gitignore hint** if a wiki page was not found and the active scope has a `.gitignore`.
 
@@ -20,15 +20,13 @@ The disable state is parser-derived, not found by a source-text scan. `<!-- jact
 
 ### Plain File Paths
 
-`src/core/plain-file-paths.ts` exposes `findPlainFilePaths(content)` and `resolvePlainFilePath(reference, sourceFile, scope)` for validation and rename. The scanner uses the Markdown parser's syntax tree to select prose, inline-code, and code-block spans. It does not scan existing links, reference definitions, wiki links, citations, images, HTML, YAML, or Obsidian comments. URLs, globs, and template paths are excluded.
+`src/core/plain-file-paths.ts` exposes `findPlainFilePaths(content)` and `resolvePlainFilePath(reference, sourceFile, scope)` for `--fix` conversion and rename. Validation does not use them: plain text and code are not link targets. The scanner uses the Markdown parser's syntax tree to select prose, inline-code, and code-block spans. It does not scan existing links, reference definitions, wiki links, citations, images, HTML, YAML, or Obsidian comments. URLs, globs, and template paths are excluded.
 
 Each reference carries its original text, file path, optional `#anchor` or `:line` suffix, source offsets, line, column, and prose/code context. Offsets cover only the path and suffix; enclosing quotes, backticks, and fences remain outside the edit span. Bare filenames require an extension; slash paths, absolute paths, and `~/` paths are also supported. A `/goal` command verb is not a file reference; its path operands are checked.
 
-Resolution checks only exact existing files relative to the note and the scope root. Absolute paths use their own location; `~/` expands from the home directory. Directories are not file targets. One distinct existing candidate succeeds; two distinct candidates produce an ambiguity error listing both. Missing targets produce a file-not-found error. No basename search or fuzzy matching is used.
+Resolution checks only exact existing files relative to the note and the scope root. Absolute paths use their own location; `~/` expands from the home directory. Directories are not file targets. One distinct existing candidate succeeds; two distinct candidates are ambiguous; missing targets are unresolved. No basename search or fuzzy matching is used.
 
-Plain references remain separate from the existing `links` contract in `ValidationResult.plainPaths`. Each entry carries `target`, `candidates`, and validation metadata. Summary counts include both collections. Human, single-file JSON, batch, in-memory, and line-filtered validation include plain-path errors.
-
-`--fix` converts only resolved prose `.md` references to Markdown links, with a destination relative to the note. Anchors are retained in both link text and destination; line suffixes such as `:12` and `:L12-L14` are retained only in the link text. Non-Markdown paths, inline code, code blocks, `/goal` commands, and shell-prompt lines remain plain. Unmarked lowercase command-shaped lines are conservatively preserved to honor the USER's requirement that commands remain usable. Their file targets are still checked and rewritten during moves. Missing and ambiguous references are not converted and are reported in the fix output.
+`--fix` converts only resolved prose `.md` references to Markdown links, with a destination relative to the note. Anchors are retained in both link text and destination; line suffixes such as `:12` and `:L12-L14` are retained only in the link text. Non-Markdown paths, inline code, code blocks, `/goal` commands, and shell-prompt lines remain plain. Unmarked lowercase command-shaped lines are conservatively preserved to honor the USER's requirement that commands remain usable. Their file targets are still rewritten during moves. Missing and ambiguous references are left unchanged and not reported, because plain text may not be a path at all. Without any resolvable scope, `--fix` skips plain-path conversion.
 
 Validation and `--fix --dry-run` do not write files or backups. Applied conversions use the same timestamped backup behavior as citation fixes, including `--no-backup`. Edits use original source offsets, so a prose occurrence cannot accidentally replace the same text inside code.
 
@@ -162,6 +160,7 @@ A valid Markdown image with bracketed description text, such as `![[caption]](fo
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-07 | Validation checks link syntax only; `plainPaths` removed from `ValidationResult`, so plain text and code never produce errors (issue #110). `--fix` no longer reports unresolved plain text and skips plain conversion without a scope |
 | 1.0.0-draft | 2026-10-06 | Parser-owned wiki embed detection distinguishes genuine embeds from escaped prose and code; rename consumes typed embed references without rescanning decoded text |
 | 1.0.0-draft | 2026-10-06 | Shared rename containment rejects absolute relative-path results across Windows drives and unrelated network roots; equality and descendants remain accepted |
 | 1.0.0-draft | 2026-10-06 | Corrected rename glob eligibility: regular files after ignore filtering, not Markdown-only matches or batch validate's resolver |

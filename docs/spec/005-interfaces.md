@@ -10,11 +10,9 @@ The CLI is the entire public surface — jact ships no HTTP API and no plugin AB
 jact validate [paths...] [options]
 ```
 
-Reads Markdown notes and validates their existing citations plus plain file references to Markdown and non-Markdown files. Plain references include prose paths, inline and fenced code paths, and command arguments; non-Markdown targets are checked on disk, not parsed as Markdown.
+Reads Markdown notes and validates their link syntax only: Markdown links, reference definitions, wiki links, and citations. Plain text, inline code, and fenced code are never link targets, so a word containing `/` or `.`, a slash command, or a path written in prose or code is not checked and never produces an error.
 
-Plain-path resolution checks exact note-relative and scope-relative candidates, including explicit absolute and tilde paths. It never infers a target by basename or fuzzy filename matching. Missing files and ambiguous exact candidates are reported, not silently repaired or selected. Existing links, definitions, wiki references, and citations are not scanned again as plain paths; URLs, globs, and template placeholders are excluded.
-
-Validation is read-only unless `--fix` is supplied; `--fix --dry-run` also writes nothing. For plain references, `--fix` converts prose `.md` paths into Markdown links while preserving any `#anchor` or `:line` suffix. Commands, inline code, fenced code, and non-Markdown references retain their text formatting; their file targets are still checked. The conversion policy for generic unmarked command lines awaits USER approval and is not finalized here.
+Validation is read-only unless `--fix` is supplied; `--fix --dry-run` also writes nothing. `--fix` converts a prose `.md` path into a Markdown link only when it resolves to exactly one existing file through exact note-relative or scope-relative candidates; it never infers a target by basename or fuzzy matching, and preserves any `#anchor` or `:line` suffix. Unresolved, ambiguous, code, command, and non-Markdown text stays unchanged and is not reported. URLs, globs, template placeholders, and existing link syntax are never converted.
 
 **Arguments:**
 
@@ -28,7 +26,7 @@ Validation is read-only unless `--fix` is supplied; `--fix --dry-run` also write
 |---|---|---|
 | `--format <type>` | `cli` | Output format: `cli` or `json` (single-file mode only) |
 | `--lines <range>` | - | Validate a specific line range, e.g. `150-160` or `157` |
-| `--scope <folder>` | smart default | Bounds file resolution; plain paths use exact note-relative and scope-relative candidates, without fuzzy guessing |
+| `--scope <folder>` | smart default | Bounds file resolution; `--fix` prose-path conversion uses exact note-relative and scope-relative candidates, without fuzzy guessing |
 | `--fix` | - | Apply existing citation anchor/path fixes and convert prose `.md` paths into links; preserve command/code and non-Markdown text formatting |
 | `--dry-run` | - | Preview `--fix` changes without writing files |
 | `--no-backup` | backup on | With `--fix`, do not write the timestamped `.bak` backup |
@@ -82,8 +80,6 @@ FAILED: X errors, Y warnings
 ```
 
 Duplicate-filename errors show at most five ranked scope-relative candidates by default, followed by the omitted count and guidance to use `--verbose` or narrow `--scope`. `--verbose` shows every ranked candidate. The same limit applies to the rich single-file JSON suggestion string; internal ranking metadata is not serialized.
-
-Plain-path diagnostics identify the source location and missing target or ambiguous exact candidates. Candidate display does not authorize choosing a target; existing citation duplicate-filename ranking is not a plain-path resolution fallback.
 
 ### Output — batch, human (default)
 
@@ -333,7 +329,7 @@ Human-readable messages do not print raw control characters from documents or pa
 
 | Code | When |
 |---|---|
-| `0` | Success — citations and plain file references valid, files passed, extraction produced content, or outline rendered |
+| `0` | Success — citations valid, files passed, extraction produced content, or outline rendered |
 | `1` | Validation/extraction/selection failure — errors found, no eligible links, header not found, or outline selector unresolved |
 | `2` | System/usage error — file not found, permission denied, parse error, missing requested source position, bad flag combination, glob matched nothing and nothing else was selected, or not a git repository |
 
@@ -347,6 +343,7 @@ Single-file `validate` sets `process.exitCode` and does not call `process.exit()
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-07 | `validate` checks link syntax only; plain text and code paths no longer produce errors (issue #110). `--fix` converts only resolved prose `.md` paths and no longer reports unresolved plain text |
 | 1.0.0-draft | 2026-10-06 | Rename refuses the whole plan before writes when a note selected for reference edits resolves physically outside scope; internal shortcuts and unaffected external notes remain allowed |
 | 1.0.0-draft | 2026-10-06 | Approved plain-path validation and prose Markdown conversion contract; arbitrary-file rename/move with plain-path rewrites, exact resolution, suffix/command preservation, and post-transaction verification |
 | 1.0.0-draft | 2026-09-30 | Printed commands use single-quote shell quoting instead of JSON strings, so document text cannot run shell commands when pasted; human-readable messages escape control characters |

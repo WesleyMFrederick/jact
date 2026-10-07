@@ -9,7 +9,6 @@
  */
 
 import type { LinkObject } from "./citationTypes.js";
-import type { PlainFilePath } from "../core/plain-file-paths.js";
 
 /**
  * LinkClass - display-layer discriminator (per D3).
@@ -117,12 +116,6 @@ export interface ValidationSummary {
 	errors: number;
 }
 
-export interface PlainPathValidation extends PlainFilePath {
-	target: string | null;
-	candidates: string[];
-	validation: ValidationMetadata;
-}
-
 /**
  * ValidationResult - semantic citation-validation result.
  *
@@ -131,7 +124,6 @@ export interface PlainPathValidation extends PlainFilePath {
 export interface ValidationResult {
 	summary: ValidationSummary;
 	links: EnrichedLinkObject[];
-	plainPaths?: PlainPathValidation[];
 	validationTime?: string;
 }
 

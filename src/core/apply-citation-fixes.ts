@@ -166,28 +166,21 @@ export async function applyCitationFixes(
 			filePath,
 		);
 		const originalContent = fsRead(filePath, "utf8");
-		const plainReferences = findPlainFilePaths(originalContent);
 		const scope = resolveScope({
 			cwd: process.cwd(), targetFile: filePath,
 			...(options.scope !== undefined && { explicit: options.scope }),
 		});
-		if (plainReferences.length > 0 && scope.source === "none") {
-			throw new Error("Cannot resolve plain file paths without a scope. Pass --scope <dir>.");
-		}
-		const plainPaths = plainReferences.map((reference) => ({
-			reference,
-			resolution: resolvePlainFilePath(reference, filePath, scope.scope),
-		}));
-		const unresolved = plainPaths.filter(({ resolution }) => resolution.target === null);
-		const diagnostics = unresolved.length === 0 ? "" : `\n\nUnresolved plain file paths:\n${unresolved.map(({ reference, resolution }) =>
-			`  Line ${reference.line}: ${resolution.candidates.length > 1
-				? `Ambiguous plain file path: ${reference.raw}. Candidates: ${resolution.candidates.join(", ")}`
-				: `File not found: ${reference.path}`}`,
-		).join("\n")}`;
-		const plainFixes = plainPaths.filter(({ reference, resolution }) =>
-			reference.context === "prose" && reference.path.toLowerCase().endsWith(".md") &&
-			resolution.target !== null,
-		);
+		// Plain text is not a reference: only resolved prose `.md` paths become links.
+		const plainFixes = scope.source === "none"
+			? []
+			: findPlainFilePaths(originalContent)
+				.filter((reference) =>
+					reference.context === "prose" && reference.path.toLowerCase().endsWith(".md"))
+				.map((reference) => ({
+					reference,
+					resolution: resolvePlainFilePath(reference, filePath, scope.scope),
+				}))
+				.filter(({ resolution }) => resolution.target !== null);
 		const fixableLinks = validationResults.links.filter(
 			(link: EnrichedLinkObject) =>
 				(link.validation.status === "warning" &&
@@ -195,7 +188,7 @@ export async function applyCitationFixes(
 				isAnchorFixable(link),
 		);
 		if (fixableLinks.length === 0 && plainFixes.length === 0) {
-			return `No auto-fixable citations found in ${filePath}${diagnostics}`;
+			return `No auto-fixable citations found in ${filePath}`;
 		}
 
 		// Scope boundary check: path corrections require scope to resolve filenames.
@@ -290,7 +283,7 @@ export async function applyCitationFixes(
 					output.push("");
 				}
 				output.push("No files were written (--dry-run).");
-				return output.join("\n") + diagnostics;
+				return output.join("\n");
 			}
 
 			const scopeRoot =
@@ -328,9 +321,9 @@ export async function applyCitationFixes(
 				output.push(`    + ${fix.new}`);
 				output.push("");
 			}
-			return output.join("\n") + diagnostics;
+			return output.join("\n");
 		}
-		return `No auto-fixable citations found in ${filePath}${diagnostics}`;
+		return `No auto-fixable citations found in ${filePath}`;
 	} catch (error) {
 		return `ERROR: ${error instanceof Error ? error.message : String(error)}`;
 	}

@@ -82,7 +82,7 @@ function toFileResult(path: string, result: ValidationResult): FileResult {
 
 	const errors: ValidationError[] = ok
 		? []
-		: [...result.links, ...(result.plainPaths ?? [])]
+		: result.links
 				.filter((link) => link.validation.status === "error")
 				.map((link) => ({
 					line: link.line,
