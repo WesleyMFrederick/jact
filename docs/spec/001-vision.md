@@ -73,7 +73,7 @@ It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not 
 | **Never mutates without `--fix`** | `validate`, `ast`, `outline`, `extract` never change a Markdown file; `rename` previews unless `--fix` is set |
 | **Backup before write** | `--fix` writes a timestamped `.bak` before it changes the target file, unless `--no-backup` is set |
 | **Deterministic exit codes** | `0`/`1`/`2` consistent across `validate`, `ast`, `extract` |
-| **Single parse per file** | The parsed-document cache parses each absolute path at most once per process |
+| **Single parse per file** | The parsed-document cache parses each absolute path at most once per process; only a failed parse is retried on the next request |
 | **Original objects never mutated** | Link checking returns a new enriched link and leaves the parsed link unchanged — see [004-domain-model.md](004-domain-model.md#ValidationMetadata%20/%20EnrichedLinkObject) |
 | **Type-safe** | Strict TypeScript: `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitReturns` |
 

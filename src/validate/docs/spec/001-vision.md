@@ -8,7 +8,7 @@ The validate module is the one workflow behind `jact validate`. It takes one Mar
 
 ### What It Does
 
-The module selects files, checks links, and reports one result per file.
+The module selects files, checks links, and reports one result per file. An unreadable or unparsable file stops the batch.
 
 1. **Single-input workflow** — scope, parse, opt-out check, link check, and line filter for one file or for `--stdin` content
 2. **File-set selection** — globs, explicit paths, and git-changed Markdown resolved into one sorted, deduplicated list

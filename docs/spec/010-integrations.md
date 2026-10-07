@@ -8,7 +8,7 @@ jact connects to four outside systems: editor hooks, AI agent sessions, the npm 
 
 An editor hook runs `jact validate` on each Markdown write. Contract:
 
-- Input: a file path, or `--stdin` content with its intended path. jact infers the scope by walking up from the working folder to `.git` or `package.json`.
+- Input: a file path, or `--stdin` content with its intended path. jact infers the scope as described in [Scope Resolution Order](006-behavior.md#Scope%20Resolution%20Order).
 - Output: exit 0 allows the write; exit 1 blocks it. The error list (line, link, error, suggestion) goes to standard output.
 - Machine data: a caller that acts on a fix reads the `pathConversion` and `anchorConversion` fields of `--format json` output. It never parses the human `suggestion` text, which can change.
 

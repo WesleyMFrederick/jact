@@ -10,7 +10,7 @@
 
 The module declares shapes and does nothing else.
 
-- Not runtime code — the build emits each file as an empty JavaScript module (`export {};`)
+- Not runtime code — the build emits each `.ts` file as an empty JavaScript module (`export {};`); declaration files emit nothing
 - Not field documentation — the [Domain Model](../../../../docs/spec/004-domain-model.md#004.%20Domain%20Model) section explains each field
 - Not the JavaScript Object Notation (JSON) output contract — the [Interfaces](../../../../docs/spec/005-interfaces.md#005.%20Interfaces) section owns command output
 - Not the definer of dependency-injection interfaces — core component files define them
