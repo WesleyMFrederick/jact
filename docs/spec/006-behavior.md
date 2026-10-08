@@ -2,94 +2,135 @@
 
 **Status:** done
 
+This section states what each jact workflow reads, writes, prints, and exits with, in order. Exit code meanings live in [Exit Codes](005-interfaces.md#Exit%20Codes). Code ownership lives in the `src/` module folders.
+
 ## Validate Workflow (single file)
 
-`ValidationWorkflow.validate()` (`src/validate/validation-workflow.ts`), used by file, in-memory, and batch validation:
+Single-file validation checks the link syntax in one Markdown file and prints one report. It writes no files. File, `--stdin`, and batch validation share steps 1–4.
 
-1. **Resolve scope** via `prepareScope()`. Seeds the shared `FileCache` even when `--scope` is omitted, so bare wiki page names resolve.
-2. **Emit scope notices** (non-JSON format only), such as an automatically selected Obsidian vault.
-3. **Parse** through `ParsedFileCache`. If `ParserOutput.validationDisabled` is true, return a successful skipped outcome before citation validation, nested-codeblock detection, line filtering, or fixes.
-4. **Validate links** with `CitationValidator.validateDocument()`, check plain file paths against disk, and detect nested-codeblock warnings.
-5. **Apply `--lines` filter** if present. Filter both `links` and `plainPaths`, then recompute `summary` from both collections.
-6. **Format**: `--format json` uses `formatAsJSON()`; human output uses the verbose tree or minimal formatter.
-7. **Append gitignore hint** if a wiki page was not found and the active scope has a `.gitignore`.
+```text
+1. Resolve scope ── no root found ──▶ ERROR: cannot resolve scope … (exit 2)
+   │  index the scope folder, even without --scope, so bare wiki page names resolve
+   ▼
+2. Read the file ── missing ──▶ ERROR: File not found … (exit 2)
+   │  --stdin: read standard input; <path> sets scope and relative links only
+   ▼
+3. Parse ── disable directive ──▶ SKIPPED: validation disabled by document directive (exit 0)
+   ▼
+4. Check every link; detect nested code blocks
+   │  plain text and inline code are never checked
+   ▼
+5. --lines: keep links in the range; recompute the summary from them
+   ▼
+6. Print (human format only, before the report):
+   │  scope notices (vault notice, gitignored-target notice)
+   │  --verbose: file count and duplicate-filename warning
+   ▼
+7. Print the report: JSON (--format json), or the minimal or --verbose tree
+   │  human format adds a .gitignore hint when a wiki page is not found
+   │  and the scope honors a .gitignore
+   ▼
+8. Exit 0 (no link errors) or 1 (link errors)
+```
 
-`JactCli.validateContent(content, options & {filePath})` is the in-memory analogue for `--stdin`: it skips the disk read and parses the supplied content, while `filePath` remains the intended path for scope resolution and relative links.
+A failure in steps 1–4 prints `ERROR: <message>`, or a JSON object with `error`, `file`, and `success: false`, and exits `2`.
 
-The disable state is parser-derived, not found by a source-text scan. `<!-- jact-validate-disable -->` must be the exact first mdast HTML body node; one mdast YAML frontmatter node may precede it. Blank lines do not create body nodes. Comments after other content, inside code fences or blockquotes, or with additional text do not disable validation.
+The disable directive is the exact comment `<!-- jact-validate-disable -->` as the first body block. One YAML frontmatter block may come before it; blank lines do not count. The comment does not disable validation after other content, inside a code fence or blockquote, or with other text on its line.
 
 ### Plain File Paths
 
-`src/core/plain-file-paths.ts` exposes `findPlainFilePaths(content)` and `resolvePlainFilePath(reference, sourceFile, scope)` for validation and rename. The scanner uses the Markdown parser's syntax tree to select prose, inline-code, and code-block spans. It does not scan existing links, reference definitions, wiki links, citations, images, HTML, YAML, or Obsidian comments. URLs, globs, and template paths are excluded.
+The plain path scanner finds file paths written as text or code. Only `--fix` (prose `.md` conversion) and `jact rename` use it; validation never does. The scanner reads prose, inline code, and code blocks from the parsed tree. It skips links, reference definitions, wiki links, citations, images, HTML, YAML, Obsidian comments, URLs, globs, and template paths.
 
-Each reference carries its original text, file path, optional `#anchor` or `:line` suffix, source offsets, line, column, and prose/code context. Offsets cover only the path and suffix; enclosing quotes, backticks, and fences remain outside the edit span. Bare filenames require an extension; slash paths, absolute paths, and `~/` paths are also supported. A `/goal` command verb is not a file reference; its path operands are checked.
+| Rule | Behavior |
+|---|---|
+| Shape | A bare filename needs an extension. Slash, absolute, and `~/` paths also match. An optional `#anchor` or `:line` suffix follows the path. |
+| Edit span | Only the path and suffix. Enclosing quotes, backticks, and fences stay outside. |
+| `/goal` | The command verb is not a path; its path operands are. |
+| Resolution | Exact existing files only, relative to the note and the scope root. Absolute paths use their own location; `~/` expands from the home folder. Folders are not targets. |
+| Outcome | One distinct file resolves. Two distinct files are ambiguous. None is unresolved. jact does no filename search or fuzzy match. |
 
-Resolution checks only exact existing files relative to the note and the scope root. Absolute paths use their own location; `~/` expands from the home directory. Directories are not file targets. One distinct existing candidate succeeds; two distinct candidates produce an ambiguity error listing both. Missing targets produce a file-not-found error. No basename search or fuzzy matching is used.
+`--fix` converts only resolved prose `.md` references to Markdown links, with a destination relative to the note:
 
-Plain references remain separate from the existing `links` contract in `ValidationResult.plainPaths`. Each entry carries `target`, `candidates`, and validation metadata. Summary counts include both collections. Human, single-file JSON, batch, in-memory, and line-filtered validation include plain-path errors.
+- The link keeps an `#anchor` in its text and destination. It keeps a line suffix (`:12`, `:L12-L14`) in its text only.
+- Non-Markdown paths, inline code, code blocks, `/goal` commands, shell-prompt lines, and unmarked lowercase command-shaped lines stay plain, so commands stay usable. `jact rename` still rewrites their file targets.
+- Missing and ambiguous references stay unchanged and unreported, because plain text may not be a path.
+- With no resolvable scope, `--fix` skips plain-path conversion.
 
-`--fix` converts only resolved prose `.md` references to Markdown links, with a destination relative to the note. Anchors are retained in both link text and destination; line suffixes such as `:12` and `:L12-L14` are retained only in the link text. Non-Markdown paths, inline code, code blocks, `/goal` commands, and shell-prompt lines remain plain. Unmarked lowercase command-shaped lines are conservatively preserved to honor the USER's requirement that commands remain usable. Their file targets are still checked and rewritten during moves. Missing and ambiguous references are not converted and are reported in the fix output.
-
-Validation and `--fix --dry-run` do not write files or backups. Applied conversions use the same timestamped backup behavior as citation fixes, including `--no-backup`. Edits use original source offsets, so a prose occurrence cannot accidentally replace the same text inside code.
+Validation and `--fix --dry-run` write no files or backups. Applied conversions use the citation-fix backup rules, including `--no-backup`. Edits use source offsets, so a prose match never replaces the same text inside code.
 
 ## Validate Workflow (batch)
 
-Batch mode (`src/cli.ts`) is a distinct orchestration path over the same validation workflow:
+Batch validation runs the single-file steps 1–4 on many files, one file at a time, and prints one combined report. Several paths, a glob, `--changed`, or `--json` select batch mode.
 
-1. `resolveFileSet({paths, changed}, cwd)` expands globs, unions `--changed` Markdown files, deduplicates, and sorts.
-2. Fresh parser, cache, and validator instances are constructed per batch run.
-3. `runBatch(files, validateOne)` iterates sequentially to avoid shared-cache races.
-4. Completed results map to passing or failing `FileResult` values. Disabled documents map to `ok: true`, `errors: []`, and `skipped: true`.
-5. `BatchSummary` counts skipped files separately; `passed` excludes them.
-6. `renderHuman()` totals errors across the batch. At five or fewer it reports every file and error. Above five, default output reports only failing files with per-file error counts, the totals, the reason details were hidden, and drill/filter/fix guidance. `--verbose` bypasses the collapse. `renderJson()` remains complete.
-7. Exit code is `1` only when `failed > 0`; a batch containing only passes and skips exits `0`.
+```text
+1. Select files: expand globs, add --changed Markdown files, drop ignored sweep
+   │  matches, keep .md only, deduplicate, sort
+   │  ── nothing selected ──▶ ERROR (exit 2); --changed alone with no changes → exit 0
+   ▼
+2. Validate each file in order with one shared cache
+   │  ── any file fails (scope, read, size, parse) ──▶ ERROR: <message> on stderr,
+   │                                                   no report, exit 2
+   ▼
+3. Map each file: pass, fail (with its errors), or skipped (disable directive)
+   ▼
+4. Print: JSONL (--json, one object per file) or the human report
+   ▼
+5. Exit 1 when any file failed; else 0 (passes and skips only)
+```
+
+The human report counts skipped files apart from passed files. With five or fewer errors in total, it lists every file and error. Above five, it lists only failing files with per-file error counts, then the totals, why details are hidden, and drill, filter, and fix commands. `--verbose` always prints the full report. JSONL output is always complete. Batch mode prints no scope notices.
 
 ## Scope Resolution Order
 
-`resolveScope()` (`src/core/resolveScope.ts`) is a pure function (only I/O is `fs.existsSync`) used by every command that needs to locate a project/vault root:
+Every command that needs a project or vault root resolves scope in this order. The first hit wins.
 
-1. **Explicit** — `--scope <folder>` is trusted completely, no marker search.
-2. **Nearest marker walking up from cwd** — checks each directory level for `.git`, `.obsidian`, `package.json` (same-level tiebreak order: `.git` > `.obsidian` > `package.json`, i.e. repo root beats vault root beats sub-project).
-3. **Nearest marker walking up from the target file's directory** — same marker search, different starting point.
-4. **None** — no marker found via either walk; the caller gets a `triedFallbacks` list for the error message and must pass `--scope` explicitly.
+1. **Explicit.** jact trusts `--scope <folder>` without a marker search.
+2. **Up from the working folder.** The nearest folder that holds `.git`, `.obsidian`, or `package.json` wins. At one level, `.git` beats `.obsidian` beats `package.json`.
+3. **Up from the target file's folder.** Same marker search, different start.
+4. **None.** The command fails with `cannot resolve scope. Tried: <folders>. Pass --scope <dir>.`
 
-When the scope resolves via `.obsidian` (not an explicit `--scope`), `JactCli` emits a notice: *"Scoped to `<dir>` (nearest Obsidian vault). Override with --scope <dir>."* — surfacing the default instead of hiding it.
+When `.obsidian` selects the scope, single-file `validate` in human format prints `Scoped to <dir> (nearest Obsidian vault). Override with --scope <dir>.` before its report. JSON output, batch mode, and other commands do not print it.
 
 ## Linked-context Backlink Discovery
 
-`extract header ... --extract-linked-content` begins with the complete file list produced by [Scope Resolution Order](#Scope%20Resolution%20Order). Before parsing backlinks, `BacklinkCandidateFilter` reads each file as text and keeps files containing the root filename stem in decoded or percent-encoded form, case-insensitively. It always keeps the root file so same-file header links remain discoverable.
+`extract header ... --extract-linked-content` finds backlinks in every file in the [Scope Resolution Order](#Scope%20Resolution%20Order) scope. A text screen first drops files that cannot link to the root file:
 
-The screen is excludes-only. Every candidate is parsed and every possible backlink is resolved through `CitationValidator.resolveCitationTarget()` before it can appear in the result. Unreadable files, an empty root stem, and candidate-filter failures use exhaustive parsing instead. Output, failures, exit codes, and `scope.filesScanned` therefore retain exhaustive-scan semantics.
+- A file stays when its text contains the root file's name stem, decoded or percent-encoded, in any letter case.
+- The root file always stays, so same-file header links remain discoverable.
+
+The screen only drops files. jact parses every remaining file and resolves each possible backlink with the same rules as link validation. An unreadable file, an empty name stem, or a screen failure makes jact parse every scope file. Output, failures, exit codes, and `scope.filesScanned` therefore equal a full scan.
 
 ## Path Resolution Strategy Order (cross-document links)
 
-`CitationValidator.validateCrossDocumentLink()` iterates `defaultPathResolutionStrategies` (`src/core/CitationValidator/pathResolutionStrategies/index.ts:32-38`) and returns the first non-null result:
+A cross-document link's file check returns the first rule that applies. A path with malformed percent-encoding fails first with `Malformed percent-encoding in link path`.
 
-1. **`WikiFastPathStrategy`** — wiki link (`[[...]]`) whose parser-resolved absolute path already exists; trusts it, checks the anchor, short-circuits valid.
-2. **`WikiFailLoudStrategy`** — wiki link whose resolution failed at parse time (`target.path.absolute === null` with a non-empty `attempted` log) → hard error listing every path the parser tried.
-3. **`FolderLinkStrategy`** — the resolved path exists but is a directory, not a file → warning.
-4. **`FileFoundStrategy`** — target file exists on disk via standard or cross-directory resolution; warns + suggests a path-conversion fix if the resolution crossed directories, otherwise valid after an anchor check.
-5. **`CacheFallbackStrategy`** — file not found via standard resolution; probes `FileCache.resolveFile()` for a fuzzy match, an exact match in a different directory, or a duplicate-filename conflict. This strategy always returns a result (never `null`), so it terminates the chain.
+jact first picks a candidate file, trying in order: `~/` from the home folder; the path relative to the source note (decoded, then raw); the Obsidian vault-absolute form (`0_SoftwareDevelopment/...`); and the path relative to the note's real location when the note is a symbolic link. If none exists, the candidate is the plain relative path.
 
-For duplicate-filename failures, `FileCache` ranks every candidate by directory-tree distance from the unresolved target's expected directory. Normalized scope-relative path provides the deterministic tie-break. Default human and single-file JSON output render the first five candidates, an omitted count, and recovery guidance. `--verbose` renders the full ranked set. Stored candidates remain complete in both modes.
+| # | Rule | Result |
+|---|---|---|
+| 1 | Wiki link whose parser-resolved file exists | Valid after the anchor check |
+| 2 | Wiki link the parser could not resolve | Error `Wiki page not found`, listing every path tried |
+| 3 | Candidate is a folder | Warning: link to a file inside the folder |
+| 4 | Candidate file exists | Valid after the anchor check; a warning and a path-conversion fix when the file sits in another folder |
+| 5 | Filename search in the scope index | Fuzzy or other-folder match: resolved with a path-conversion fix; duplicate names or no match: error `File not found` |
 
-Internally, `PathResolver.resolveTargetPath()` (`src/core/CitationValidator/PathResolver.ts:123-195`) runs its own 5-step waterfall to produce the candidate path each strategy checks: (0) tilde-expand `~/`, (1) standard relative resolution (with a decoded/non-decoded retry for URL-encoded paths), (2) Obsidian absolute-path format (`0_SoftwareDevelopment/...` style, walking up from the source file to find a match), (3) symlink-resolved source directory retry, (4) `FileCache` smart filename matching. If none succeed, it falls back to the standard path, which the caller then reports as "file not found."
+Rule 5 always returns a result, so the chain always ends. For duplicate filenames, jact ranks candidates by folder distance from the expected folder, then by scope-relative path. Default output shows the first five, the omitted count, and recovery guidance. `--verbose` shows all.
 
 ## Anchor Matching Order
 
-`AnchorMatcher.findFlexibleAnchorMatch()` (`src/core/CitationValidator/AnchorMatcher.ts:66-117`) tries, in order:
+An anchor check on a resolved target runs these steps in order.
 
-1. **Exact match** — search anchor equals the header's `id`.
-2. **Raw-text match** — search anchor equals the header's `rawText`.
-3. **Backtick-unwrapped** — search anchor is backtick-wrapped; strip backticks and compare to the header's raw/id text.
-4. **Backtick-wrapped** — the header's raw text contains backticks; wrap the search term in backticks and compare.
-5. **Markdown-cleaned comparison** — both sides run through `cleanMarkdownForComparison()` (tokenizer-backed `stripInlineMarkdown` plus domain-specific normalization: strip `:` → space, strip backslashes/brackets, collapse whitespace) and compared.
+1. **Dropped characters.** A header anchor with characters Obsidian drops is an error: see [Anchors with characters Obsidian drops](#Anchors%20with%20characters%20Obsidian%20drops).
+2. **Match.** An anchor matches a heading or block when any form is equal: the exact ID, the URL-encoded or decoded ID, the normalized ID, the raw heading text, the text with backticks added or removed, or both sides with Markdown formatting removed. A block anchor also matches with or without its leading `^`.
+3. **Missing caret.** A link that matches only a block anchor and omits `^` is a warning that suggests `#^<id>`.
+4. **Kebab-case slug.** A kebab-case slug of a heading fails with a suggestion to use the raw heading text. `--fix` applies it.
+5. **No match.** The error `Anchor not found` lists similar anchors, up to five headers, and up to five block references. When a listed header is close, `--fix` uses it.
 
-`validateAnchorExists()` (`AnchorMatcher.ts:142-279`) wraps this with additional passes checked *before* falling through to the flexible matcher: a direct `ParsedDocument.hasAnchor()` check, block-ref-without-caret detection (a link to `^id` that omits the leading `^`), URL-decoded `%20` matching for emphasis-marked anchors, and `^`-prefixed Obsidian block-reference matching. If nothing matches, it falls back to an Obsidian "better format" suggestion (prefer the raw header over a guessed kebab-case slug) and, failing that, Levenshtein-based similar-anchor suggestions.
+Same-file `[text](#heading)` links run the same steps against their own file.
 
 ### Anchors with characters Obsidian drops
 
-Obsidian drops `:` `#` `|` `^` `[` `]` from heading-link anchors. It renders an anchor that keeps any of these characters as an external link. Before the matching passes, `validateAnchorExists()` decodes a header anchor (an anchor that does not start with `^`) and checks it for these characters. If the anchor has one, `AnchorMatcher` replaces each character with a space, collapses whitespace, and matches again. When a header matches, the link is an error:
+Obsidian drops `:` `#` `|` `^` `[` `]` from heading-link anchors. It renders an anchor that keeps any of these characters as an external link. jact decodes each header anchor (one that does not start with `^`) and checks it for these characters. If the anchor has one, jact replaces each with a space, collapses whitespace, and matches again. When a header matches, the link is an error:
 
 - `error`: `Anchor uses characters Obsidian drops (<chars>): #<anchor>`
 - `suggestion`: the corrected anchor, `#` + the header text with those characters replaced and whitespace collapsed, spaces encoded as `%20`. Examples: `#Q1%20Does%20the%20gap?` for the heading `Q1: Does the gap?`; `#Trace%20run%20(opsx%20continue)` for the heading `Trace: run (opsx:continue)`
@@ -99,21 +140,21 @@ If no header matches after the replacement, the normal `Anchor not found` result
 
 ## Extraction Eligibility Order
 
-`ContentExtractor.extractContent()` runs each cross-document link (internal links are filtered out first, per AC15) through `analyzeEligibility()`, which tries strategies in this fixed order (`componentFactory.ts:95-99`, wired in `createContentExtractor`):
+Extraction decides per link whether to read its target. Same-file links are excluded, except in linked-context extraction. A link that failed validation is skipped. jact then applies these rules in fixed order; the first decision wins:
 
-1. **`StopMarkerStrategy`** — a `%%stop-extract-link%%` marker immediately after the link forces `eligible: false`. Highest precedence — an explicit stop always wins.
-2. **`ForceMarkerStrategy`** — a `%%force-extract%%` marker forces `eligible: true`, overriding the `--full-files` requirement below.
-3. **`SectionLinkStrategy`** — any link with a non-null `anchorType` (header or block) is eligible by default; no flag needed.
-4. **`CliFlagStrategy`** — terminal strategy, never returns `null`. A full-file link (no anchor) is eligible only if `--full-files` was passed; otherwise ineligible.
+1. **Stop marker.** `%%stop-extract-link%%` right after the link makes it ineligible. An explicit stop always wins.
+2. **Force marker.** `%%force-extract%%` makes it eligible, without `--full-files`.
+3. **Section link.** A link with a header or block anchor is eligible.
+4. **CLI flag.** A full-file link is eligible only with `--full-files`. This rule always decides.
 
-Links that fail validation (`status === "error"`) are skipped before eligibility is even checked. Eligible links dispatch to `ParsedDocument.extractSection()`, `.extractBlock()`, or `.extractFullContent()` depending on `anchorType`, then get deduplicated by a SHA-256 content hash — a second link to already-extracted content increments `duplicateContentDetected`/`tokensSaved` instead of re-emitting the content.
+An eligible link yields its section, block, or full file. jact deduplicates content by SHA-256 hash. A repeat link increases `duplicateContentDetected` and `tokensSaved` instead of emitting the content again.
 
 ## Extraction Read Boundary
 
 Extraction reads a link target only when the target is inside a permitted directory. This rule applies to every target that comes from a link in Markdown: `extract links` (including `--full-files` and force markers), and `extract file` or `extract header` with `--extract-linked-content`. A file that the user names on the command line (`extract file <path>`, `extract header <path>`) is always permitted.
 
 - **Permitted directories.** The scope root (the `--scope` value or the inferred project root) is permitted. Each `--allow-read <dir>` adds one more directory. The flag is repeatable.
-- **Check.** jact resolves symlinks in the target and in each directory with `realpath`, then compares them with `path.relative`. Absolute paths, `~/` paths, `../` traversal, symbolic links to files or parent directories outside the root, and sibling folders that share a name prefix (`/proj-evil` next to `/proj`) are all outside.
+- **Check.** jact resolves symbolic links in the target and in each directory, then checks containment. Absolute paths, `~/` paths, `../` traversal, symbolic links to files or parent directories outside the root, and sibling folders that share a name prefix (`/proj-evil` next to `/proj`) are all outside.
 - **Result.** jact does not read a blocked target. The link gets status `skipped` with the reason `Blocked: target is outside the project. To allow, add --allow-read <dir>.` jact prints that reason on stderr with the source `file:line`. `extract file` does not follow links in a blocked file. In linked header output, the link shows as `not-followed` with the same reason. A blocked link is an intentional skip, so exit codes follow the existing rules for skipped links.
 - **Validation.** `validate` does not use this boundary.
 
@@ -121,38 +162,82 @@ A link path with malformed percent-encoding (for example, `%E0%A4%A`) does not c
 
 ## Input Size Limits
 
-jact uses fixed limits so that hostile or very large input cannot stop the process. Each limit is a constant in the module that owns it.
+jact uses fixed limits so that hostile or very large input cannot stop the process.
 
-- **Markdown file size.** jact does not parse a Markdown file larger than 8 MiB (`MAX_MARKDOWN_FILE_BYTES` in `src/core/MarkdownParser/MarkdownParser.ts`). The error is `Skipped <path>: file is larger than 8 MiB.` For a file named on the command line, the command exits with code `2`. For a link target, the link fails with that reason. Parse cost still grows with file size. A 4 MiB file that contains only links validates in about 13 seconds and uses about 3 GB of memory. A file of that kind near 8 MiB can need more memory than Node.js allows. Then the process stops with an out-of-memory error.
-- **Similar-anchor suggestions.** `ParsedDocument.findSimilarAnchors()` in `src/ParsedDocument.ts` skips an anchor longer than 256 characters (`MAX_FUZZY_ANCHOR_LENGTH`). It compares at most 1,000 anchors for each lookup (`MAX_FUZZY_ANCHOR_CANDIDATES`). It compares at most 20,000,000 character pairs for each target document (`MAX_FUZZY_ANCHOR_WORK`). After a limit, jact gives fewer suggestions or none. The `Anchor not found` error stays the same.
-- **Anchor lookup.** `AnchorMatcher` in `src/core/CitationValidator/AnchorMatcher.ts` normalizes each anchor one time for each parsed document. A link lookup reads only the anchors that share a text form with the link. Many broken links to a document with many headings stay fast.
-- **Similar wiki page names.** `resolveWikiPath()` in `src/core/MarkdownParser/resolveWikiPath.ts` does not compare a file name longer than 256 characters (`MAX_FUZZY_NAME_LENGTH`). Such a wiki link gets no page-name suggestion.
-- **Directory scan.** The `FileCache` scan in `src/FileCache.ts` reads each real directory (after `realpath`) one time. A symbolic link loop in the scope does not repeat the scan. A directory that two paths reach is scanned only through the first path.
+- **Markdown file size.** jact does not parse a Markdown file larger than 8 MiB. The error is `Skipped <path>: file is larger than 8 MiB.` For a file named on the command line, the command exits with code `2`. For a link target, the link fails with that reason. Parse cost still grows with file size. A 4 MiB file that contains only links validates in about 13 seconds and uses about 3 GB of memory. A file of that kind near 8 MiB can need more memory than Node.js allows. Then the process stops with an out-of-memory error.
+- **Similar-anchor suggestions.** jact skips an anchor longer than 256 characters. It compares at most 1,000 anchors for each lookup and at most 20,000,000 character pairs for each target document. After a limit, jact gives fewer suggestions or none. The `Anchor not found` error stays the same.
+- **Anchor lookup.** jact normalizes each anchor one time for each parsed document. A link lookup reads only the anchors that share a text form with the link. Many broken links to a document with many headings stay fast.
+- **Similar wiki page names.** jact does not compare a file name longer than 256 characters. Such a wiki link gets no page-name suggestion.
+- **Directory scan.** The scope index reads each real directory (after symbolic link resolution) one time. A symbolic link loop in the scope does not repeat the scan. A directory that two paths reach is scanned only through the first path.
 
 ## Citation Patterns Supported
 
-| Pattern | Example | Classification |
-|---|---|---|
-| Cross-document link | `[Text](path/to/file.md#anchor)` | `CROSS_DOCUMENT` |
-| Internal anchor link | `[Text](#anchor)` | `INTERNAL_ANCHOR` |
-| Wiki-style link | `[[file.md#anchor\|text]]` or `[[#anchor\|text]]` | `WIKI_STYLE` |
-| Caret / block reference | `^FR1`, `^US1-1AC1` | `CARET_SYNTAX` |
-| Emphasis-marked anchor | `==**Component Name**==` | `EMPHASIS_MARKED` |
-| Citation format | `[cite: path]` | tokenized via the `citation` micromark extension |
+jact parses six link patterns with its Markdown syntax extensions, not with regular expressions over raw text. Each pattern gets one check.
 
-All six are tokenized by the Flavor Extension Collection (see the Architecture section) rather than re-derived with regex against raw source text; `CitationValidator.classifyPattern()` (`CitationValidator.ts:206-`) dispatches each `LinkObject` to its pattern-specific validator based on `scope`/`anchorType`/`linkType`.
+| Pattern | Example | What validation checks |
+|---|---|---|
+| Cross-document link | `[Text](path/to/file.md#anchor)` | File, then anchor, per the two orders above |
+| Internal anchor link | `[Text](#anchor)` | Anchor in the same file |
+| Wiki-style link | `[[file.md#anchor\|text]]` or `[[#anchor\|text]]` | Cross-document form: file, then anchor. Same-file form: always valid |
+| Caret / block reference | `^FR1`, `^US1-1AC1` | ID format only |
+| Emphasis-marked anchor | `==**Component Name**==` | Anchor format only |
+| Citation format | `[cite: path]` | Target file, as a cross-document link |
 
 ## Fix Workflow (`--fix`)
 
-`JactCli.fix()` parses before selecting fixes. A document with the validation-disable directive returns the same successful skip result as validation and is not read again, backed up, or written. Other documents validate, filter to fixable links, require `--scope` for path fixes, and then either print a dry-run diff or write the fixes. Before it writes, `--fix` creates a timestamped `.bak` backup; `--no-backup` skips the backup. Anchor fixes cover the kebab-case-to-raw-header conversion, a fuzzy header match for a missing anchor, and anchors with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged (for example, a missing anchor with no close header match) is not applied, counted, or reported. If no fix changes a citation, `--fix` prints `No auto-fixable citations found in <file>` and writes nothing.
+`--fix` repairs broken citations and converts resolved prose `.md` paths in one file. It writes only that file and its backup.
+
+```text
+1. Parse ── disable directive ──▶ SKIPPED: … (file not read again, backed up, or written)
+   ▼
+2. Validate; collect citation fixes and plain-path conversions
+   │  ── none ──▶ No auto-fixable citations found in <file>
+   │  ── a path fix without --scope ──▶ ERROR: Path corrections require --scope …
+   ▼
+3. --dry-run: print the diff and stop
+   ▼
+4. Refuse when the file is a symbolic link, is outside the scope, or its backup path exists
+   ▼
+5. Write a timestamped .bak backup (skipped with --no-backup), then replace the file in one step
+   ▼
+6. Print each fix and the backup path
+```
+
+Fix kinds: a path conversion, a kebab-case anchor to its raw heading, a close heading for a missing anchor, and an anchor with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged is not applied, counted, or reported. A changed citation or two overlapping edits stop the fix before any write. `--fix` exits `0`, including when it prints `ERROR:`.
 
 ## Rename Workflow (`jact rename`)
 
-`JactCli.rename()` gives existing source paths literal precedence over glob expansion, including names containing brackets. It expands only non-existing glob sources to regular files, applies ignore rules, and refuses a glob when no eligible files remain. It infers scope from the first source and calls `renameMarkdownFiles()` (`src/core/rename-markdown-file.ts`), which runs in this order:
+`jact rename` moves Markdown files and folders and rewrites every link and plain path that the move changes. Preview is the default; `--fix` applies.
 
-1. **Plan moves.** Resolve each source's destination with `mv` rules, then refuse invalid or overlapping requests before reading any links. Collect missing destination directories. Expand every directory move into a map from each carried file's current path to its new path. Reject a source directory if it contains a symlink (a file or folder shortcut), including nested file and folder symlinks. Report the shortcut path with exit code 1. Preview and `--fix` both stop without changing files.
-2. **Plan reference edits.** Parse discovered Markdown notes plus every moved Markdown file. A cross-document link or plain path is rewritten when its target moves or its file changes directory. The new text points at the target's final location. Unchanged rewrites are dropped. For every note whose reference text would change, resolve its physical location and refuse the whole plan with exit code 1 if it is outside canonical scope, including another Windows drive or unrelated network root. This happens before backups, staging, directory creation, writes, or moves. Reference discovery through internal symlinks remains allowed, and an external note with no selected edits does not trigger the containment check. Image embeds that the moves would break refuse the plan, because they are outside the link model. Reference-style images such as `![picture][pic]` use ordinary parsed definitions such as `[pic]: notes/p.png`, which follow the same link-rewrite rules.
-3. **Preview** returns the plan. **Apply** (`--fix`) re-checks that sources, destinations, and edited files did not change. It then backs up and stages edits, writes them, creates directories, performs the moves, and verifies every rewritten relationship at its final location against the planned target: parsed links are re-parsed, and plain paths are checked with exact disk resolution. On failure, recovery is best-effort: it attempts to reverse every completed move, remove every created directory, and restore every edited file from backups, continuing after recovery errors, and exits 2. Nonempty directories are retained rather than deleting files created by another process; errors and retained backup paths are reported for manual recovery.
+Source selection: an existing path is literal, even with glob characters such as brackets. jact expands only a non-existing glob, to regular files, and applies ignore rules. A glob with no eligible files is refused. Scope comes from the first source.
+
+```text
+1. Plan moves ── invalid, overlapping, or folder holds a symbolic link ──▶ refuse (exit 1)
+   │  resolve each destination with mv rules; collect missing destination folders;
+   │  map every file inside a moved folder to its new path
+   ▼
+2. Plan reference edits ── unsafe ──▶ refuse (exit 1)
+   │  parse scope notes and every moved file; rewrite each link or plain path whose
+   │  target moves or whose file changes folder, to the target's final location
+   ▼
+3. Preview: print the plan and stop
+   ▼
+4. Apply (--fix): re-check sources, destinations, and edited files for changes;
+   │  back up and stage edits; write; create folders; move
+   ▼
+5. Verify every rewritten link and plain path at its final location
+   ── failure in step 4 or 5 ──▶ best-effort recovery; report errors and kept backups (exit 2)
+```
+
+Step 2 refuses the whole plan before any write when:
+
+- a moved file's outgoing link, or one of its plain paths, does not resolve or is ambiguous;
+- a note whose reference text would change is physically outside the canonical scope, including another Windows drive or an unrelated network root;
+- the moves would break an image embed, which is outside the link model.
+
+Reference discovery through internal symbolic links stays allowed. An outside note with no selected edits does not trigger the containment check. Reference-style images such as `![picture][pic]` use parsed definitions such as `[pic]: notes/p.png`, which follow the link-rewrite rules.
+
+Recovery attempts to reverse every completed move, remove every created folder, and restore every edited file from backups. It continues after recovery errors. It keeps nonempty folders rather than delete files that another process created.
 
 Embed classification comes from parsed syntax, not decoded prose. Escaped examples such as `\!\[\[folder/image.png\]\]` and `!\[\[folder/image.png\]\]`, inline code, and fenced code do not block a move. In `\![[notes/a.md]]`, only the bang is escaped: the ordinary wiki link still follows the link-rewrite rules. A genuine embed that still resolves correctly after a move remains unchanged.
 
@@ -162,6 +247,8 @@ A valid Markdown image with bracketed description text, such as `![[caption]](fo
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift. Batch abort on a failed file, scope-notice output, and same-file wiki-link handling stated as observed behavior |
+| 1.0.0-draft | 2026-10-07 | Validation checks link syntax only; `plainPaths` removed from `ValidationResult`, so plain text and code never produce errors (issue #110). `--fix` no longer reports unresolved plain text and skips plain conversion without a scope |
 | 1.0.0-draft | 2026-10-06 | Parser-owned wiki embed detection distinguishes genuine embeds from escaped prose and code; rename consumes typed embed references without rescanning decoded text |
 | 1.0.0-draft | 2026-10-06 | Shared rename containment rejects absolute relative-path results across Windows drives and unrelated network roots; equality and descendants remain accepted |
 | 1.0.0-draft | 2026-10-06 | Corrected rename glob eligibility: regular files after ignore filtering, not Markdown-only matches or batch validate's resolver |

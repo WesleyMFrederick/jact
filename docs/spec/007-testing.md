@@ -2,42 +2,55 @@
 
 **Status:** done
 
+jact tests run on Vitest. Unit tests import the TypeScript source; command-line tests run the built CLI, so they need a fresh build.
+
 ## Test Framework
 
-**Vitest**. `npm test` runs the full suite once; `npm run test:watch` runs in watch mode. Tests import from **compiled `dist/`**, not `src/` TypeScript directly — `dist/` must be up to date (`npm run build` / `npx tsc --build`) before running tests, since the test runner executes plain JS. This means a source change with no rebuild will test stale behavior silently; there is no build-on-test-run step.
+**Vitest** runs every test. Vitest compiles TypeScript itself, so a test that imports from `src/` sees source changes without a build. A test that spawns `dist/cli.js` or imports from `dist/` runs the last build. Rebuild with `npm run build` before you run those tests, or they check stale behavior. No test run builds the project for you.
 
 ## Directory Layout (`test/`)
 
+Each folder holds one kind of test.
+
 | Directory | Purpose |
 |---|---|
-| `test/unit/` | Component-level unit tests, including `core/`, `factories/`, `utils/` subdirs and dedicated type-contract tests (e.g. `jact-cli-class-types.test.ts`) |
-| `test/integration/` | End-to-end workflow tests across multiple components (parser → validator → extractor), including an `integration/ContentExtractor/` subdir |
-| `test/core/` | Mirrors `src/core/` structure directly (`ContentExtractor/`, `MarkdownParser/`) |
-| `test/validate/` | Batch-validate feature: `batch-runner.test.ts`, `renderers.test.ts`, `resolve-changed-files.test.ts`, `resolve-files.test.ts`, `validate-integration.test.ts`, plus `git-fixture-test-utils.ts` |
-| `test/cli-integration/` | Full CLI invocations (extract command, extract-header variants, base-paths npm script) |
-| `test/hardening-pipeline/` | Architectural/characterization constraint tests — e.g. `c1-d1-injectable-bans.test.ts` (bans certain hard imports), `c4-portability.test.ts` |
-| `test/cache/`, `test/fixtures/`, `test/helpers/`, `test/regressions/`, `test/scratch/` | Supporting fixtures, test doubles, and regression-specific cases |
+| `test/unit/` | Unit tests for one component, plus type-contract tests for public shapes |
+| `test/core/` | Tests that mirror the `src/core/` folders, one subfolder per component |
+| `test/validate/` | Batch-validate tests: file selection, the batch run, reports, and the end-to-end batch path |
+| `test/integration/` | Workflows that span several components (parser to checker to extractor) |
+| `test/cli-integration/` | Full runs of the built CLI, one command or flag behavior per file |
+| `test/regressions/` | One test per fixed bug, named `<issue-number>-<short-slug>.test.ts` |
+| `test/hardening-pipeline/` | Architecture constraint tests, such as bans on hard-coded dependencies |
+| `test/fixtures/`, `test/helpers/` | Shared Markdown fixtures, CLI runners, and test doubles |
+| `test/scratch/` | Exploratory proofs and benchmarks, not product guarantees |
 
-Mixed `.js`/`.ts` test files coexist: older tests are still plain `.js`, newer ones are `.ts` with explicit type-contract assertions.
+Plain `.js` and `.ts` test files coexist. Newer tests use `.ts`.
 
 ## Conventions
 
-- **TDD-first for new features.** Feature work under `design-docs/features/<slug>/` typically ships its own `spec/006-testing.md` mapping each requirement scenario to a test suite before implementation — see the batch-validate feature's testing spec for the pattern (WHEN/THEN scenarios become test cases directly).
-- **Characterization/snapshot tests guard migrations.** The WMF-35 regex-to-mdast-token migration added characterization snapshots of `cleanMarkdownForComparison` output *before* swapping its internals to a tokenizer-backed implementation, so behavior parity is provable rather than assumed. See ADR-0002 in the ADRs section.
-- **Injectable seams over module mocking.** Git access (`RunGit` type in `resolve-changed-files.ts`) and filesystem access (`FileSystemInterface` in `MarkdownParser`) are injected interfaces, not `vi.mock()` targets — tests supply a stub function/object directly rather than mocking `node:child_process` or `node:fs`.
-- **DI factories accept overrides for testing.** Every `create*` function in `componentFactory.ts` accepts optional dependency parameters (falling back to production defaults), so tests can inject fakes without importing concrete production classes — see the componentFactory entry in the Architecture section.
-- **Type-contract tests are a first-class suite**, not just `tsc` — e.g. `jact-cli-class-types.test.ts` asserts on the shape of `JactCli`'s public API directly, catching accidental signature drift that a behavioral test might miss.
+Five conventions decide how a new test is written.
+
+- **Test first for features.** A feature folder under `design-docs/features/` maps each requirement scenario to a test before the code exists.
+- **Characterization snapshots guard migrations.** Before an internal rewrite, a snapshot pins the old output, so the rewrite proves the same behavior. Example: [ADR-0002 — Regex → mdast-token migration (WMF-35)](../adrs/003-adrs.md#ADR-0002%20—%20Regex%20→%20mdast-token%20migration%20(WMF-35)).
+- **Injected seams, not module mocks.** Git calls and file-system reads come in as injected functions or objects. Tests pass a stub; no test mocks `node:child_process` or `node:fs`.
+- **Factory overrides for fakes.** The component factory accepts dependency overrides, so a test injects a fake without a production class. Why: [ADR-0001 — DI-via-factory pattern](../adrs/003-adrs.md#ADR-0001%20—%20DI-via-factory%20pattern).
+- **Type-contract tests are a suite.** Type tests assert public shapes directly and catch a signature change that a behavior test misses.
 
 ## Running Tests
 
+These commands run the suite.
+
 ```bash
+npm run build            # rebuild dist/ before CLI tests
 npm test                 # full suite once
 npm run test:watch       # watch mode
-npx tsc --build          # rebuild dist/ before testing source changes
 ```
 
 ## Version History
 
+Each row records one version of this section.
+
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0-draft | 2026-07-01 | Initial testing doc, grounded in `test/` directory layout and `test/README.md` |
+| 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |

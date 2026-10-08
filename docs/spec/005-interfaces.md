@@ -2,7 +2,9 @@
 
 **Status:** done
 
-The CLI is the entire public surface — jact ships no HTTP API and no plugin ABI. `src/cli.ts` owns Commander registration; `src/jact-cli.ts` (`JactCli` class) owns orchestration and is independently importable without activating Commander (`src/jact-cli.ts:1-8`).
+The command-line interface (CLI) is the whole public surface of jact. jact ships no HTTP API and no plugin interface. Commands, flags, exit codes, printed output, and JSON shapes in this section are contracts: hooks, scripts, and agents depend on them. `src/cli.ts` registers every command; `jact <command> --help` prints its flags and usage examples.
+
+Each command that takes `--scope <folder>` defaults to a smart scope. The order is in [Scope Resolution Order](006-behavior.md#Scope%20Resolution%20Order).
 
 ## `jact validate`
 
@@ -10,60 +12,41 @@ The CLI is the entire public surface — jact ships no HTTP API and no plugin AB
 jact validate [paths...] [options]
 ```
 
-Reads Markdown notes and validates their existing citations plus plain file references to Markdown and non-Markdown files. Plain references include prose paths, inline and fenced code paths, and command arguments; non-Markdown targets are checked on disk, not parsed as Markdown.
+`jact validate` checks the link syntax of Markdown notes and reports broken links and anchors. It checks Markdown links, reference definitions, wiki links, and citations. Plain text, inline code, and fenced code are never link targets. A word that contains `/` or `.`, a slash command, or a path in prose or code never produces an error.
 
-Plain-path resolution checks exact note-relative and scope-relative candidates, including explicit absolute and tilde paths. It never infers a target by basename or fuzzy filename matching. Missing files and ambiguous exact candidates are reported, not silently repaired or selected. Existing links, definitions, wiki references, and citations are not scanned again as plain paths; URLs, globs, and template placeholders are excluded.
-
-Validation is read-only unless `--fix` is supplied; `--fix --dry-run` also writes nothing. For plain references, `--fix` converts prose `.md` paths into Markdown links while preserving any `#anchor` or `:line` suffix. Commands, inline code, fenced code, and non-Markdown references retain their text formatting; their file targets are still checked. The conversion policy for generic unmarked command lines awaits USER approval and is not finalized here.
+Validation writes no files unless `--fix` is set. `--fix --dry-run` also writes nothing. `--fix` converts a prose `.md` path into a Markdown link only when exactly one existing file matches an exact note-relative or scope-relative candidate. It never guesses by basename or fuzzy match, and it keeps any `#anchor` or `:line` suffix. jact leaves unresolved, ambiguous, code, command, and non-Markdown text unchanged and does not report it. URLs, globs, template placeholders, and existing link syntax are never converted.
 
 **Arguments:**
 
 | Arg | Meaning |
 |---|---|
-| `paths...` | Zero or more markdown file paths and/or glob patterns; omit when using `--changed` alone. With `--stdin`, exactly one path — the intended on-disk path, not read from disk. |
+| `paths...` | Zero or more Markdown file paths or glob patterns. Omit with `--changed` alone. With `--stdin`, exactly one path: the intended on-disk path, which jact does not read. |
 
-**Options** (`src/cli.ts:113-164`):
+**Options:**
 
 | Flag | Default | Description |
 |---|---|---|
-| `--format <type>` | `cli` | Output format: `cli` or `json` (single-file mode only) |
-| `--lines <range>` | - | Validate a specific line range, e.g. `150-160` or `157` |
-| `--scope <folder>` | smart default | Bounds file resolution; plain paths use exact note-relative and scope-relative candidates, without fuzzy guessing |
-| `--fix` | - | Apply existing citation anchor/path fixes and convert prose `.md` paths into links; preserve command/code and non-Markdown text formatting |
-| `--dry-run` | - | Preview `--fix` changes without writing files |
-| `--no-backup` | backup on | With `--fix`, do not write the timestamped `.bak` backup |
-| `--verbose` | `false` | Full validation report, including valid references and all diagnostic candidates, instead of minimal errors/warnings-only output |
+| `--format <type>` | `cli` | `cli` or `json`; single-file mode only |
+| `--lines <range>` | - | Check one line range, such as `150-160` or `157` |
+| `--scope <folder>` | smart default | Bounds file resolution and `--fix` prose-path candidates |
+| `--fix` | - | Single-file mode only: apply citation anchor and path fixes, and convert resolved prose `.md` paths into links |
+| `--dry-run` | - | With `--fix`, print a diff and write nothing |
+| `--no-backup` | backup on | With `--fix`, skip the timestamped `.bak` backup |
+| `--verbose` | `false` | Full report with valid links and every duplicate-file candidate; in batch mode, expand collapsed error details |
 | `--allow-gitignore` | `false` | Include `.gitignore`-excluded files in the scope scan |
-| `--changed` | `false` | Union git working-tree-modified markdown into the selection (batch mode) |
-| `--json` | `false` | Batch mode: emit one compact JSON object per file (JSONL) |
-| `--stdin` | - | Read markdown from stdin; `<path>` is the intended path, not read from disk |
+| `--changed` | `false` | Add git working-tree-modified Markdown to the selection (batch mode) |
+| `--json` | `false` | Batch mode: print one compact JSON object per file (JSON Lines, JSONL) |
+| `--stdin` | - | Read Markdown from standard input; the one path argument is the intended path |
 
-**Mode selection:** batch mode triggers when `paths.length > 1`, `--changed`, `--json`, or any path is a glob pattern (`cli.ts:225-229`). Otherwise it's single-file mode, unchanged from pre-batch behavior.
+**Mode selection:** batch mode runs when there is more than one path, any path is a glob, or `--changed` or `--json` is set. Otherwise jact runs in single-file mode. Batch mode ignores `--format`, `--fix`, `--dry-run`, and `--no-backup`.
 
-**`--stdin` constraints** (`cli.ts:210-223`): exactly one path required; incompatible with any batch-mode trigger (multiple paths, glob, `--changed`, `--json`) — violating either exits 2 with an explicit error.
+**Usage errors (exit `2`):** `--stdin` with zero or several paths, or with any batch trigger; `--json` together with `--format json`. The two JSON outputs have different shapes and cannot combine.
 
-**`--json` + `--format json` conflict** (`cli.ts:202-208`): passing both exits 2 — they are different shapes (single-file rich JSON vs. batch JSONL) and cannot compose.
-
-**Document opt-out:** `<!-- jact-validate-disable -->` skips the whole document only when it is the first Markdown body block, with at most one parser-recognized YAML frontmatter block before it. The directive must be an exact HTML comment node; a later, fenced, quoted, or near-match comment does not disable validation. This applies to file, `--stdin`, batch, and `--fix` workflows.
-
-### Examples
-
-```bash
-jact validate docs/design.md                    # single file, minimal output
-jact validate docs/design.md --verbose           # full valid-citation tree
-jact validate file.md --format json              # single-file JSON
-jact validate file.md --lines 100-200
-jact validate file.md --fix --scope ./docs
-jact validate file.md --fix --dry-run            # preview fixes, no writes
-jact validate file.md --fix --no-backup          # fix without a .bak file
-jact validate "concepts/*.md"                    # glob batch mode
-jact validate a.md b.md c.md                     # explicit multi-path batch
-jact validate --changed                          # all markdown you edited
-jact validate "**/*.md" --json                   # JSONL for CI/agents
-cat draft.md | jact validate <path> --stdin      # validate unwritten content
-```
+**Document opt-out:** `<!-- jact-validate-disable -->` skips the whole document only when it is the first Markdown body block. At most one YAML frontmatter block may come before it. The directive must be an exact HTML comment node; a later, fenced, quoted, or near-match comment does not count. The opt-out applies to file, `--stdin`, batch, and `--fix` runs.
 
 ### Output — single-file, human (default, minimal)
+
+Single-file output is one status line, or error and warning blocks with a final count.
 
 ```
 OK: <N> citations valid
@@ -72,7 +55,7 @@ or, when the document opts out:
 ```
 SKIPPED: validation disabled by document directive
 ```
-or, with errors/warnings:
+or, with errors or warnings:
 ```
 ERRORS (n)
 ...
@@ -81,28 +64,28 @@ WARNINGS (n)
 FAILED: X errors, Y warnings
 ```
 
-Duplicate-filename errors show at most five ranked scope-relative candidates by default, followed by the omitted count and guidance to use `--verbose` or narrow `--scope`. `--verbose` shows every ranked candidate. The same limit applies to the rich single-file JSON suggestion string; internal ranking metadata is not serialized.
+`--format json` prints the full validation result: a `summary` object (`total`, `valid`, `warnings`, `errors`) and a `links` list. The fields are in [ValidationResult](004-domain-model.md#ValidationResult). A missing file prints `{"error", "file", "success": false}` and exits `2`.
 
-Plain-path diagnostics identify the source location and missing target or ambiguous exact candidates. Candidate display does not authorize choosing a target; existing citation duplicate-filename ranking is not a plain-path resolution fallback.
+A duplicate-filename error shows at most five ranked, scope-relative candidates, then the omitted count and a hint to use `--verbose` or a narrower `--scope`. `--verbose` shows every candidate. The JSON suggestion string uses the same limit.
 
 ### Output — batch, human (default)
 
-When a batch has at most five errors in total, output retains one status line per file, full error details, and the file-count summary (`src/validate/renderers.ts`):
+With five or fewer errors in total, batch output shows one status line per file, every error, and a file-count summary.
 
 ```
-SKIPPED: examples/example.md (validation disabled by document directive)
-✅ concepts/bar.md
-❌ concepts/foo.md
+SKIPPED: /abs/examples/example.md (validation disabled by document directive)
+✅ /abs/concepts/bar.md
+❌ /abs/concepts/foo.md
    Line 94: File not found: concepts/attention-mechanism
 ---
 3 files · 1 passed · 1 failed · 1 skipped
 ```
 
-When a batch has more than five errors, default output collapses the details and omits passing and skipped file lines. It reports every failing file with that file's error count, preserves the totals, explains the five-error display limit, and prints commands for single-file validation, line filtering, fix preview/application, full `--verbose` expansion, and help discovery:
+With more than five errors, default output collapses. It lists each failing file with its error count, keeps the summary, and explains the five-error display limit. It then prints commands to check one file, filter lines, preview and apply fixes, expand with `--verbose`, and open help.
 
 ```
-❌ concepts/foo.md (8 errors)
-❌ concepts/baz.md (2 errors)
+❌ /abs/concepts/foo.md (8 errors)
+❌ /abs/concepts/baz.md (2 errors)
 ---
 3 files · 1 passed · 2 failed · 0 skipped
 
@@ -111,17 +94,22 @@ To Drill Into a File: run `jact validate "{{path-to-file}}"`
 ...
 ```
 
-`--verbose` bypasses this collapse and renders every file and error. The collapse changes presentation only: any batch with `failed > 0` still exits `1`.
+`--verbose` turns off the collapse. The collapse changes display only: a batch with one or more failed files exits `1`.
 
 ### Output — batch, `--json` (JSONL)
 
-One complete compact JSON object per line, no summary line (`src/validate/renderers.ts`). JSONL does not apply the human display collapse. Skipped rows have `ok: true`, an empty error list, and `skipped: true`; they do not increment `passed`.
+`--json` prints one complete JSON object per file, one per line, with no summary line and no collapse.
 
 ```json
-{"path":"examples/example.md","ok":true,"errors":[],"skipped":true}
-{"path":"concepts/foo.md","ok":false,"errors":[{"line":94,"message":"File not found: concepts/attention-mechanism"}]}
-{"path":"concepts/bar.md","ok":true,"errors":[]}
+{"path":"/abs/examples/example.md","ok":true,"errors":[],"skipped":true}
+{"path":"/abs/concepts/foo.md","ok":false,"errors":[{"line":94,"message":"File not found: concepts/attention-mechanism"}]}
+{"path":"/abs/concepts/bar.md","ok":true,"errors":[]}
 ```
+
+- `path` — the selected file
+- `ok` — `true` when the file has zero errors; warnings never fail a file
+- `errors` — one `{line, message}` per error; `line` is `null` for a file-level error
+- `skipped` — present and `true` only for an opted-out file, which does not count as passed
 
 ---
 
@@ -131,59 +119,68 @@ One complete compact JSON object per line, no summary line (`src/validate/render
 jact rename <source...> <destination> [options]
 ```
 
-Previews or applies one guarded batch move. Each source is an arbitrary existing file, a quoted glob, or a directory. Existing source paths take literal precedence over glob expansion, including names containing brackets; only non-existing glob sources are expanded to regular files after ignore filtering. The whole request is one plan: parsed links and incoming plain paths from Markdown notes in scope, relationships between moved notes, and outgoing references in moved Markdown notes are rewritten relative to their final locations. Non-Markdown source files can move without their contents being parsed or rewritten. Rewrites that leave reference text unchanged (for example, two siblings moved together) are not counted.
+`jact rename` previews or applies one guarded batch move and rewrites every affected reference. A source is an existing file of any type, a quoted glob, or a directory. An existing source path is literal, even when its name contains brackets. Only a source that does not exist expands as a glob, and only to regular files that pass ignore rules.
 
-Plain references use exact pre-move disk resolution, not basename or fuzzy guessing. Rewrites preserve `#anchor` and `:line` suffixes, enclosing quotes/backticks, code formatting, and executable command syntax, including command prefixes such as `/goal plan:`. Rename changes path text; it does not convert plain references into Markdown links. Already-broken references unaffected by the move remain unchanged; an outgoing reference needed for a safe rewrite must have an unambiguous target.
+One request is one plan. jact rewrites, relative to final locations:
 
-Destination rules, matching `mv`:
+- parsed links and plain paths in in-scope Markdown notes that point at a moved file
+- outgoing references in moved Markdown notes
+- references between moved notes
 
-- One file source, Markdown or not: `<destination>` is a file path, a directory (existing, or written with a trailing `/`), or a bare filename that keeps the source directory.
-- One directory source: the tree moves to `<destination>/<dirname>` when `<destination>` is an existing directory, otherwise to `<destination>`. Every file in the tree moves, Markdown or not, and relative paths inside it are preserved.
-- Several sources, or any glob: `<destination>` is a directory; each source lands at `<destination>/<basename>`.
+jact never parses or rewrites the content of a moved non-Markdown file. A rewrite that leaves the reference text unchanged is not counted.
 
-Missing destination directories are listed in the preview and created on `--fix`.
+Plain references resolve against the disk before the move, by exact path only. Rewrites keep `#anchor` and `:line` suffixes, quotes, backticks, code formatting, and command syntax such as `/goal plan:`. Rename changes path text; it never turns a plain reference into a Markdown link. An already-broken reference that the move does not affect stays unchanged.
+
+Destination rules follow `mv`:
+
+- One file source: `<destination>` is a file path, a directory (existing, or ending in `/`), or a bare filename that keeps the source directory.
+- One directory source: the tree moves to `<destination>/<dirname>` when `<destination>` is an existing directory, otherwise to `<destination>`. Every file moves, and relative paths inside the tree stay the same.
+- Several sources, or any glob: `<destination>` is a directory, and each source lands at `<destination>/<basename>`.
+
+The preview lists missing destination directories; `--fix` creates them.
 
 | Flag | Default | Description |
 |---|---|---|
-| `--scope <folder>` | smart default (inferred from the first source) | Bounds sources, destinations, and the physical locations of notes selected for reference edits |
-| `--fix` | `false` | Apply moves and reference edits; omission is a read-only preview |
-| `--json` | `false` | Emit the structured rename result for the whole batch |
-| `--allow-gitignore` | `false` | Include ignored Markdown notes while discovering incoming links and plain paths |
+| `--scope <folder>` | smart default | Bounds sources, destinations, and the physical location of each note that gets a reference edit |
+| `--fix` | `false` | Apply moves and reference edits; without it, jact only previews |
+| `--json` | `false` | Print the structured result for the whole batch |
+| `--allow-gitignore` | `false` | Include ignored Markdown notes when jact searches for references |
 
-The plan is refused (exit `1`, nothing written) when:
+jact refuses the plan with exit `1` and writes nothing when:
 
+- a source or destination argument is missing
 - a source does not exist, is outside scope, or is neither a file nor a directory
-- a source directory contains a symlink descendant, including a nested file or folder symlink; preview and `--fix` both report its path and refuse without writes
+- a source directory contains a symlink at any depth; preview and `--fix` both report its path
 - a glob matches no eligible files
-- a destination exists, leaves scope, equals its source, or two sources map to the same destination
-- a directory would move into itself, one source sits inside another directory source, or one destination sits inside another moved directory
-- a moved note's outgoing cross-document link or selected plain path cannot resolve unambiguously, because its post-move path is unknown
-- a note selected for reference edits resolves physically outside scope, including through a file or directory symlink
-- a move would break an image embed (see below)
+- a destination exists, leaves scope, equals its source, or two sources map to one destination
+- a directory would move into itself, a source sits inside a directory source, or a destination sits inside a moved directory
+- a moved note has an outgoing link or selected plain path with no single resolved target
+- a note that needs a reference edit resolves physically outside scope, including through a symlink
+- a move would break an image embed
 
-Reference discovery still follows symlinks. A shortcut to a note physically inside scope is allowed; an external note with no selected edits remains unchanged and does not trigger the containment check. An affected external note refuses the whole plan in preview and apply, before backups, staging files, destination directories, reference writes, or moves.
+Reference search follows symlinks. A shortcut to a note inside scope is allowed. An outside note that needs no edit stays unchanged. An outside note that needs an edit refuses the whole plan before any write. Its error, on standard error in both human and `--json` modes, tells the agent to ask the user whether to widen scope, to preview first, and to apply only after the preview succeeds.
 
-The outside-scope error includes next-step hints in Jact's existing `To ...:` style. It tells the agent to ask USER whether the physical note may be included in scope, not to widen scope automatically or skip the reference update, to preview the authorized scope without `--fix`, and to apply only after that preview succeeds. The hints are part of the error on standard error in both human and `--json` modes; exit status remains `1`, with no files changed.
+**Non-Markdown files and embeds.** Any file can move, alone, in a batch, or inside a directory. Parsed links such as `[text](file.pdf)` or `[[dir/file.png]]` and plain paths are rewritten when their target moves; non-Markdown references keep their formatting. Image embeds (`![alt](path)`, `![[dir/file]]`) are outside the jact link model, so rename cannot rewrite them and `jact validate` cannot check them. Rename refuses a plan that would break an embed and lists each `file:line`. These embeds do not block a move:
 
-**Non-Markdown files.** Any existing file can be selected directly or carried by a directory or batch move. Parsed links — `[text](file.pdf)`, `[[dir/file.png]]` — and plain paths in Markdown notes are rewritten when their targets move, including non-Markdown targets. Non-Markdown references retain their plain/code formatting. Image embeds (`![alt](path)`, `![[dir/file]]`) remain outside jact's link model and are not treated as plain paths: rename cannot rewrite them and `jact validate` cannot check them. Before writing, rename scans every Markdown file in scope (and every moved one) for image embeds whose target would no longer resolve after the moves and refuses the plan, listing each `file:line`. Reference-style images such as `![picture][pic]` use ordinary parsed definitions such as `[pic]: notes/p.png`; those definitions are rewritten when their target moves or their file changes directory. Embeds inside a moved directory that point into the same tree keep working because the tree's shape is preserved, and bare-name `![[file.png]]` embeds resolve by name in Obsidian, so neither blocks a move.
+- a reference-style image such as `![picture][pic]`; jact rewrites its `[pic]: notes/p.png` definition
+- an embed inside a moved directory that points into the same tree
+- a bare-name `![[file.png]]`, which Obsidian resolves by name
 
-On apply, jact backs up every edited file and every individually moved source file, stages edits, writes them, creates missing directories, and moves files and whole directories. It then verifies every rewritten relationship at its final location against the planned target: parsed links are re-parsed, and plain paths are checked with exact disk resolution rather than relying on the citation parser. On failure, recovery is best-effort: jact attempts to reverse every completed move, remove every created directory, and restore every edited file, continuing after recovery errors, and exits `2`. Nonempty created directories are retained rather than deleting files created by another process. Errors and retained backup paths are reported for manual recovery; successful recovery is not guaranteed. Backups of files inside a moved directory move with it, and reported backup paths reflect their retained locations.
+**Apply and recovery.** On `--fix`, jact backs up every edited file and every moved source file, then writes edits, creates directories, and moves files. It then re-checks each rewritten relationship at its final location against the planned target. On failure, jact attempts to undo every move, remove every created directory, and restore every edited file, and exits `2`. Recovery is best-effort: jact continues past recovery errors, keeps non-empty created directories, and reports errors and kept backup paths. A backup inside a moved directory moves with it, and the reported path is its final location.
 
-**JSON result.** One object per request: `scope`, `applied`, `moves` (`kind` `file` or `directory`, `source`, `destination`, and `movedFiles` for directories), `directories` (missing directories, outermost first), `links`, `files` (`path` at its final location, `links`), and `backups`. A single file source without a glob also carries the original top-level `source` and `destination` fields; human output for that case keeps its `Source:`/`Destination:` lines, while batches print a `Moves:` list.
+**JSON result.** `--json` prints one object per request:
 
-```bash
-jact rename docs/old.md new.md --scope .                 # preview same-directory rename
-jact rename docs/old.md archive/ --scope . --fix         # move, retaining old.md
-jact rename docs/old.md archive/new.md --scope . --fix   # move and rename
-jact rename a.md b.md new/dir/ --fix                     # several files into a new directory
-jact rename "concepts/*.md" archive/concepts/            # glob into a directory
-jact rename notes/old-folder archive/ --fix              # move a whole directory tree
-jact rename data/results.json archive/ --scope . --fix   # move a non-Markdown file
-jact rename plan.md data/results.json archive/ --fix     # mixed file types in one batch
-jact rename "data/*.json" archive/data/ --scope .        # non-Markdown glob preview
-```
+- `scope`, `applied`
+- `moves` — `kind` (`file` or `directory`), `source`, `destination`, and `movedFiles` for directories
+- `directories` — missing directories, outermost first
+- `links` — total rewritten references
+- `files` — `path` at its final location and its `links` count
+- `backups` — backup file paths
+- `source`, `destination` — only for a single file source without a glob
 
-**Exit codes:** `0` preview or apply succeeded; `1` invalid or unsafe plan with no writes; `2` file-system, parse, commit, or rollback failure.
+Human output for a single file prints `Source:` and `Destination:` lines; a batch prints a `Moves:` list.
+
+**Exit codes:** `0` preview or apply succeeded; `1` invalid or unsafe plan, no writes; `2` file-system, parse, commit, or recovery failure.
 
 ---
 
@@ -193,29 +190,22 @@ jact rename "data/*.json" archive/data/ --scope .        # non-Markdown glob pre
 jact outline <file> [level] [options]
 ```
 
-Displays a parser-derived, quoted heading outline. The optional positional `level` accepts `H1` through `H6`, defaults to `H2`, and is an inclusive ceiling. For example, positional `H3` shows H1 through H3. The exact-filter and source-line behavior follows [ADR-0006 — Exact heading-level filtering and source lines](../adrs/adr-0006-exact-heading-level-and-source-lines.md#ADR-0006 — Exact heading-level filtering and source lines).
+`jact outline` prints a quoted tree of the parsed headings in one file. The optional `level` is `H1` through `H6`, defaults to `H2`, and is an inclusive ceiling: `H3` shows H1 through H3. Exact-level and source-line rules follow [ADR-0006 — Exact heading-level filtering and source lines](../adrs/adr-0006-exact-heading-level-and-source-lines.md#ADR-0006 — Exact heading-level filtering and source lines).
 
 | Flag | Default | Description |
 |---|---|---|
-| `--exact-heading-level <level>` | - | Show only headings at one level (`H1` through `H6`); positional `level` semantics stay unchanged |
-| `-n, --line-number` | `false` | Prefix each heading with its parser-derived, one-based source line |
+| `--exact-heading-level <level>` | - | Show only one level (`H1` through `H6`); `level` keeps its meaning |
+| `-n, --line-number` | `false` | Prefix each heading with its one-based source line |
 | `--expand <headings>` | - | Fully expand comma-separated heading branches |
-| `--within <parent>` | - | Limit the outline and heading resolution to one parent branch |
-| `--cache-reset` | `false` | Show next-step reminders again for the active session and target |
-| `--scope <folder>` | smart default | Folder search matches |
+| `--within <parent>` | - | Limit the outline and heading lookup to one parent branch |
+| `--cache-reset` | `false` | Show next-step reminders again for this session and file |
+| `--scope <folder>` | smart default | Folder for filename matches |
 
-Exact-level output excludes all other heading levels and does not mark deliberately filtered descendants as collapsed. Line-number output uses a right-aligned six-character line field followed by two spaces. If a visible heading has no parser source position, the command fails clearly instead of re-scanning Markdown.
+Exact-level output hides every other level and does not mark filtered children as collapsed. Line numbers sit in a right-aligned six-character field followed by two spaces. A visible heading with no parser source position fails the command.
 
-The first successful outline for a session and file also shows concise next-step commands: expand collapsed branches when present, show only the selected level with source lines via `--exact-heading-level` and `-n`, extract a section, and discover the remaining outline options via `jact outline -h`. The reminder revision is part of its cache namespace, so newly added guidance appears once after an upgrade instead of being hidden by an older reminder marker.
+After the tree, jact prints next-step commands: expand collapsed branches, filter one level with line numbers, extract a section, and open `jact outline -h`. With a session ID, jact shows them once per session and file. The reminder set has a revision, so new guidance shows once after an upgrade.
 
-```bash
-jact outline docs/guide.md
-jact outline docs/guide.md H3
-jact outline docs/guide.md --exact-heading-level H3 --line-number
-jact outline handbook.md H2 --expand "Install" --within "Guide"
-```
-
-**Exit codes:** `0` outline rendered, including a valid file with no headings; `1` heading selector missing, ambiguous, or unsupported; `2` file lookup, scope, permission, parse, or source-position error.
+**Exit codes:** `0` outline printed, including a file with no headings; `1` heading selector missing, ambiguous, or unsupported; `2` file lookup, scope, permission, parse, or source-position error.
 
 ---
 
@@ -225,14 +215,7 @@ jact outline handbook.md H2 --expand "Install" --within "Guide"
 jact ast <file> [--scope <folder>]
 ```
 
-Displays the parsed markdown AST and extracted citation metadata (links, headings, anchors) as JSON, for debugging. Output includes the full `ParserOutput` contract — see [004-domain-model.md](004-domain-model.md#ParserOutput).
-
-```bash
-jact ast docs/design.md
-jact ast file.md | jq '.links'
-jact ast file.md | jq '.anchors | length'
-jact ast plan.md --scope ./other-repo    # explicit scope override
-```
+`jact ast` prints the parser output for one file as JSON, for debugging. The top-level keys are `filePath`, `content`, `ast`, `links`, `embeds`, `headings`, `anchors`, and `validationDisabled`. The fields are in [ParserOutput](004-domain-model.md#ParserOutput). Errors exit `2`.
 
 ---
 
@@ -242,25 +225,20 @@ jact ast plan.md --scope ./other-repo    # explicit scope override
 jact extract links <source-file> [options]
 ```
 
+`jact extract links` checks every link in the source note, then prints the linked content as deduplicated JSON.
+
 | Flag | Default | Description |
 |---|---|---|
-| `--scope <folder>` | smart default | Folder search matches |
-| `--allow-read <dir>` | - | Also let links read files in `<dir>`. Repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction Read Boundary) |
-| `--format <type>` | `json` | Output format (reserved for future) |
-| `--full-files` | - | Enable full-file link extraction (default: sections only) |
-| `--session <id>` | - | Session ID for cache deduplication (skips extraction on cache hit) |
-| `-v, --verbose` | `false` | Include `outgoingLinksReport` + `stats` in output |
+| `--scope <folder>` | smart default | Folder for filename matches |
+| `--allow-read <dir>` | - | Also let links read files in `<dir>`; repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction Read Boundary) |
+| `--format <type>` | `json` | Reserved; output is always JSON |
+| `--full-files` | - | Also extract full-file links (default: sections and blocks only) |
+| `--session <id>` | - | Skip extraction when this session already extracted the file |
+| `-v, --verbose` | `false` | Add `outgoingLinksReport` and `stats` to the output |
 
-Validates every link in the source document first, then extracts referenced content (section, block, or full file per link) with deduplication. Output is `OutgoingLinksExtractedContent` JSON — see [004-domain-model.md](004-domain-model.md#Extraction%20Types%20%28%60src/types/extraction-types.ts%60%29).
+Default output holds only `extractedContentBlocks`. The fields are in [Extraction Types (`src/types/extraction-types.ts`)](004-domain-model.md#Extraction%20Types%20%28%60src/types/extraction-types.ts%60%29).
 
-**Exit codes:** `0` at least one link extracted successfully (or cache hit via `--session`); `1` no eligible links / all extractions failed; `2` system error.
-
-```bash
-jact extract links docs/design.md
-jact extract links docs/design.md --full-files
-jact extract links docs/design.md --session abc123
-jact extract links file.md | jq '.stats.compressionRatio'
-```
+**Exit codes:** `0` at least one link extracted, or a `--session` cache hit; `1` no eligible links, or every extraction failed; `2` system error, such as a missing source file.
 
 ---
 
@@ -270,20 +248,21 @@ jact extract links file.md | jq '.stats.compressionRatio'
 jact extract header <target-file> <header-name> [options]
 ```
 
-Builds a synthetic header link via `LinkObjectFactory.createHeaderLink()`, validates it, and extracts the section content. The default `markdown` output prefixes every extracted line in `cat -n` format: a right-aligned six-character source line followed by a tab. `--format json` preserves raw content and returns the structured extraction contract.
+`jact extract header` prints one section of a file. The default `markdown` output prefixes each line in `cat -n` format: a right-aligned six-character source line, then a tab. `--format json` prints raw content in the extraction JSON shape.
 
-`--extract-linked-content [depth]` also extracts linked sections, blocks, and whole markdown files, following links to `depth` (default `1`, minimum `1`), and lists backlinks to the header across the scope. The markdown output labels every block with `Source: file:start-end` and, for linked blocks, `Via: file:line` (the link that pulled it in). The same next-step hints and `--max-chars` content map as [`jact extract file <target-file>`](#`jact extract file <target-file>`) apply; the header map keeps the backlinks and failures lists.
+| Flag | Default | Description |
+|---|---|---|
+| `--scope <folder>` | smart default | Folder for filename matches |
+| `--allow-read <dir>` | - | As in [`jact extract links <source-file>`](#`jact extract links <source-file>`); without it, jact does not read linked targets outside scope |
+| `--within <parent>` | - | Resolve the header only among children of one unique parent |
+| `--extract-linked-content [depth]` | off; depth `1` | Also extract linked content to `depth` (whole number ≥ 1), plus backlinks to the header in scope |
+| `--max-chars <n>` | `28000` | With `--extract-linked-content`: above this size, print a content map |
+| `-v, --verbose` | `false` | Add `outgoingLinksReport` and `stats` |
+| `--format <type>` | `markdown` | `markdown` or `json` |
 
-`--allow-read <dir>` works as in [`jact extract links <source-file>`](#`jact extract links <source-file>`). Without it, linked targets outside the scope root are not read.
+With `--extract-linked-content`, the markdown output labels each block `Source: file:start-end`, and each linked block `Via: file:line` (the link that pulled it in). Next-step hints and the `--max-chars` content map work as in [`jact extract file <target-file>`](#`jact extract file <target-file>`). The header content map also lists backlinks and failures.
 
-**Exit codes:** `0` header extracted (and all linked content resolved); `1` header not found, validation failed, or some linked content failed to resolve; `2` system error.
-
-```bash
-jact extract header plan.md "Task 1: Implementation"
-jact extract header docs/guide.md "Overview" --scope ./docs
-jact extract header file.md "Design" --format json | jq '.extractedContentBlocks'
-jact extract header plan.md "Overview" --extract-linked-content 2
-```
+**Exit codes:** `0` header extracted and all linked content resolved; `1` header not found, or some linked content failed; `2` system error, such as a missing file.
 
 ---
 
@@ -293,31 +272,45 @@ jact extract header plan.md "Overview" --extract-linked-content 2
 jact extract file <target-file> [options]
 ```
 
-Builds a synthetic full-file link via `LinkObjectFactory.createFileLink()`, validates it, and extracts the entire file content. The default `markdown` output prefixes every line in `cat -n` format using its original one-based source line. `--format json` returns the structured extraction contract with raw, unnumbered content.
+`jact extract file` prints a whole file. The default `markdown` output prefixes each line in `cat -n` format with its one-based source line. `--format json` prints raw content in the extraction JSON shape.
 
-`--extract-linked-content [depth]` also extracts what the file links to, following linked files up to `depth` levels (whole number ≥ 1; default `1`). Linked section and block links extract that section or block; full-file links to `.md` files extract the file and, while depth remains, its links. Each file is followed once, so link cycles end. Links marked `%%stop-extract-link%%` are neither extracted nor followed. Without the option, only the target file is extracted.
+| Flag | Default | Description |
+|---|---|---|
+| `--scope <folder>` | smart default | Folder for filename matches |
+| `--allow-read <dir>` | - | Also let links read files in `<dir>`; repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction Read Boundary) |
+| `--extract-linked-content [depth]` | off; depth `1` | Also extract linked content, following linked files to `depth` (whole number ≥ 1) |
+| `--max-chars <n>` | `28000` | With `--extract-linked-content`: above this size, print a content map |
+| `-v, --verbose` | `false` | Add `outgoingLinksReport` and `stats` |
+| `--format <type>` | `markdown` | `markdown` or `json` |
 
-Linked targets outside the scope root are not read or followed. `--allow-read <dir>` permits one more directory and is repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction Read Boundary).
+**Linked content.** A section or block link extracts that section or block. A full-file link to a `.md` file extracts the file and, while depth remains, follows its links. jact follows each file once, so link cycles end. A link marked `%%stop-extract-link%%` is neither extracted nor followed. jact does not read or follow targets outside scope unless `--allow-read` permits them.
 
-If a linked target cannot be extracted (file not found, anchor not found, or file not readable), jact still extracts the other links, lists each failed link as `file:line — reason` under `## Failures` (on stderr as `Failures:` for `json`), and exits `1`. Stop-marker links are intentional skips, not failures.
+**Failures.** When a linked target cannot be extracted (file not found, anchor not found, or file not readable), jact still extracts the other links. It lists each failure as `file:line — reason` under `## Failures`, or under `Failures:` on standard error for `json`, and exits `1`. A stop-marker link is a skip, not a failure.
 
-After the content, `jact outline`-style next-step hints follow — on stdout for `markdown`, on stderr for `json` so stdout stays parseable. A `[+] … To Go Deeper` hint with the next depth appears only when the depth limit cut off links that would add content.
+**Next-step hints.** After the content, jact prints `jact outline`-style hints: on standard output for `markdown`, on standard error for `json`, so standard output stays parseable. A `[+] … To Go Deeper` hint with the next depth appears only when the depth limit left out links that would add content.
 
-`--max-chars <n>` (default `28000`, whole number ≥ 1) caps `markdown` output from `--extract-linked-content`. When the full output would exceed it, jact prints a **content map** instead: one row per block with its `Source`, `Via`, character count, and a command that loads only that block (`jact extract header` for section links, `jact extract file` for whole-file links, a line range for block links). A `To Print Everything Anyway` hint gives the `--max-chars` value that prints it all. The default fits a default Claude Code Bash result, which shows 30,000 characters inline. `json` output is never replaced.
+**Content map.** When `--extract-linked-content` markdown output would exceed `--max-chars`, jact prints a content map instead. Each row is one block with its `Source`, `Via`, character count, and a command that loads only that block. A `To Print Everything Anyway` hint gives the `--max-chars` value that prints everything. The default fits a default Claude Code Bash result, which shows 30,000 characters inline. jact never replaces `json` output with a map.
 
-```bash
-jact extract file docs/architecture.md
-jact extract file docs/architecture.md --format json | jq '.extractedContentBlocks'
-jact extract file docs/plan.md --extract-linked-content
-jact extract file docs/plan.md --extract-linked-content 2
-jact extract file docs/plan.md --extract-linked-content --max-chars 100000
-```
+**Exit codes:** `0` file extracted, with no linked failures; `1` target file not found or invalid, or a linked target failed; `2` system error, such as a permission or parse error.
 
 ---
 
 ## `jact:base-paths` (npm script, not a jact subcommand)
 
-`package.json` defines `jact:base-paths` as a shell wrapper: `extract links "$1" --verbose | jq -r '.outgoingLinksReport.processedLinks[] | select(.sourceLink.target.path.absolute) | .sourceLink.target.path.absolute' | sort -u`. There is no `jact base-paths` command in `src/cli.ts` — it is composed entirely from `extract links --verbose` plus `jq`.
+`npm run jact:base-paths <file>` prints the unique absolute target paths of every link in `<file>`. It runs `jact extract links <file> --verbose` and reads the `outgoingLinksReport` with `jq`. There is no `jact base-paths` command.
+
+---
+
+## Environment Variables
+
+`jact outline` reads a session ID from the environment to show next-step reminders once per session.
+
+| Variable | Effect |
+|---|---|
+| `JACT_SESSION_ID` | Session ID for outline reminders; wins over `CLAUDE_SESSION_ID` |
+| `CLAUDE_SESSION_ID` | Session ID for outline reminders when `JACT_SESSION_ID` is not set |
+
+Without either variable, `jact outline` shows its reminders on every run.
 
 ---
 
@@ -331,15 +324,22 @@ Human-readable messages do not print raw control characters from documents or pa
 
 ## Exit Codes
 
+Every command uses three exit codes, and hooks depend on them.
+
 | Code | When |
 |---|---|
-| `0` | Success — citations and plain file references valid, files passed, extraction produced content, or outline rendered |
-| `1` | Validation/extraction/selection failure — errors found, no eligible links, header not found, or outline selector unresolved |
-| `2` | System/usage error — file not found, permission denied, parse error, missing requested source position, bad flag combination, glob matched nothing and nothing else was selected, or not a git repository |
+| `0` | Success: links valid, files passed, extraction produced content, outline printed, or rename succeeded; `--changed` with no changes |
+| `1` | Content failure: errors found, no eligible links, header or target file not found by extraction, outline selector unresolved, or rename plan refused |
+| `2` | System or usage error: missing file, permission denied, parse error, missing source position, bad flag combination, a glob that matched nothing when nothing else was selected, or not a git repository |
 
-Exit code `2` is consistent across `validate`, `outline`, `ast`, and `extract` for system-level failures — this is a deliberate compatibility guarantee (batch-validate feature ADR D4, `design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md`).
+The three-code contract is a recorded decision: D4 in [Decision](../../design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md#Decision).
 
-Single-file `validate` sets `process.exitCode` and does not call `process.exit()`. Node writes the full report to a piped stdout (for example, `jact validate file.md --format json | jq`) before the process exits, including reports larger than 64KB.
+Command-specific exceptions:
+
+- `jact validate --fix` exits `0` after it prints its report, even when errors remain.
+- In batch mode, a file that jact cannot read stops the whole batch with exit `2` and no report.
+
+Single-file `validate` writes its full report to a piped standard output before it exits, including reports larger than 64 KB.
 
 ---
 
@@ -347,6 +347,8 @@ Single-file `validate` sets `process.exitCode` and does not call `process.exit()
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift. Added missing `extract header --within` and `-v` flags, the batch-mode flags that jact ignores, single-file JSON keys, rename exit `1` for missing arguments, `extract file` exit `1` for a missing target, outline session variables, and the `--fix` and batch-read exit exceptions |
+| 1.0.0-draft | 2026-10-07 | `validate` checks link syntax only; plain text and code paths no longer produce errors (issue #110). `--fix` converts only resolved prose `.md` paths and no longer reports unresolved plain text |
 | 1.0.0-draft | 2026-10-06 | Rename refuses the whole plan before writes when a note selected for reference edits resolves physically outside scope; internal shortcuts and unaffected external notes remain allowed |
 | 1.0.0-draft | 2026-10-06 | Approved plain-path validation and prose Markdown conversion contract; arbitrary-file rename/move with plain-path rewrites, exact resolution, suffix/command preservation, and post-transaction verification |
 | 1.0.0-draft | 2026-09-30 | Printed commands use single-quote shell quoting instead of JSON strings, so document text cannot run shell commands when pasted; human-readable messages escape control characters |
@@ -359,4 +361,4 @@ Single-file `validate` sets `process.exitCode` and does not call `process.exit()
 | 1.0.0-draft | 2026-08-02 | Added bounded duplicate-path diagnostics, verbose expansion, and explicit document-skip output |
 | 1.0.0-draft | 2026-07-31 | Added contextual outline next-step guidance for exact-level filtering, source lines, extraction, expansion, and help discovery |
 | 1.0.0-draft | 2026-07-31 | Added parser-derived outline interface, exact heading-level filtering, and source-line prefixes |
-| 1.0.0-draft | 2026-07-01 | Initial interfaces doc, grounded in `src/cli.ts` |
+| 1.0.0-draft | 2026-07-01 | Initial interfaces doc |

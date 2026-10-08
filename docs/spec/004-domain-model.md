@@ -2,294 +2,172 @@
 
 **Status:** done
 
-Canonical types live in `src/types/*.ts`. Every entity below cites its exact source file — treat that file as the ground truth if this doc and the code ever diverge.
+This section defines the entities that jact callers see. A field list appears only where jact prints the shape as JSON.
+
+Shared data shapes are declared in `src/types/`. Dependency-injection interfaces are not domain entities: each is defined beside its consuming core component and re-exported from `src/types/`.
 
 ## Core Entities
 
+Five entities describe one parsed document. [`jact ast <file>`](005-interfaces.md#`jact ast <file>`) prints them as JSON.
+
 ### LinkObject
 
-A parsed markdown reference (`file.ts:src/types/citationTypes.ts:28-76`). Created by `MarkdownParser` (real links) or `LinkObjectFactory` (synthetic links for `extract header`/`extract file`), consumed by `CitationValidator`.
+A link object is one parsed reference to an anchor or another file. The `extract header` and `extract file` commands also build synthetic links from their arguments.
 
 **Fields:**
-- `linkType: "markdown" | "wiki"`
-- `scope: "internal" | "cross-document"`
-- `anchorType: "header" | "block" | null` — null when the link has no anchor
-- `source.path.absolute: string | null`
-- `target.path.raw: string | null` — null for internal links
-- `target.path.absolute: string | null` — null if unresolved or internal
-- `target.path.relative: string | null` — null if unresolved or internal
-- `target.path.attempted?: readonly string[]` — wiki resolver attempt log, present only on failed wiki resolution
-- `target.anchor: string | null`
-- `text: string | null` — null for caret references
-- `fullMatch: string`
-- `line: number` — 1-based
-- `column: number` — 0-based
-- `extractionMarker: {fullMatch, innerText} | null` — null if no `%%marker%%` follows the link
-- `validation?: ValidationMetadata` — added by `CitationValidator`, absent on raw parser output
-
-Internal links (`scope: "internal"`) have `target.path.*` all null since they reference an anchor within the same document, not an external file.
-
-```ts
-// path: src/types/citationTypes.ts:28
-export interface LinkObject {
-	linkType: "markdown" | "wiki";
-	scope: LinkScope;
-	anchorType: "header" | "block" | null;
-	source: { path: { absolute: string | null } };
-	target: {
-		path: {
-			raw: string | null;
-			absolute: string | null;
-			relative: string | null;
-			attempted?: readonly string[];
-		};
-		anchor: string | null;
-	};
-	text: string | null;
-	fullMatch: string;
-	line: number;
-	column: number;
-	extractionMarker: { fullMatch: string; innerText: string } | null;
-	validation?: ValidationMetadata;
-}
-```
+- `linkType` — `"markdown"` or `"wiki"`
+- `scope` — `"internal"` (an anchor in the same document) or `"cross-document"`
+- `anchorType` — `"header"`, `"block"`, or `null` when the link has no anchor
+- `source.path.absolute` — the document that holds the link
+- `target.path.raw` (as written), `target.path.absolute`, `target.path.relative` (resolved) — `null` for internal links; resolved paths are `null` when unresolved
+- `target.path.attempted` — paths tried by a failed wiki resolution
+- `target.anchor` — anchor text, or `null`
+- `text` — display text; `null` for caret references
+- `fullMatch` — the source text of the link
+- `line` (1-based), `column` (0-based)
+- `extractionMarker` — the following `%%…%%` marker (`fullMatch`, `innerText`), or `null`
+- `validation` — added by validation (see below)
 
 ---
 
 ### AnchorObject
 
-A potential link target in a document — a heading or a block reference (`src/types/citationTypes.ts:86-121`). Created by `MarkdownParser.extractAnchors()`. Discriminated union on `anchorType` so header-only fields (`urlEncodedId`) can never appear on a block anchor.
+An anchor object is a heading or block reference that a link can target. The `anchorType` field selects the variant.
 
-**`header` variant:**
-- `id: string` — raw heading text
-- `urlEncodedId: string` — URL-encoded id for Obsidian compatibility (always present)
-- `rawText: string`
-- `fullMatch: string`, `line: number` (1-based), `column: number` (0-based)
+**`header` variant:** `id` (heading text, or an explicit `{#custom-id}`), `urlEncodedId` (Obsidian-style encoded id, always present), `rawText`, `fullMatch`, `line`, `column`.
 
-**`block` variant:**
-- `id: string` — block id, e.g. `FR1` or `^my-anchor`
-- `rawText: null` — always null for block anchors
-- `fullMatch: string`, `line: number`, `column: number`
+**`block` variant:** `id` (block id, such as `FR1`), `rawText` (always `null`), `fullMatch`, `line`, `column`. It never has `urlEncodedId`.
 
-Sources: header anchors come from ATX headings walked via `unist-util-visit` on the mdast tree (setext headings are skipped, matching the prior contract). Block/caret/emphasis anchors come from the `caretAnchor` and `highlight` mdast node types the parser already produced — see `src/core/MarkdownParser/extractAnchors.ts:46-186`.
+Only ATX headings (`# Heading`) produce header anchors; setext headings do not.
 
 ---
 
 ### HeadingObject
 
-A heading extracted from the mdast tree (`src/types/citationTypes.ts:127-138`). Created by `MarkdownParser.extractHeadings()`.
+A heading object is one heading in the document, in source order.
 
 **Fields:**
-- `level: number` — 1-6
-- `text: string` — inline text with ATX markers stripped, inline markdown (backticks, emphasis) preserved
-- `raw: string` — raw markdown slice including `#` symbols
-- `position?: Position` — **source position from the mdast heading node.** This is a load-bearing detail: line numbers for headings come from `node.position` on the parsed tree, not a regex re-scan of the file (`src/core/MarkdownParser/extractHeadings.ts:41-54`).
+- `level` — 1 to 6
+- `text` — heading text without ATX markers; inline Markdown such as backticks and emphasis stays
+- `raw` — the source text of the heading, including `#` markers
+- `position` — the source position from the parsed tree; heading line numbers never come from a second text scan
 
 ---
 
 ### EmbedReference
 
-`src/types/citationTypes.ts`. A parsed inline image or Obsidian wiki embed, separate from citation links.
+An embed reference is one inline image or Obsidian wiki embed. Embeds are separate from links.
 
-```ts
-export interface EmbedReference {
-	kind: "markdown" | "wiki";
-	target: string;
-	line: number; // 1-based starting line; 0 if the parsed node has no position
-}
-```
+**Fields:**
+- `kind` — `"markdown"` (inline image) or `"wiki"` (`![[…]]` embed)
+- `target` — the destination; for a wiki embed, the text before any `#`, `^`, or `|` suffix
+- `line` — 1-based; `0` when the parsed node has no position
 
-For wiki embeds, `target` excludes the anchor and alias suffixes. Reference-style images remain represented by their ordinary link definitions, not this collection.
+A reference-style image (`![alt][ref]`) is not an embed reference. Its link definition represents it.
 
 ---
 
 ### ParserOutput
 
-The complete contract returned by `MarkdownParser.parseFile()` (`src/types/citationTypes.ts`).
+Parser output is the complete parsed form of one document. `jact ast` prints it.
 
-```ts
-export interface ParserOutput {
-	filePath: string;
-	content: string;
-	ast: Root;
-	validationDisabled: boolean; // exact first-body HTML directive, after optional YAML
-	links: LinkObject[];
-	embeds: EmbedReference[];
-	headings: HeadingObject[];
-	anchors: AnchorObject[];
-}
-```
+**Fields:**
+- `filePath`, `content` — the source path and text
+- `ast` — the Markdown syntax tree (mdast)
+- `validationDisabled` — `true` when the document opts out of validation; the directive rules are in [`jact validate`](005-interfaces.md#`jact validate`)
+- `links`, `embeds`, `headings`, `anchors` — lists of the entities above
 
 ---
 
 ### ValidationMetadata / EnrichedLinkObject
 
-`src/types/validationTypes.ts`. `CitationValidator.validateSingleCitation()` returns a new `EnrichedLinkObject` built by object-spreading `{ ...link, validation: meta }` — the original `LinkObject` is never mutated (tracked as Issue #37 in the source comments, `validationTypes.ts:1-9`).
+Validation metadata is the result of checking one link. An enriched link object is a link object plus its `validation` field. Validation builds a new object; it never changes the original link.
 
-```ts
-export interface DuplicatePathSuggestion {
-	filename: string;
-	total: number;
-	candidates: string[]; // complete ranked, scope-relative set
-	debugInfo: string;
-}
+The `status` field selects the variant:
 
-export type ValidationMetadata =
-	| { status: "valid" }
-	| { status: "error"; error: string; suggestion?: string; duplicatePathSuggestion?: DuplicatePathSuggestion; /* fix metadata */ }
-	| { status: "warning"; message: string; suggestion?: string; duplicatePathSuggestion?: DuplicatePathSuggestion; /* fix metadata */ };
+| Status | Fields |
+|---|---|
+| `valid` | none |
+| `error` | `error` (message), optional `suggestion`, `pathConversion`, `anchorConversion` |
+| `warning` | `message`, optional `suggestion`, `pathConversion`, `anchorConversion` |
 
-export interface EnrichedLinkObject extends LinkObject {
-	validation: ValidationMetadata;
-}
-```
+A path conversion or anchor conversion carries the fix that `--fix` applies: `type` (`"path-conversion"` or `"anchor-conversion"`), `original`, and `recommended`.
 
-`LinkClass = "markdown" | "wiki" | "caret"` (`validationTypes.ts:20`) is a separate **display-layer** discriminator from `LinkObject.linkType`, so reporting/formatting can distinguish caret-block citations from header citations without touching the syntactic `linkType` field.
-
-`PathConversion` (`validationTypes.ts:26-30`) carries an auto-fix suggestion: `{ type: "path-conversion", original: string, recommended: string }`.
+JSON output renders duplicate-filename candidates into the `suggestion` string and omits the candidate data.
 
 ---
 
 ### ValidationResult
 
-`CitationValidator.validateDocument()`'s return shape (`src/types/validationTypes.ts`). **Property names are `summary` and `links`, not `results`** — this matches the enrichment pattern where links are enriched in place within the array.
+A validation result is the outcome of checking one document. `jact validate --format json` prints it.
 
-```ts
-// path: src/types/validationTypes.ts:67
-export interface ValidationSummary {
-	total: number;
-	valid: number;
-	warnings: number;
-	errors: number;
-}
+**Fields:**
+- `summary` — counts: `total`, `valid`, `warnings`, `errors`
+- `links` — every enriched link object in the checked range
+- `validationTime` — elapsed time, such as `"0.4s"`
+- `lineRange` — the applied range, such as `"150-160"`; present only with `--lines`
 
-// path: src/types/validationTypes.ts:80
-export interface ValidationResult {
-	summary: ValidationSummary;
-	links: EnrichedLinkObject[];
-	validationTime?: string;
-}
-```
+With `--lines`, the summary counts only the links in the range. A document that opts out prints zero counts, an empty `links` list, `skipped: true`, and `skipReason`.
 
 ---
 
 ## Batch-Validate Types (`src/types/cli-types.ts`)
 
-Added for the `jact validate` batch-mode feature (multiple paths, globs, `--changed`, `--json`).
+A file result is the outcome of checking one file in batch mode. [`jact validate`](005-interfaces.md#`jact validate`) `--json` prints one per line.
 
-```ts
-export interface BatchValidateOptions {
-	paths: string[];
-	changed: boolean;
-	json: boolean;
-}
+**File result fields:**
+- `path` — the file as selected
+- `ok` — `true` when the file has no errors
+- `errors` — one entry per error: `line` and `message`
+- `skipped` — `true` only for a document that opts out; absent otherwise
 
-export interface FileResult {
-	path: string;
-	ok: boolean;
-	errors: ValidationError[];
-	skipped?: true; // present only for an intentional document opt-out
-}
+The `line` key is always present; a file-level error has `line: null`.
 
-export interface ValidationError {
-	line: number | null;
-	message: string;
-}
-
-export interface BatchSummary {
-	total: number;
-	passed: number;  // successfully validated; skips excluded
-	failed: number;
-	skipped: number;
-	results: FileResult[];
-}
-```
-
-**Gotcha:** `ValidationError.line` is `number | null`, **not optional** (`line?`). Under jact's `exactOptionalPropertyTypes`, an absent key and an explicit `null` are distinct types — the JSONL contract always emits the `line` key, so a file-level error is an explicit `null`, never a missing field.
+The batch summary counts `total`, `passed`, `failed`, and `skipped` files; a skip is not a pass. The summary sets the exit code but is not printed as JSON.
 
 ---
 
 ## Extraction Types (`src/types/extraction-types.ts`)
 
-```ts
-// path: src/types/extraction-types.ts:12
-export interface EligibilityDecision {
-	eligible: boolean;
-	reason: string;
-}
+Extraction output is the deduplicated content that `extract` commands print as JSON. Default JSON holds only `extractedContentBlocks`; `--verbose` adds `outgoingLinksReport` and `stats`.
 
-// path: src/types/extraction-types.ts:29
-export interface ExtractedContentBlock {
-	content: string;
-	contentLength: number;
-	startLine?: number; // one-based source line for the first content line
-	sourceLinks?: SourceLinkEntry[]; // { rawSourceLink, sourceLine }
-}
+**`extractedContentBlocks`** — a map from content id to block. A content id is the first 16 hexadecimal characters of the SHA-256 hash of the content, so equal content is stored once. Each block has:
+- `content`, `contentLength`
+- `startLine` — 1-based source line of the first content line, when known
+- `sourceLinks` — the links that pulled in the block: `rawSourceLink`, `sourceLine`
 
-// path: src/types/extraction-types.ts:39
-export interface ProcessedLinkEntry {
-	sourceLink: EnrichedLinkObject;
-	contentId: string | null;
-	status: "extracted" | "skipped" | "success" | "error" | "failed";
-	eligibilityReason?: string;
-	failureDetails?: { reason: string };
-}
+The map also holds `_totalContentCharacterLength`, the length of the serialized blocks.
 
-// path: src/types/extraction-types.ts:65
-export interface ExtractionStats {
-	totalLinks: number;
-	uniqueContent: number;
-	duplicateContentDetected: number;
-	tokensSaved: number;
-	compressionRatio: number;
-}
+**`outgoingLinksReport.processedLinks`** — one entry per link:
+- `sourceLink` — the enriched link object
+- `contentId` — the block id, or `null` when nothing was extracted
+- `status` — `"extracted"`, `"skipped"` (not extracted: validation error, ineligible, unresolved, or outside the read boundary), or `"failed"`
+- `failureDetails.reason` — why a link was skipped or failed
 
-// path: src/types/extraction-types.ts:80 — public output contract of extract commands
-export interface OutgoingLinksExtractedContent {
-	extractedContentBlocks: {
-		_totalContentCharacterLength: number;
-		[contentId: string]: ExtractedContentBlock | number;
-	};
-	outgoingLinksReport: { processedLinks: ProcessedLinkEntry[]; sourceFilePath?: string };
-	stats: ExtractionStats;
-}
-```
+**`stats`:** `totalLinks`, `uniqueContent`, `duplicateContentDetected`, `tokensSaved`, `compressionRatio`.
 
-`ExtractionEligibilityStrategy` (`src/types/strategy-types.ts:15-17`) is the strategy interface: `getDecision(link, cliFlags): EligibilityDecision | null` — `null` means "defer to the next strategy in the chain."
+**Linked-context output.** `jact extract header --extract-linked-content --format json` prints a different shape, marked `mode: "linked-context"`. It adds `complete`, `depth`, `root`, `outgoingLinks`, `backlinks`, and `failures`, and each content block names its `source`.
+
+Eligibility rules in `src/core/ContentExtractor/` decide which links are extracted.
 
 ---
 
 ## FileCache Types (`src/types/fileCacheTypes.ts`)
 
-```ts
-export interface ResolveFileOptions {
-	expectedPath?: string;
-}
-
-export interface ResolveResultFailure {
-	found: false;
-	reason: "duplicate" | "not_found" | "duplicate_fuzzy";
-	message: string;
-	candidates?: string[];        // complete ranked absolute paths
-	displayCandidates?: string[]; // complete ranked scope-relative paths
-	scope?: ScopeResolution;
-	nearMisses?: string[];
-	attemptedPaths?: readonly string[];
-}
-```
-
-Duplicate candidates are ranked by tree distance from `expectedPath`'s directory, then by normalized scope-relative path. `FileCache` retains the complete list; the output formatter, not resolution, applies the default five-candidate display limit.
+A file resolution result is the outcome of finding a file by name in the scope. A failure has a reason: `not_found`, `duplicate`, or `duplicate_fuzzy`. A duplicate failure keeps every candidate, ranked by directory distance from the expected location, then by scope-relative path. Only the output formatter limits the display; see [`jact validate`](005-interfaces.md#`jact validate`).
 
 ---
 
 ## Relationships
+
+One parsed document owns its links, embeds, headings, and anchors.
 
 ```
 ParserOutput 1───N LinkObject
 ParserOutput 1───N EmbedReference
 ParserOutput 1───N HeadingObject
 ParserOutput 1───N AnchorObject
-LinkObject   1───1 ValidationMetadata (added during validation → EnrichedLinkObject)
+LinkObject   1───1 ValidationMetadata (validation adds it → EnrichedLinkObject)
 ValidationResult 1───N EnrichedLinkObject
 BatchSummary 1───N FileResult
 FileResult   1───N ValidationError
@@ -303,6 +181,7 @@ ProcessedLinkEntry 1───1 EnrichedLinkObject (sourceLink)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
 | 1.0.0-draft | 2026-10-06 | Added typed inline-image and wiki-embed references to the required parser output contract |
 | 1.0.0-draft | 2026-08-13 | Added optional extracted-content start lines for source-numbered command output |
 | 1.0.0-draft | 2026-08-02 | Added parser disable state, structured duplicate-path diagnostics, and skipped batch results |

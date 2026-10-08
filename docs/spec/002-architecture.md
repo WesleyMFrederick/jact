@@ -2,252 +2,181 @@
 
 **Status:** done
 
+jact is a layered command-line interface (CLI): a thin command layer, an orchestration layer, a dependency-injection factory, and core components that never print or pick exit codes. This section states what each component owns, what it guarantees, and what it must not do.
+
 ## System Overview
 
-jact is a **layered CLI architecture** with dependency injection via a factory pattern. Commander command registration is deliberately separated from orchestration logic (`src/cli.ts` vs `src/jact-cli.ts`, issue #29), so the orchestration class (`JactCli`) is importable and testable without activating Commander at all.
+Each layer calls only the layer below it, and a factory builds and connects every core component. Command registration stays apart from orchestration, so tests import the orchestrator without starting the command parser.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                         CLI Layer                                    │
-│  src/cli.ts — Commander command registration only                    │
-│  (validate, ast, extract links/header/file)                          │
-└───────────────────────────────┬────────────────────────────────────--┘
-                                 │ delegates to
-                                 ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                    Orchestration Layer                                │
-│  src/jact-cli.ts — JactCli class (scope resolution, formatting,           │
-│  fix workflow, importable without Commander)                          │
+│  CLI layer — src/cli.ts                                              │
+│  commands: validate, rename, outline, ast, extract links|header|file │
 └───────────────────────────────┬──────────────────────────────────────┘
-                                 │ wires via
-                                 ▼
+                                │ single file          │ batch
+                                ▼                      ▼
+┌───────────────────────────────┐  ┌─────────────────────────────────┐
+│ Orchestrator — src/jact-cli.ts │─▶│ Validate module — src/validate/ │
+│ scope, fix, extract, render    │  │ workflow; batch select, run,    │
+│                                │  │ report                          │
+└───────────────┬───────────────┘  └────────────────┬────────────────┘
+                └────────────── wires via ──────────┘
+                                ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│              src/factories/componentFactory.ts (DI factory)           │
+│  Component factory — src/factories/                                  │
 └──┬──────────────┬───────────────┬────────────────┬───────────────┬───┘
    ▼              ▼               ▼                ▼               ▼
 MarkdownParser  FileCache   ParsedFileCache  CitationValidator  ContentExtractor
-   │                              │            │      │              │
-   │ produces ParserOutput        │            │      │              │
-   ▼                              │            ▼      ▼              ▼
-extensions/ (Flavor Extension     │      PathResolver AnchorMatcher  eligibilityStrategies/
-Collection: flavors.ts + assemble.ts)   pathResolutionStrategies/    (Stop/Force/Section/CliFlag)
-                                 │
-                                 ▼
-                          ParsedDocument (facade over ParserOutput)
+(src/core/)     (src/)      (src/)           (src/core/)        (src/core/)
+   │                              │
+   ▼                              ▼
+extension registry          ParsedDocument (query facade over parser output)
 ```
 
-```
-Batch validate path (jact validate with multiple paths/glob/--changed/--json):
+| Folder or file | Owns |
+|---|---|
+| `src/cli.ts` | Command and flag registration, flag conflicts, exit codes |
+| `src/jact-cli.ts` | Single-file orchestration: scope, fix, extraction, report rendering |
+| `src/validate/` | The validate workflow and batch selection, run, and report |
+| `src/factories/` | Component construction and dependency injection |
+| `src/core/` | Parsing, link checking, content extraction, fixes, renames, scope |
+| `src/types/` | Shared type declarations; no runtime code |
+| `src/outline/` | The heading tree that `jact outline` prints |
+| `src/cache/` | Per-session marker files |
 
-  src/cli.ts ──▶ resolveFileSet() ──▶ runBatch() ──▶ renderHuman()/renderJson()
-   (validate/resolve-files.ts,     (validate/       (validate/renderers.ts)
-    resolve-changed-files.ts)       batch-runner.ts)
-```
+`src/core/`, `src/validate/`, and `src/types/` each have a module spec, listed in [Spec Sections](SPEC.md#Spec%20Sections).
 
 ---
 
 ## Component Specifications
 
+Each component has one job, a few guarantees that tests enforce, and one boundary.
+
 ### CLI Orchestrator: `src/cli.ts` + `src/jact-cli.ts`
 
-**`cli.ts`** (538 lines) owns every Commander `.command()` registration: `validate`, `ast`, `extract` (with `links`/`header`/`file` subcommands). It contains argument parsing, flag validation (e.g. `--stdin`/batch-mode mutual exclusion, `--json`/`--format json` conflict), exit-code mapping, and delegates all actual work to `JactCli`.
+The command layer parses arguments and maps results to exit codes; the orchestrator runs each command against the core components.
 
-**`jact.ts``'s `JactCli` class** (630 lines) is the orchestration layer:
+- The command layer rejects conflicting flags (`--stdin` with batch selection, `--json` with `--format json`) with exit `2`.
+- The orchestrator renders validation outcomes, scope notices, and hints; the validate workflow returns an outcome only.
+- `extract header` and `extract file` build a synthetic link from the command arguments. `extract file` checks that link through the same checker as parsed links.
 
-```ts
-class JactCli {
-  private parser: MarkdownParser;
-  private parsedFileCache: ParsedFileCache;
-  private fileCache: FileCache;
-  private validator: CitationValidator;
-  private contentExtractor: ContentExtractor;
-  private scopeNotices: string[];
+Boundary: neither file builds the parser, caches, checker, extractor, or validate workflow itself; the factory builds them.
 
-  async getAst(filePath, options?): Promise<ParserOutput>
-  async validate(filePath, options?): Promise<string>
-  async validateContent(content, options & {filePath}): Promise<string>
-  async extractLinks(sourceFile, options): Promise<void>
-  async extractHeader(targetFile, headerName, options): Promise<OutgoingLinksExtractedContent | undefined>
-  async extractFile(targetFile, options): Promise<OutgoingLinksExtractedContent | undefined>
-  async fix(filePath, options?, _fs?): Promise<string>
-}
-```
+### Component Factory (`src/factories/`)
 
-All dependencies are wired via `componentFactory` in the constructor — `JactCli` never directly `new`s a `CitationValidator` or `MarkdownParser`.
+The factory builds each component with production defaults and accepts a replacement for every dependency.
 
----
+- Tests inject fakes through the factory and the dependency interfaces, not through concrete classes.
+- The extractor gets its eligibility rules in fixed precedence: stop marker, force marker, section link, CLI flag. Rules: [Extraction Eligibility Order](006-behavior.md#Extraction%20Eligibility%20Order).
 
-### `componentFactory.ts` (`src/factories/componentFactory.ts`)
-
-Dependency-injection factory. Every `create*` function accepts optional overrides, falling back to production defaults:
-
-```ts
-createMarkdownParser(fileCache?: FileCache): MarkdownParser
-createFileCache(): FileCache
-createParsedFileCache(parser?: MarkdownParser | null): ParsedFileCache
-createCitationValidator(parsedFileCache?, fileCache?): CitationValidator
-createContentExtractor(parsedFileCache?, citationValidator?, strategies?): ContentExtractor
-createLinkedHeaderContextQuery(parsedFileCache?, fileCache?, validator?, contentExtractor?, candidateFilter?): LinkedHeaderContextQuery
-```
-
-`createContentExtractor` wires the eligibility strategy chain in fixed precedence order: `[StopMarkerStrategy, ForceMarkerStrategy, SectionLinkStrategy, CliFlagStrategy]` — see the Behavior section for what each does. This is the seam tests use to inject fakes without importing concrete production classes (`FileCacheLike`/`ParsedFileCacheLike` interfaces in `src/types/componentInterfaces.ts` exist for exactly this purpose).
-
-`LinkObjectFactory` (`src/factories/LinkObjectFactory.ts`) is a separate, smaller factory used only by the CLI's `extract header`/`extract file` commands to build a synthetic `LinkObject` from CLI string arguments (`createHeaderLink`, `createFileLink`) before handing it to `CitationValidator.validateSingleCitation()` — the same validation path real parsed links go through.
-
----
+Boundary: the factory wires components; it holds no parsing, checking, or extraction logic.
 
 ### BacklinkCandidateFilter (`src/core/LinkedHeaderContext/BacklinkCandidateFilter.ts`)
 
-Screens the resolved scope before `extract header --extract-linked-content` backlink parsing. `selectCandidates(scopeFiles, rootFilePath)` reads each non-root file once and keeps files containing the root filename stem in decoded or percent-encoded form, case-insensitively. The root file is always kept so internal links remain discoverable.
+The candidate filter cuts the scope files that `extract header --extract-linked-content` parses for backlinks.
 
-This component can only exclude parse candidates; it does not create backlink facts. `LinkedHeaderContextQuery` still parses every candidate and confirms links through `CitationValidator.resolveCitationTarget()`. Unreadable files, an empty stem, or a filter failure fall back to exhaustive parsing. `scope.filesScanned` continues to report the full resolved scope size.
+- It keeps a file only if the file text contains the root file name, decoded or percent-encoded, ignoring case.
+- It always keeps the root file and any file it cannot read.
+- A filter failure or an empty file-name stem falls back to parsing every scope file.
+- The reported scanned-file count stays the full scope size.
 
----
-
+Boundary: the filter only removes candidates; the checker confirms every backlink.
 
 ### MarkdownParser (`src/core/MarkdownParser/`)
 
-Parses markdown using **micromark + mdast** (`mdast-util-from-markdown`) — **not marked.js**. (jact's own `CLAUDE.md` still says marked.js; that line is stale — see [003-adrs.md](../adrs/003-adrs.md#ADR-0002%20—%20Regex%20→%20mdast-token%20migration%20%28WMF-35%29).)
+The parser turns Markdown text into one parser output (links, headings, anchors, embeds) from one micromark and mdast syntax tree. Why: [ADR-0002 — Regex → mdast-token migration (WMF-35)](../adrs/003-adrs.md#ADR-0002%20—%20Regex%20→%20mdast-token%20migration%20%28WMF-35%29).
 
-```ts
-class MarkdownParser {
-  constructor(fs: FileSystemInterface, fileCache: FileCache, extensions?)
-  async parseFile(filePath: string): Promise<ParserOutput>
-  async parseContent(content: string, filePath: string): Promise<ParserOutput>
-  extractLinks(content, sourcePath): LinkObject[]
-  extractHeadings(content): HeadingObject[]
-  extractAnchors(content): AnchorObject[]
-}
-```
+- One registry groups every syntax extension by Markdown flavor, so a new construct is one new registry entry: [ADR-0003 — Flavor Extension Collection](../adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection).
+- Consumers read typed results, including [typed embed references](004-domain-model.md#EmbedReference); nothing re-scans decoded prose.
+- The parser refuses input over its size limit: [Input Size Limits](006-behavior.md#Input%20Size%20Limits).
 
-**The Flavor Extension Collection** (`src/core/MarkdownParser/extensions/flavors.ts` + `assemble.ts`) is the pattern that groups every micromark/mdast extension by *markdown flavor*, so "what does jact parse?" is answered by one registry instead of diffing six imports:
+The registry recognizes this syntax:
 
-```ts
-interface FlavorExtensionGroup {
-  flavor: "commonmark" | "obsidian";
-  description: string;
-  syntax: Extension[];        // micromark syntax extensions
-  fromMarkdown: MdastExtension[]; // mdast builders, order-aligned with syntax
-}
+| Flavor | Syntax |
+|---|---|
+| CommonMark (built into micromark) | inline and reference links, autolinks, ATX and setext headings, code |
+| Obsidian | YAML frontmatter, `==highlight==`, `%%comment%%`, `[cite: path]`, `^anchor-id`, `[[target#anchor\|alias]]`, `![[embed]]`, links whose fragment holds a raw space |
 
-const commonmarkFlavor: FlavorExtensionGroup; // baseline: inline/reference links, autolinks,
-                                                // ATX/setext headings — built into micromark itself
-const obsidianFlavor: FlavorExtensionGroup;    // highlight, obsidianComment, citation,
-                                                // caretAnchor, wikilink, obsidianEmbed, obsidianLink
-const allFlavors: FlavorExtensionGroup[] = [commonmarkFlavor, obsidianFlavor];
-```
-
-`assemble.ts` composes `allFlavors` into the two things `MarkdownParser` actually needs: `jactSyntaxExtension()` (via `combineExtensions`) and `jactMdastExtensions()` (a flat, order-aligned array). Adding a new construct means adding one group to `flavors.ts` — nothing else changes.
-
-**Individual extension responsibilities** (all in `extensions/`):
-
-| Extension | Syntax | Node type |
-|---|---|---|
-| `caretAnchor.ts` | `^anchor-id` | `caretAnchor` |
-| `citation.ts` | `[cite: path]` | `citation` |
-| `highlight.ts` | `==text==` | `highlight` |
-| `obsidianComment.ts` | `%%text%%` | (comment, suppressed from output) |
-| `obsidianLink.ts` | Permissive links whose fragment contains a raw space, e.g. `[t](file#My Heading)` | link with unencoded fragment |
-| `wikilink.ts` | `[[target#anchor\|alias]]`, all parts optional | `wikilink` |
-| `obsidianEmbed.ts` | `![[target#anchor\|alias]]` | `obsidianEmbed` |
-
-`highlight.ts` and `obsidianComment.ts` share a `wrappedInline` helper (delimiter-pair tokenizer), differing only by marker character (`=` vs `%`).
-
-**Post-parse extraction** (`mdastAdapter.ts` → `extractHeadings.ts`, `extractLinks.ts`, `extractAnchors.ts`) walks the single parsed tree via `unist-util-visit` to build headings, citation links, anchors, and [typed embed references](004-domain-model.md#EmbedReference). The adapter reads inline `image` and `obsidianEmbed` nodes for embeds. Consumers use these typed results rather than scanning decoded prose — one parse, no re-parse.
-
-The `obsidianEmbed.ts` rule starts at a raw `!` and delegates normal image recognition to CommonMark's `labelStartImage` and `labelEnd` helpers. It retains the existing token events and their array identity. The mdast compiler uses image ancestry to keep wiki-like text inside image descriptions under CommonMark's text rules, including formatting, escapes, entities, and nested links. Only active embeds become custom nodes.
-
----
+Boundary: the parser knows nothing of the query facade or validation results.
 
 ### CitationValidator (`src/core/CitationValidator/`)
 
-A **thin coordinator** — pattern classification and result assembly only. Path resolution and anchor matching are extracted into their own classes (issue #28):
+The checker gives each parsed link a status (valid, warning, or error), an error message, and a suggestion.
 
-```ts
-class CitationValidator {
-  constructor(parsedFileCache, fileCache, pathResolutionStrategies?)
-  async validateFile(filePath): Promise<ValidationResult>
-  async validateSingleCitation(citation, contextFile?): Promise<EnrichedLinkObject>
-  classifyPattern(citation): "CARET_SYNTAX" | "EMPHASIS_MARKED" | "CROSS_DOCUMENT" | "WIKI_STYLE" | "INTERNAL_ANCHOR"
-}
-```
+- It returns a new enriched link and leaves the parser's link unchanged.
+- Path resolution and anchor matching are separate units inside the folder; the order is in [Path Resolution Strategy Order (cross-document links)](006-behavior.md#Path%20Resolution%20Strategy%20Order%20%28cross-document%20links%29) and [Anchor Matching Order](006-behavior.md#Anchor%20Matching%20Order).
+- Backlink discovery resolves each candidate link through the checker, not through its own path logic.
 
-**`AnchorMatcher`** (`AnchorMatcher.ts`) owns all anchor-matching logic: flexible matching (exact → raw-text → backtick-unwrapped → backtick-wrapped → markdown-cleaned), Obsidian "prefer raw header" suggestions, and block-ref-without-caret detection. See the Behavior section for the full matching order.
-
-**`PathResolver`** (`PathResolver.ts`) owns path resolution: tilde expansion, Obsidian absolute-path conversion, symlink-aware retries, and path-conversion suggestion generation.
-
-**`pathResolutionStrategies/`** is a strategy array (`WikiFastPathStrategy`, `WikiFailLoudStrategy`, `FolderLinkStrategy`, `FileFoundStrategy`, `CacheFallbackStrategy`) that `CitationValidator` iterates for cross-document link resolution, mirroring the eligibility-strategy pattern in `ContentExtractor`.
-
----
+Boundary: the checker reads documents only through the injected parsed-document cache and file index; it never writes.
 
 ### ContentExtractor (`src/core/ContentExtractor/`)
 
-```ts
-class ContentExtractor {
-  constructor(eligibilityStrategies, parsedFileCache, citationValidator)
-  async extractContent(enrichedLinks, cliFlags): Promise<OutgoingLinksExtractedContent>
-}
-```
+The extractor reads the content that eligible links point at and removes duplicate content by content hash.
 
-Strategy pattern (`eligibilityStrategies/`) decides, per link, whether to extract at all: `StopMarkerStrategy` → `ForceMarkerStrategy` → `SectionLinkStrategy` → `CliFlagStrategy` (fixed precedence — see the Behavior section). `extractContent()` deduplicates extracted content by SHA-256 hash across all processed links in one call, tracking `tokensSaved`/`compressionRatio`.
+- A read boundary permits a linked target only inside the scope root or an `--allow-read` folder: [Extraction Read Boundary](006-behavior.md#Extraction%20Read%20Boundary).
 
----
+Boundary: the extractor receives links that the checker already checked; it has no checker dependency.
 
 ### ParsedDocument (`src/ParsedDocument.ts`)
 
-Facade providing a stable query interface over raw `ParserOutput`, isolating consumers (`CitationValidator`, `ContentExtractor`) from parser internals:
+The query facade answers questions about one parsed document: anchors, links, headings, sections, and blocks.
 
-```ts
-class ParsedDocument {
-  get data(): ParserOutput
-  hasAnchor(anchorId): boolean
-  findSimilarAnchors(anchorId): string[]     // Levenshtein fuzzy, top 5
-  getLinks(): LinkObject[]
-  getAnchorIds(): string[]                    // lazy-cached
-  extractFullContent(): string
-  extractSection(headingText, headingLevel?): string | null
-  extractBlock(anchorId): string | null
-}
-```
+- Heading lookup reports a unique, missing, or ambiguous match.
+- Similar-anchor suggestions stop at fixed work limits.
 
----
+Boundary: consumers query the facade, never the raw parser output.
 
 ### ParsedFileCache (`src/ParsedFileCache.ts`)
 
-Enforces the **single-parse-per-file guarantee**: caches the *Promise* returned by `MarkdownParser.parseFile()`, keyed by `resolve(normalize(filePath))`, not the resolved value. This means two concurrent `resolveParsedFile()` calls for the same path share one in-flight parse rather than triggering two. Failed parses are evicted from the cache so a retry is possible. `seedParsedFile()` lets a caller pre-populate the cache with in-memory content (used by `validateContent` for `--stdin`).
+The parsed-document cache makes sure jact parses each file at most once per process.
 
----
+- It caches the in-flight parse by absolute path, so concurrent requests share one parse.
+- A failed parse leaves the cache, so a retry parses again.
+- In-memory content (`--stdin`) replaces any cached entry for its intended path.
 
-### FileCache (`src/FileCache.ts`, 605 lines)
+Boundary: the cache holds no parsing logic; the injected parser does the work.
 
-Builds and queries a filename → paths index for a scope folder:
+### FileCache (`src/FileCache.ts`)
 
-```ts
-class FileCache {
-  buildCache(scopeFolder, verbose, scope?, options): CacheStats
-  resolveFile(filename): ResolveResult
-  scopeHasGitignore(): boolean
-  isIgnored(absPath): boolean
-  getAllFiles(): FileEntry[]
-  getCacheStats(): CacheStatsDetail
-}
-export function findNearMisses(name, entries, k=3, maxDist=2): string[]
-```
+The file index maps Markdown file names to paths inside the scope folder, for links that do not resolve by relative path.
 
-Resolves symlinks (`realpathSync`) before scanning to avoid duplicate cache entries from symlink artifacts. Respects `.gitignore` by default (`--allow-gitignore` opts out). `resolveFile()` tries exact match, then with/without `.md` extension, then `findFuzzyMatch()` (handles double-extension typos, a small hardcoded typo-correction table, and `arch-`-style prefix matching).
+- It resolves the scope folder and each subfolder to its real path, and scans each real folder once.
+- It obeys `.gitignore` unless `--allow-gitignore` is set, and always obeys `.jactignore` and the default ignore patterns.
+- A name that matches more than one file is an error with ranked candidates; a near-miss name gets suggestions.
+
+Boundary: the index never parses Markdown.
 
 ---
 
 ## Batch-Validate Components (`src/validate/`)
 
-Added as an orchestration layer over the same single-file `CitationValidator` — no validation logic was forked:
+The validate module runs `jact validate` for one file or many over the shared checker, with no copy of the validation logic. `jact validate` checks link syntax only; plain text and inline code are never checked.
 
-| File | Responsibility |
+| Part | Responsibility |
 |---|---|
-| `resolve-files.ts` | Glob/path expansion (tinyglobby), `.gitignore` filtering, dedup, sort |
-| `resolve-changed-files.ts` | `git status --porcelain` parsing into a changed-`.md` file list, via an injectable `RunGit` seam |
-| `batch-runner.ts` | Sequential iteration over resolved files, calling an injected `ValidateOneFn`, aggregating into `BatchSummary` |
-| `renderers.ts` | `renderHuman()` and `renderJson()` — two views over the same `BatchSummary` |
+| Single-input workflow | Checks one file or one in-memory document; returns a completed, skipped, or failed outcome and never throws |
+| Opt-out directive | Detects the disable comment and holds the one skip reason |
+| File-set selection | Expands paths, globs, and `--changed` into one sorted, deduplicated `.md` list |
+| Git-changed files | Lists changed Markdown from `git status` through a replaceable `git` runner |
+| Batch run | Checks files one at a time and totals the results |
+| Batch reports | Human and JSON Lines views of one batch summary |
+
+Module ownership and guarantees: [validate Module Living Specification](../../src/validate/docs/spec/SPEC.md#validate%20Module%20Living%20Specification).
+
+---
+
+## Layer Boundaries
+
+Core never imports the command layer, the orchestrator, or the output formatters. Four imports cross a layer line on purpose, so each shared rule keeps one owner.
+
+| Importer | Imports from | Why |
+|---|---|---|
+| Parser adapter in `src/core/MarkdownParser/` | `src/validate/` opt-out directive | Sets the disable flag from the syntax tree |
+| Citation fixer in `src/core/` | `src/validate/` opt-out directive | Reports the same skip reason as validation |
+| Rename planner in `src/core/` | `src/factories/` | Builds a fresh parser to verify an applied rename |
+| `src/ParsedDocument.ts` | `src/outline/` | Builds the heading tree for heading lookup |
+
+The opt-out directive imports only syntax-tree types, so these imports form no cycle. The dependency interfaces live in `src/core/`; `src/types/` re-exports them as type-only imports.
 
 ---
 
@@ -255,5 +184,6 @@ Added as an orchestration layer over the same single-file `CitationValidator` �
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
 | 1.0.0-draft | 2026-08-24 | Added the stateless backlink candidate filter and its excludes-only correctness boundary |
 | 1.0.0-draft | 2026-07-01 | Initial architecture doc, replacing per-component design-docs guides |

@@ -10,7 +10,7 @@ Architecture Decision Records reconstructed from commit history, in-repo design 
 
 **Context:** Commit `ce18a19` (October 2025) introduced the pattern with the explicit stated intent of improved testability — components previously constructed their own dependencies inline, making it hard to inject test doubles without importing concrete production classes.
 
-**Consequences:** Every consumer (CLI, tests) gets a consistent construction path. `src/types/componentInterfaces.ts` re-exports the minimal `ParsedFileCacheLike`/`FileCacheLike` interfaces specifically so factories and consumers can depend on interfaces, not concrete classes, avoiding transitive/circular imports. This is long-stable infrastructure, untouched by the more recent parser migrations below.
+**Consequences:** Every consumer (CLI, tests) gets a consistent construction path. `src/types/componentInterfaces.ts` re-exports the minimal `ParsedDocumentLifecycleLike`/`FileCacheLike` interfaces specifically so factories and consumers can depend on interfaces, not concrete classes, avoiding transitive/circular imports. This is long-stable infrastructure, untouched by the more recent parser migrations below.
 
 ---
 
@@ -52,11 +52,11 @@ A fuller inventory of remaining architecture-principle gaps in this area (naming
 
 ## ADR-0004 — ParsedFileCache single-parse guarantee
 
-**Decision:** `ParsedFileCache.resolveParsedFile()` caches the **Promise** returned by `parser.parseFile()`, keyed by the normalized absolute path, and stores it in the cache *before* awaiting it.
+**Decision:** The parsed-file cache stores the pending parse for a file, keyed by its normalized absolute path, before the parse finishes.
 
-**Context:** Solves three named problems (`src/ParsedFileCache.ts:6-17`): (1) parser encapsulation — callers get a stable `ParsedDocument` facade, not raw parser output; (2) wasted re-parsing — the same file is frequently referenced by multiple citing documents in one validation run; (3) concurrent duplicate work — validating several files that all reference the same target could otherwise trigger overlapping `parseFile()` calls for that target before the first one completes.
+**Context:** The cache solves three problems. (1) Parser encapsulation: callers get a stable parsed-document facade, not raw parser output. (2) Wasted re-parsing: one validation run often reaches the same file from several citing documents. (3) Concurrent duplicate work: several files that cite the same target could otherwise start overlapping parses of that target.
 
-**Consequences:** Caching the Promise (not the resolved value) is the mechanism that closes the concurrency gap — two calls to `resolveParsedFile()` for the same path while the first parse is still in flight return the *same* Promise, not two separate parses. Failed promises are evicted from the cache (`.catch(() => this.cache.delete(cacheKey))`) so a subsequent call can retry rather than being stuck on a permanently-rejected cached Promise. `seedParsedFile()` is the escape hatch for in-memory content (`--stdin`) that never touches disk but still needs to participate in the same cache.
+**Consequences:** Two requests for the same path while the first parse is in flight share one parse. A failed parse is removed from the cache, so a later request retries instead of getting the old failure. In-memory content (`--stdin`) enters the same cache under its intended path without touching disk.
 
 ---
 

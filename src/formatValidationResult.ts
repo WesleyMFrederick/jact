@@ -27,10 +27,7 @@ export function formatForCLI(
 		return formatForCLIMinimal(result, nestedCodeblockWarnings);
 	}
 
-	const references = [
-		...result.links,
-		...(result.plainPaths ?? []).map((reference) => ({ ...reference, fullMatch: reference.raw })),
-	];
+	const references = result.links;
 	const lines: string[] = [];
 	lines.push("Citation Validation Report");
 	lines.push("==========================");
@@ -156,10 +153,7 @@ export function formatForCLIMinimal(
 	result: ValidationResult & { lineRange?: string },
 	nestedCodeblockWarnings: NestedCodeblockWarning[] = [],
 ): string {
-	const references = [
-		...result.links,
-		...(result.plainPaths ?? []).map((reference) => ({ ...reference, fullMatch: reference.raw })),
-	];
+	const references = result.links;
 	const lines: string[] = [];
 
 	if (result.summary.errors > 0) {

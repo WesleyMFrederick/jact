@@ -6,7 +6,6 @@ import {
 	type NestedCodeblockWarning,
 } from "../core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "../core/prepare-scope.js";
-import { findPlainFilePaths, resolvePlainFilePath } from "../core/plain-file-paths.js";
 import type { FileCache } from "../FileCache.js";
 import type { ParsedFileCache } from "../ParsedFileCache.js";
 import type { CliValidateOptions } from "../types/cli-types.js";
@@ -79,28 +78,6 @@ export class ValidationWorkflow {
 				intendedPath,
 			);
 			const content = document.data.content;
-			validation.plainPaths = findPlainFilePaths(content).map((reference) => {
-				const resolution = resolvePlainFilePath(
-					reference, intendedPath, preparedScope.stats.scopeFolder,
-				);
-				return {
-					...reference,
-					...resolution,
-					validation: resolution.target !== null
-						? { status: "valid" as const }
-						: {
-								status: "error" as const,
-								error: resolution.candidates.length > 1
-									? `Ambiguous plain file path: ${reference.raw}. Candidates: ${resolution.candidates.join(", ")}`
-									: `File not found: ${reference.path}`,
-							},
-				};
-			});
-			for (const reference of validation.plainPaths) {
-				validation.summary.total++;
-				if (reference.validation.status === "valid") validation.summary.valid++;
-				else validation.summary.errors++;
-			}
 			validation.validationTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
 			const result = options.lines
 				? this.filterByLineRange(validation, options.lines)
@@ -131,19 +108,14 @@ export class ValidationWorkflow {
 		const links = result.links.filter(
 			(link) => link.line >= startLine && link.line <= endLine,
 		);
-		const plainPaths = (result.plainPaths ?? []).filter(
-			(reference) => reference.line >= startLine && reference.line <= endLine,
-		);
-		const references = [...links, ...plainPaths];
 		return {
 			...result,
 			links,
-			plainPaths,
 			summary: {
-				total: references.length,
-				valid: references.filter((reference) => reference.validation.status === "valid").length,
-				warnings: references.filter((reference) => reference.validation.status === "warning").length,
-				errors: references.filter((reference) => reference.validation.status === "error").length,
+				total: links.length,
+				valid: links.filter((link) => link.validation.status === "valid").length,
+				warnings: links.filter((link) => link.validation.status === "warning").length,
+				errors: links.filter((link) => link.validation.status === "error").length,
 			},
 			lineRange: `${startLine}-${endLine}`,
 		};
