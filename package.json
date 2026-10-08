@@ -51,7 +51,7 @@
 		"url": "https://github.com/WesleyMFrederick/jact/issues"
 	},
 	"engines": {
-		"node": ">=20"
+		"node": ">=22.12.0"
 	},
 	"packageManager": "npm@12.0.1",
 	"publishConfig": {
@@ -59,7 +59,7 @@
 		"provenance": true
 	},
 	"dependencies": {
-		"commander": "^14.0.1",
+		"commander": "^15.0.0",
 		"ignore": "^7.0.5",
 		"mdast-util-from-markdown": "^2.0.3",
 		"mdast-util-frontmatter": "^2.0.1",

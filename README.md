@@ -14,7 +14,7 @@ It understands standard Markdown links and Obsidian syntax (wiki links, block re
 
 ## Install
 
-You need Node.js 20 or later.
+You need Node.js 22.12 or later.
 
 **From GitHub:**
 
