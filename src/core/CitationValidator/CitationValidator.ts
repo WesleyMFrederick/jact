@@ -261,15 +261,15 @@ export class CitationValidator {
 	// ── Pattern classification ────────────────────────────────────────────────
 
 	private classifyPattern(citation: LinkObject): string {
-		if (citation.scope === "internal" && citation.anchorType === "block") {
-			return "CARET_SYNTAX";
-		}
-
 		if (citation.linkType === "wiki") {
 			if (citation.scope === "internal") {
-				return "WIKI_STYLE";
+				return "INTERNAL_ANCHOR";
 			}
 			return "CROSS_DOCUMENT";
+		}
+
+		if (citation.scope === "internal" && citation.anchorType === "block") {
+			return "CARET_SYNTAX";
 		}
 
 		if (citation.scope === "cross-document") {
@@ -308,8 +308,6 @@ export class CitationValidator {
 				return this.validateEmphasisPattern(citation);
 			case "CROSS_DOCUMENT":
 				return await this.validateCrossDocumentLink(citation, contextFile);
-			case "WIKI_STYLE":
-				return this.validateWikiStyleLink(citation);
 			case "INTERNAL_ANCHOR":
 				return await this.validateInternalAnchorLink(citation, contextFile);
 			default:
@@ -441,12 +439,6 @@ export class CitationValidator {
 				outcome.pathConversion ?? null,
 			);
 		}
-		return this.createValidationResult(citation, "valid");
-	}
-
-	private validateWikiStyleLink(
-		citation: LinkObject,
-	): SingleCitationValidationResult {
 		return this.createValidationResult(citation, "valid");
 	}
 

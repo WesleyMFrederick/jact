@@ -38,9 +38,9 @@ Validation writes no files unless `--fix` is set. `--fix --dry-run` also writes 
 | `--json` | `false` | Batch mode: print one compact JSON object per file (JSON Lines, JSONL) |
 | `--stdin` | - | Read Markdown from standard input; the one path argument is the intended path |
 
-**Mode selection:** batch mode runs when there is more than one path, any path is a glob, or `--changed` or `--json` is set. Otherwise jact runs in single-file mode. Batch mode ignores `--format`, `--fix`, `--dry-run`, and `--no-backup`.
+**Mode selection:** batch mode runs when there is more than one path, any path is a glob, or `--changed` or `--json` is set. Otherwise jact runs in single-file mode. Batch mode ignores `--format`.
 
-**Usage errors (exit `2`):** `--stdin` with zero or several paths, or with any batch trigger; `--json` together with `--format json`. The two JSON outputs have different shapes and cannot combine.
+**Usage errors (exit `2`):** `--stdin` with zero or several paths, or with any batch trigger; `--json` together with `--format json`; `--fix`, `--dry-run`, or `--no-backup` together with any batch trigger or with `--stdin`. The two JSON outputs have different shapes and cannot combine. On a usage error jact validates nothing and writes nothing.
 
 **Document opt-out:** `<!-- jact-validate-disable -->` skips the whole document only when it is the first Markdown body block. At most one YAML frontmatter block may come before it. The directive must be an exact HTML comment node; a later, fenced, quoted, or near-match comment does not count. The opt-out applies to file, `--stdin`, batch, and `--fix` runs.
 
@@ -336,7 +336,6 @@ The three-code contract is a recorded decision: D4 in [Decision](../../design-do
 
 Command-specific exceptions:
 
-- `jact validate --fix` exits `0` after it prints its report, even when errors remain.
 - In batch mode, a file that jact cannot read stops the whole batch with exit `2` and no report.
 
 Single-file `validate` writes its full report to a piped standard output before it exits, including reports larger than 64 KB.
@@ -348,6 +347,7 @@ Single-file `validate` writes its full report to a piped standard output before 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift. Added missing `extract header --within` and `-v` flags, the batch-mode flags that jact ignores, single-file JSON keys, rename exit `1` for missing arguments, `extract file` exit `1` for a missing target, outline session variables, and the `--fix` and batch-read exit exceptions |
+| 1.0.0-draft | 2026-10-07 | `validate --fix` follows the three-code contract: exit `1` when errors remain after fixing or during `--dry-run`, `2` on a system error. `--fix`, `--dry-run`, and `--no-backup` with batch selection or `--stdin` are usage errors (exit `2`) instead of being ignored |
 | 1.0.0-draft | 2026-10-07 | `validate` checks link syntax only; plain text and code paths no longer produce errors (issue #110). `--fix` converts only resolved prose `.md` paths and no longer reports unresolved plain text |
 | 1.0.0-draft | 2026-10-06 | Rename refuses the whole plan before writes when a note selected for reference edits resolves physically outside scope; internal shortcuts and unaffected external notes remain allowed |
 | 1.0.0-draft | 2026-10-06 | Approved plain-path validation and prose Markdown conversion contract; arbitrary-file rename/move with plain-path rewrites, exact resolution, suffix/command preservation, and post-transaction verification |
