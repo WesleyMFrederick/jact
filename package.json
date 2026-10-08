@@ -64,7 +64,7 @@
 		"mdast-util-from-markdown": "^2.0.3",
 		"mdast-util-frontmatter": "^2.0.1",
 		"mdast-util-to-string": "^4.0.0",
-		"micromark-core-commonmark": "^2.0.3",
+		"micromark-core-commonmark": "^2.0.4",
 		"micromark-extension-frontmatter": "^2.0.0",
 		"micromark-util-character": "^2.1.1",
 		"micromark-util-combine-extensions": "^2.0.1",
@@ -73,8 +73,8 @@
 		"unist-util-visit-parents": "6.0.2"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.3",
-		"@types/node": "^24.12.4",
+		"@biomejs/biome": "^2.5.15",
+		"@types/node": "^26.6.4",
 		"@typescript-eslint/parser": "^8.59.1",
 		"@vitest/coverage-v8": "^4.1.11",
 		"@vitest/ui": "^4.1.11",
