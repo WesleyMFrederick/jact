@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 20 is the minimum in package.json engines. 24 is the current LTS line.
-        node-version: ['20', '24']
+        # 22 is the minimum line in package.json engines (>=22.12.0). 24 is the current LTS line.
+        node-version: ['22', '24']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
