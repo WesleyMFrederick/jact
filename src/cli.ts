@@ -278,6 +278,9 @@ Exit Codes:
 					{ kind: "file", filePath: file },
 					options,
 				);
+				if (remaining.kind === "failed") {
+					console.log(`ERROR: ${remaining.error}`);
+				}
 				process.exitCode =
 					remaining.kind === "failed"
 						? 2
