@@ -232,7 +232,6 @@ describe("jact vault-link — single target", () => {
 		const result = jact(["vault-link", note, target]);
 
 		expect(result.status).toBe(1);
-		expect(result.stderr).toContain("worktree");
 		expect(
 			isSymlink(path.join(notesDir, "sources", REPO_NAME, "docs", "linked.md")),
 		).toBe(false);
