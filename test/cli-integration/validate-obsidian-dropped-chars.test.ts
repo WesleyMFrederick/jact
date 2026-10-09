@@ -7,6 +7,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const cliPath = path.resolve(testDir, "../../dist/cli.js");
+/** The dropped-character anchor check is an obsidian-preset rule. */
+const env = {
+	...process.env,
+	XDG_CONFIG_HOME: path.resolve(testDir, "../fixtures/config-home-obsidian"),
+};
 const workDir = path.join(tmpdir(), "jact-obsidian-dropped-chars-test");
 const sourcePath = path.join(workDir, "source.md");
 
@@ -41,6 +46,7 @@ function run(...args: string[]) {
 	return spawnSync(process.execPath, [cliPath, ...args], {
 		cwd: workDir,
 		encoding: "utf8",
+		env,
 	});
 }
 

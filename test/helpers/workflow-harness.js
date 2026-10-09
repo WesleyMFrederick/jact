@@ -22,8 +22,8 @@ export function createCitationHarness(overrides = {}) {
 		parser,
 		parsedDocuments,
 		validator,
-		validateDocumentFile: (filePath) =>
-			validateDocumentFile(validator, parsedDocuments, filePath),
+		validateDocumentFile: (filePath, options) =>
+			validateDocumentFile(validator, parsedDocuments, filePath, options),
 	};
 }
 
@@ -31,12 +31,13 @@ export async function validateDocumentFile(
 	validator,
 	parsedDocuments,
 	filePath,
+	options,
 ) {
 	const document = await parsedDocuments.resolveDocument({
 		kind: "file",
 		filePath,
 	});
-	return validator.validateDocument(document, filePath);
+	return validator.validateDocument(document, filePath, options);
 }
 
 export async function extractDocumentLinks(

@@ -4,7 +4,10 @@ import { toString as mdastToString } from "mdast-util-to-string";
 import type { Position } from "unist";
 import { visitParents } from "unist-util-visit-parents";
 import type { FileCache } from "../../FileCache.js";
-import type { LinkObject } from "../../types/citationTypes.js";
+import type {
+	LinkObject,
+	LinkReferenceUsage,
+} from "../../types/citationTypes.js";
 import { createLinkObject } from "./createLinkObject.js";
 import {
 	collectExtractionMarkers,
@@ -50,6 +53,7 @@ function extractLinksFromAst(
 		text: string | null,
 		raw: string,
 		position: Position | undefined,
+		markdownForm?: "definition",
 	) => {
 		// Strip surrounding backticks — footnote reference definitions like
 		// `[^S-001]: `/path/file.md`` carry the dest wrapped in backticks.
@@ -116,7 +120,7 @@ function extractLinksFromAst(
 					: null,
 			fileCache,
 		});
-		links.push(linkObject);
+		links.push(markdownForm ? { ...linkObject, markdownForm } : linkObject);
 	};
 
 	const sliceRaw = (
@@ -145,8 +149,36 @@ function extractLinksFromAst(
 			node.label ?? null,
 			sliceRaw(node, node.url),
 			node.position,
+			"definition",
 		);
 	});
+}
+
+/**
+ * Collect split-style link usages (`linkReference` nodes). micromark creates
+ * these only when a matching definition exists, and never inside code.
+ */
+export function extractLinkReferences(
+	ast: Root,
+	content: string,
+): LinkReferenceUsage[] {
+	const usages: LinkReferenceUsage[] = [];
+	visitParents(ast, "linkReference", (node) => {
+		const start = node.position?.start.offset;
+		const end = node.position?.end.offset;
+		if (start === undefined || end === undefined || !node.position) return;
+		usages.push({
+			identifier: node.identifier,
+			referenceType: node.referenceType,
+			text: mdastToString(node),
+			raw: content.slice(start, end),
+			line: node.position.start.line,
+			column: node.position.start.column - 1,
+			start,
+			end,
+		});
+	});
+	return usages;
 }
 
 /**

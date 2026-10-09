@@ -12,6 +12,7 @@
  * @module cli
  */
 
+import path from "node:path";
 import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import { isDynamicPattern } from "tinyglobby";
 import {
@@ -19,6 +20,7 @@ import {
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
 import { RenameValidationError } from "./core/rename-markdown-file.js";
+import { createRuleSetResolver } from "./core/ValidationRules/loadConfig.js";
 import { createValidationWorkflow } from "./factories/componentFactory.js";
 import { formatContentMap, formatExtractResult } from "./formatExtractResult.js";
 import { JactCli, linkedContentHints } from "./jact-cli.js";
@@ -206,10 +208,17 @@ With --fix, --dry-run, or --no-backup:
   nothing runs and nothing is written. The exit code reflects the errors left in
   the file after fixing (or, with --dry-run, the errors still in it).
 
+Rules and presets:
+  Settings come from ~/.config/jact/config.json ($XDG_CONFIG_HOME/jact/config.json),
+  overridden by the nearest .jact.json above each checked file:
+    { "preset": "obsidian", "rules": { "<rule-id>": "off" }, "plugins": ["./my-rules.mjs"] }
+  Presets: commonmark (default, no extra rules), obsidian (obsidian/no-reference-note-link,
+  obsidian/anchor-dropped-chars). Rule errors end with [rule-id]; --fix applies rule fixes.
+
 Exit Codes:
   0  All validated files passed (or --changed matched nothing)
   1  At least one file failed validation (with --fix: errors remain after fixing)
-  2  A glob/path matched nothing and nothing else was selected, a usage error (--fix/--dry-run/--no-backup with batch selection or --stdin), or a system error (missing file, git unavailable, conflicting --json/--format json)
+  2  A glob/path matched nothing and nothing else was selected, a usage error (--fix/--dry-run/--no-backup with batch selection or --stdin), an invalid config or plugin, or a system error (missing file, git unavailable, conflicting --json/--format json)
 `,
 	)
 	.action(async (paths: string[], options: CliBatchValidateOptions) => {
@@ -247,6 +256,10 @@ Exit Codes:
 			return;
 		}
 
+		// Config errors (malformed file, unknown rule/preset, bad plugin) stop
+		// the run before any validation: exit 2, nothing written.
+		const resolveRuleSet = createRuleSetResolver();
+
 		if (!isBatch) {
 			const file = paths[0];
 			if (file === undefined) {
@@ -254,8 +267,15 @@ Exit Codes:
 				process.exitCode = 2;
 				return;
 			}
+			try {
+				await resolveRuleSet(path.resolve(file));
+			} catch (error) {
+				console.error(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
+				process.exitCode = 2;
+				return;
+			}
 
-			const manager = new JactCli();
+			const manager = new JactCli(resolveRuleSet);
 			let result: string;
 
 			if (options.stdin) {
@@ -274,7 +294,12 @@ Exit Codes:
 				}
 				// Exit on the errors left in the file as it now stands on disk
 				// (unchanged after --dry-run). A fresh workflow re-reads the file.
-				const remaining = await createValidationWorkflow().validate(
+				const remaining = await createValidationWorkflow(
+					null,
+					null,
+					null,
+					resolveRuleSet,
+				).validate(
 					{ kind: "file", filePath: file },
 					options,
 				);
@@ -324,7 +349,8 @@ Exit Codes:
 				process.cwd(),
 			);
 
-			const workflow = createValidationWorkflow();
+			for (const filePath of files) await resolveRuleSet(filePath);
+			const workflow = createValidationWorkflow(null, null, null, resolveRuleSet);
 			const validateOne: ValidateOneFn = async (filePath) => {
 				const outcome = await workflow.validate(
 					{ kind: "file", filePath },

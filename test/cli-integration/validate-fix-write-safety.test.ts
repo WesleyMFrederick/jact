@@ -13,10 +13,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createRuleSetResolver } from "../../dist/core/ValidationRules/loadConfig.js";
 import { JactCli } from "../../dist/jact-cli.js";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const cliPath = path.resolve(testDir, "../../dist/cli.js");
+/** The dropped-character anchor check is an obsidian-preset rule. */
+const configHome = path.resolve(testDir, "../fixtures/config-home-obsidian");
+const env = { ...process.env, XDG_CONFIG_HOME: configHome };
 
 /** Obsidian-style anchors that `--fix` rewrites by dropping the colon. */
 const brokenCitation = (token: string) =>
@@ -36,7 +40,7 @@ function fix(file: string) {
 	return spawnSync(
 		process.execPath,
 		[cliPath, "validate", file, "--fix", "--scope", project],
-		{ cwd: project, encoding: "utf8" },
+		{ cwd: project, encoding: "utf8", env },
 	);
 }
 
@@ -115,7 +119,11 @@ describe("jact validate --fix — write boundary", () => {
 		vi.spyOn(Date, "now").mockReturnValue(1234);
 		symlinkSync(victim, `${sourcePath}.1234.bak`);
 
-		const result = await new JactCli().fix(sourcePath, { scope: project });
+		const result = await new JactCli(
+			createRuleSetResolver({
+				userConfigPath: path.join(configHome, "jact", "config.json"),
+			}),
+		).fix(sourcePath, { scope: project });
 
 		expect(result).toContain("Refused:");
 		expect(readFileSync(victim, "utf8")).toBe("victim\n");

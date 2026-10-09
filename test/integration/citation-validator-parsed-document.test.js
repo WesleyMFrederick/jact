@@ -65,8 +65,10 @@ describe("CitationValidator - ParsedDocument Integration", () => {
 		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "anchor-matching-source.md");
 
-		// When: Validation executes for both raw and URL-encoded format links
-		const result = await validateDocumentFile(testFile);
+		// When: Validation executes for both formats with the dropped-chars rule enabled
+		const result = await validateDocumentFile(testFile, {
+			ruleIds: new Set(["obsidian/anchor-dropped-chars"]),
+		});
 
 		// Then: The raw format resolves but keeps a colon, which Obsidian drops
 

@@ -6,6 +6,7 @@
  * a `BatchSummary` that drives the process exit code (R4, ADR D6).
  */
 
+import { withRuleId } from "../core/ValidationRules/runRules.js";
 import type {
 	BatchSummary,
 	FileResult,
@@ -82,13 +83,22 @@ function toFileResult(path: string, result: ValidationResult): FileResult {
 
 	const errors: ValidationError[] = ok
 		? []
-		: result.links
-				.filter((link) => link.validation.status === "error")
-				.map((link) => ({
-					line: link.line,
-					message:
-						link.validation.status === "error" ? link.validation.error : "",
-				}));
+		: [
+				...result.links.flatMap((link) =>
+					link.validation.status === "error"
+						? [
+								{
+									line: link.line,
+									message: withRuleId(link.validation.error, link.validation.ruleId),
+								},
+							]
+						: [],
+				),
+				...(result.findings ?? []).map((finding) => ({
+					line: finding.line,
+					message: withRuleId(finding.message, finding.ruleId),
+				})),
+			].sort((a, b) => a.line - b.line);
 
 	return { path, ok, errors };
 }

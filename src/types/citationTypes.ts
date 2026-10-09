@@ -71,6 +71,9 @@ export interface LinkObject {
 		innerText: string;
 	} | null;
 
+	/** "definition" when the link is a reference definition (`[label]: dest`) */
+	markdownForm?: "definition";
+
 	/** enriched during validation */
 	validation?: ValidationMetadata;
 }
@@ -146,6 +149,27 @@ export interface EmbedReference {
 }
 
 /**
+ * A split-style link usage — `[text][label]`, `[label][]` or `[label]` —
+ * read from an mdast `linkReference` node. Only exists when a matching
+ * definition exists.
+ */
+export interface LinkReferenceUsage {
+	/** normalized label, matching the definition's mdast identifier */
+	identifier: string;
+	referenceType: "full" | "collapsed" | "shortcut";
+	text: string;
+	/** exact source slice */
+	raw: string;
+	/** 1-based */
+	line: number;
+	/** 0-based */
+	column: number;
+	/** source offsets of `raw` */
+	start: number;
+	end: number;
+}
+
+/**
  * Parser output contract from MarkdownParser.parseFile().
  * Contains complete structural representation of a markdown document.
  */
@@ -161,6 +185,9 @@ export interface ParserOutput {
 	validationDisabled: boolean;
 
 	links: LinkObject[];
+
+	/** Split-style link usages; their definitions are in `links` (markdownForm "definition"). */
+	linkReferences: LinkReferenceUsage[];
 
 	/** Inline images and wiki embeds; reference images use their link definitions. */
 	embeds: EmbedReference[];

@@ -6,10 +6,13 @@ import {
 	type NestedCodeblockWarning,
 } from "../core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "../core/prepare-scope.js";
+import { NO_RULES } from "../core/ValidationRules/presets.js";
+import { runRules } from "../core/ValidationRules/runRules.js";
 import type { FileCache } from "../FileCache.js";
 import type { ParsedFileCache } from "../ParsedFileCache.js";
 import type { CliValidateOptions } from "../types/cli-types.js";
 import type { CacheStats } from "../types/fileCacheTypes.js";
+import type { RuleSetResolver } from "../types/validationRuleTypes.js";
 import type { ValidationResult } from "../types/validationTypes.js";
 import { VALIDATION_DISABLED_REASON } from "./validation-disable.js";
 
@@ -38,6 +41,8 @@ export class ValidationWorkflow {
 		private parsedDocuments: ParsedFileCache,
 		private validator: CitationValidator,
 		private fileCache: FileCache,
+		/** Enabled validation rules per file; defaults to none (commonmark). */
+		private resolveRuleSet: RuleSetResolver = async () => NO_RULES,
 	) {}
 
 	async validate(
@@ -73,9 +78,14 @@ export class ValidationWorkflow {
 					reason: VALIDATION_DISABLED_REASON,
 				};
 			}
-			const validation = await this.validator.validateDocument(
-				document,
+			const ruleSet = await this.resolveRuleSet(intendedPath);
+			const validation = runRules(
+				ruleSet,
 				intendedPath,
+				document.data,
+				await this.validator.validateDocument(document, intendedPath, {
+					ruleIds: ruleSet.enabled,
+				}),
 			);
 			const content = document.data.content;
 			validation.validationTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
@@ -108,14 +118,20 @@ export class ValidationWorkflow {
 		const links = result.links.filter(
 			(link) => link.line >= startLine && link.line <= endLine,
 		);
+		const findings = result.findings?.filter(
+			(finding) => finding.line >= startLine && finding.line <= endLine,
+		);
 		return {
 			...result,
 			links,
+			...(findings && { findings }),
 			summary: {
 				total: links.length,
 				valid: links.filter((link) => link.validation.status === "valid").length,
 				warnings: links.filter((link) => link.validation.status === "warning").length,
-				errors: links.filter((link) => link.validation.status === "error").length,
+				errors:
+					links.filter((link) => link.validation.status === "error").length +
+					(findings?.length ?? 0),
 			},
 			lineRange: `${startLine}-${endLine}`,
 		};

@@ -9,6 +9,7 @@
  */
 
 import type { LinkObject } from "./citationTypes.js";
+import type { RuleFinding } from "./validationRuleTypes.js";
 
 /**
  * LinkClass - display-layer discriminator (per D3).
@@ -85,6 +86,8 @@ export type ValidationMetadata =
 			pathConversion?: PathConversion;
 			anchorConversion?: AnchorConversion;
 			duplicatePathSuggestion?: DuplicatePathSuggestion;
+			/** set when an enabled validation rule produced this error */
+			ruleId?: string;
 	  }
 	| {
 			status: "warning";
@@ -125,6 +128,8 @@ export interface ValidationResult {
 	summary: ValidationSummary;
 	links: EnrichedLinkObject[];
 	validationTime?: string;
+	/** findings from enabled validation rules; each counts in summary.errors */
+	findings?: RuleFinding[];
 }
 
 export interface FixRecord {

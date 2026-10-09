@@ -18,6 +18,7 @@ import type {
 } from "../../types/citationTypes.js";
 import type { AnchorConversion } from "../../types/validationTypes.js";
 import { normalizeAnchorText } from "../MarkdownParser/normalizeInlineText.js";
+import { ANCHOR_DROPPED_CHARS_RULE } from "../ValidationRules/rules/anchorDroppedChars.js";
 
 /**
  * Minimal semantic-document interface used for anchor matching.
@@ -406,11 +407,12 @@ export class AnchorMatcher {
 	async validateAnchorExists(
 		anchor: string,
 		targetFile: string,
-		options?: { isBlockRef?: boolean },
+		options?: { isBlockRef?: boolean; ruleIds?: ReadonlySet<string> },
 	): Promise<{
 		valid: boolean;
 		error?: string;
 		suggestion?: string;
+		ruleId?: string;
 		matchedAs?: string;
 		anchorConversion?: AnchorConversion;
 		matchedAnchors?: AnchorObject[];
@@ -428,7 +430,11 @@ export class AnchorMatcher {
 					filePath: targetFile,
 				});
 
-			if (!anchor.startsWith("^") && !options?.isBlockRef) {
+			if (
+				!anchor.startsWith("^") &&
+				!options?.isBlockRef &&
+				options?.ruleIds?.has(ANCHOR_DROPPED_CHARS_RULE)
+			) {
 				const droppedChars = this.findObsidianDroppedChars(
 					anchor,
 					targetParsedDoc.data.anchors,
@@ -438,6 +444,7 @@ export class AnchorMatcher {
 						valid: false,
 						error: `${OBSIDIAN_DROPPED_CHARS_ERROR} (${droppedChars.dropped}): #${anchor}`,
 						suggestion: `#${droppedChars.recommended}`,
+						ruleId: ANCHOR_DROPPED_CHARS_RULE,
 						anchorConversion: {
 							type: "anchor-conversion",
 							original: anchor,
