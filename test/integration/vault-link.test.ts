@@ -204,6 +204,62 @@ describe("jact vault-link — single target", () => {
 		expect(lastLine(result.stdout)).toBe(`sources/${REPO_NAME}/docs/spec.md#Anchor`);
 		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
 	});
+
+	it("Given the note's sources folder is a symlink to a folder outside the vault, When vault-link runs, Then it refuses with exit 1 and writes nothing outside the vault", () => {
+		const outside = path.join(root, "outside");
+		mkdirSync(outside);
+		symlinkSync(outside, path.join(notesDir, "sources"), "dir");
+		const target = path.join(worktree, "docs", "spec.md");
+		writeFileSync(note, `See [spec](${target}).\n`);
+
+		const result = jact(["vault-link", note, target]);
+
+		expect(result.status).toBe(1);
+		expect(result.stderr).toContain(path.join(notesDir, "sources"));
+		expect(existsSync(path.join(outside, REPO_NAME))).toBe(false);
+	});
+
+	it("Given the main checkout file is a symlink into a linked worktree, When vault-link runs on it, Then it refuses with exit 1 and creates no symlink", () => {
+		writeFileSync(path.join(worktree, "docs", "wt-only.md"), "# Only\n");
+		symlinkSync(
+			path.join(worktree, "docs", "wt-only.md"),
+			path.join(mainCheckout, "docs", "linked.md"),
+			"file",
+		);
+		const target = path.join(mainCheckout, "docs", "linked.md");
+		writeFileSync(note, `See [linked](${target}).\n`);
+
+		const result = jact(["vault-link", note, target]);
+
+		expect(result.status).toBe(1);
+		expect(result.stderr).toContain("worktree");
+		expect(
+			isSymlink(path.join(notesDir, "sources", REPO_NAME, "docs", "linked.md")),
+		).toBe(false);
+	});
+
+	it("Given a file symlink outside any repo points into a linked worktree, When vault-link runs on the symlink, Then the real worktree location maps to the main checkout", () => {
+		const alias = path.join(root, "outside-repo-alias.md");
+		symlinkSync(path.join(worktree, "docs", "spec.md"), alias, "file");
+		writeFileSync(note, `See [alias](${alias}).\n`);
+
+		const result = jact(["vault-link", note, alias]);
+
+		expect(result.status, result.stderr).toBe(0);
+		const symlinkPath = path.join(
+			notesDir,
+			"sources",
+			REPO_NAME,
+			"docs",
+			"spec.md",
+		);
+		expect(readlinkSync(symlinkPath)).toBe(
+			path.join(mainCheckout, "docs", "spec.md"),
+		);
+		expect(lastLine(result.stdout)).toBe(
+			`sources/${REPO_NAME}/docs/spec.md`,
+		);
+	});
 });
 
 describe("jact vault-link --all", () => {
@@ -245,6 +301,68 @@ describe("jact vault-link --all", () => {
 		);
 		expect(readlinkSync(path.join(notesDir, specLink))).toBe(mainSpec);
 		expect(escapeFindings(note)).toEqual([]);
+	});
+
+	it("Given an escaping link to a file whose name holds #, written as %23, When --all runs, Then the new link encodes # and resolves to the symlink for that file", () => {
+		const hashFile = path.join(mainCheckout, "docs", "spec#1.md");
+		writeFileSync(hashFile, "# One\n");
+		writeFileSync(note, `- [h](../../${REPO_NAME}/docs/spec%231.md#One)\n`);
+
+		const result = jact(["vault-link", note, "--all"]);
+
+		expect(result.status, result.stderr).toBe(0);
+		const link = `sources/${REPO_NAME}/docs/spec%231.md`;
+		expect(readFileSync(note, "utf8")).toBe(`- [h](${link}#One)\n`);
+		const symlinkPath = path.resolve(notesDir, decodeURIComponent(link));
+		expect(symlinkPath).toBe(
+			path.join(notesDir, "sources", REPO_NAME, "docs", "spec#1.md"),
+		);
+		expect(readlinkSync(symlinkPath)).toBe(hashFile);
+	});
+
+	it("Given an escaping link with a Markdown backslash escape in its path, When --all runs, Then it links the unescaped file and replaces the whole written destination", () => {
+		writeFileSync(note, `- [s](../../${REPO_NAME}/docs/spec\\.md#Second)\n`);
+
+		const result = jact(["vault-link", note, "--all"]);
+
+		expect(result.status, result.stderr).toBe(0);
+		expect(readFileSync(note, "utf8")).toBe(
+			`- [s](sources/${REPO_NAME}/docs/spec.md#Second)\n`,
+		);
+		expect(
+			readlinkSync(path.join(notesDir, "sources", REPO_NAME, "docs", "spec.md")),
+		).toBe(path.join(mainCheckout, "docs", "spec.md"));
+		expect(escapeFindings(note)).toEqual([]);
+	});
+
+	it("Given encoded-scheme file URLs whose filenames contain # and ?, When --all runs, Then the encoded characters stay in the filename rather than becoming URL suffixes", () => {
+		const hashFile = path.join(mainCheckout, "docs", "hash#name.md");
+		const queryFile = path.join(mainCheckout, "docs", "query?name.md");
+		writeFileSync(hashFile, "# Hash name\n");
+		writeFileSync(queryFile, "# Query name\n");
+		writeFileSync(path.join(mainCheckout, "docs", "hash"), "# Wrong hash\n");
+		writeFileSync(path.join(mainCheckout, "docs", "query"), "# Wrong query\n");
+		writeFileSync(
+			note,
+			`- [h](${pathToFileURL(hashFile).href.replace(/^file:/, "file%3A")})\n- [q](${pathToFileURL(queryFile).href.replace(/^file:/, "file%3A")})\n`,
+		);
+
+		const result = jact(["vault-link", note, "--all"]);
+
+		expect(result.status, result.stderr).toBe(0);
+		expect(readFileSync(note, "utf8")).toBe(
+			`- [h](sources/${REPO_NAME}/docs/hash%23name.md)\n- [q](sources/${REPO_NAME}/docs/query%3Fname.md)\n`,
+		);
+		expect(
+			readlinkSync(
+				path.join(notesDir, "sources", REPO_NAME, "docs", "hash#name.md"),
+			),
+		).toBe(hashFile);
+		expect(
+			readlinkSync(
+				path.join(notesDir, "sources", REPO_NAME, "docs", "query?name.md"),
+			),
+		).toBe(queryFile);
 	});
 });
 

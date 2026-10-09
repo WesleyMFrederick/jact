@@ -3,11 +3,25 @@ import { fileURLToPath } from "node:url";
 
 const URL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
+/** First `#` not escaped by a Markdown backslash: where the anchor starts. */
+export const ANCHOR_START = /(?<!\\)#/;
+
+/** True when `child` is `parent` or lies under it. */
+export function isInside(parent: string, child: string): boolean {
+	const relative = path.relative(parent, child);
+	return !(
+		relative === ".." ||
+		relative.startsWith(`..${path.sep}`) ||
+		path.isAbsolute(relative)
+	);
+}
+
 /**
  * Classify one markdown link target written in a vault note.
  * Returns the absolute path the target points at when it leaves the vault,
  * or null when it stays inside or is an external URL. The `#anchor` is
- * dropped, the path is URL-decoded, and `file:` URLs become paths.
+ * dropped, Markdown backslash escapes are removed, the path is URL-decoded
+ * before classification, and `file:` URLs become paths.
  * Relative targets resolve lexically from the note's real directory (never
  * realpathed), so a symlink inside the vault is a valid way to link out.
  */
@@ -16,25 +30,23 @@ export function resolveVaultEscape(
 	noteRealDir: string,
 	vaultRoot: string,
 ): string | null {
-	const written = (raw.split("#", 1)[0] ?? "").replace(/^<|>$/g, "");
-	if (/^file:/i.test(written)) {
+	const written = (raw.split(ANCHOR_START, 1)[0] ?? "")
+		.replace(/\\([!-/:-@[-`{-~])/g, "$1")
+		.replace(/^<|>$/g, "");
+	const target = decode(written).replace(/^<|>$/g, "");
+	if (/^file:/i.test(target)) {
+		// Decode only the scheme: %23 or %3F in the path must stay part of the name.
 		try {
-			return fileURLToPath(written);
+			return fileURLToPath(written.replace(/^file%3A/i, "file:"));
 		} catch {
-			return path.resolve(decode(written).replace(/^file:(\/\/)?/i, "/"));
+			return path.resolve(target.replace(/^file:(\/\/)?/i, "/"));
 		}
 	}
-	const target = decode(written).replace(/^<|>$/g, "");
 	if (target === "" || URL_SCHEME.test(target)) return null;
 	if (path.isAbsolute(target)) return path.normalize(target);
 	const resolved = path.resolve(noteRealDir, target);
 	if (target.includes(".paseo/worktrees/")) return resolved;
-	const relative = path.relative(vaultRoot, resolved);
-	const escapes =
-		relative === ".." ||
-		relative.startsWith(`..${path.sep}`) ||
-		path.isAbsolute(relative);
-	return escapes ? resolved : null;
+	return isInside(vaultRoot, resolved) ? null : resolved;
 }
 
 function decode(text: string): string {

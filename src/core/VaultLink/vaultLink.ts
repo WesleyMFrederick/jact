@@ -3,7 +3,12 @@ import * as fs from "node:fs";
 import path from "node:path";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { findVaultRoot } from "../resolveScope.js";
-import { destinationSpan, resolveVaultEscape } from "../vaultEscape.js";
+import {
+	ANCHOR_START,
+	destinationSpan,
+	isInside,
+	resolveVaultEscape,
+} from "../vaultEscape.js";
 
 const PASEO_WORKTREE = /^(.*\/\.paseo\/worktrees\/[^/]+\/[^/]+)(?:\/|$)/;
 
@@ -51,7 +56,7 @@ export class VaultLinker {
 	readonly dryRun: boolean;
 	created = 0;
 	reused = 0;
-	private mainCheckouts = new Map<string, string | null>();
+	private worktreeLists = new Map<string, string[] | null>();
 	private symlinks = new Map<
 		string,
 		{ mapped: string; status: "created" | "reused" }
@@ -94,7 +99,7 @@ export class VaultLinker {
 			else this.reused++;
 		}
 
-		const hash = written.indexOf("#");
+		const hash = written.search(ANCHOR_START);
 		const link =
 			path
 				.relative(this.note.noteRealDir, symlinkPath)
@@ -104,14 +109,23 @@ export class VaultLinker {
 						.replaceAll("%", "%25")
 						.replaceAll(" ", "%20")
 						.replaceAll("(", "%28")
-						.replaceAll(")", "%29"),
+						.replaceAll(")", "%29")
+						.replaceAll("#", "%23")
+						.replaceAll("?", "%3F"),
 				)
 				.join("/") + (hash < 0 ? "" : written.slice(hash));
 		return { kind: "linked", link, symlinkPath, mapped, status };
 	}
 
-	/** Map an escaping path to its main-checkout file and vault symlink path. */
-	private map(escaping: string): Mapping {
+	/**
+	 * Map an escaping path to its main-checkout file and vault symlink path.
+	 * An existing path maps by its real location, so a symlink outside any
+	 * repo that points into a worktree still maps to the main checkout.
+	 */
+	private map(resolved: string): Mapping {
+		const escaping = fs.existsSync(resolved)
+			? fs.realpathSync(resolved)
+			: resolved;
 		const sourcesDir = path.join(this.note.noteRealDir, "sources");
 		const worktree = PASEO_WORKTREE.exec(escaping)?.[1];
 		if (worktree !== undefined && !fs.existsSync(worktree)) {
@@ -144,17 +158,18 @@ export class VaultLinker {
 			};
 		}
 
-		if (worktree !== undefined) {
-			const fromWorktree = path.relative(fs.realpathSync(worktree), toplevel);
-			if (fromWorktree.startsWith("..") || path.isAbsolute(fromWorktree)) {
-				return {
-					kind: "refused",
-					reason: `cannot find the git repository for ${escaping}`,
-				};
-			}
+		if (
+			worktree !== undefined &&
+			!isInside(fs.realpathSync(worktree), toplevel)
+		) {
+			return {
+				kind: "refused",
+				reason: `cannot find the git repository for ${escaping}`,
+			};
 		}
-		const main = this.mainCheckout(toplevel);
-		if (main === null) {
+		const worktrees = this.worktrees(toplevel);
+		const main = worktrees?.[0];
+		if (main === undefined) {
 			return {
 				kind: "refused",
 				reason: `cannot find the main checkout of ${toplevel}`,
@@ -174,6 +189,25 @@ export class VaultLinker {
 				reason: `main checkout has no ${mapped}; land the file on the main checkout first`,
 			};
 		}
+		const realMapped = fs.realpathSync(mapped);
+		const linkedWorktree = worktrees?.slice(1).find((linked) => {
+			let realLinked = linked;
+			try {
+				realLinked = fs.realpathSync(linked);
+			} catch {
+				// a pruned worktree keeps its listed path
+			}
+			return isInside(realLinked, realMapped);
+		});
+		if (
+			linkedWorktree !== undefined ||
+			realMapped.includes(`${path.sep}.paseo${path.sep}worktrees${path.sep}`)
+		) {
+			return {
+				kind: "refused",
+				reason: `main checkout file ${mapped} resolves to ${realMapped}, inside a worktree`,
+			};
+		}
 		return {
 			kind: "mapped",
 			mapped,
@@ -181,14 +215,18 @@ export class VaultLinker {
 		};
 	}
 
-	private mainCheckout(toplevel: string): string | null {
-		let main = this.mainCheckouts.get(toplevel);
-		if (main === undefined) {
+	/** Worktree paths of a repository, main checkout first. */
+	private worktrees(toplevel: string): string[] | null {
+		let worktrees = this.worktreeLists.get(toplevel);
+		if (worktrees === undefined) {
 			const list = git(toplevel, ["worktree", "list", "--porcelain"]);
-			main = list?.match(/^worktree (.+)$/m)?.[1] ?? null;
-			this.mainCheckouts.set(toplevel, main);
+			worktrees =
+				list === null
+					? null
+					: [...list.matchAll(/^worktree (.+)$/gm)].map((match) => match[1] ?? "");
+			this.worktreeLists.set(toplevel, worktrees);
 		}
-		return main;
+		return worktrees;
 	}
 
 	/** Create the symlink, or reuse one that already points at `mapped`. */
@@ -198,6 +236,35 @@ export class VaultLinker {
 	):
 		| { kind: "placed"; status: "created" | "reused" }
 		| { kind: "refused"; reason: string } {
+		const parent = path.dirname(symlinkPath);
+		if (
+			!isInside(this.note.noteRealDir, parent) ||
+			!isInside(this.note.vaultRoot, symlinkPath)
+		) {
+			return {
+				kind: "refused",
+				reason: `${symlinkPath} would leave the vault`,
+			};
+		}
+		let dir = this.note.noteRealDir;
+		for (const segment of path
+			.relative(dir, parent)
+			.split(path.sep)
+			.filter(Boolean)) {
+			dir = path.join(dir, segment);
+			let stats: fs.Stats;
+			try {
+				stats = fs.lstatSync(dir);
+			} catch {
+				break;
+			}
+			if (!stats.isDirectory()) {
+				return {
+					kind: "refused",
+					reason: `${dir} is ${stats.isSymbolicLink() ? "a symlink" : "not a folder"}; not creating a symlink through it`,
+				};
+			}
+		}
 		let existing: fs.Stats | undefined;
 		try {
 			existing = fs.lstatSync(symlinkPath);
