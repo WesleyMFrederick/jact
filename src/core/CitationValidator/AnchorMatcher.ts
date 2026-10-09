@@ -430,11 +430,10 @@ export class AnchorMatcher {
 					filePath: targetFile,
 				});
 
-			if (
-				!anchor.startsWith("^") &&
-				!options?.isBlockRef &&
-				options?.ruleIds?.has(ANCHOR_DROPPED_CHARS_RULE)
-			) {
+			// Without the rule, suggestions keep heading punctuation intact.
+			const dropsChars =
+				options?.ruleIds?.has(ANCHOR_DROPPED_CHARS_RULE) ?? false;
+			if (!anchor.startsWith("^") && !options?.isBlockRef && dropsChars) {
 				const droppedChars = this.findObsidianDroppedChars(
 					anchor,
 					targetParsedDoc.data.anchors,
@@ -537,7 +536,7 @@ export class AnchorMatcher {
 				.slice(0, 5);
 
 			const availableHeaders = headerAnchors.map(
-				(a) => `"${a.rawText}" → #${stripObsidianDroppedChars(a.id)}`,
+				(a) => `"${a.rawText}" → #${dropsChars ? stripObsidianDroppedChars(a.id) : a.id}`,
 			);
 
 			const availableBlockRefs = targetParsedDoc.data.anchors
@@ -581,7 +580,9 @@ export class AnchorMatcher {
 						type: "anchor-conversion" as const,
 						original: anchor,
 						recommended: this.urlEncodeAnchor(
-							stripObsidianDroppedChars(bestHeaderMatch.rawText ?? ""),
+							dropsChars
+								? stripObsidianDroppedChars(bestHeaderMatch.rawText ?? "")
+								: (bestHeaderMatch.rawText ?? ""),
 						),
 					},
 				}),
