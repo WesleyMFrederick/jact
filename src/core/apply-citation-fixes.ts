@@ -181,6 +181,12 @@ export async function applyCitationFixes(
 		);
 		const ruleEdits = ruleFixes.flatMap((finding) => finding.edits);
 		const originalContent = fsRead(filePath, "utf8");
+		// Rule edits carry offsets into the parsed content; refuse a source that
+		// changed since (an editor save, or memory content validated for this path).
+		// Ordinary citation fixes verify their own spans below.
+		if (ruleEdits.length > 0 && originalContent !== document.data.content) {
+			throw new Error("Source changed since it was parsed; no files were written.");
+		}
 		const scope = resolveScope({
 			cwd: process.cwd(), targetFile: filePath,
 			...(options.scope !== undefined && { explicit: options.scope }),
