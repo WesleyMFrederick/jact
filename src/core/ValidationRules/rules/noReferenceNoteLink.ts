@@ -69,20 +69,32 @@ export const noReferenceNoteLink: ValidationRule = {
 			if (document.content[index] === "\n") lineStarts.push(index + 1);
 		}
 
-		// CommonMark: the first definition of a label wins. Key by the raw label,
-		// as mdast does for usages, so escapes and entities match.
-		const definitions = new Map<string, EnrichedLinkObject>();
+		// CommonMark: the first definition of a label wins, whatever its
+		// destination. Pick it from every AST definition, so an earlier web
+		// definition shadows a later local one; the validated link is then
+		// matched to the winning node by position (web definitions have none).
+		const linkAt = new Map<string, EnrichedLinkObject>();
 		for (const link of links) {
-			if (link.markdownForm !== "definition") continue;
-			const rawLabel = RAW_DEFINITION_LABEL.exec(link.fullMatch)?.[1];
-			if (rawLabel === undefined) continue;
-			const identifier = normalizeIdentifier(rawLabel).toLowerCase();
-			if (!definitions.has(identifier)) definitions.set(identifier, link);
+			if (link.markdownForm === "definition") {
+				linkAt.set(`${link.line}:${link.column}`, link);
+			}
 		}
+		const definitions = new Map<string, EnrichedLinkObject | null>();
+		visit(document.ast, "definition", (node) => {
+			if (definitions.has(node.identifier)) return;
+			const start = node.position?.start;
+			definitions.set(
+				node.identifier,
+				start === undefined
+					? null
+					: (linkAt.get(`${start.line}:${start.column - 1}`) ?? null),
+			);
+		});
 
 		const findings: RuleFinding[] = [];
 		for (const [identifier, definition] of definitions) {
 			if (
+				definition === null ||
 				identifier.startsWith("^") ||
 				definition.scope !== "cross-document" ||
 				URL_SCHEME.test(definition.target.path.raw ?? "")

@@ -120,6 +120,22 @@ describe("obsidian/no-reference-note-link", () => {
 		} as Partial<EnrichedLinkObject["validation"]>);
 		expect(fixed).toBe("[a](./b.md#New)\n\n");
 	});
+
+	it("keeps a web definition that comes before a local one (first definition wins)", async () => {
+		const content =
+			"See [note][x].\n\n[x]: https://example.com\n[x]: target.md\n";
+		const { findings, fixed } = await check(content);
+		expect(findings).toEqual([]);
+		expect(fixed).toBe(content);
+	});
+
+	it("still flags a local definition that comes before a web one", async () => {
+		const { findings, fixed } = await check(
+			"See [note][x].\n\n[x]: target.md\n[x]: https://example.com\n",
+		);
+		expect(findings).toHaveLength(1);
+		expect(fixed).toBe("See [note](target.md).\n\n[x]: https://example.com\n");
+	});
 });
 
 describe("runRules", () => {
