@@ -24,6 +24,7 @@ import { createRuleSetResolver } from "./core/ValidationRules/loadConfig.js";
 import { createValidationWorkflow } from "./factories/componentFactory.js";
 import { formatContentMap, formatExtractResult } from "./formatExtractResult.js";
 import { JactCli, linkedContentHints } from "./jact-cli.js";
+import { terminalText } from "./shellArgument.js";
 import type {
 	CliExtractOptions,
 	CliRenameOptions,
@@ -271,7 +272,9 @@ Exit Codes:
 			try {
 				await resolveRuleSet(path.resolve(file));
 			} catch (error) {
-				console.error(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
+				console.error(
+					`ERROR: ${terminalText(error instanceof Error ? error.message : String(error))}`,
+				);
 				process.exitCode = 2;
 				return;
 			}
@@ -380,7 +383,7 @@ Exit Codes:
 				return;
 			}
 			const message = error instanceof Error ? error.message : String(error);
-			console.error(`ERROR: ${message}`);
+			console.error(`ERROR: ${terminalText(message)}`);
 			process.exitCode = 2;
 		}
 	});

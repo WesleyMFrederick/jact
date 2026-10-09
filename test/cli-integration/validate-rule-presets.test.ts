@@ -157,4 +157,17 @@ describe("jact validate — rule presets", () => {
 		);
 		expect(result.stderr).toContain('unknown preset "obsidain"');
 	});
+
+	it.each([
+		["a single file", ["source.md"]],
+		["a batch", ["source.md", "target.md"]],
+	])("prints control bytes in a config error as visible escapes for %s", (_name, args) => {
+		userConfig({ preset: "evil\u001b]52;c;QQ==\u0007\u001b[2J" });
+		const result = run(args);
+		expect(result.status).toBe(2);
+		expect(result.stderr).toContain("unknown preset");
+		expect(result.stderr).toContain("\\u001b]52;c;QQ==\\u0007\\u001b[2J");
+		// biome-ignore lint/suspicious/noControlCharactersInRegex: asserting none are printed
+		expect(result.stderr).not.toMatch(/[\u0000-\u0009\u000b-\u001f\u007f]/);
+	});
 });
