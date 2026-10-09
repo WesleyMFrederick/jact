@@ -6,31 +6,33 @@ This section states what each jact workflow reads, writes, prints, and exits wit
 
 ## Validate Workflow (single file)
 
-Single-file validation checks the link syntax in one Markdown file and prints one report. It writes no files. File, `--stdin`, and batch validation share steps 1–4.
+Single-file validation checks the link syntax and enabled renderer rules in one Markdown file and prints one report. It writes no files. Before validation, the CLI resolves [Validation configuration and presets](005-interfaces.md#Validation configuration and presets); a configuration or plugin error prints `ERROR: <message>` on stderr and exits `2` without validating or writing anything. File, `--stdin`, and batch validation share steps 1–5.
 
 ```text
 1. Resolve scope ── no root found ──▶ ERROR: cannot resolve scope … (exit 2)
    │  index the scope folder, even without --scope, so bare wiki page names resolve
    ▼
 2. Read the file ── missing ──▶ ERROR: File not found … (exit 2)
-   │  --stdin: read standard input; <path> sets scope and relative links only
+   │  --stdin: read standard input; <path> sets config, scope, and relative links
    ▼
 3. Parse ── disable directive ──▶ SKIPPED: validation disabled by document directive (exit 0)
    ▼
 4. Check every link; detect nested code blocks
    │  plain text and inline code are never checked
    ▼
-5. --lines: keep links in the range; recompute the summary from them
+5. Run enabled rules against the parsed document and validated links
    ▼
-6. Print (human format only, before the report):
+6. --lines: keep links and findings in the range; recompute the summary
+   ▼
+7. Print (human format only, before the report):
    │  scope notices (vault notice, gitignored-target notice)
    │  --verbose: file count and duplicate-filename warning
    ▼
-7. Print the report: JSON (--format json), or the minimal or --verbose tree
+8. Print the report: JSON (--format json), or the minimal or --verbose tree
    │  human format adds a .gitignore hint when a wiki page is not found
    │  and the scope honors a .gitignore
    ▼
-8. Exit 0 (no link errors) or 1 (link errors)
+9. Exit 0 (no errors) or 1 (link errors or rule errors)
 ```
 
 A failure in steps 1–4 prints `ERROR: <message>`, or a JSON object with `error`, `file`, and `success: false`, and exits `2`.
@@ -60,22 +62,26 @@ Validation and `--fix --dry-run` write no files or backups. Applied conversions 
 
 ## Validate Workflow (batch)
 
-Batch validation runs the single-file steps 1–4 on many files, one file at a time, and prints one combined report. Several paths, a glob, `--changed`, or `--json` select batch mode.
+Batch validation runs the single-file steps 1–5 on many files, one file at a time, and prints one combined report. Several paths, a glob, `--changed`, or `--json` select batch mode.
 
 ```text
 1. Select files: expand globs, add --changed Markdown files, drop ignored sweep
    │  matches, keep .md only, deduplicate, sort
    │  ── nothing selected ──▶ ERROR (exit 2); --changed alone with no changes → exit 0
    ▼
-2. Validate each file in order with one shared cache
+2. Resolve each selected file's rule set from the user config and its nearest
+   │  .jact.json ── bad config/plugin ──▶ ERROR on stderr, no validation, exit 2
+   ▼
+3. Validate each file in order with one shared cache; run its enabled rules
+   │  after link validation
    │  ── any file fails (scope, read, size, parse) ──▶ ERROR: <message> on stderr,
    │                                                   no report, exit 2
    ▼
-3. Map each file: pass, fail (with its errors), or skipped (disable directive)
+4. Map each file: pass, fail (with link errors and rule findings), or skipped
    ▼
-4. Print: JSONL (--json, one object per file) or the human report
+5. Print: JSONL (--json, one object per file) or the human report
    ▼
-5. Exit 1 when any file failed; else 0 (passes and skips only)
+6. Exit 1 when any file failed; else 0 (passes and skips only)
 ```
 
 The human report counts skipped files apart from passed files. With five or fewer errors in total, it lists every file and error. Above five, it lists only failing files with per-file error counts, then the totals, why details are hidden, and drill, filter, and fix commands. `--verbose` always prints the full report. JSONL output is always complete. Batch mode prints no scope notices.
@@ -120,7 +126,7 @@ Rule 5 always returns a result, so the chain always ends. For duplicate filename
 
 An anchor check on a resolved target runs these steps in order.
 
-1. **Dropped characters.** A header anchor with characters Obsidian drops is an error: see [Anchors with characters Obsidian drops](#Anchors%20with%20characters%20Obsidian%20drops).
+1. **Dropped characters (opt-in).** Only when `obsidian/anchor-dropped-chars` is enabled, a header anchor with characters Obsidian drops is an error: see [Anchors with characters Obsidian drops](#Anchors%20with%20characters%20Obsidian%20drops).
 2. **Match.** An anchor matches a heading or block when any form is equal: the exact ID, the URL-encoded or decoded ID, the normalized ID, the raw heading text, the text with backticks added or removed, or both sides with Markdown formatting removed. A block anchor also matches with or without its leading `^`.
 3. **Missing caret.** A link that matches only a block anchor and omits `^` is a warning that suggests `#^<id>`.
 4. **Kebab-case slug.** A kebab-case slug of a heading fails with a suggestion to use the raw heading text. `--fix` applies it.
@@ -130,13 +136,15 @@ Same-file `[text](#heading)` links run the same steps against their own file.
 
 ### Anchors with characters Obsidian drops
 
-Obsidian drops `:` `#` `|` `^` `[` `]` from heading-link anchors. It renders an anchor that keeps any of these characters as an external link. jact decodes each header anchor (one that does not start with `^`) and checks it for these characters. If the anchor has one, jact replaces each with a space, collapses whitespace, and matches again. When a header matches, the link is an error:
+This check runs only when the `obsidian/anchor-dropped-chars` rule is enabled by the `obsidian` preset or a per-rule override; see [Validation configuration and presets](005-interfaces.md#Validation configuration and presets). With no configuration, the default `commonmark` preset leaves it off.
+
+Obsidian drops `:` `#` `|` `^` `[` `]` from heading-link anchors. It renders an anchor that keeps any of these characters as an external link. When the rule is enabled, jact decodes each header anchor (one that does not start with `^`) and checks it for these characters. If the anchor has one, jact replaces each with a space, collapses whitespace, and matches again. When a header matches, the link is an error owned by `obsidian/anchor-dropped-chars`:
 
 - `error`: `Anchor uses characters Obsidian drops (<chars>): #<anchor>`
 - `suggestion`: the corrected anchor, `#` + the header text with those characters replaced and whitespace collapsed, spaces encoded as `%20`. Examples: `#Q1%20Does%20the%20gap?` for the heading `Q1: Does the gap?`; `#Trace%20run%20(opsx%20continue)` for the heading `Trace: run (opsx:continue)`
 - `anchorConversion`: the same correction, which `--fix` applies
 
-If no header matches after the replacement, the normal `Anchor not found` result applies. Its `Available headers` list and its fuzzy-match `--fix` correction use the same replacement, so they never suggest an anchor that this rule rejects.
+If no header matches after the replacement, the normal `Anchor not found` result applies. When the rule is enabled, its `Available headers` list and fuzzy-match `--fix` correction use the same replacement, so they never suggest an anchor that this rule rejects. When it is disabled, normal matching and suggestions keep those characters.
 
 ## Extraction Eligibility Order
 
@@ -185,12 +193,12 @@ jact parses six link patterns with its Markdown syntax extensions, not with regu
 
 ## Fix Workflow (`--fix`)
 
-`--fix` repairs broken citations and converts resolved prose `.md` paths in one file. It writes only that file and its backup. `--fix`, `--dry-run`, or `--no-backup` with batch selection or `--stdin` is a usage error: jact prints `ERROR:` on stderr, validates and writes nothing, and exits `2`.
+`--fix` repairs broken citations, applies enabled rule edits, and converts resolved prose `.md` paths in one file. It writes only that file and its backup. Configuration is resolved before any validation or write, as in [Validate Workflow (single file)](#Validate Workflow (single file)). `--fix`, `--dry-run`, or `--no-backup` with batch selection or `--stdin` is a usage error: jact prints `ERROR:` on stderr, validates and writes nothing, and exits `2`.
 
 ```text
 1. Parse ── disable directive ──▶ SKIPPED: … (file not read again, backed up, or written)
    ▼
-2. Validate; collect citation fixes and plain-path conversions
+2. Validate links; run rules; collect citation fixes, rule edits, and plain-path conversions
    │  ── none ──▶ No auto-fixable citations found in <file>
    │  ── a path fix without --scope ──▶ ERROR: Path corrections require --scope …
    ▼
@@ -203,10 +211,14 @@ jact parses six link patterns with its Markdown syntax extensions, not with regu
 6. Print each fix and the backup path
    ▼
 7. Validate the file as it now stands on disk (unchanged after --dry-run)
-   └─ exit 0 (no link errors left) or 1 (link errors left)
+   └─ exit 0 (no errors left) or 1 (link errors or rule errors left)
 ```
 
-Fix kinds: a path conversion, a kebab-case anchor to its raw heading, a close heading for a missing anchor, and an anchor with characters Obsidian drops. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged is not applied, counted, or reported. A changed citation or two overlapping edits stop the fix before any write. Every path that ends in `ERROR:` (missing file, missing `--scope` for a path fix, refused write, changed or overlapping citations) exits `2`. Every other path, including `SKIPPED:`, "No auto-fixable citations found", and `--dry-run`, ends at step 7.
+Fix kinds: a path conversion, a kebab-case anchor to its raw heading, a close heading for a missing anchor, and an anchor with characters Obsidian drops when its rule is enabled. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged is not applied, counted, or reported.
+
+When `obsidian/no-reference-note-link` is enabled, each local-file split-style usage becomes `[text](dest)` and its definition line is deleted after all usages are rewritten. The destination is preserved byte-for-byte unless jact's own path or anchor correction is folded into it. Other excluded forms are listed in [Validation configuration and presets](005-interfaces.md#Validation configuration and presets).
+
+Rule edits and ordinary fixes share source-offset ranges and apply from the end of the document backward. A citation fix wholly contained in a rule rewrite or deletion is omitted because the rule already folds it in; any remaining overlap stops the fix before backups or writes. A changed citation also stops the fix before writing. Every path that ends in `ERROR:` (configuration/plugin failure, missing file, missing `--scope` for a path fix, refused write, changed or overlapping citations) exits `2`. Every other path, including `SKIPPED:`, "No auto-fixable citations found", and `--dry-run`, ends at step 7.
 
 ## Rename Workflow (`jact rename`)
 
@@ -250,6 +262,7 @@ A valid Markdown image with bracketed description text, such as `![[caption]](fo
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-09 | Added preflight configuration, per-file batch presets, post-link rule checks, findings filtering, rule edits and overlap handling; gated Obsidian dropped-character matching behind its rule |
 | 1.0.0-draft | 2026-10-07 | `--fix` exits `0` when no link errors are left, `1` when errors remain after fixing or during `--dry-run`, and `2` on `ERROR:`. `--fix`, `--dry-run`, and `--no-backup` with batch selection or `--stdin` are usage errors (exit `2`) |
 | 1.0.0-draft | 2026-10-07 | Same-file wiki links are checked against the file's own headings and block anchors; an unknown anchor is an error with anchor suggestions |
 | 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift. Batch abort on a failed file, scope-notice output, and same-file wiki-link handling stated as observed behavior |

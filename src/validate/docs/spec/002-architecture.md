@@ -25,7 +25,7 @@ workflow:
   scope ──► parsed document ──► disabled? ──yes──► skipped
                                    │no
                                    ▼
-                      link checker ──► --lines filter ──► completed
+                      link checker ──► enabled rules ──► --lines filter ──► completed
   any thrown error ──► failed
 ```
 
@@ -42,9 +42,10 @@ Each file owns one job and states the guarantees it holds.
 The workflow checks one file or one in-memory document and returns a `completed`, `skipped`, or `failed` outcome.
 
 - **Never throws.** Every error becomes a `failed` outcome with the message, so each caller picks its own exit code.
-- **Skip before check.** A disabled document returns `skipped` before link checks, nested-code-block checks, or the line filter.
-- **Intended path for memory input.** `--stdin` content resolves scope and relative links from its stated path, and the module never reads that path from disk.
-- **Line filter recomputes totals.** `--lines` filters links, then rebuilds the summary from the kept links only.
+- **Skip before check.** A disabled document returns `skipped` before link checks, rule checks, nested-code-block checks, or the line filter.
+- **Intended path for memory input.** `--stdin` content resolves configuration, scope, and relative links from its stated path, and the module never reads that path from disk.
+- **Rules after links.** The workflow invokes `src/core/ValidationRules/` checks on the parsed document and validated links, using the injected per-file rule-set resolver. Configuration preflight belongs to `src/cli.ts`; see [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation configuration and presets).
+- **Line filter recomputes totals.** `--lines` filters links and findings, then rebuilds the summary from the kept results.
 
 Tests: `test/unit/jact-validate-stdin.test.ts`, `test/validate/validate-integration.test.ts`, `test/cli-integration/plain-path-validate.test.ts`.
 
@@ -126,3 +127,4 @@ Each row records one version of this architecture section.
 |---------|---------|
 | 1.0.0 | First module architecture |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
+| 1.2.0 | 2026-10-09: Added post-link rule checks, per-file configuration, and findings filtering |

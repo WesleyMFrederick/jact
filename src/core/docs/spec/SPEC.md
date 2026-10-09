@@ -1,6 +1,6 @@
 # `src/core` Living Specification
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Status:** done
 
 `src/core` is the domain layer of jact: it parses Markdown, checks links, extracts linked content, and plans or applies file edits. It has no command registration, no output formatting, and no exit codes. Those belong to the command-line interface (CLI) layer in the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -47,6 +47,7 @@ These summaries show what core is, is not, and guarantees.
 
 - The **parser**: Markdown text to a typed parser output, through one micromark extension set
 - The **checker**: each parsed link to a valid, warning, or error result
+- The **rule layer** (`src/core/ValidationRules/`): preset registry, configuration and plugin loading, and post-link checks; contracts live in [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation configuration and presets)
 - The **extractor**: linked sections, blocks, and files to deduplicated content
 - The **editors**: `--fix` citation repair and `jact rename` move planning, the only code that writes user files
 
@@ -71,3 +72,4 @@ Each row records one version of this module spec.
 |---------|---------|
 | 1.0.0 | Initial module spec for `src/core` |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
+| 1.2.0 | 2026-10-09: Added validation rule layer ownership and canonical configuration contract |
