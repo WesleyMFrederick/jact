@@ -11,6 +11,7 @@ import type {
 } from "../../types/validationRuleTypes.js";
 import { anchorDroppedChars } from "./rules/anchorDroppedChars.js";
 import { noReferenceNoteLink } from "./rules/noReferenceNoteLink.js";
+import { noVaultEscapeLink } from "./rules/noVaultEscapeLink.js";
 
 /** Preset used when no config selects one: plain CommonMark, no extra rules. */
 export const DEFAULT_PRESET = "commonmark";
@@ -26,7 +27,10 @@ export class RuleRegistry {
 	readonly rules = new Map<string, ValidationRule>();
 
 	constructor() {
-		this.register({ rules: [noReferenceNoteLink, anchorDroppedChars] }, "jact");
+		this.register(
+			{ rules: [noReferenceNoteLink, anchorDroppedChars, noVaultEscapeLink] },
+			"jact",
+		);
 	}
 
 	/** Add a plugin's rules and presets. Throws on a rule ID already registered. */

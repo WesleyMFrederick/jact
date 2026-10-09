@@ -8,6 +8,7 @@
 
 import * as defaultFs from "node:fs";
 import path from "node:path";
+import type * as NodeFs from "node:fs";
 
 export type ScopeSource =
 	| "explicit"
@@ -108,6 +109,29 @@ function walkUpForAny(
 		}
 		const parent = path.dirname(dir);
 		if (parent === dir) return null; // reached filesystem root
+		dir = parent;
+	}
+}
+
+/**
+ * Nearest directory above filePath (by real path) containing `.obsidian`,
+ * or null. `.git` and `package.json` are ignored.
+ */
+export function findVaultRoot(
+	filePath: string,
+	fsModule: typeof NodeFs = defaultFs,
+): string | null {
+	let real: string;
+	try {
+		real = fsModule.realpathSync(filePath);
+	} catch {
+		real = path.resolve(filePath);
+	}
+	let dir = path.dirname(real);
+	while (true) {
+		if (fsModule.existsSync(path.join(dir, ".obsidian"))) return dir;
+		const parent = path.dirname(dir);
+		if (parent === dir) return null;
 		dir = parent;
 	}
 }

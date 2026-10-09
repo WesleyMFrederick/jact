@@ -170,4 +170,29 @@ describe("jact validate — rule presets", () => {
 		// biome-ignore lint/suspicious/noControlCharactersInRegex: asserting none are printed
 		expect(result.stderr).not.toMatch(/[\u0000-\u0009\u000b-\u001f\u007f]/);
 	});
+
+	it("Given a vault note under the obsidian preset, When it links outside the vault, Then it reports no-vault-escape-link and exits 1", () => {
+		mkdirSync(path.join(root, "vault", ".obsidian"), { recursive: true });
+		projectConfig(path.join(root, "vault"), { preset: "obsidian" });
+		writeFileSync(
+			path.join(root, "vault", "note.md"),
+			"See [out](../target.md).\n",
+		);
+		const result = run(["vault/note.md"]);
+		expect(result.status).toBe(1);
+		expect(result.stdout).toContain("[obsidian/no-vault-escape-link]");
+		expect(result.stdout).toContain("symlink");
+	});
+
+	it("Given a non-vault note under the obsidian preset, When it links to a parent folder, Then it exits 0", () => {
+		mkdirSync(path.join(root, "plain"));
+		projectConfig(path.join(root, "plain"), { preset: "obsidian" });
+		writeFileSync(
+			path.join(root, "plain", "note.md"),
+			"See [out](../target.md).\n",
+		);
+		const result = run(["plain/note.md"]);
+		expect(result.stdout).not.toContain("no-vault-escape-link");
+		expect(result.status).toBe(0);
+	});
 });

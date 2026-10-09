@@ -58,12 +58,13 @@ The configuration keys are:
 
 Only the user config may list `plugins`; a project config that lists them exits `2` before any plugin code runs because a downloaded repository could run code with your permissions.
 
-The default preset is `commonmark`, which enables no additional rules. It does not change the parser's supported syntax or turn off ordinary link checks. The `obsidian` preset enables both built-in rules:
+The default preset is `commonmark`, which enables no additional rules. It does not change the parser's supported syntax or turn off ordinary link checks. The `obsidian` preset enables all three built-in rules:
 
 | Rule ID | Check |
 |---|---|
 | `obsidian/no-reference-note-link` | Reject local-file split-style links: `[text][label]`, `[label][]`, and `[label]` with a reference definition. The first definition of a label decides, as in CommonMark: a label whose first definition is a `scheme:` URL such as `https:` or `obsidian:` is skipped even when a later definition is a local file. Also skip footnotes, same-file `#anchor` definitions, and unused definitions. |
 | `obsidian/anchor-dropped-chars` | Enable [Anchors with characters Obsidian drops](006-behavior.md#Anchors with characters Obsidian drops). This check no longer runs with no configuration. |
+| `obsidian/no-vault-escape-link` | Only in a vault: the nearest folder above the file's real path that contains `.obsidian`. With no vault, the rule does nothing. Inside a vault, a Markdown link is an error when its target is an absolute path, a `file:` URL, contains `.paseo/worktrees/`, or is a relative path that leaves the vault root. Relative paths are resolved from the note's real folder as text, without following symlinks, so a link to a symlink inside the vault passes even when the symlink points outside. Skip web URLs, `#anchor`-only links, wikilinks, and footnotes. The message tells you to create a symlink beside the note that points at the stable main checkout, then link to it relatively. |
 
 Setting a rule to `"error"` enables it regardless of preset; `"off"` disables it. For example, a project can keep the Obsidian preset but opt out of one check:
 

@@ -44,6 +44,7 @@ describe("rule set resolution from config", () => {
 		expect(await enabledFor()).toEqual([
 			"obsidian/anchor-dropped-chars",
 			"obsidian/no-reference-note-link",
+			"obsidian/no-vault-escape-link",
 		]);
 	});
 
@@ -55,7 +56,10 @@ describe("rule set resolution from config", () => {
 	it("lets project keys override user keys", async () => {
 		write(userConfig, { preset: "obsidian" });
 		writeProject({ rules: { "obsidian/no-reference-note-link": "off" } });
-		expect(await enabledFor()).toEqual(["obsidian/anchor-dropped-chars"]);
+		expect(await enabledFor()).toEqual([
+			"obsidian/anchor-dropped-chars",
+			"obsidian/no-vault-escape-link",
+		]);
 	});
 
 	it("rejects malformed JSON and bad keys, naming the file", async () => {

@@ -215,7 +215,7 @@ Rules and presets:
     { "preset": "obsidian", "rules": { "<rule-id>": "off" }, "plugins": ["./my-rules.mjs"] }
   Only the personal file may list "plugins" (plugins run code).
   Presets: commonmark (default, no extra rules), obsidian (obsidian/no-reference-note-link,
-  obsidian/anchor-dropped-chars). Rule errors end with [rule-id]; --fix applies rule fixes.
+  obsidian/anchor-dropped-chars, obsidian/no-vault-escape-link). Rule errors end with [rule-id]; --fix applies rule fixes.
 
 Exit Codes:
   0  All validated files passed (or --changed matched nothing)
