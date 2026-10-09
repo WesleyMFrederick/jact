@@ -22,6 +22,9 @@ const RAW_DEFINITION_LABEL = /^\[((?:[^\\\]]|\\.)*)\]:/s;
 /** The trailing `[label]` of a full reference; labels hold no unescaped brackets. */
 const TRAILING_LABEL = /\[(?:[^\\[\]]|\\.)*\]$/s;
 
+/** What may follow a definition on its last line: blanks, then the newline or end of text. */
+const LINE_END = /^[ \t]*(?:\r?\n|$)/;
+
 /**
  * The definition's destination and optional title as written, with the path
  * and anchor corrections jact's own `--fix` would apply folded in.
@@ -79,20 +82,24 @@ export const noReferenceNoteLink: ValidationRule = {
 				linkAt.set(`${link.line}:${link.column}`, link);
 			}
 		}
-		const definitions = new Map<string, EnrichedLinkObject | null>();
-		visit(document.ast, "definition", (node) => {
-			if (definitions.has(node.identifier)) return;
+		const winners = new Map<
+			string,
+			{ definition: EnrichedLinkObject | null; topLevel: boolean }
+		>();
+		visit(document.ast, "definition", (node, _index, parent) => {
+			if (winners.has(node.identifier)) return;
 			const start = node.position?.start;
-			definitions.set(
-				node.identifier,
-				start === undefined
-					? null
-					: (linkAt.get(`${start.line}:${start.column - 1}`) ?? null),
-			);
+			winners.set(node.identifier, {
+				definition:
+					start === undefined
+						? null
+						: (linkAt.get(`${start.line}:${start.column - 1}`) ?? null),
+				topLevel: parent?.type === "root",
+			});
 		});
 
 		const findings: RuleFinding[] = [];
-		for (const [identifier, definition] of definitions) {
+		for (const [identifier, { definition, topLevel }] of winners) {
 			if (
 				definition === null ||
 				identifier.startsWith("^") ||
@@ -107,10 +114,18 @@ export const noReferenceNoteLink: ValidationRule = {
 			if (usages.length === 0) continue;
 
 			const target = correctedTarget(definition);
-			const definitionStart =
-				(lineStarts[definition.line - 1] ?? 0) + definition.column;
-			let definitionEnd = definitionStart + definition.fullMatch.length;
-			if (document.content[definitionEnd] === "\n") definitionEnd++;
+			const lineStart = lineStarts[definition.line - 1] ?? 0;
+			const definitionStart = lineStart + definition.column;
+			const definitionEnd = definitionStart + definition.fullMatch.length;
+			const lineEnd = LINE_END.exec(document.content.slice(definitionEnd));
+			// Edit only a definition that owns its whole line(s). A quote or list
+			// prefix before it, or a multi-line form inside a container (whose
+			// continuation lines repeat the container marker), cannot be inlined
+			// or deleted without damaging the surrounding structure.
+			const editable =
+				lineEnd !== null &&
+				/^[ \t]*$/.test(document.content.slice(lineStart, definitionStart)) &&
+				(topLevel || !definition.fullMatch.includes("\n"));
 
 			usages.forEach((usage, index) => {
 				// Slice off the known suffix: the text may hold escaped brackets.
@@ -121,20 +136,21 @@ export const noReferenceNoteLink: ValidationRule = {
 							? 2
 							: 0;
 				const text = usage.raw.slice(1, usage.raw.length - suffixLength - 1);
-				const edits: RuleEdit[] = [
-					{
+				const edits: RuleEdit[] = [];
+				if (editable) {
+					edits.push({
 						start: usage.start,
 						end: usage.end,
 						replacement: `[${text}](${target})`,
-					},
-				];
-				// Images keep their reference syntax and still need the definition.
-				if (index === usages.length - 1 && !imageIdentifiers.has(identifier)) {
-					edits.push({
-						start: definitionStart,
-						end: definitionEnd,
-						replacement: "",
 					});
+					// Images keep their reference syntax and still need the definition.
+					if (index === usages.length - 1 && !imageIdentifiers.has(identifier)) {
+						edits.push({
+							start: lineStart,
+							end: definitionEnd + (lineEnd?.[0].length ?? 0),
+							replacement: "",
+						});
+					}
 				}
 				findings.push({
 					ruleId: NO_REFERENCE_NOTE_LINK_RULE,

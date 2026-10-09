@@ -136,6 +136,24 @@ describe("obsidian/no-reference-note-link", () => {
 		expect(findings).toHaveLength(1);
 		expect(fixed).toBe("See [note](target.md).\n\n[x]: https://example.com\n");
 	});
+
+	it.each([
+		["a quoted single-line definition", "> [x]: target.md\n> More quoted text.\n"],
+		["a quoted definition with a next-line title", '> [x]: target.md\n>   "Tooltip"\n'],
+		["a quoted definition with a next-line destination", "> [x]:\n> target.md\n"],
+		["a list-item definition", "- [x]: target.md\n- Another item\n"],
+	])("reports %s but supplies no edits", async (_name, definition) => {
+		const content = `See [note][x].\n\n${definition}`;
+		const { findings, fixed } = await check(content);
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.edits ?? []).toEqual([]);
+		expect(fixed).toBe(content);
+	});
+
+	it("still fixes an indented top-level definition", async () => {
+		const { fixed } = await check("See [note][x].\n\n   [x]: target.md\nAfter.\n");
+		expect(fixed).toBe("See [note](target.md).\n\nAfter.\n");
+	});
 });
 
 describe("runRules", () => {
