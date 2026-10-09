@@ -48,7 +48,7 @@ function expectOneEscape(
 	expect(finding?.ruleId).toBe(NO_VAULT_ESCAPE_LINK_RULE);
 	expect(finding?.line).toBe(line);
 	expect(finding?.source).toBe(source);
-	expect(finding?.message).toContain("symlink");
+	expect(finding?.message).toContain("Fix: jact vault-link ");
 	expect(finding?.edits).toBeUndefined();
 }
 

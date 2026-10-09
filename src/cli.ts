@@ -12,6 +12,7 @@
  * @module cli
  */
 
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import { isDynamicPattern } from "tinyglobby";
@@ -20,8 +21,16 @@ import {
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
 import { RenameValidationError } from "./core/rename-markdown-file.js";
+import {
+	rewriteVaultEscapes,
+	VaultLinker,
+	vaultNote,
+} from "./core/VaultLink/vaultLink.js";
 import { createRuleSetResolver } from "./core/ValidationRules/loadConfig.js";
-import { createValidationWorkflow } from "./factories/componentFactory.js";
+import {
+	createMarkdownParser,
+	createValidationWorkflow,
+} from "./factories/componentFactory.js";
 import { formatContentMap, formatExtractResult } from "./formatExtractResult.js";
 import { JactCli, linkedContentHints } from "./jact-cli.js";
 import { terminalText } from "./shellArgument.js";
@@ -518,6 +527,123 @@ Exit Codes:
 			process.exitCode = error instanceof RenameValidationError ? 1 : 2;
 		}
 	});
+
+program
+	.command("vault-link")
+	.description(
+		"Fix links that leave an Obsidian vault: create a symlink beside the note that points at the file in the repo's main checkout, and give (or write, with --all) the relative link",
+	)
+	.argument("<note>", "markdown note inside an Obsidian vault")
+	.argument(
+		"[target]",
+		"one escaping link target exactly as written in the note, optionally with #anchor",
+	)
+	.option("--all", "fix every escaping link in the note in place", false)
+	.option(
+		"--dry-run",
+		"print the plan without creating symlinks or writing the note",
+		false,
+	)
+	.addHelpText(
+		"after",
+		`
+Examples:
+    $ jact vault-link notes/plan.md '/Users/me/code/repo/docs/spec.md#Ask'
+    $ jact vault-link notes/plan.md --all
+    $ jact vault-link notes/plan.md --all --dry-run
+
+Behavior:
+  The symlink lives at <note dir>/sources/<repo>/<path in repo> and points at
+  the file in the repo's main checkout, never a .paseo/worktrees path. A file
+  outside any git repo links as <note dir>/sources/<file name>. An existing
+  symlink to the same file is reused; anything else at that path is refused.
+  With a target, the last stdout line is the link to write; the note is not
+  edited. With --all, each escaping link in the note is rewritten in place.
+
+Exit Codes:
+  0  Every requested link was fixed (or would be, with --dry-run)
+  1  A target does not leave the vault, or a link was refused
+  2  Usage error, missing note, or the note is not inside an Obsidian vault
+`,
+	)
+	.action(
+		async (
+			note: string,
+			target: string | undefined,
+			options: { all: boolean; dryRun: boolean },
+		) => {
+			if ((target === undefined) === !options.all) {
+				console.error(
+					"ERROR: vault-link needs exactly one of [target] or --all",
+				);
+				process.exitCode = 2;
+				return;
+			}
+			if (!existsSync(note)) {
+				console.error(`ERROR: note not found: ${terminalText(note)}`);
+				process.exitCode = 2;
+				return;
+			}
+			const context = vaultNote(note);
+			if (context === null) {
+				console.error(
+					`ERROR: ${terminalText(note)} is not inside an Obsidian vault (no .obsidian folder above it)`,
+				);
+				process.exitCode = 2;
+				return;
+			}
+			const linker = new VaultLinker(context, options.dryRun);
+			const would = options.dryRun ? "would " : "";
+
+			if (target !== undefined) {
+				const outcome = linker.link(target);
+				if (outcome === null) {
+					console.error("ERROR: target does not leave the vault");
+					process.exitCode = 1;
+				} else if (outcome.kind === "refused") {
+					console.error(`ERROR: ${terminalText(outcome.reason)}`);
+					process.exitCode = 1;
+				} else {
+					const verb = options.dryRun
+						? `would ${outcome.status === "created" ? "create" : "reuse"}`
+						: outcome.status;
+					console.log(
+						terminalText(
+							`${verb} symlink ${outcome.symlinkPath} -> ${outcome.mapped}`,
+						),
+					);
+					console.log(terminalText(outcome.link));
+				}
+				return;
+			}
+
+			try {
+				const content = readFileSync(note, "utf8");
+				const { links } = createMarkdownParser().parseContent(content, note);
+				const result = rewriteVaultEscapes(content, links, linker);
+				const refused = result.rewrites.filter(
+					(rewrite) => rewrite.kind === "refused",
+				).length;
+				const lines = result.rewrites.map((rewrite) =>
+					rewrite.kind === "rewritten"
+						? `line ${rewrite.line}: ${rewrite.oldTarget} -> ${rewrite.newTarget}`
+						: `line ${rewrite.line}: refused: ${rewrite.reason}`,
+				);
+				lines.push(
+					`vault-link: ${result.rewrites.length - refused} links rewritten, ${linker.created} symlinks created, ${linker.reused} reused, ${refused} refused`,
+				);
+				if (!options.dryRun && result.content !== content) {
+					writeFileSync(note, result.content);
+				}
+				console.log(lines.map(terminalText).join("\n"));
+				process.exitCode = refused > 0 ? 1 : 0;
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				console.error(`ERROR: ${terminalText(message)}`);
+				process.exitCode = 2;
+			}
+		},
+	);
 
 program
 	.command("outline")

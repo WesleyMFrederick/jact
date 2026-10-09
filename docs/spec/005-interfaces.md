@@ -64,7 +64,7 @@ The default preset is `commonmark`, which enables no additional rules. It does n
 |---|---|
 | `obsidian/no-reference-note-link` | Reject local-file split-style links: `[text][label]`, `[label][]`, and `[label]` with a reference definition. The first definition of a label decides, as in CommonMark: a label whose first definition is a `scheme:` URL such as `https:` or `obsidian:` is skipped even when a later definition is a local file. Also skip footnotes, same-file `#anchor` definitions, and unused definitions. |
 | `obsidian/anchor-dropped-chars` | Enable [Anchors with characters Obsidian drops](006-behavior.md#Anchors with characters Obsidian drops). This check no longer runs with no configuration. |
-| `obsidian/no-vault-escape-link` | Only in a vault: the nearest folder above the file's real path that contains `.obsidian`. With no vault, the rule does nothing. Inside a vault, a Markdown link is an error when its target is an absolute path, a `file:` URL, contains `.paseo/worktrees/`, or is a relative path that leaves the vault root. Relative paths are resolved from the note's real folder as text, without following symlinks, so a link to a symlink inside the vault passes even when the symlink points outside. Skip web URLs, `#anchor`-only links, wikilinks, and footnotes. The message tells you to create a symlink beside the note that points at the stable main checkout, then link to it relatively. |
+| `obsidian/no-vault-escape-link` | Only in a vault: the nearest folder above the file's real path that contains `.obsidian`. With no vault, the rule does nothing. Inside a vault, a Markdown link is an error when its target is an absolute path, a `file:` URL, contains `.paseo/worktrees/`, or is a relative path that leaves the vault root. Relative paths are resolved from the note's real folder as text, without following symlinks, so a link to a symlink inside the vault passes even when the symlink points outside. Skip web URLs, `#anchor`-only links, wikilinks, and footnotes. The one-line message names a paste-ready fix: [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) with this note and the target as written, plus a hint to use `--all` for every such link in the note. |
 
 Setting a rule to `"error"` enables it regardless of preset; `"off"` disables it. For example, a project can keep the Obsidian preset but opt out of one check:
 
@@ -219,6 +219,35 @@ Reference search follows symlinks. A shortcut to a note inside scope is allowed.
 Human output for a single file prints `Source:` and `Destination:` lines; a batch prints a `Moves:` list.
 
 **Exit codes:** `0` preview or apply succeeded; `1` invalid or unsafe plan, no writes; `2` file-system, parse, commit, or recovery failure.
+
+---
+
+## `jact vault-link <note> [target]`
+
+```
+jact vault-link <note> [target] [--all] [--dry-run]
+```
+
+`jact vault-link` fixes links that `obsidian/no-vault-escape-link` reports. It creates a symlink inside the vault, beside the note, that points at the file in the repository's main checkout, and gives the relative link to write. It uses the same escape check as the rule.
+
+| Argument or flag | Default | Description |
+|---|---|---|
+| `<note>` | - | Markdown note inside an Obsidian vault |
+| `[target]` | - | One escaping target exactly as written in the note, optionally with `#anchor`. Relative targets resolve from the note's real folder |
+| `--all` | `false` | Fix every escaping Markdown link in the note in place, including reference definitions; footnote definitions are skipped |
+| `--dry-run` | `false` | Print the same plan, but create no folders or symlinks and write no files |
+
+Exactly one of `[target]` or `--all` is required.
+
+**Main checkout.** jact finds the git repository that holds the target and takes its main checkout from the first entry of `git worktree list --porcelain`. A file in a linked worktree maps to the same repository-relative path in the main checkout. jact refuses a link when the main checkout lacks that file (the message names the missing path), when a `.paseo/worktrees/` target's repository cannot be found, or when the result would be a `.paseo/worktrees` path. A file outside any repository links as itself if it exists.
+
+**Symlink.** The symlink is `<note folder>/sources/<repo name>/<repository-relative path>`, where the repo name is the main checkout's folder name; a file outside git uses `<note folder>/sources/<file name>`. Missing folders are created as real folders. The symlink holds the absolute main-checkout path. A symlink already pointing at that path is reused; any other file, folder, or symlink at that path is refused and never overwritten. Links to one file share one symlink.
+
+**Link to write.** The path from the note's folder to the symlink, with `/` separators and space, `(`, `)`, and `%` percent-encoded in each segment, followed by the original `#anchor`.
+
+**Output.** With a target, jact prints `created|reused|would create|would reuse symlink <symlink> -> <main-checkout file>`, then the link to write as the last line; the note is not edited. With `--all`, jact rewrites each escaping destination in place, keeping link text, title, and anchor, and prints `line <n>: <old target> -> <new target>` or `line <n>: refused: <reason>` per link, then `vault-link: <r> links rewritten, <c> symlinks created, <u> reused, <f> refused`. Refused links stay unchanged.
+
+**Exit codes:** `0` every requested link fixed (or planned, with `--dry-run`); `1` the target does not leave the vault, or a link was refused; `2` usage error, missing note, or a note outside any Obsidian vault.
 
 ---
 
@@ -384,6 +413,7 @@ Single-file `validate` writes its full report to a piped standard output before 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-09 | Added `jact vault-link`; the `obsidian/no-vault-escape-link` message now names the exact `jact vault-link` fix command |
 | 1.0.0-draft | 2026-10-09 | Package plugins resolve with ESM import conditions; configuration errors escape control characters; `obsidian/no-reference-note-link` follows first-definition precedence |
 | 1.0.0-draft | 2026-10-09 | Moved project configuration to `.jact/config.json`. Restricted plugins to user configuration. Project plugin lists cause exit `2` before plugin code runs. |
 | 1.0.0-draft | 2026-10-09 | Added renderer presets, user/project configuration, per-rule overrides, plugin contract, findings output, and exit-2 configuration failures; Obsidian dropped-character checking is no longer enabled by default |

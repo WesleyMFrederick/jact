@@ -105,6 +105,15 @@ The scope helpers find the project root, index it, and skip ignored paths. Order
 
 Boundary: the scope helpers never parse Markdown.
 
+### `vaultEscape.ts`, `VaultLink/vaultLink.ts` — vault-escape fixer
+
+`vaultEscape.ts` holds the one check for whether a link target leaves the Obsidian vault; the `obsidian/no-vault-escape-link` rule and `jact vault-link` both call it. `VaultLink/vaultLink.ts` maps an escaping target to the repo's main checkout, makes a per-file symlink under `sources/` beside the note, and rewrites links for `--all`. Command contract: [`jact vault-link <note> [target]`](../../../../docs/spec/005-interfaces.md#`jact vault-link <note> [target]`).
+
+- **Main checkout only.** A target inside a linked worktree maps to the same repo-relative path in the first entry of `git worktree list --porcelain`; a file missing there is refused.
+- **Never overwrite.** An identical symlink is reused; anything else at the symlink path is refused.
+
+Boundary: `src/cli.ts` parses options and sets exit codes; the module returns results and never prints.
+
 ### `computeValidationSummary.ts`, `getLinkClass.ts` — result helpers
 
 The result helpers count link statuses and classify a link as `wiki`, `caret`, or `markdown` for reports. Both are pure functions.
