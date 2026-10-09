@@ -134,6 +134,25 @@ cat draft.md | jact validate docs/draft.md --stdin   # check text that is not sa
 
 With `--stdin`, jact reads the Markdown from standard input. The path you give is where the file *would* live; jact uses it to resolve relative links but does not read it.
 
+### Validation presets
+
+By default, jact checks links without extra renderer-specific rules. For Obsidian notes, create `~/.config/jact/config.json`:
+
+```json
+{"preset":"obsidian"}
+```
+
+This enables checks for split-style links that Obsidian opens as web links and heading anchors with characters Obsidian drops. `jact validate note.md --fix --dry-run` previews available repairs; `--fix` applies them.
+
+A project can override your default with a `.jact/config.json` in the note's folder or an ancestor:
+
+```json
+{"preset":"commonmark"}
+```
+
+Only the nearest `.jact/config.json` is used. For individual rule overrides, user-config plugins, and the alternative user config location, see [Validation configuration and presets](docs/spec/005-interfaces.md#Validation configuration and presets).
+
+
 ### `validate --fix` — repair heading links
 
 `--fix` rewrites heading links that point at a real heading but use the wrong form (for example a lowercase, dash-separated slug instead of the exact heading text).

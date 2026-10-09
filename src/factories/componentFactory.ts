@@ -35,6 +35,7 @@ import type {
 	ParsedDocumentLifecycleLike,
 } from "../types/componentInterfaces.js";
 import type { ExtractionEligibilityStrategy } from "../types/strategy-types.js";
+import type { RuleSetResolver } from "../types/validationRuleTypes.js";
 import { ValidationWorkflow } from "../validate/validation-workflow.js";
 
 /**
@@ -147,11 +148,17 @@ export function createValidationWorkflow(
 	parsedDocuments: ParsedFileCache | null = null,
 	fileCache: FileCache | null = null,
 	validator: CitationValidator | null = null,
+	resolveRuleSet?: RuleSetResolver,
 ): ValidationWorkflow {
 	const cache = fileCache || createFileCache();
 	const lifecycle =
 		parsedDocuments || createParsedFileCache(createMarkdownParser(cache));
 	const citationValidator =
 		validator || createCitationValidator(lifecycle, cache);
-	return new ValidationWorkflow(lifecycle, citationValidator, cache);
+	return new ValidationWorkflow(
+		lifecycle,
+		citationValidator,
+		cache,
+		resolveRuleSet,
+	);
 }

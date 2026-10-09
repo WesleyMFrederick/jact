@@ -7,8 +7,8 @@
  * @module jact
  */
 
-import { existsSync, realpathSync } from "node:fs";
 import * as fs from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { glob, isDynamicPattern } from "tinyglobby";
 import {
@@ -19,23 +19,24 @@ import {
 import { applyCitationFixes } from "./core/apply-citation-fixes.js";
 import type { CitationValidator } from "./core/CitationValidator/CitationValidator.js";
 import type { ContentExtractor } from "./core/ContentExtractor/ContentExtractor.js";
-import {
-	followableMarkdownFile,
-	type LinkedHeaderContextQuery,
-} from "./core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
 import { generateContentId } from "./core/ContentExtractor/generateContentId.js";
 import {
 	BLOCKED_READ_REASON,
 	ReadBoundary,
 } from "./core/ContentExtractor/readBoundary.js";
+import { buildIgnoreRules } from "./core/ignoreRules.js";
+import {
+	followableMarkdownFile,
+	type LinkedHeaderContextQuery,
+} from "./core/LinkedHeaderContext/LinkedHeaderContextQuery.js";
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
 import { prepareScope } from "./core/prepare-scope.js";
-import { buildIgnoreRules } from "./core/ignoreRules.js";
 import {
 	type RenameMarkdownFilesResult,
 	RenameValidationError,
 	renameMarkdownFiles,
 } from "./core/rename-markdown-file.js";
+import { NO_RULES } from "./core/ValidationRules/presets.js";
 import type { FileCache } from "./FileCache.js";
 import {
 	createCitationValidator,
@@ -71,6 +72,7 @@ import type {
 	OutgoingLinksExtractedContent,
 } from "./types/extraction-types.js";
 import type { CacheStats } from "./types/fileCacheTypes.js";
+import type { RuleSetResolver } from "./types/validationRuleTypes.js";
 import type {
 	EnrichedLinkObject,
 	ValidationResult,
@@ -137,8 +139,14 @@ export class JactCli {
 	private contentExtractor: ContentExtractor;
 	private linkedHeaderContextQuery: LinkedHeaderContextQuery;
 	private validationWorkflow: ValidationWorkflow;
+	private resolveRuleSet: RuleSetResolver;
 
-	constructor() {
+	/**
+	 * @param resolveRuleSet - Enabled validation rules per file (from config);
+	 *   omitted means no rules, the `commonmark` preset.
+	 */
+	constructor(resolveRuleSet: RuleSetResolver = async () => NO_RULES) {
+		this.resolveRuleSet = resolveRuleSet;
 		this.fileCache = createFileCache();
 		const parser = createMarkdownParser(this.fileCache);
 		this.parsedFileCache = createParsedFileCache(parser);
@@ -157,6 +165,7 @@ export class JactCli {
 			this.parsedFileCache,
 			this.fileCache,
 			this.validator,
+			resolveRuleSet,
 		);
 	}
 
@@ -841,6 +850,7 @@ export class JactCli {
 				validator: this.validator,
 				fileCache: this.fileCache,
 				parsedDocuments: this.parsedFileCache,
+				resolveRuleSet: this.resolveRuleSet,
 			},
 			filePath,
 			options,

@@ -18,6 +18,7 @@ import type {
 } from "../../types/citationTypes.js";
 import type { AnchorConversion } from "../../types/validationTypes.js";
 import { normalizeAnchorText } from "../MarkdownParser/normalizeInlineText.js";
+import { ANCHOR_DROPPED_CHARS_RULE } from "../ValidationRules/rules/anchorDroppedChars.js";
 
 /**
  * Minimal semantic-document interface used for anchor matching.
@@ -406,11 +407,12 @@ export class AnchorMatcher {
 	async validateAnchorExists(
 		anchor: string,
 		targetFile: string,
-		options?: { isBlockRef?: boolean },
+		options?: { isBlockRef?: boolean; ruleIds?: ReadonlySet<string> },
 	): Promise<{
 		valid: boolean;
 		error?: string;
 		suggestion?: string;
+		ruleId?: string;
 		matchedAs?: string;
 		anchorConversion?: AnchorConversion;
 		matchedAnchors?: AnchorObject[];
@@ -428,7 +430,10 @@ export class AnchorMatcher {
 					filePath: targetFile,
 				});
 
-			if (!anchor.startsWith("^") && !options?.isBlockRef) {
+			// Without the rule, suggestions keep heading punctuation intact.
+			const dropsChars =
+				options?.ruleIds?.has(ANCHOR_DROPPED_CHARS_RULE) ?? false;
+			if (!anchor.startsWith("^") && !options?.isBlockRef && dropsChars) {
 				const droppedChars = this.findObsidianDroppedChars(
 					anchor,
 					targetParsedDoc.data.anchors,
@@ -438,6 +443,7 @@ export class AnchorMatcher {
 						valid: false,
 						error: `${OBSIDIAN_DROPPED_CHARS_ERROR} (${droppedChars.dropped}): #${anchor}`,
 						suggestion: `#${droppedChars.recommended}`,
+						ruleId: ANCHOR_DROPPED_CHARS_RULE,
 						anchorConversion: {
 							type: "anchor-conversion",
 							original: anchor,
@@ -530,7 +536,7 @@ export class AnchorMatcher {
 				.slice(0, 5);
 
 			const availableHeaders = headerAnchors.map(
-				(a) => `"${a.rawText}" → #${stripObsidianDroppedChars(a.id)}`,
+				(a) => `"${a.rawText}" → #${dropsChars ? stripObsidianDroppedChars(a.id) : a.id}`,
 			);
 
 			const availableBlockRefs = targetParsedDoc.data.anchors
@@ -574,7 +580,9 @@ export class AnchorMatcher {
 						type: "anchor-conversion" as const,
 						original: anchor,
 						recommended: this.urlEncodeAnchor(
-							stripObsidianDroppedChars(bestHeaderMatch.rawText ?? ""),
+							dropsChars
+								? stripObsidianDroppedChars(bestHeaderMatch.rawText ?? "")
+								: (bestHeaderMatch.rawText ?? ""),
 						),
 					},
 				}),

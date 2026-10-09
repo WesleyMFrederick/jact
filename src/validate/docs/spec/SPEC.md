@@ -1,9 +1,9 @@
 # validate Module Living Specification
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Status:** done
 
-The `src/validate/` module runs the `jact validate` workflow for one file or many files and reports the result. It checks link syntax only and writes no files. This spec covers what the module owns and the rules it must keep. The repo spec owns the command-line interface (CLI) contract and the step order.
+The `src/validate/` module runs the `jact validate` workflow for one file or many files and reports the result. It orchestrates link checks and enabled validation rules and writes no files. This spec covers what the module owns and the rules it must keep. The repo spec owns the command-line interface (CLI) contract and the step order.
 
 ---
 
@@ -45,6 +45,7 @@ These links point to the facts that a reader of this module needs first.
 | Need | Canonical source |
 |------|------------------|
 | Flags, mode selection, output shapes | [`jact validate`](../../../../docs/spec/005-interfaces.md#%60jact%20validate%60) |
+| Presets, configuration, and plugins | [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation configuration and presets) |
 | Single-file step order | [Validate Workflow (single file)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20(single%20file)) |
 | Batch step order | [Validate Workflow (batch)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20(batch)) |
 | Exit codes | [Exit Codes](../../../../docs/spec/005-interfaces.md#Exit%20Codes) |
@@ -54,9 +55,10 @@ These links point to the facts that a reader of this module needs first.
 
 ## Change Log
 
-The module spec is at version 1.1.0.
+The module spec is at version 1.2.0.
 
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | First module spec: vision and architecture |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
+| 1.2.0 | 2026-10-09: Added rule orchestration and canonical configuration reference |

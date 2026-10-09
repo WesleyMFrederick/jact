@@ -13,6 +13,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const cliPath = path.resolve(testDir, "../../dist/cli.js");
+/** The dropped-character anchor check is an obsidian-preset rule. */
+const env = {
+	...process.env,
+	XDG_CONFIG_HOME: path.resolve(testDir, "../fixtures/config-home-obsidian"),
+};
 
 const FIXABLE = "[Q1: Does it fit](target.md#Q1:%20Does%20it%20fit)\n";
 const FIXED = "[Q1: Does it fit](target.md#Q1%20Does%20it%20fit)\n";
@@ -25,6 +30,7 @@ function run(args: string[], input?: string) {
 	return spawnSync(process.execPath, [cliPath, "validate", ...args], {
 		cwd: workDir,
 		encoding: "utf8",
+		env,
 		...(input !== undefined && { input }),
 	});
 }

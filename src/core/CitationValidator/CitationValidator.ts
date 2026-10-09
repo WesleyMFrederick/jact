@@ -30,6 +30,13 @@ import type { FileCacheLike } from "./PathResolver.js";
 import { PathResolver } from "./PathResolver.js";
 
 type FileCacheInterface = FileCacheLike;
+
+/** Per-call validation options. */
+export interface ValidateOptions {
+	/** enabled validation rule IDs; gates rule-owned link checks */
+	ruleIds?: ReadonlySet<string>;
+}
+
 interface SingleCitationValidationResult {
 	line: number;
 	citation: string;
@@ -41,6 +48,7 @@ interface SingleCitationValidationResult {
 	pathConversion?: PathConversion;
 	anchorConversion?: AnchorConversion;
 	duplicatePathSuggestion?: DuplicatePathSuggestion;
+	ruleId?: string;
 }
 
 // ── enrichLinkObject factory ──────────────────────────────────────────────────
@@ -99,16 +107,20 @@ export class CitationValidator {
 
 	// ── Public API ────────────────────────────────────────────────────────────
 
-	/** Validate one semantic document using filePath as its link base and self-anchor key. */
+	/**
+	 * Validate one semantic document using filePath as its link base and self-anchor key.
+	 * `ruleIds` enables checks owned by validation rules (e.g. obsidian/anchor-dropped-chars).
+	 */
 	async validateDocument(
 		document: ParsedDocumentLike,
 		filePath: string,
+		options: ValidateOptions = {},
 	): Promise<ValidationResult> {
 		const links = document.getLinks();
 
 		const enrichedLinks: EnrichedLinkObject[] = await Promise.all(
 			links.map((link: LinkObject) =>
-				this.validateSingleCitation(link, filePath),
+				this.validateSingleCitation(link, filePath, options),
 			),
 		);
 
@@ -128,10 +140,12 @@ export class CitationValidator {
 	async validateSingleCitation(
 		citation: LinkObject,
 		contextFile?: string,
+		options: ValidateOptions = {},
 	): Promise<EnrichedLinkObject> {
 		const result = await this._validateSingleCitationInternal(
 			citation,
 			contextFile,
+			options,
 		);
 
 		let validation: ValidationMetadata;
@@ -163,6 +177,7 @@ export class CitationValidator {
 				...(result.duplicatePathSuggestion && {
 					duplicatePathSuggestion: result.duplicatePathSuggestion,
 				}),
+				...(result.ruleId && { ruleId: result.ruleId }),
 			};
 		}
 
@@ -297,7 +312,8 @@ export class CitationValidator {
 
 	private async _validateSingleCitationInternal(
 		citation: LinkObject,
-		contextFile?: string,
+		contextFile: string | undefined,
+		options: ValidateOptions,
 	): Promise<SingleCitationValidationResult> {
 		const patternType = this.classifyPattern(citation);
 
@@ -307,9 +323,9 @@ export class CitationValidator {
 			case "EMPHASIS_MARKED":
 				return this.validateEmphasisPattern(citation);
 			case "CROSS_DOCUMENT":
-				return await this.validateCrossDocumentLink(citation, contextFile);
+				return await this.validateCrossDocumentLink(citation, contextFile, options);
 			case "INTERNAL_ANCHOR":
-				return await this.validateInternalAnchorLink(citation, contextFile);
+				return await this.validateInternalAnchorLink(citation, contextFile, options);
 			default:
 				return this.createValidationResult(
 					citation,
@@ -375,7 +391,8 @@ export class CitationValidator {
 
 	private async validateCrossDocumentLink(
 		citation: LinkObject,
-		sourceFile?: string,
+		sourceFile: string | undefined,
+		options: ValidateOptions,
 	): Promise<SingleCitationValidationResult> {
 		const outcome = this.pathResolver.resolveCitationPath(
 			citation,
@@ -405,20 +422,24 @@ export class CitationValidator {
 			const anchor = await this.anchorMatcher.validateAnchorExists(
 				citation.target.anchor,
 				outcome.targetPath,
+				options,
 			);
 			if (!anchor.valid) {
 				const anchorError =
 					anchor.error ?? `Anchor not found: #${citation.target.anchor}`;
 				const prefix = outcome.anchorFailurePrefix ?? outcome.warning;
 				const error = prefix ? `${prefix}. ${anchorError}` : anchorError;
-				return this.createValidationResult(
-					citation,
-					outcome.anchorFailureStatus,
-					error,
-					anchor.suggestion ?? null,
-					null,
-					anchor.anchorConversion ?? null,
-				);
+				return {
+					...this.createValidationResult(
+						citation,
+						outcome.anchorFailureStatus,
+						error,
+						anchor.suggestion ?? null,
+						null,
+						anchor.anchorConversion ?? null,
+					),
+					...(anchor.ruleId && { ruleId: anchor.ruleId }),
+				};
 			}
 			if (anchor.matchedAs === "block-ref-missing-caret") {
 				return this.createValidationResult(
@@ -444,7 +465,8 @@ export class CitationValidator {
 
 	private async validateInternalAnchorLink(
 		citation: LinkObject,
-		sourceFile?: string,
+		sourceFile: string | undefined,
+		options: ValidateOptions,
 	): Promise<SingleCitationValidationResult> {
 		if (!sourceFile) {
 			return this.createValidationResult(
@@ -466,16 +488,20 @@ export class CitationValidator {
 		const anchorExists = await this.anchorMatcher.validateAnchorExists(
 			anchor,
 			sourceFile,
+			options,
 		);
 		if (!anchorExists.valid) {
-			return this.createValidationResult(
-				citation,
-				"error",
-				anchorExists.error ?? `Anchor not found: #${anchor}`,
-				anchorExists.suggestion,
-				null,
-				anchorExists.anchorConversion ?? null,
-			);
+			return {
+				...this.createValidationResult(
+					citation,
+					"error",
+					anchorExists.error ?? `Anchor not found: #${anchor}`,
+					anchorExists.suggestion,
+					null,
+					anchorExists.anchorConversion ?? null,
+				),
+				...(anchorExists.ruleId && { ruleId: anchorExists.ruleId }),
+			};
 		}
 
 		if (

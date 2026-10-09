@@ -6,30 +6,39 @@ import { createCitationHarness } from "../helpers/workflow-harness.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = join(__dirname, "..", "fixtures");
+const OBSIDIAN = { ruleIds: new Set(["obsidian/anchor-dropped-chars"]) };
+const RAW_COLON_LINK =
+	"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)";
 
 describe("CitationValidator Anchor Matching with Dual IDs", () => {
-	it("should flag raw ID format with a colon and suggest the URL-encoded ID", async () => {
+	it("should flag raw ID format with a colon and suggest the URL-encoded ID under obsidian", async () => {
 		// Given: Validator with test fixture containing header "Story 1.5: Implement Cache"
 		const { validateDocumentFile } = createCitationHarness();
 		const testFile = join(fixturesDir, "anchor-matching-source.md");
 
-		// When: Validate link using RAW format: #Story 1.5: Implement Cache
-		const result = await validateDocumentFile(testFile);
+		// When: Validate link using RAW format with the dropped-chars rule enabled
+		const result = await validateDocumentFile(testFile, OBSIDIAN);
 
 		// Then: The anchor resolves, but Obsidian drops the colon, so it is an error
-		const linkObject = result.links.find(
-			(link) =>
-				link.fullMatch ===
-				"[Link using raw format](anchor-matching.md#Story 1.5: Implement Cache)",
-		);
+		const linkObject = result.links.find((link) => link.fullMatch === RAW_COLON_LINK);
 		expect(linkObject).toBeDefined();
 		expect(linkObject.validation.status).toBe("error");
+		expect(linkObject.validation.ruleId).toBe("obsidian/anchor-dropped-chars");
 		expect(linkObject.validation.error).toMatch(
 			/^Anchor uses characters Obsidian drops/,
 		);
 		expect(linkObject.validation.suggestion).toBe(
 			"#Story%201.5%20Implement%20Cache",
 		);
+	});
+
+	it("accepts the raw colon anchor when the dropped-chars rule is off (commonmark)", async () => {
+		const { validateDocumentFile } = createCitationHarness();
+		const result = await validateDocumentFile(
+			join(fixturesDir, "anchor-matching-source.md"),
+		);
+		const linkObject = result.links.find((link) => link.fullMatch === RAW_COLON_LINK);
+		expect(linkObject.validation.status).toBe("valid");
 	});
 
 	it("should match anchor using URL-encoded ID format", async () => {

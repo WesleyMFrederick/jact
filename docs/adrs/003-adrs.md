@@ -79,6 +79,20 @@ Full context, alternatives, and diagram: `design-docs/features/20260701T041917-b
 
 ---
 
+## ADR-0006 — Validation rule presets and plugins
+
+**Decision:** Separate renderer-specific validity checks into named presets with per-rule `"off"` or `"error"` overrides and dynamically imported ESM plugins. Resolve the user configuration first, then the nearest project configuration for each checked file. The public configuration and plugin contracts live in [Validation configuration and presets](../spec/005-interfaces.md#Validation configuration and presets).
+
+**Context:** CommonMark accepts split-style reference links to local files, but Obsidian opens them as web URLs rather than notes. Syntax can therefore be valid while the intended renderer cannot navigate it. Applying Obsidian-specific errors to every Markdown document would reject valid CommonMark usage; hardcoding every renderer's checks into the link validator would make extensions costly.
+
+**Consequences:** The default `commonmark` preset adds no renderer rules. Users opt into `obsidian`, override individual rules, or load trusted plugins through their user config. User defaults follow the person. The nearest `.jact/config.json` follows the file, including across projects in one batch. Configuration and plugin failures stop the whole command before validation or writes. Downloaded repositories are not trusted sources of code. The plugin restriction is in [Validation configuration and presets](../spec/005-interfaces.md#Validation configuration and presets). Duplicate rule IDs are refused. Rule findings share error counts and output with ordinary link errors. Rule edits share the guarded fix workflow.
+
+**Behavior change:** The former always-on dropped-character anchor check is now `obsidian/anchor-dropped-chars` and is off by default. Users who need it must select the Obsidian preset or explicitly enable the rule. Normal link validation and the parser's syntax collection remain available regardless of preset; this is not a general renderer-specific anchor-policy replacement.
+
+**Evidence:** `src/core/ValidationRules/presets.ts`, `src/core/ValidationRules/loadConfig.ts`, `src/core/ValidationRules/loadPlugins.ts`, `src/core/ValidationRules/rules/noReferenceNoteLink.ts`, and `src/types/validationRuleTypes.ts` implement the registry, configuration layering, plugin loading, local-reference check, and extension contract. Execution and guarded edits follow [Validate Workflow (single file)](../spec/006-behavior.md#Validate Workflow (single file)) and [Fix Workflow (`--fix`)](../spec/006-behavior.md#Fix Workflow (`--fix`)).
+
+---
+
 ## Known Tech Debt
 
 Two existing findings docs already catalogue open gaps against architecture principles and against the ADR-0002 migration's own stated scope. This spec surfaces them rather than duplicating them — read the source docs for detail:
@@ -104,4 +118,5 @@ The living specification in `docs/spec/` and ADRs in `docs/adrs/` replace `desig
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-09 | Added ADR-0006 for renderer validation presets, per-rule overrides, plugins, configuration layering, and the opt-in dropped-character check |
 | 1.0.0-draft | 2026-07-01 | Initial ADR set, reconstructed from git history and in-repo design docs |

@@ -21,22 +21,26 @@ import path from "node:path";
 import type { FileCache } from "../FileCache.js";
 import type { ParsedFileCache } from "../ParsedFileCache.js";
 import type { CliValidateOptions } from "../types/cli-types.js";
+import type { RuleEdit, RuleSetResolver } from "../types/validationRuleTypes.js";
 import type {
 	EnrichedLinkObject,
 	FixRecord,
 } from "../types/validationTypes.js";
+import { VALIDATION_DISABLED_REASON } from "../validate/validation-disable.js";
 import { OBSIDIAN_DROPPED_CHARS_ERROR } from "./CitationValidator/AnchorMatcher.js";
 import type { CitationValidator } from "./CitationValidator/CitationValidator.js";
 import { applyAnchorFix, applyPathConversion } from "./citationFixer.js";
-import { VALIDATION_DISABLED_REASON } from "../validate/validation-disable.js";
 import { findPlainFilePaths, resolvePlainFilePath } from "./plain-file-paths.js";
 import { resolveScope } from "./resolveScope.js";
+import { runRules } from "./ValidationRules/runRules.js";
 
 /** Dependencies apply-citation-fixes reads from JactCli — same instances, not copies. */
 export interface ApplyCitationFixesDeps {
 	validator: CitationValidator;
 	fileCache: FileCache;
 	parsedDocuments: ParsedFileCache;
+	/** Enabled validation rules per file. */
+	resolveRuleSet: RuleSetResolver;
 }
 
 /** True when the validator reported an anchor error that `--fix` can rewrite. */
@@ -161,11 +165,28 @@ export async function applyCitationFixes(
 		if (document.data.validationDisabled) {
 			return `SKIPPED: ${VALIDATION_DISABLED_REASON}`;
 		}
-		const validationResults = await deps.validator.validateDocument(
-			document,
+		const ruleSet = await deps.resolveRuleSet(filePath);
+		const validationResults = runRules(
+			ruleSet,
 			filePath,
+			document.data,
+			await deps.validator.validateDocument(document, filePath, {
+				ruleIds: ruleSet.enabled,
+			}),
 		);
+		const ruleFixes = (validationResults.findings ?? []).flatMap((finding) =>
+			finding.edits !== undefined && finding.edits.length > 0
+				? [{ ...finding, edits: finding.edits }]
+				: [],
+		);
+		const ruleEdits = ruleFixes.flatMap((finding) => finding.edits);
 		const originalContent = fsRead(filePath, "utf8");
+		// Rule edits carry offsets into the parsed content; refuse a source that
+		// changed since (an editor save, or memory content validated for this path).
+		// Ordinary citation fixes verify their own spans below.
+		if (ruleEdits.length > 0 && originalContent !== document.data.content) {
+			throw new Error("Source changed since it was parsed; no files were written.");
+		}
 		const scope = resolveScope({
 			cwd: process.cwd(), targetFile: filePath,
 			...(options.scope !== undefined && { explicit: options.scope }),
@@ -187,7 +208,7 @@ export async function applyCitationFixes(
 					link.validation.pathConversion) ||
 				isAnchorFixable(link),
 		);
-		if (fixableLinks.length === 0 && plainFixes.length === 0) {
+		if (fixableLinks.length === 0 && plainFixes.length === 0 && ruleFixes.length === 0) {
 			return `No auto-fixable citations found in ${filePath}`;
 		}
 
@@ -207,7 +228,7 @@ export async function applyCitationFixes(
 		let pathFixesApplied = 0;
 		let anchorFixesApplied = 0;
 		const fixes: FixRecord[] = [];
-		const edits: { start: number; end: number; replacement: string }[] = [];
+		const edits: RuleEdit[] = [];
 		const lineStarts = [0];
 		for (let index = 0; index < originalContent.length; index++) {
 			if (originalContent[index] === "\n") lineStarts.push(index + 1);
@@ -224,8 +245,6 @@ export async function applyCitationFixes(
 			if (newCitation === link.fullMatch) continue;
 			const pathChanged = pathCitation !== link.fullMatch;
 			const anchorChanged = newCitation !== pathCitation;
-			if (pathChanged) pathFixesApplied++;
-			if (anchorChanged) anchorFixesApplied++;
 			const lineStart = lineStarts[link.line - 1];
 			const start = lineStart === undefined ? -1 : lineStart + link.column;
 			if (
@@ -237,7 +256,12 @@ export async function applyCitationFixes(
 			) {
 				throw new Error(`Citation changed at line ${link.line}; no files were written.`);
 			}
-			edits.push({ start, end: start + link.fullMatch.length, replacement: newCitation });
+			const end = start + link.fullMatch.length;
+			// A rule edit that rewrites or deletes this citation already folds in its fix.
+			if (ruleEdits.some((edit) => edit.start <= start && end <= edit.end)) continue;
+			if (pathChanged) pathFixesApplied++;
+			if (anchorChanged) anchorFixesApplied++;
+			edits.push({ start, end, replacement: newCitation });
 			fixes.push({
 				line: link.line,
 				old: link.fullMatch,
@@ -259,6 +283,16 @@ export async function applyCitationFixes(
 			const replacement = `[${reference.raw}](${destination})`;
 			edits.push({ start: reference.start, end: reference.end, replacement });
 			fixes.push({ line: reference.line, old: reference.raw, new: replacement, type: "plain-path" });
+			fixesApplied++;
+		}
+		edits.push(...ruleEdits);
+		for (const finding of ruleFixes) {
+			fixes.push({
+				line: finding.line,
+				old: finding.source ?? "",
+				new: finding.edits[0]?.replacement ?? "",
+				type: finding.ruleId,
+			});
 			fixesApplied++;
 		}
 		let nextEditStart = originalContent.length;

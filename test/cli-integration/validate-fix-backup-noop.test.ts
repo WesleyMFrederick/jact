@@ -13,6 +13,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const cliPath = path.resolve(testDir, "../../dist/cli.js");
+/** The dropped-character anchor check is an obsidian-preset rule. */
+const env = {
+	...process.env,
+	XDG_CONFIG_HOME: path.resolve(testDir, "../fixtures/config-home-obsidian"),
+};
 const workDir = path.join(tmpdir(), "jact-fix-backup-noop-test");
 const sourcePath = path.join(workDir, "source.md");
 
@@ -28,7 +33,7 @@ function fix(source: string, ...extra: string[]) {
 	return spawnSync(
 		process.execPath,
 		[cliPath, "validate", sourcePath, "--fix", "--scope", workDir, ...extra],
-		{ cwd: workDir, encoding: "utf8" },
+		{ cwd: workDir, encoding: "utf8", env },
 	);
 }
 

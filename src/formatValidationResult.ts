@@ -1,4 +1,5 @@
 import type { NestedCodeblockWarning } from "./core/MarkdownParser/detectNestedCodeblocks.js";
+import { withRuleId } from "./core/ValidationRules/runRules.js";
 import { terminalText } from "./shellArgument.js";
 import type {
 	DuplicatePathSuggestion,
@@ -40,19 +41,14 @@ export function formatForCLI(
 
 	if (result.summary.errors > 0) {
 		lines.push(`CRITICAL ERRORS (${result.summary.errors})`);
-		const errorLinks = references.filter(
-			(link) => link.validation.status === "error",
-		);
-		for (const [index, link] of errorLinks.entries()) {
-			const isLast = index === errorLinks.length - 1;
+		const errorEntries = collectErrorEntries(result, true);
+		for (const [index, entry] of errorEntries.entries()) {
+			const isLast = index === errorEntries.length - 1;
 			const prefix = isLast ? "└─" : "├─";
-			lines.push(`${prefix} Line ${link.line}: ${terminalText(link.fullMatch)}`);
-			if (link.validation.status === "error") {
-				lines.push(`│  └─ ${terminalText(link.validation.error)}`);
-				const suggestion = renderValidationSuggestion(link.validation, true);
-				if (suggestion) {
-					lines.push(`│  └─ Suggestion: ${suggestion}`);
-				}
+			lines.push(`${prefix} Line ${entry.line}: ${terminalText(entry.source)}`);
+			lines.push(`│  └─ ${terminalText(entry.error)}`);
+			if (entry.suggestion) {
+				lines.push(`│  └─ Suggestion: ${entry.suggestion}`);
 			}
 			if (!isLast) lines.push("│");
 		}
@@ -158,17 +154,11 @@ export function formatForCLIMinimal(
 
 	if (result.summary.errors > 0) {
 		lines.push(`ERRORS (${result.summary.errors})`);
-		const errorLinks = references.filter(
-			(link) => link.validation.status === "error",
-		);
-		for (const link of errorLinks) {
-			lines.push(`- Line ${link.line}: ${terminalText(link.fullMatch)}`);
-			if (link.validation.status === "error") {
-				lines.push(`  error: ${terminalText(link.validation.error)}`);
-				const suggestion = renderValidationSuggestion(link.validation, false);
-				if (suggestion) {
-					lines.push(`  suggestion: ${suggestion}`);
-				}
+		for (const entry of collectErrorEntries(result, false)) {
+			lines.push(`- Line ${entry.line}: ${terminalText(entry.source)}`);
+			lines.push(`  error: ${terminalText(entry.error)}`);
+			if (entry.suggestion) {
+				lines.push(`  suggestion: ${entry.suggestion}`);
 			}
 		}
 		lines.push("");
@@ -221,6 +211,39 @@ export function formatForCLIMinimal(
 	}
 
 	return lines.join("\n");
+}
+
+/**
+ * Link errors and rule findings in line order. Errors owned by a rule end
+ * with `[rule-id]` so the reader knows which config setting turns them off.
+ */
+function collectErrorEntries(
+	result: ValidationResult,
+	verbose: boolean,
+): { line: number; column: number; source: string; error: string; suggestion: string | undefined }[] {
+	const entries = result.links.flatMap((link) =>
+		link.validation.status === "error"
+			? [
+					{
+						line: link.line,
+						column: link.column,
+						source: link.fullMatch,
+						error: withRuleId(link.validation.error, link.validation.ruleId),
+						suggestion: renderValidationSuggestion(link.validation, verbose),
+					},
+				]
+			: [],
+	);
+	for (const finding of result.findings ?? []) {
+		entries.push({
+			line: finding.line,
+			column: finding.column,
+			source: finding.source ?? "",
+			error: withRuleId(finding.message, finding.ruleId),
+			suggestion: undefined,
+		});
+	}
+	return entries.sort((a, b) => a.line - b.line || a.column - b.column);
 }
 
 function renderDuplicatePathSuggestion(

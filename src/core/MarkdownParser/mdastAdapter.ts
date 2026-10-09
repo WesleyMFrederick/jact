@@ -15,15 +15,17 @@ import type {
 	EmbedReference,
 	HeadingObject,
 	LinkObject,
+	LinkReferenceUsage,
 } from "../../types/citationTypes.js";
 import { isValidationDisabled } from "../../validate/validation-disable.js";
 import { extractAnchors } from "./extractAnchors.js";
 import { extractHeadings } from "./extractHeadings.js";
-import { extractLinks } from "./extractLinks.js";
+import { extractLinkReferences, extractLinks } from "./extractLinks.js";
 
 /** The parsed, domain-typed portions of a ParserOutput (everything but ast/content/filePath). */
 export interface AdaptedParserFields {
 	links: LinkObject[];
+	linkReferences: LinkReferenceUsage[];
 	embeds: EmbedReference[];
 	headings: HeadingObject[];
 	anchors: AnchorObject[];
@@ -66,5 +68,12 @@ export function adaptMdastToParserOutput(
 		}
 	});
 	const validationDisabled = isValidationDisabled(ast);
-	return { links, embeds, headings, anchors, validationDisabled };
+	return {
+		links,
+		linkReferences: extractLinkReferences(ast, content),
+		embeds,
+		headings,
+		anchors,
+		validationDisabled,
+	};
 }

@@ -2,7 +2,7 @@
 
 **Status:** done
 
-The command-line interface (CLI) is the whole public surface of jact. jact ships no HTTP API and no plugin interface. Commands, flags, exit codes, printed output, and JSON shapes in this section are contracts: hooks, scripts, and agents depend on them. `src/cli.ts` registers every command; `jact <command> --help` prints its flags and usage examples.
+The command-line interface (CLI) is the public user surface of jact; validation plugins extend its rule checks. jact ships no HTTP API. Commands, flags, exit codes, printed output, and JSON shapes in this section are contracts: hooks, scripts, and agents depend on them. `src/cli.ts` registers every command; `jact <command> --help` prints its flags and usage examples.
 
 Each command that takes `--scope <folder>` defaults to a smart scope. The order is in [Scope Resolution Order](006-behavior.md#Scope%20Resolution%20Order).
 
@@ -44,6 +44,43 @@ Validation writes no files unless `--fix` is set. `--fix --dry-run` also writes 
 
 **Document opt-out:** `<!-- jact-validate-disable -->` skips the whole document only when it is the first Markdown body block. At most one YAML frontmatter block may come before it. The directive must be an exact HTML comment node; a later, fenced, quoted, or near-match comment does not count. The opt-out applies to file, `--stdin`, batch, and `--fix` runs.
 
+### Validation configuration and presets
+
+`jact validate` reads `$XDG_CONFIG_HOME/jact/config.json`. If `XDG_CONFIG_HOME` is unset or empty, it reads `~/.config/jact/config.json`. The nearest `.jact/config.json` overrides that user configuration. The search starts in the checked file's folder and walks upward. Other ancestor project configurations are not merged. Batch mode resolves configuration separately for each file. `--stdin` uses the intended file path.
+
+The configuration keys are:
+
+| Key | Shape | Meaning |
+|---|---|---|
+| `preset` | string | Select the preset; the project value overrides the user value |
+| `rules` | object of rule ID → `"off"` or `"error"` | Override preset defaults; project entries override matching user entries |
+| `plugins` | array of strings | User config only; relative paths start at the user config folder, and package names resolve from that folder with ESM `import` conditions, so import-only `exports` maps work |
+
+Only the user config may list `plugins`; a project config that lists them exits `2` before any plugin code runs because a downloaded repository could run code with your permissions.
+
+The default preset is `commonmark`, which enables no additional rules. It does not change the parser's supported syntax or turn off ordinary link checks. The `obsidian` preset enables both built-in rules:
+
+| Rule ID | Check |
+|---|---|
+| `obsidian/no-reference-note-link` | Reject local-file split-style links: `[text][label]`, `[label][]`, and `[label]` with a reference definition. The first definition of a label decides, as in CommonMark: a label whose first definition is a `scheme:` URL such as `https:` or `obsidian:` is skipped even when a later definition is a local file. Also skip footnotes, same-file `#anchor` definitions, and unused definitions. |
+| `obsidian/anchor-dropped-chars` | Enable [Anchors with characters Obsidian drops](006-behavior.md#Anchors with characters Obsidian drops). This check no longer runs with no configuration. |
+
+Setting a rule to `"error"` enables it regardless of preset; `"off"` disables it. For example, a project can keep the Obsidian preset but opt out of one check:
+
+```json
+{
+  "preset": "obsidian",
+  "rules": { "obsidian/no-reference-note-link": "off" }
+}
+```
+
+Plugins are imported as modules and must default-export `{ rules: [{ id, preset, check }], presets?: string[] }`. Each rule has a unique namespaced ID, a preset name, and a synchronous `check(context)` returning findings. The context supplies the file path, parsed document, and validated links. Rules declare their presets; optional `presets` declares additional names. The same resolved plugin registers once. Plugins execute code in the jact process. Load only trusted modules. The TypeScript contract is `src/types/validationRuleTypes.ts`.
+
+**Configuration errors (exit `2`):** malformed JSON, unknown keys or invalid value shapes, unknown presets or rule IDs, missing or unloadable plugins, invalid default exports, and duplicate rule IDs print `ERROR: <message>` on stderr naming the configuration file or plugin. Control characters in the message print as visible `\uXXXX` escapes. Configuration for every selected file is resolved before validation begins: jact validates nothing and writes nothing on these errors, including in batch and `--fix` modes.
+
+Rule errors count in `summary.errors` and fail validation with exit `1`. `--lines` filters rule findings as well as links. Rule edits follow [Fix Workflow (`--fix`)](006-behavior.md#Fix Workflow (`--fix`)).
+
+
 ### Output — single-file, human (default, minimal)
 
 Single-file output is one status line, or error and warning blocks with a final count.
@@ -64,7 +101,7 @@ WARNINGS (n)
 FAILED: X errors, Y warnings
 ```
 
-`--format json` prints the full validation result: a `summary` object (`total`, `valid`, `warnings`, `errors`) and a `links` list. The fields are in [ValidationResult](004-domain-model.md#ValidationResult). A missing file prints `{"error", "file", "success": false}` and exits `2`.
+`--format json` prints the full validation result: a `summary` object (`total`, `valid`, `warnings`, `errors`), a `links` list, and a top-level `findings` array. Each finding contains `ruleId`, one-based `line`, zero-based `column`, `message`, and optional `source` and `edits`; an edit contains source offsets `start`, exclusive `end`, and `replacement`. Link errors owned by a rule carry `validation.ruleId`. The shared result fields are in [ValidationResult](004-domain-model.md#ValidationResult). A missing file prints `{"error", "file", "success": false}` and exits `2`. Human error lines append `[rule-id]` when owned by a rule.
 
 A duplicate-filename error shows at most five ranked, scope-relative candidates, then the omitted count and a hint to use `--verbose` or a narrower `--scope`. `--verbose` shows every candidate. The JSON suggestion string uses the same limit.
 
@@ -108,7 +145,7 @@ To Drill Into a File: run `jact validate "{{path-to-file}}"`
 
 - `path` — the selected file
 - `ok` — `true` when the file has zero errors; warnings never fail a file
-- `errors` — one `{line, message}` per error; `line` is `null` for a file-level error
+- `errors` — one `{line, message}` per link error or rule finding; `line` is `null` for a file-level error. Rule-owned messages end with `[rule-id]`.
 - `skipped` — present and `true` only for an opted-out file, which does not count as passed
 
 ---
@@ -346,6 +383,9 @@ Single-file `validate` writes its full report to a piped standard output before 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-09 | Package plugins resolve with ESM import conditions; configuration errors escape control characters; `obsidian/no-reference-note-link` follows first-definition precedence |
+| 1.0.0-draft | 2026-10-09 | Moved project configuration to `.jact/config.json`. Restricted plugins to user configuration. Project plugin lists cause exit `2` before plugin code runs. |
+| 1.0.0-draft | 2026-10-09 | Added renderer presets, user/project configuration, per-rule overrides, plugin contract, findings output, and exit-2 configuration failures; Obsidian dropped-character checking is no longer enabled by default |
 | 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift. Added missing `extract header --within` and `-v` flags, the batch-mode flags that jact ignores, single-file JSON keys, rename exit `1` for missing arguments, `extract file` exit `1` for a missing target, outline session variables, and the `--fix` and batch-read exit exceptions |
 | 1.0.0-draft | 2026-10-07 | `validate --fix` follows the three-code contract: exit `1` when errors remain after fixing or during `--dry-run`, `2` on a system error. `--fix`, `--dry-run`, and `--no-backup` with batch selection or `--stdin` are usage errors (exit `2`) instead of being ignored |
 | 1.0.0-draft | 2026-10-07 | `validate` checks link syntax only; plain text and code paths no longer produce errors (issue #110). `--fix` converts only resolved prose `.md` paths and no longer reports unresolved plain text |
