@@ -61,6 +61,7 @@
 	"dependencies": {
 		"commander": "^15.0.0",
 		"ignore": "^7.0.5",
+		"import-meta-resolve": "^4.2.0",
 		"mdast-util-from-markdown": "^2.0.3",
 		"mdast-util-frontmatter": "^2.0.1",
 		"mdast-util-to-string": "^4.0.0",

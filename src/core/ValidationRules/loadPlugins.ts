@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { resolve } from "import-meta-resolve";
 import type { ValidationPlugin } from "../../types/validationRuleTypes.js";
 
 /** A loaded plugin and the resolved URL that identifies it. */
@@ -54,9 +54,12 @@ export async function loadPlugin(
 		url = pathToFileURL(filePath).href;
 	} else {
 		try {
-			url = pathToFileURL(
-				createRequire(path.join(baseDir, "jact-config.js")).resolve(specifier),
-			).href;
+			// ESM import conditions, as `import "<package>"` would resolve from the
+			// config folder; `require.resolve` would reject import-only `exports`.
+			url = resolve(
+				specifier,
+				pathToFileURL(path.join(baseDir, "jact-config.js")).href,
+			);
 		} catch {
 			throw new Error(`Plugin "${specifier}" not found from ${baseDir}`);
 		}

@@ -90,6 +90,32 @@ describe("plugins", () => {
 		expect([...ruleSet.enabled]).toEqual(["todo/flag"]);
 	});
 
+	it("loads an installed package whose exports are import-only", async () => {
+		const packageDir = join(root, "home", "node_modules", "esm-only-plugin");
+		mkdirSync(packageDir, { recursive: true });
+		write(join(packageDir, "package.json"), {
+			name: "esm-only-plugin",
+			type: "module",
+			exports: { ".": { import: "./plugin.js" } },
+		});
+		write(join(packageDir, "plugin.js"), pluginSource("pkg/flag"));
+		write(userConfig, {
+			plugins: ["esm-only-plugin"],
+			rules: { "pkg/flag": "error" },
+		});
+		const ruleSet = await createRuleSetResolver({ userConfigPath: userConfig })(
+			note,
+		);
+		expect([...ruleSet.enabled]).toEqual(["pkg/flag"]);
+	});
+
+	it("names a package that is not installed", async () => {
+		write(userConfig, { plugins: ["not-installed-plugin"] });
+		await expect(enabledFor()).rejects.toThrow(
+			/"not-installed-plugin" not found from/,
+		);
+	});
+
 	it("names a plugin path that does not exist", async () => {
 		write(userConfig, { plugins: ["./missing.mjs"] });
 		await expect(enabledFor()).rejects.toThrow(
