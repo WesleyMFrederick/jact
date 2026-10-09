@@ -1,4 +1,5 @@
 import { normalizeIdentifier } from "micromark-util-normalize-identifier";
+import { visit } from "unist-util-visit";
 import type {
 	RuleEdit,
 	RuleFinding,
@@ -50,15 +51,19 @@ function correctedTarget(definition: EnrichedLinkObject): string {
 /**
  * Obsidian resolves only inline `[text](path)` links to notes; a split-style
  * link (`[text][label]` + `[label]: path`) opens as a web URL. Each usage of a
- * local-file definition is an error; `--fix` inlines every usage and deletes
- * the definition. Footnotes (`[^label]`) are a separate Obsidian construct and
- * are not checked.
+ * local-file definition is an error; `--fix` inlines every link usage and
+ * deletes the definition unless an image reference still needs it. Footnotes
+ * (`[^label]`) are a separate Obsidian construct and are not checked.
  */
 export const noReferenceNoteLink: ValidationRule = {
 	id: NO_REFERENCE_NOTE_LINK_RULE,
 	preset: "obsidian",
 	check({ document, links }) {
 		if (document.linkReferences.length === 0) return [];
+		const imageIdentifiers = new Set<string>();
+		visit(document.ast, "imageReference", (node) => {
+			imageIdentifiers.add(normalizeIdentifier(node.identifier).toLowerCase());
+		});
 		const lineStarts = [0];
 		for (let index = 0; index < document.content.length; index++) {
 			if (document.content[index] === "\n") lineStarts.push(index + 1);
@@ -111,8 +116,8 @@ export const noReferenceNoteLink: ValidationRule = {
 						replacement: `[${text}](${target})`,
 					},
 				];
-				// Every usage is rewritten, so the definition goes with the last one.
-				if (index === usages.length - 1) {
+				// Images keep their reference syntax and still need the definition.
+				if (index === usages.length - 1 && !imageIdentifiers.has(identifier)) {
 					edits.push({
 						start: definitionStart,
 						end: definitionEnd,

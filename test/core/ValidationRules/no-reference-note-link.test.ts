@@ -79,6 +79,18 @@ describe("obsidian/no-reference-note-link", () => {
 		expect(fixed).toBe("[a](./b.md)\n[a](./b.md)\n\n");
 	});
 
+	it.each(["![diagram][ASSET]", "![asset][]", "![asset]"])(
+		"preserves the shared definition for image usage %s",
+		async (image) => {
+			const { fixed } = await check(
+				`[diagram][asset]\n${image}\n\n[asset]: assets/plot.png\n`,
+			);
+			expect(fixed).toBe(
+				`[diagram](assets/plot.png)\n${image}\n\n[asset]: assets/plot.png\n`,
+			);
+		},
+	);
+
 	it("matches labels case- and whitespace-insensitively", async () => {
 		const { fixed } = await check("[a][My  Label]\n\n[my label]: ./b.md\n");
 		expect(fixed).toBe("[a](./b.md)\n\n");
