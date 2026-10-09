@@ -144,13 +144,13 @@ By default, jact checks links without extra renderer-specific rules. For Obsidia
 
 This enables checks for split-style links that Obsidian opens as web links and heading anchors with characters Obsidian drops. `jact validate note.md --fix --dry-run` previews available repairs; `--fix` applies them.
 
-A project can override your default with a `.jact.json` in the note's folder or an ancestor:
+A project can override your default with a `.jact/config.json` in the note's folder or an ancestor:
 
 ```json
 {"preset":"commonmark"}
 ```
 
-Only the nearest `.jact.json` is used. For individual rule overrides, custom plugins, and the alternative user config location, see [Validation configuration and presets](docs/spec/005-interfaces.md#Validation configuration and presets).
+Only the nearest `.jact/config.json` is used. For individual rule overrides, user-config plugins, and the alternative user config location, see [Validation configuration and presets](docs/spec/005-interfaces.md#Validation configuration and presets).
 
 
 ### `validate --fix` — repair heading links

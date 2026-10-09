@@ -46,15 +46,17 @@ Validation writes no files unless `--fix` is set. `--fix --dry-run` also writes 
 
 ### Validation configuration and presets
 
-`jact validate` reads `$XDG_CONFIG_HOME/jact/config.json`, falling back to `~/.config/jact/config.json` when `XDG_CONFIG_HOME` is unset or empty. The nearest `.jact.json`, walking upward from the checked file's folder, overrides that user configuration. Ancestor project configurations beyond the nearest one are not merged. Batch mode resolves configuration separately for each file; `--stdin` uses the intended file path.
+`jact validate` reads `$XDG_CONFIG_HOME/jact/config.json`. If `XDG_CONFIG_HOME` is unset or empty, it reads `~/.config/jact/config.json`. The nearest `.jact/config.json` overrides that user configuration. The search starts in the checked file's folder and walks upward. Other ancestor project configurations are not merged. Batch mode resolves configuration separately for each file. `--stdin` uses the intended file path.
 
-Both files accept only these JSON keys:
+The configuration keys are:
 
 | Key | Shape | Meaning |
 |---|---|---|
 | `preset` | string | Select the preset; the project value overrides the user value |
 | `rules` | object of rule ID → `"off"` or `"error"` | Override preset defaults; project entries override matching user entries |
-| `plugins` | array of strings | Load modules from both layers; relative paths start at the containing config folder, package names resolve from that folder |
+| `plugins` | array of strings | User config only; relative paths start at the user config folder, and package names resolve from that folder |
+
+Only the user config may list `plugins`; a project config that lists them exits `2` before any plugin code runs because a downloaded repository could run code with your permissions.
 
 The default preset is `commonmark`, which enables no additional rules. It does not change the parser's supported syntax or turn off ordinary link checks. The `obsidian` preset enables both built-in rules:
 
@@ -72,7 +74,7 @@ Setting a rule to `"error"` enables it regardless of preset; `"off"` disables it
 }
 ```
 
-Plugins are imported as modules and must default-export `{ rules: [{ id, preset, check }], presets?: string[] }`. Each rule has a unique namespaced ID, a preset name, and a synchronous `check(context)` returning findings. The context supplies the file path, parsed document, and validated links. Rules declare their presets; optional `presets` declares additional names. The same resolved plugin listed in both layers registers once. Plugins execute code in the jact process; load only trusted modules. The TypeScript contract is `src/types/validationRuleTypes.ts`.
+Plugins are imported as modules and must default-export `{ rules: [{ id, preset, check }], presets?: string[] }`. Each rule has a unique namespaced ID, a preset name, and a synchronous `check(context)` returning findings. The context supplies the file path, parsed document, and validated links. Rules declare their presets; optional `presets` declares additional names. The same resolved plugin registers once. Plugins execute code in the jact process. Load only trusted modules. The TypeScript contract is `src/types/validationRuleTypes.ts`.
 
 **Configuration errors (exit `2`):** malformed JSON, unknown keys or invalid value shapes, unknown presets or rule IDs, missing or unloadable plugins, invalid default exports, and duplicate rule IDs print `ERROR: <message>` on stderr naming the configuration file or plugin. Configuration for every selected file is resolved before validation begins: jact validates nothing and writes nothing on these errors, including in batch and `--fix` modes.
 
@@ -381,6 +383,7 @@ Single-file `validate` writes its full report to a piped standard output before 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-09 | Moved project configuration to `.jact/config.json`. Restricted plugins to user configuration. Project plugin lists cause exit `2` before plugin code runs. |
 | 1.0.0-draft | 2026-10-09 | Added renderer presets, user/project configuration, per-rule overrides, plugin contract, findings output, and exit-2 configuration failures; Obsidian dropped-character checking is no longer enabled by default |
 | 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift. Added missing `extract header --within` and `-v` flags, the batch-mode flags that jact ignores, single-file JSON keys, rename exit `1` for missing arguments, `extract file` exit `1` for a missing target, outline session variables, and the `--fix` and batch-read exit exceptions |
 | 1.0.0-draft | 2026-10-07 | `validate --fix` follows the three-code contract: exit `1` when errors remain after fixing or during `--dry-run`, `2` on a system error. `--fix`, `--dry-run`, and `--no-backup` with batch selection or `--stdin` are usage errors (exit `2`) instead of being ignored |

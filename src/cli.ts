@@ -210,8 +210,9 @@ With --fix, --dry-run, or --no-backup:
 
 Rules and presets:
   Settings come from ~/.config/jact/config.json ($XDG_CONFIG_HOME/jact/config.json),
-  overridden by the nearest .jact.json above each checked file:
+  overridden by the nearest .jact/config.json above each checked file:
     { "preset": "obsidian", "rules": { "<rule-id>": "off" }, "plugins": ["./my-rules.mjs"] }
+  Only the personal file may list "plugins" (plugins run code).
   Presets: commonmark (default, no extra rules), obsidian (obsidian/no-reference-note-link,
   obsidian/anchor-dropped-chars). Rule errors end with [rule-id]; --fix applies rule fixes.
 

@@ -38,6 +38,11 @@ function userConfig(config: unknown) {
 	);
 }
 
+function projectConfig(dir: string, config: unknown) {
+	mkdirSync(path.join(dir, ".jact"), { recursive: true });
+	writeFileSync(path.join(dir, ".jact", "config.json"), JSON.stringify(config));
+}
+
 beforeEach(() => {
 	root = realpathSync(mkdtempSync(path.join(tmpdir(), "jact-rule-presets-")));
 	configHome = path.join(root, "config-home");
@@ -111,21 +116,17 @@ describe("jact validate — rule presets", () => {
 		);
 	});
 
-	it("a rule set to off in .jact.json overrides the user preset (AE4)", () => {
+	it("a rule set to off in .jact/config.json overrides the user preset (AE4)", () => {
 		userConfig({ preset: "obsidian" });
-		writeFileSync(
-			path.join(root, ".jact.json"),
-			JSON.stringify({ rules: { "obsidian/no-reference-note-link": "off" } }),
-		);
+		projectConfig(root, {
+			rules: { "obsidian/no-reference-note-link": "off" },
+		});
 		expect(run(["source.md"]).status).toBe(0);
 	});
 
-	it("applies each file's nearest .jact.json in a batch", () => {
+	it("applies each file's nearest .jact/config.json in a batch", () => {
 		mkdirSync(path.join(root, "vault"));
-		writeFileSync(
-			path.join(root, "vault", ".jact.json"),
-			JSON.stringify({ preset: "obsidian" }),
-		);
+		projectConfig(path.join(root, "vault"), { preset: "obsidian" });
 		writeFileSync(path.join(root, "vault", "target.md"), "# Intro\n");
 		writeFileSync(path.join(root, "vault", "note.md"), SPLIT_SOURCE);
 		const result = run(["source.md", "vault/note.md", "--json"]);

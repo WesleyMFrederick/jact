@@ -70,7 +70,7 @@ Batch validation runs the single-file steps 1–5 on many files, one file at a t
    │  ── nothing selected ──▶ ERROR (exit 2); --changed alone with no changes → exit 0
    ▼
 2. Resolve each selected file's rule set from the user config and its nearest
-   │  .jact.json ── bad config/plugin ──▶ ERROR on stderr, no validation, exit 2
+   │  .jact/config.json ── bad config/plugin ──▶ ERROR on stderr, no validation, exit 2
    ▼
 3. Validate each file in order with one shared cache; run its enabled rules
    │  after link validation

@@ -1,7 +1,8 @@
 /**
  * Validation config: a user file (`$XDG_CONFIG_HOME/jact/config.json`, else
- * `~/.config/jact/config.json`) overridden by the nearest `.jact.json`
- * walking up from each checked file.
+ * `~/.config/jact/config.json`) overridden by the nearest `.jact/config.json`
+ * walking up from each checked file. Only the user file may list plugins:
+ * a project config can arrive in a downloaded repo, and plugins run code.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -14,7 +15,8 @@ import type {
 import { loadPlugin } from "./loadPlugins.js";
 import { DEFAULT_PRESET, RuleRegistry, type RuleSetting } from "./presets.js";
 
-export const PROJECT_CONFIG_FILENAME = ".jact.json";
+/** Project config inside the per-folder `.jact/` directory jact already uses for its cache. */
+export const PROJECT_CONFIG_PATH = path.join(".jact", "config.json");
 
 interface JactConfig {
 	preset?: string;
@@ -84,11 +86,11 @@ function readConfigFile(filePath: string): ConfigLayer | null {
 	return { path: filePath, config };
 }
 
-/** The nearest `.jact.json` in the file's folder or an ancestor, or null. */
+/** The nearest `.jact/config.json` in the file's folder or an ancestor, or null. */
 function findProjectConfig(filePath: string): string | null {
 	let dir = path.dirname(path.resolve(filePath));
 	for (;;) {
-		const candidate = path.join(dir, PROJECT_CONFIG_FILENAME);
+		const candidate = path.join(dir, PROJECT_CONFIG_PATH);
 		if (existsSync(candidate)) return candidate;
 		const parent = path.dirname(dir);
 		if (parent === dir) return null;
@@ -141,7 +143,7 @@ async function buildRuleSet(layers: ConfigLayer[]): Promise<RuleSet> {
 
 /**
  * Create a per-file rule set lookup. The user config is read once; each
- * distinct nearest `.jact.json` builds its rule set once. Bad config or
+ * distinct nearest `.jact/config.json` builds its rule set once. Bad config or
  * plugins reject with an error naming the file or plugin.
  */
 export function createRuleSetResolver(
@@ -158,6 +160,11 @@ export function createRuleSetResolver(
 		if (ruleSet === undefined) {
 			const projectLayer =
 				projectConfigPath === "" ? null : readConfigFile(projectConfigPath);
+			if (projectLayer && projectLayer.config.plugins.length > 0) {
+				throw new Error(
+					`Invalid config ${projectConfigPath}: a project config cannot list "plugins" because plugins run code; add them to your personal config (${userConfigPath})`,
+				);
+			}
 			ruleSet = buildRuleSet(
 				[userLayer, projectLayer].filter((layer) => layer !== null),
 			);

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -13,6 +13,11 @@ const write = (path: string, content: unknown) =>
 		path,
 		typeof content === "string" ? content : JSON.stringify(content),
 	);
+
+const writeProject = (content: unknown) => {
+	mkdirSync(join(root, "project", ".jact"), { recursive: true });
+	write(join(root, "project", ".jact", "config.json"), content);
+};
 
 const enabledFor = async (filePath = note) =>
 	[
@@ -42,18 +47,14 @@ describe("rule set resolution from config", () => {
 		]);
 	});
 
-	it("reads the nearest .jact.json walking up from the file", async () => {
-		write(join(root, "project", ".jact.json"), {
-			rules: { "obsidian/no-reference-note-link": "error" },
-		});
+	it("reads the nearest .jact/config.json walking up from the file", async () => {
+		writeProject({ rules: { "obsidian/no-reference-note-link": "error" } });
 		expect(await enabledFor()).toEqual(["obsidian/no-reference-note-link"]);
 	});
 
 	it("lets project keys override user keys", async () => {
 		write(userConfig, { preset: "obsidian" });
-		write(join(root, "project", ".jact.json"), {
-			rules: { "obsidian/no-reference-note-link": "off" },
-		});
+		writeProject({ rules: { "obsidian/no-reference-note-link": "off" } });
 		expect(await enabledFor()).toEqual(["obsidian/anchor-dropped-chars"]);
 	});
 
@@ -109,5 +110,18 @@ describe("plugins", () => {
 		write(join(root, "home", "bare.mjs"), "export const rules = [];");
 		write(userConfig, { plugins: ["./bare.mjs"] });
 		await expect(enabledFor()).rejects.toThrow(/bare\.mjs.*default-export/);
+	});
+
+	it("refuses plugins in a project config without running them", async () => {
+		const marker = join(root, "ran");
+		writeProject({ plugins: ["./evil.mjs"] });
+		write(
+			join(root, "project", ".jact", "evil.mjs"),
+			`import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(marker)}, "x"); export default { rules: [] };`,
+		);
+		await expect(enabledFor()).rejects.toThrow(
+			/project config.*"plugins".*personal config/,
+		);
+		expect(existsSync(marker)).toBe(false);
 	});
 });
