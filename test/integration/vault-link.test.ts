@@ -27,6 +27,7 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const cliPath = path.resolve(testDir, "../../dist/cli.js");
 const RULE_ID = "obsidian/no-vault-escape-link";
 const REPO_NAME = "proj-repo";
+const tmpIsCaseInsensitive = existsSync(realpathSync(tmpdir()).toUpperCase());
 
 let root: string;
 let configHome: string;
@@ -650,6 +651,30 @@ describe("jact vault-link --all", () => {
 			names.map((name) => path.join(notesDir, "sources", name)),
 		);
 		expect(jact(["validate", note]).status).toBe(0);
+	});
+
+	it.runIf(tmpIsCaseInsensitive)("Given two targets whose symlink paths differ only by case on a case-insensitive disk, When --all runs with and without --dry-run, Then both runs refuse the second link the same way", () => {
+		const outside = path.join(root, "outside");
+		mkdirSync(path.join(outside, "one"), { recursive: true });
+		mkdirSync(path.join(outside, "two"), { recursive: true });
+		writeFileSync(path.join(outside, "one", "Same.md"), "# One\n");
+		writeFileSync(path.join(outside, "two", "same.md"), "# Two\n");
+		writeFileSync(
+			note,
+			`- [one](${outside}/one/Same.md)\n- [two](${outside}/two/same.md)\n`,
+		);
+
+		const dryRun = jact(["vault-link", note, "--all", "--dry-run"]);
+		const run = jact(["vault-link", note, "--all"]);
+
+		for (const result of [dryRun, run]) {
+			expect(result.status).toBe(1);
+			expect(result.stdout).toContain("line 2: refused");
+			expect(lastLine(result.stdout)).toContain("1 links rewritten");
+		}
+		expect(readlinkSync(path.join(notesDir, "sources", "Same.md"))).toBe(
+			path.join(outside, "one", "Same.md"),
+		);
 	});
 });
 

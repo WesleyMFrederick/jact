@@ -69,14 +69,21 @@ export class VaultLinker {
 		string,
 		{ bare: boolean; paths: string[] } | null
 	>();
+	/** Planned symlinks, keyed by path as the note's disk compares names. */
 	private symlinks = new Map<
 		string,
-		{ mapped: string; status: "created" | "reused" }
+		{ symlinkPath: string; mapped: string; status: "created" | "reused" }
 	>();
+	/** True when the note's disk ignores letter case, as macOS does by default. */
+	private readonly caseInsensitive: boolean;
 
 	constructor(note: VaultNote) {
 		this.note = note;
 		this.view = new ObsidianVaultView(note.vaultRoot);
+		const dir = note.noteRealDir;
+		const flipped =
+			dir.toUpperCase() === dir ? dir.toLowerCase() : dir.toUpperCase();
+		this.caseInsensitive = flipped !== dir && fs.existsSync(flipped);
 	}
 
 	/**
@@ -134,19 +141,23 @@ export class VaultLinker {
 		}
 		const { mapped, symlinkPath } = mapping;
 
-		const known = this.symlinks.get(symlinkPath);
+		const key = this.caseInsensitive ? symlinkPath.toLowerCase() : symlinkPath;
+		const known = this.symlinks.get(key);
 		let status = known?.status;
-		if (known !== undefined && known.mapped !== mapped) {
+		if (
+			known !== undefined &&
+			(known.mapped !== mapped || known.symlinkPath !== symlinkPath)
+		) {
 			return {
 				kind: "refused",
-				reason: `${symlinkPath} is already planned to point at ${known.mapped}, not ${mapped}`,
+				reason: `${known.symlinkPath} is already planned to point at ${known.mapped}, not ${mapped}`,
 			};
 		}
 		if (status === undefined) {
 			const placed = this.place(symlinkPath, mapped);
 			if (placed.kind === "refused") return placed;
 			status = placed.status;
-			this.symlinks.set(symlinkPath, { mapped, status });
+			this.symlinks.set(key, { symlinkPath, mapped, status });
 		}
 
 		return {
