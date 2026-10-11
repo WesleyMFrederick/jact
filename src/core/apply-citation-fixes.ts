@@ -8,15 +8,7 @@
  * here; no behavior change.
  */
 
-import { randomUUID } from "node:crypto";
-import {
-	lstatSync,
-	readFileSync,
-	realpathSync,
-	renameSync,
-	rmSync,
-	writeFileSync,
-} from "node:fs";
+import { lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { FileCache } from "../FileCache.js";
 import type { ParsedFileCache } from "../ParsedFileCache.js";
@@ -32,6 +24,7 @@ import type { CitationValidator } from "./CitationValidator/CitationValidator.js
 import { applyAnchorFix, applyPathConversion } from "./citationFixer.js";
 import { findPlainFilePaths, resolvePlainFilePath } from "./plain-file-paths.js";
 import { resolveScope } from "./resolveScope.js";
+import { replaceFile } from "./replaceFile.js";
 import { runRules } from "./ValidationRules/runRules.js";
 
 /** Dependencies apply-citation-fixes reads from JactCli — same instances, not copies. */
@@ -104,17 +97,7 @@ function writeFixedFile(
 		}
 	}
 
-	const tempPath = path.join(
-		path.dirname(realFile),
-		`.${path.basename(realFile)}.${randomUUID()}.tmp`,
-	);
-	try {
-		writeFileSync(tempPath, fixedContent, { flag: "wx", mode });
-		renameSync(tempPath, realFile);
-	} catch (error) {
-		rmSync(tempPath, { force: true });
-		throw error;
-	}
+	replaceFile(realFile, fixedContent, mode);
 	return backupPath;
 }
 

@@ -68,11 +68,11 @@ function git(cwd: string, args: string[]): void {
 	}
 }
 
-function jact(args: string[]): SpawnSyncReturns<string> {
+function jact(args: string[], env: NodeJS.ProcessEnv = {}): SpawnSyncReturns<string> {
 	return spawnSync(process.execPath, [cliPath, ...args], {
 		cwd: root,
 		encoding: "utf8",
-		env: cleanEnv(),
+		env: { ...cleanEnv(), ...env },
 	});
 }
 
@@ -506,6 +506,59 @@ describe("jact vault-link --all", () => {
 				path.join(notesDir, "sources", REPO_NAME, "docs", "query?name.md"),
 			),
 		).toBe(queryFile);
+	});
+
+	it("Given the note is saved while --all runs, When --all reaches the write, Then it refuses with exit 1, keeps the saved edit, and creates no symlinks", () => {
+		// A git shim first on PATH appends to the note on the first git call,
+		// which --all makes after reading the note and before writing it.
+		const shimDir = path.join(root, "shim");
+		mkdirSync(shimDir);
+		const realGit = spawnSync("sh", ["-c", "command -v git"], {
+			encoding: "utf8",
+			env: cleanEnv(),
+		}).stdout.trim();
+		const marker = path.join(root, "edited");
+		writeFileSync(
+			path.join(shimDir, "git"),
+			`#!/bin/sh\nif [ ! -e ${shellArgument(marker)} ]; then : > ${shellArgument(marker)}; printf 'USER EDIT\\n' >> ${shellArgument(note)}; fi\nexec ${shellArgument(realGit)} "$@"\n`,
+			{ mode: 0o755 },
+		);
+		const original = `- [spec](${path.join(mainCheckout, "docs", "spec.md")})\n`;
+		writeFileSync(note, original);
+
+		const result = jact(["vault-link", note, "--all"], {
+			PATH: `${shimDir}${path.delimiter}${process.env["PATH"] ?? ""}`,
+		});
+
+		expect(existsSync(marker)).toBe(true);
+		expect(result.status, result.stdout).toBe(1);
+		expect(result.stderr).toContain("changed");
+		expect(readFileSync(note, "utf8")).toBe(`${original}USER EDIT\n`);
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+	});
+
+	it("Given an escaping autolink whose destination cannot be located in the text, When --all runs, Then it refuses the link and creates no symlink", () => {
+		const original = `- <${pathToFileURL(path.join(mainCheckout, "docs", "spec.md")).href}>\n`;
+		writeFileSync(note, original);
+
+		const result = jact(["vault-link", note, "--all"]);
+
+		expect(result.status).toBe(1);
+		expect(result.stdout).toContain("cannot locate the link destination");
+		expect(result.stdout).toContain("0 symlinks created");
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+		expect(readFileSync(note, "utf8")).toBe(original);
+	});
+
+	it("Given a read-only note with an escaping link, When --all runs, Then it fails without writing the note and creates no symlink", () => {
+		const original = `- [spec](${path.join(mainCheckout, "docs", "spec.md")})\n`;
+		writeFileSync(note, original, { mode: 0o444 });
+
+		const result = jact(["vault-link", note, "--all"]);
+
+		expect(result.status).toBe(2);
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+		expect(readFileSync(note, "utf8")).toBe(original);
 	});
 });
 

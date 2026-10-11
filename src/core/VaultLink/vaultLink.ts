@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import path from "node:path";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { ObsidianVaultView, unstableReason } from "../obsidianVaultView.js";
+import { replaceFile } from "../replaceFile.js";
 import { findVaultRoot } from "../resolveScope.js";
 import {
 	ANCHOR_START,
@@ -40,7 +41,7 @@ export type VaultLinkOutcome =
 			link: string;
 			symlinkPath: string;
 			mapped: string;
-			/** "created" also covers a symlink a dry run would create. */
+			/** "created": the symlink does not exist yet and is to be created. */
 			status: "created" | "reused";
 	  }
 	| {
@@ -57,16 +58,12 @@ type Mapping =
 	| { kind: "refused"; reason: string };
 
 /**
- * Plans and creates vault symlinks for link targets Obsidian cannot open.
- * One instance shares git lookups per repository and one symlink per target
- * file.
+ * Plans vault symlinks for link targets Obsidian cannot open. One instance
+ * shares git lookups per repository and one symlink per target file. It
+ * changes nothing on disk; {@link createVaultSymlinks} creates the symlinks.
  */
 export class VaultLinker {
 	readonly note: VaultNote;
-	readonly dryRun: boolean;
-	created = 0;
-	reused = 0;
-	inVault = 0;
 	private readonly view: ObsidianVaultView;
 	private worktreeLists = new Map<string, string[] | null>();
 	private symlinks = new Map<
@@ -74,9 +71,8 @@ export class VaultLinker {
 		{ mapped: string; status: "created" | "reused" }
 	>();
 
-	constructor(note: VaultNote, dryRun: boolean) {
+	constructor(note: VaultNote) {
 		this.note = note;
-		this.dryRun = dryRun;
 		this.view = new ObsidianVaultView(note.vaultRoot);
 	}
 
@@ -127,7 +123,6 @@ export class VaultLinker {
 			};
 		}
 		if (mapping.kind === "in-vault") {
-			this.inVault++;
 			return {
 				kind: "in-vault",
 				link: this.relativeLink(mapping.vaultPath, written),
@@ -149,8 +144,6 @@ export class VaultLinker {
 			if (placed.kind === "refused") return placed;
 			status = placed.status;
 			this.symlinks.set(symlinkPath, { mapped, status });
-			if (status === "created") this.created++;
-			else this.reused++;
 		}
 
 		return {
@@ -318,7 +311,7 @@ export class VaultLinker {
 		return worktrees;
 	}
 
-	/** Create the symlink, or reuse one that already points at `mapped`. */
+	/** Plan a new symlink, or reuse one that already points at `mapped`. */
 	private place(
 		symlinkPath: string,
 		mapped: string,
@@ -377,17 +370,6 @@ export class VaultLinker {
 				reason: `${symlinkPath} already exists as ${what}; not overwriting it`,
 			};
 		}
-		if (!this.dryRun) {
-			try {
-				fs.mkdirSync(path.dirname(symlinkPath), { recursive: true });
-				fs.symlinkSync(mapped, symlinkPath, "file");
-			} catch (error) {
-				return {
-					kind: "refused",
-					reason: `cannot create ${symlinkPath}: ${error instanceof Error ? error.message : String(error)}`,
-				};
-			}
-		}
 		return { kind: "placed", status: "created" };
 	}
 }
@@ -404,21 +386,114 @@ function git(cwd: string, args: string[]): string | null {
 	}
 }
 
+/** A symlink `--all` or a single target plans to create. */
+export interface PlannedSymlink {
+	symlinkPath: string;
+	mapped: string;
+}
+
+/**
+ * Create planned symlinks and their missing folders. On failure, remove what
+ * this call created and return the reason. On success, `remove` undoes it.
+ */
+export function createVaultSymlinks(
+	planned: readonly PlannedSymlink[],
+): { kind: "created"; remove: () => void } | { kind: "refused"; reason: string } {
+	const made: string[] = [];
+	const remove = () => {
+		for (const madePath of [...made].reverse()) {
+			try {
+				if (fs.lstatSync(madePath).isSymbolicLink()) fs.unlinkSync(madePath);
+				else fs.rmdirSync(madePath);
+			} catch {
+				// already gone, or a folder that now holds other files
+			}
+		}
+	};
+	for (const { symlinkPath, mapped } of planned) {
+		try {
+			const parent = path.dirname(symlinkPath);
+			const firstMade = fs.mkdirSync(parent, { recursive: true });
+			if (firstMade !== undefined) {
+				let dir = firstMade;
+				made.push(dir);
+				for (const segment of path
+					.relative(firstMade, parent)
+					.split(path.sep)
+					.filter(Boolean)) {
+					dir = path.join(dir, segment);
+					made.push(dir);
+				}
+			}
+			fs.symlinkSync(mapped, symlinkPath, "file");
+			made.push(symlinkPath);
+		} catch (error) {
+			remove();
+			return {
+				kind: "refused",
+				reason: `cannot create ${symlinkPath}: ${error instanceof Error ? error.message : String(error)}`,
+			};
+		}
+	}
+	return { kind: "created", remove };
+}
+
+/**
+ * Apply an `--all` plan: create its symlinks and write the rewritten note,
+ * but only while the note still holds `original`, the text the plan was made
+ * from. The note is checked before anything is created and again just before
+ * its new text replaces it; a changed note leaves no symlink behind. Throws
+ * when the note cannot be written.
+ */
+export function applyVaultLinkPlan(
+	notePath: string,
+	original: string,
+	plan: { content: string; symlinks: readonly PlannedSymlink[] },
+): { kind: "written" } | { kind: "refused"; reason: string } {
+	const realNote = fs.realpathSync(notePath);
+	fs.accessSync(realNote, fs.constants.W_OK);
+	const mode = fs.statSync(realNote).mode & 0o777;
+	const unchanged = () => fs.readFileSync(realNote, "utf8") === original;
+	const changed = {
+		kind: "refused",
+		reason: `${notePath} changed while vault-link ran; nothing was written. Run vault-link again`,
+	} as const;
+	if (!unchanged()) return changed;
+	const created = createVaultSymlinks(plan.symlinks);
+	if (created.kind === "refused") return created;
+	try {
+		if (!replaceFile(realNote, plan.content, mode, unchanged)) {
+			created.remove();
+			return changed;
+		}
+	} catch (error) {
+		created.remove();
+		throw error;
+	}
+	return { kind: "written" };
+}
+
 /** One escaping link handled by `--all`. */
 export type VaultLinkRewrite =
 	| { line: number; kind: "rewritten"; oldTarget: string; newTarget: string }
 	| { line: number; kind: "refused"; reason: string };
 
 /**
- * Link every escaping markdown link in `content` and return the rewritten
- * content. Refused links stay unchanged. Footnote definitions are skipped,
- * as the rule skips them.
+ * Plan a link for every escaping markdown link in `content` and return the
+ * rewritten content, the symlinks the applied rewrites need, and counts.
+ * Nothing is written. Refused links stay unchanged. Footnote definitions are
+ * skipped, as the rule skips them.
  */
 export function rewriteVaultEscapes(
 	content: string,
 	links: readonly LinkObject[],
 	linker: VaultLinker,
-): { content: string; rewrites: VaultLinkRewrite[] } {
+): {
+	content: string;
+	rewrites: VaultLinkRewrite[];
+	symlinks: PlannedSymlink[];
+	summary: { created: number; reused: number; inVault: number };
+} {
 	const lineStarts = [0];
 	for (let i = 0; i < content.length; i++) {
 		if (content[i] === "\n") lineStarts.push(i + 1);
@@ -426,6 +501,8 @@ export function rewriteVaultEscapes(
 
 	const edits: { start: number; end: number; text: string }[] = [];
 	const rewrites: VaultLinkRewrite[] = [];
+	const symlinkStatus = new Map<string, PlannedSymlink & { status: string }>();
+	let inVault = 0;
 	const ordered = links
 		.filter(
 			(link) =>
@@ -468,6 +545,15 @@ export function rewriteVaultEscapes(
 			oldTarget: span.text,
 			newTarget: outcome.link,
 		});
+		if (outcome.kind === "in-vault") {
+			inVault++;
+		} else {
+			symlinkStatus.set(outcome.symlinkPath, {
+				symlinkPath: outcome.symlinkPath,
+				mapped: outcome.mapped,
+				status: outcome.status,
+			});
+		}
 	}
 
 	let rewritten = content;
@@ -475,5 +561,18 @@ export function rewriteVaultEscapes(
 		rewritten =
 			rewritten.slice(0, edit.start) + edit.text + rewritten.slice(edit.end);
 	}
-	return { content: rewritten, rewrites };
+	const planned = [...symlinkStatus.values()];
+	const symlinks = planned
+		.filter((symlink) => symlink.status === "created")
+		.map(({ symlinkPath, mapped }) => ({ symlinkPath, mapped }));
+	return {
+		content: rewritten,
+		rewrites,
+		symlinks,
+		summary: {
+			created: symlinks.length,
+			reused: planned.length - symlinks.length,
+			inVault,
+		},
+	};
 }

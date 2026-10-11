@@ -12,7 +12,7 @@
  * @module cli
  */
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import { isDynamicPattern } from "tinyglobby";
@@ -22,6 +22,8 @@ import {
 } from "./cache/checkExtractCache.js";
 import { RenameValidationError } from "./core/rename-markdown-file.js";
 import {
+	applyVaultLinkPlan,
+	createVaultSymlinks,
 	rewriteVaultEscapes,
 	VaultLinker,
 	vaultNote,
@@ -604,8 +606,7 @@ Exit Codes:
 				process.exitCode = 2;
 				return;
 			}
-			const linker = new VaultLinker(context, options.dryRun);
-			const would = options.dryRun ? "would " : "";
+			const linker = new VaultLinker(context);
 
 			if (target !== undefined) {
 				const outcome = linker.link(target);
@@ -619,6 +620,14 @@ Exit Codes:
 					console.log(terminalText(`already in vault: ${outcome.vaultPath}`));
 					console.log(terminalText(outcome.link));
 				} else {
+					if (!options.dryRun && outcome.status === "created") {
+						const created = createVaultSymlinks([outcome]);
+						if (created.kind === "refused") {
+							console.error(`ERROR: ${terminalText(created.reason)}`);
+							process.exitCode = 1;
+							return;
+						}
+					}
 					const verb = options.dryRun
 						? `would ${outcome.status === "created" ? "create" : "reuse"}`
 						: outcome.status;
@@ -644,11 +653,17 @@ Exit Codes:
 						? `line ${rewrite.line}: ${rewrite.oldTarget} -> ${rewrite.newTarget}`
 						: `line ${rewrite.line}: refused: ${rewrite.reason}`,
 				);
+				const { summary } = result;
 				lines.push(
-					`vault-link: ${result.rewrites.length - refused} links rewritten, ${linker.created} symlinks created, ${linker.reused} reused, ${linker.inVault} already in vault, ${refused} refused`,
+					`vault-link: ${result.rewrites.length - refused} links rewritten, ${summary.created} symlinks created, ${summary.reused} reused, ${summary.inVault} already in vault, ${refused} refused`,
 				);
 				if (!options.dryRun && result.content !== content) {
-					writeFileSync(note, result.content);
+					const applied = applyVaultLinkPlan(note, content, result);
+					if (applied.kind === "refused") {
+						console.error(`ERROR: ${terminalText(applied.reason)}`);
+						process.exitCode = 1;
+						return;
+					}
 				}
 				console.log(lines.map(terminalText).join("\n"));
 				process.exitCode = refused > 0 ? 1 : 0;
