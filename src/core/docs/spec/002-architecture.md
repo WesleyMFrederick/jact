@@ -111,6 +111,7 @@ Boundary: the scope helpers never parse Markdown.
 
 - **Main checkout only.** A target inside a linked worktree maps to the same repo-relative path in the first entry of `git worktree list --porcelain`; a file missing there is refused.
 - **Never overwrite.** An identical symlink is reused; anything else at the symlink path is refused.
+- **Reuse what Obsidian shows.** A file already in the vault, or under a vault folder symlink, links to that vault path with no new symlink; paths under dot-named folders are refused.
 
 Boundary: `src/cli.ts` parses options and sets exit codes; the module returns results and never prints.
 

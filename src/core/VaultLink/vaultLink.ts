@@ -41,11 +41,24 @@ export type VaultLinkOutcome =
 			/** "created" also covers a symlink a dry run would create. */
 			status: "created" | "reused";
 	  }
+	| {
+			/** Obsidian already shows the file at `vaultPath`; no symlink needed. */
+			kind: "in-vault";
+			link: string;
+			vaultPath: string;
+	  }
 	| { kind: "refused"; reason: string };
 
 type Mapping =
 	| { kind: "mapped"; mapped: string; symlinkPath: string }
+	| { kind: "in-vault"; vaultPath: string }
 	| { kind: "refused"; reason: string };
+
+/** A folder symlink in the vault that Obsidian follows. */
+interface VaultFolderSymlink {
+	vaultPath: string;
+	target: string;
+}
 
 /**
  * Plans and creates vault symlinks for escaping link targets. One instance
@@ -56,6 +69,9 @@ export class VaultLinker {
 	readonly dryRun: boolean;
 	created = 0;
 	reused = 0;
+	inVault = 0;
+	private readonly realVaultRoot: string;
+	private folderSymlinkList: VaultFolderSymlink[] | undefined;
 	private worktreeLists = new Map<string, string[] | null>();
 	private symlinks = new Map<
 		string,
@@ -65,6 +81,7 @@ export class VaultLinker {
 	constructor(note: VaultNote, dryRun: boolean) {
 		this.note = note;
 		this.dryRun = dryRun;
+		this.realVaultRoot = fs.realpathSync(note.vaultRoot);
 	}
 
 	/**
@@ -80,6 +97,31 @@ export class VaultLinker {
 		if (escaping === null) return null;
 		const mapping = this.map(escaping);
 		if (mapping.kind === "refused") return mapping;
+		const placedAt =
+			mapping.kind === "in-vault" ? mapping.vaultPath : mapping.symlinkPath;
+		const hidden = path
+			.relative(
+				mapping.kind === "in-vault"
+					? this.realVaultRoot
+					: this.note.noteRealDir,
+				placedAt,
+			)
+			.split(path.sep)
+			.find((segment) => segment.startsWith(".") && segment !== "..");
+		if (hidden !== undefined) {
+			return {
+				kind: "refused",
+				reason: `${placedAt} is under ${hidden}; Obsidian does not index names that start with a dot`,
+			};
+		}
+		if (mapping.kind === "in-vault") {
+			this.inVault++;
+			return {
+				kind: "in-vault",
+				link: this.relativeLink(mapping.vaultPath, written),
+				vaultPath: mapping.vaultPath,
+			};
+		}
 		const { mapped, symlinkPath } = mapping;
 
 		const known = this.symlinks.get(symlinkPath);
@@ -99,10 +141,21 @@ export class VaultLinker {
 			else this.reused++;
 		}
 
+		return {
+			kind: "linked",
+			link: this.relativeLink(symlinkPath, written),
+			symlinkPath,
+			mapped,
+			status,
+		};
+	}
+
+	/** Relative, percent-encoded link from the note to `to`, keeping the written `#anchor`. */
+	private relativeLink(to: string, written: string): string {
 		const hash = written.search(ANCHOR_START);
-		const link =
+		return (
 			path
-				.relative(this.note.noteRealDir, symlinkPath)
+				.relative(this.note.noteRealDir, to)
 				.split(path.sep)
 				.map((segment) =>
 					segment
@@ -113,8 +166,65 @@ export class VaultLinker {
 						.replaceAll("#", "%23")
 						.replaceAll("?", "%3F"),
 				)
-				.join("/") + (hash < 0 ? "" : written.slice(hash));
-		return { kind: "linked", link, symlinkPath, mapped, status };
+				.join("/") + (hash < 0 ? "" : written.slice(hash))
+		);
+	}
+
+	/**
+	 * Vault path where Obsidian already shows a real file: the file itself when
+	 * it lies in the vault, or its path under a vault folder symlink. Null when
+	 * the vault does not reach it.
+	 */
+	private vaultPathOf(realFile: string): string | null {
+		if (isInside(this.realVaultRoot, realFile)) return realFile;
+		for (const { vaultPath, target } of this.folderSymlinks()) {
+			if (isInside(target, realFile)) {
+				return path.join(vaultPath, path.relative(target, realFile));
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Folder symlinks Obsidian follows: outside dot folders, with a target
+	 * disjoint from the vault. Found once per instance, in path order.
+	 */
+	private folderSymlinks(): VaultFolderSymlink[] {
+		if (this.folderSymlinkList !== undefined) return this.folderSymlinkList;
+		const found: VaultFolderSymlink[] = [];
+		const pending = [this.realVaultRoot];
+		for (let dir = pending.pop(); dir !== undefined; dir = pending.pop()) {
+			let entries: fs.Dirent[];
+			try {
+				entries = fs.readdirSync(dir, { withFileTypes: true });
+			} catch {
+				continue;
+			}
+			for (const entry of entries) {
+				if (entry.name.startsWith(".")) continue;
+				const entryPath = path.join(dir, entry.name);
+				if (entry.isDirectory()) {
+					pending.push(entryPath);
+				} else if (entry.isSymbolicLink()) {
+					let target: string;
+					try {
+						target = fs.realpathSync(entryPath);
+						if (!fs.statSync(target).isDirectory()) continue;
+					} catch {
+						continue;
+					}
+					if (
+						!isInside(this.realVaultRoot, target) &&
+						!isInside(target, this.realVaultRoot)
+					) {
+						found.push({ vaultPath: entryPath, target });
+					}
+				}
+			}
+		}
+		found.sort((a, b) => a.vaultPath.localeCompare(b.vaultPath));
+		this.folderSymlinkList = found;
+		return found;
 	}
 
 	/**
@@ -123,9 +233,10 @@ export class VaultLinker {
 	 * repo that points into a worktree still maps to the main checkout.
 	 */
 	private map(resolved: string): Mapping {
-		const escaping = fs.existsSync(resolved)
-			? fs.realpathSync(resolved)
-			: resolved;
+		const exists = fs.existsSync(resolved);
+		const escaping = exists ? fs.realpathSync(resolved) : resolved;
+		const vaultPath = exists ? this.vaultPathOf(escaping) : null;
+		if (vaultPath !== null) return { kind: "in-vault", vaultPath };
 		const sourcesDir = path.join(this.note.noteRealDir, "sources");
 		const worktree = PASEO_WORKTREE.exec(escaping)?.[1];
 		if (worktree !== undefined && !fs.existsSync(worktree)) {
@@ -207,6 +318,10 @@ export class VaultLinker {
 				kind: "refused",
 				reason: `main checkout file ${mapped} resolves to ${realMapped}, inside a worktree`,
 			};
+		}
+		const mappedVaultPath = this.vaultPathOf(realMapped);
+		if (mappedVaultPath !== null) {
+			return { kind: "in-vault", vaultPath: mappedVaultPath };
 		}
 		return {
 			kind: "mapped",

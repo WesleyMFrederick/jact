@@ -562,6 +562,10 @@ Behavior:
 
 Exit Codes:
   0  Every requested link was fixed (or would be, with --dry-run)
+  When Obsidian already shows the file (it lies in the vault, or under a vault
+  folder symlink), the link points at that vault path and no symlink is made.
+  Paths under a folder or file whose name starts with a dot are refused,
+  because Obsidian does not index them.
   1  A target does not leave the vault, or a link was refused
   2  Usage error, missing note, or the note is not inside an Obsidian vault
 `,
@@ -603,6 +607,9 @@ Exit Codes:
 				} else if (outcome.kind === "refused") {
 					console.error(`ERROR: ${terminalText(outcome.reason)}`);
 					process.exitCode = 1;
+				} else if (outcome.kind === "in-vault") {
+					console.log(terminalText(`already in vault: ${outcome.vaultPath}`));
+					console.log(terminalText(outcome.link));
 				} else {
 					const verb = options.dryRun
 						? `would ${outcome.status === "created" ? "create" : "reuse"}`
@@ -630,7 +637,7 @@ Exit Codes:
 						: `line ${rewrite.line}: refused: ${rewrite.reason}`,
 				);
 				lines.push(
-					`vault-link: ${result.rewrites.length - refused} links rewritten, ${linker.created} symlinks created, ${linker.reused} reused, ${refused} refused`,
+					`vault-link: ${result.rewrites.length - refused} links rewritten, ${linker.created} symlinks created, ${linker.reused} reused, ${linker.inVault} already in vault, ${refused} refused`,
 				);
 				if (!options.dryRun && result.content !== content) {
 					writeFileSync(note, result.content);

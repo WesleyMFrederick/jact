@@ -259,6 +259,43 @@ describe("jact vault-link — single target", () => {
 			`sources/${REPO_NAME}/docs/spec.md`,
 		);
 	});
+
+	it("Given the vault already shows the repo folder through a folder symlink, When vault-link runs on a worktree file, Then the link goes through that vault folder and no symlink is created", () => {
+		symlinkSync(path.join(mainCheckout, "docs"), path.join(vault, "repo-docs"), "dir");
+		const target = `${path.join(worktree, "docs", "spec.md")}#Second`;
+		writeFileSync(note, `See [spec](${target}).\n`);
+
+		const result = jact(["vault-link", note, target]);
+
+		expect(result.status, result.stderr).toBe(0);
+		expect(lastLine(result.stdout)).toBe("../repo-docs/spec.md#Second");
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+	});
+
+	it("Given a link leaves the vault but its real file is inside the vault, When vault-link runs, Then the link points at the vault file and no symlink is created", () => {
+		const alias = path.join(root, "outside-alias-of-vault-note.md");
+		symlinkSync(path.join(vault, "other.md"), alias, "file");
+		writeFileSync(note, `See [other](${alias}).\n`);
+
+		const result = jact(["vault-link", note, alias]);
+
+		expect(result.status, result.stderr).toBe(0);
+		expect(lastLine(result.stdout)).toBe("../other.md");
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+	});
+
+	it("Given the target sits under a dot folder in the repo, When vault-link runs, Then it refuses with exit 1 because Obsidian would not index the symlink", () => {
+		mkdirSync(path.join(mainCheckout, ".agents"));
+		writeFileSync(path.join(mainCheckout, ".agents", "skill.md"), "# Skill\n");
+		const target = path.join(mainCheckout, ".agents", "skill.md");
+		writeFileSync(note, `See [skill](${target}).\n`);
+
+		const result = jact(["vault-link", note, target]);
+
+		expect(result.status).toBe(1);
+		expect(result.stderr).toContain(".agents");
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+	});
 });
 
 describe("jact vault-link --all", () => {
@@ -284,7 +321,7 @@ describe("jact vault-link --all", () => {
 
 		expect(result.status, result.stderr).toBe(0);
 		expect(result.stdout).toMatch(
-			/vault-link: 5 links rewritten, 2 symlinks created, \d+ reused, 0 refused/,
+			/vault-link: 5 links rewritten, 2 symlinks created, \d+ reused, 0 already in vault, 0 refused/,
 		);
 		const specLink = `sources/${REPO_NAME}/docs/spec.md`;
 		expect(readFileSync(note, "utf8")).toBe(
