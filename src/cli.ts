@@ -110,6 +110,17 @@ program.configureOutput({
 	},
 });
 
+// List each command in the parent's help with the command's own usage line.
+program.configureHelp({
+	subcommandTerm: (command) => `${command.name()} ${command.usage()}`,
+});
+
+// Shared option descriptions — kept in one place so wording stays consistent across subcommands
+const SCOPE_OPTION_DESCRIPTION =
+	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
+const VERBOSE_OPTION_DESCRIPTION =
+	"Include outgoingLinksReport + stats in output";
+
 /** Read all of process.stdin to a UTF-8 string (used by `validate --stdin`). */
 async function readAllStdin(): Promise<string> {
 	const chunks: Buffer[] = [];
@@ -128,7 +139,7 @@ interface CliBatchValidateOptions extends CliValidateOptions {
 program
 	.command("validate")
 	.description(
-		"Validate citations in a markdown file, checking that target files exist and anchors resolve correctly",
+		"Validate citations in one or more markdown files, checking that target files exist and anchors resolve correctly",
 	)
 	// Optional at the Commander level so --stdin's missing-<file-path> case can exit 2
 	// with our own message (D2) instead of Commander's generic usage error.
@@ -136,15 +147,16 @@ program
 		"[paths...]",
 		"path(s) to markdown file(s) and/or glob patterns; omit when using --changed alone; with --stdin, exactly one path (the intended on-disk path, not read from disk)",
 	)
-	.option("--format <type>", "output format (cli, json)", "cli")
+	.addOption(
+		new Option("--format <type>", "output format")
+			.choices(["cli", "json"])
+			.default("cli"),
+	)
 	.option(
 		"--lines <range>",
 		'validate specific line range (e.g., "150-160" or "157")',
 	)
-	.option(
-		"--scope <folder>",
-		"limit file resolution to specific folder (enables smart filename matching)",
-	)
+	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option(
 		"--fix",
 		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections; one on-disk file only (not with batch selection or --stdin)",
@@ -397,12 +409,6 @@ Exit Codes:
 		}
 	});
 
-// Shared option descriptions — kept in one place so wording stays consistent across subcommands
-const SCOPE_OPTION_DESCRIPTION =
-	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
-const VERBOSE_OPTION_DESCRIPTION =
-	"Include outgoingLinksReport + stats in output";
-
 program
 	.command("rename")
 	.description(
@@ -540,7 +546,7 @@ program
 	)
 	.option(
 		"--all",
-		"fix every link in the note that Obsidian cannot open, in place",
+		"fix every link in the note that Obsidian cannot open, in place; footnote definitions are skipped",
 		false,
 	)
 	.option(
@@ -775,11 +781,19 @@ Examples:
     $ jact ast plan.md                        # smart default scope (cwd-git/pkg)
     $ jact ast plan.md --scope ./other-repo   # explicit override
 
-Output includes:
+Output fields (top-level JSON keys):
+  - filePath: Path of the parsed file
+  - content: Raw file text
   - ast: Markdown AST (mdast) from the micromark parser
   - links: Detected citation links with anchor metadata
+  - embeds: Inline image and wiki embeds
   - headings: Parsed heading structure
   - anchors: Available anchor points (headers and blocks)
+  - validationDisabled: true when the document opts out of validation
+
+Exit Codes:
+  0  AST printed
+  2  File lookup, scope, permission, or parse error
 `,
 	)
 	.action(async (file: string, options: { scope?: string }) => {
@@ -1073,7 +1087,7 @@ Examples:
 
 Exit Codes:
   0  File extracted successfully
-  1  File not found or validation failed
+  1  Target file not found or invalid, or a linked target failed
   2  System error (permission denied, parse error)
 `,
 	)

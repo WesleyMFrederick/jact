@@ -26,7 +26,7 @@ Validation writes no files unless `--fix` is set. `--fix --dry-run` also writes 
 
 | Flag | Default | Description |
 |---|---|---|
-| `--format <type>` | `cli` | `cli` or `json`; single-file mode only |
+| `--format <type>` | `cli` | `cli` or `json`; jact rejects any other value before validating; single-file mode only |
 | `--lines <range>` | - | Check one line range, such as `150-160` or `157` |
 | `--scope <folder>` | smart default | Bounds file resolution and `--fix` prose-path candidates |
 | `--fix` | - | Single-file mode only: apply citation anchor and path fixes, and convert resolved prose `.md` paths into links |
@@ -421,6 +421,7 @@ Single-file `validate` writes its full report to a piped standard output before 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-11 | `validate --format` rejects values other than `cli` and `json` instead of printing CLI output |
 | 1.0.0-draft | 2026-10-11 | Added `obsidian/no-unstable-symlink-link` for links through file or folder symlinks into `.paseo/worktrees/` or folder symlinks inside a `sources` folder; `jact vault-link` no longer reuses such folder symlinks, relinks links through such symlinks, and refuses when only such a folder symlink shows the file |
 | 1.0.0-draft | 2026-10-10 | Added `obsidian/no-unindexed-link` for in-vault links through symlinks or dot folders Obsidian skips; `jact vault-link` rewrites those links to the vault path Obsidian shows |
 | 1.0.0-draft | 2026-10-10 | `jact vault-link` links to a vault path Obsidian already shows instead of making a symlink Obsidian would skip, and refuses symlinks under dot-named folders |
