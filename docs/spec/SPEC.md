@@ -70,7 +70,7 @@ This specification is the **canonical source of truth** for how jact is designed
 
 ### Core Guarantees
 
-1. **Never mutates without `--fix`** — `validate` is read-only; only `--fix` writes, and by default writes a timestamped `.bak` first. `--fix` refuses symbolic links, files outside the real scope root, and existing backup paths; it replaces the file with an atomic rename
+1. **Never mutates without `--fix`** — `validate` is read-only; only `--fix` writes, and by default writes a timestamped `.bak` first. `--fix` refuses symbolic links, files outside the real scope root, and existing backup paths; it replaces the file with an atomic rename. Exception: `jact vault-link` creates vault symlinks and, with `--all`, rewrites the note without a backup
 2. **Parse-don't-regex for markdown source** — anything that lives in markdown syntax is tokenized via a micromark/mdast extension (the Flavor Extension Collection), not re-derived with regex; regex is reserved for non-markdown strings (paths, CLI text, slugs) — see [003-adrs.md ADR-0003](../adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection)
 3. **Single parse per file** — the parsed-document cache parses a file at most once per process, even under concurrent requests — see [002-architecture.md](002-architecture.md#ParsedFileCache%20%28%60src/ParsedFileCache.ts%60%29)
 4. **Deterministic exit codes** — `0` success, `1` validation/extraction failure, `2` system error — consistent across `validate`, `ast`, and `extract`

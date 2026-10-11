@@ -11,7 +11,8 @@ Each layer calls only the layer below it, and a factory builds and connects ever
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │  CLI layer — src/cli.ts                                              │
-│  commands: validate, rename, outline, ast, extract links|header|file │
+│  commands: validate, rename, outline, ast, extract links|header|file,│
+│  vault-link (calls src/core/VaultLink/ directly)                     │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │ single file          │ batch
                                 ▼                      ▼

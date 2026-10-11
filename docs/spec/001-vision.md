@@ -49,7 +49,7 @@ It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not 
 
 ### 3. Read-Only by Default
 
-**Principle:** `jact validate` never mutates a file. Only `--fix` writes (`validate --fix` and `rename --fix`). By default `--fix` writes a timestamped `.bak` backup first; `--no-backup` turns the backup off.
+**Principle:** `jact validate` never mutates a file. Only `--fix` writes (`validate --fix` and `rename --fix`). By default `--fix` writes a timestamped `.bak` backup first; `--no-backup` turns the backup off. One command writes without `--fix`: [`jact vault-link`](005-interfaces.md#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) exists to fix links, so it creates vault symlinks, and with `--all` it rewrites the note in place, with no backup; `--dry-run` writes nothing.
 
 **Implications:**
 - `--dry-run` (only meaningful with `--fix`) prints the would-be diff without touching disk
@@ -70,7 +70,7 @@ It parses markdown with **micromark + mdast** (`mdast-util-from-markdown`), not 
 
 | Guarantee | Description |
 |-----------|-------------|
-| **Never mutates without `--fix`** | `validate`, `ast`, `outline`, `extract` never change a Markdown file; `rename` previews unless `--fix` is set |
+| **Never mutates without `--fix`** | `validate`, `ast`, `outline`, `extract` never change a Markdown file; `rename` previews unless `--fix` is set; `vault-link` is the one exception (it creates symlinks, and `--all` rewrites the note) |
 | **Backup before write** | `--fix` writes a timestamped `.bak` before it changes the target file, unless `--no-backup` is set |
 | **Deterministic exit codes** | `0`/`1`/`2` consistent across `validate`, `ast`, `extract` |
 | **Single parse per file** | The parsed-document cache parses each absolute path at most once per process; only a failed parse is retried on the next request |

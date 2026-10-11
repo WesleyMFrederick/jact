@@ -49,7 +49,7 @@ These summaries show what core is, is not, and guarantees.
 - The **checker**: each parsed link to a valid, warning, or error result
 - The **rule layer** (`src/core/ValidationRules/`): preset registry, configuration and plugin loading, and post-link checks; contracts live in [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation configuration and presets)
 - The **extractor**: linked sections, blocks, and files to deduplicated content
-- The **editors**: `--fix` citation repair and `jact rename` move planning, the only code that writes user files
+- The **editors**: `--fix` citation repair, `jact rename` move planning, and the vault link fixer (`src/core/VaultLink/`, which creates symlinks and plans note rewrites that `jact vault-link --all` writes), the only code that changes user files
 
 ### What `src/core` Is Not
 
