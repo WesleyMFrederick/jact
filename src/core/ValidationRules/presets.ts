@@ -11,6 +11,7 @@ import type {
 } from "../../types/validationRuleTypes.js";
 import { anchorDroppedChars } from "./rules/anchorDroppedChars.js";
 import { noReferenceNoteLink } from "./rules/noReferenceNoteLink.js";
+import { noUnindexedLink } from "./rules/noUnindexedLink.js";
 import { noVaultEscapeLink } from "./rules/noVaultEscapeLink.js";
 
 /** Preset used when no config selects one: plain CommonMark, no extra rules. */
@@ -28,7 +29,14 @@ export class RuleRegistry {
 
 	constructor() {
 		this.register(
-			{ rules: [noReferenceNoteLink, anchorDroppedChars, noVaultEscapeLink] },
+			{
+				rules: [
+					noReferenceNoteLink,
+					anchorDroppedChars,
+					noVaultEscapeLink,
+					noUnindexedLink,
+				],
+			},
 			"jact",
 		);
 	}

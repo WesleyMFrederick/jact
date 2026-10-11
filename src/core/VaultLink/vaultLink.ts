@@ -2,12 +2,14 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import path from "node:path";
 import type { LinkObject } from "../../types/citationTypes.js";
+import { ObsidianVaultView } from "../obsidianVaultView.js";
 import { findVaultRoot } from "../resolveScope.js";
 import {
 	ANCHOR_START,
 	destinationSpan,
 	isInside,
 	resolveVaultEscape,
+	resolveVaultTarget,
 } from "../vaultEscape.js";
 
 const PASEO_WORKTREE = /^(.*\/\.paseo\/worktrees\/[^/]+\/[^/]+)(?:\/|$)/;
@@ -54,15 +56,10 @@ type Mapping =
 	| { kind: "in-vault"; vaultPath: string }
 	| { kind: "refused"; reason: string };
 
-/** A folder symlink in the vault that Obsidian follows. */
-interface VaultFolderSymlink {
-	vaultPath: string;
-	target: string;
-}
-
 /**
- * Plans and creates vault symlinks for escaping link targets. One instance
- * shares git lookups per repository and one symlink per target file.
+ * Plans and creates vault symlinks for link targets Obsidian cannot open.
+ * One instance shares git lookups per repository and one symlink per target
+ * file.
  */
 export class VaultLinker {
 	readonly note: VaultNote;
@@ -70,8 +67,7 @@ export class VaultLinker {
 	created = 0;
 	reused = 0;
 	inVault = 0;
-	private readonly realVaultRoot: string;
-	private folderSymlinkList: VaultFolderSymlink[] | undefined;
+	private readonly view: ObsidianVaultView;
 	private worktreeLists = new Map<string, string[] | null>();
 	private symlinks = new Map<
 		string,
@@ -81,28 +77,36 @@ export class VaultLinker {
 	constructor(note: VaultNote, dryRun: boolean) {
 		this.note = note;
 		this.dryRun = dryRun;
-		this.realVaultRoot = fs.realpathSync(note.vaultRoot);
+		this.view = new ObsidianVaultView(note.vaultRoot);
 	}
 
 	/**
-	 * Link one target as written in the note. Returns null when the target
-	 * does not leave the vault.
+	 * Link one target as written in the note. Returns null when Obsidian can
+	 * already open the target.
 	 */
 	link(written: string): VaultLinkOutcome | null {
-		const escaping = resolveVaultEscape(
-			written,
-			this.note.noteRealDir,
-			this.note.vaultRoot,
-		);
-		if (escaping === null) return null;
-		const mapping = this.map(escaping);
+		const { noteRealDir, vaultRoot } = this.note;
+		const escaping = resolveVaultEscape(written, noteRealDir, vaultRoot);
+		let mapping: Mapping;
+		if (escaping !== null) {
+			mapping = this.map(escaping);
+		} else {
+			const inside = resolveVaultTarget(written, noteRealDir, vaultRoot);
+			const reason = inside === null ? null : this.view.unindexed(inside);
+			if (inside === null || reason === null) return null;
+			// A dot path maps to itself so the dot check below refuses it.
+			mapping = {
+				kind: "in-vault",
+				vaultPath: reason.kind === "dot" ? inside : reason.vaultPath,
+			};
+		}
 		if (mapping.kind === "refused") return mapping;
 		const placedAt =
 			mapping.kind === "in-vault" ? mapping.vaultPath : mapping.symlinkPath;
 		const hidden = path
 			.relative(
 				mapping.kind === "in-vault"
-					? this.realVaultRoot
+					? this.view.realRoot
 					: this.note.noteRealDir,
 				placedAt,
 			)
@@ -171,63 +175,6 @@ export class VaultLinker {
 	}
 
 	/**
-	 * Vault path where Obsidian already shows a real file: the file itself when
-	 * it lies in the vault, or its path under a vault folder symlink. Null when
-	 * the vault does not reach it.
-	 */
-	private vaultPathOf(realFile: string): string | null {
-		if (isInside(this.realVaultRoot, realFile)) return realFile;
-		for (const { vaultPath, target } of this.folderSymlinks()) {
-			if (isInside(target, realFile)) {
-				return path.join(vaultPath, path.relative(target, realFile));
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Folder symlinks Obsidian follows: outside dot folders, with a target
-	 * disjoint from the vault. Found once per instance, in path order.
-	 */
-	private folderSymlinks(): VaultFolderSymlink[] {
-		if (this.folderSymlinkList !== undefined) return this.folderSymlinkList;
-		const found: VaultFolderSymlink[] = [];
-		const pending = [this.realVaultRoot];
-		for (let dir = pending.pop(); dir !== undefined; dir = pending.pop()) {
-			let entries: fs.Dirent[];
-			try {
-				entries = fs.readdirSync(dir, { withFileTypes: true });
-			} catch {
-				continue;
-			}
-			for (const entry of entries) {
-				if (entry.name.startsWith(".")) continue;
-				const entryPath = path.join(dir, entry.name);
-				if (entry.isDirectory()) {
-					pending.push(entryPath);
-				} else if (entry.isSymbolicLink()) {
-					let target: string;
-					try {
-						target = fs.realpathSync(entryPath);
-						if (!fs.statSync(target).isDirectory()) continue;
-					} catch {
-						continue;
-					}
-					if (
-						!isInside(this.realVaultRoot, target) &&
-						!isInside(target, this.realVaultRoot)
-					) {
-						found.push({ vaultPath: entryPath, target });
-					}
-				}
-			}
-		}
-		found.sort((a, b) => a.vaultPath.localeCompare(b.vaultPath));
-		this.folderSymlinkList = found;
-		return found;
-	}
-
-	/**
 	 * Map an escaping path to its main-checkout file and vault symlink path.
 	 * An existing path maps by its real location, so a symlink outside any
 	 * repo that points into a worktree still maps to the main checkout.
@@ -235,7 +182,7 @@ export class VaultLinker {
 	private map(resolved: string): Mapping {
 		const exists = fs.existsSync(resolved);
 		const escaping = exists ? fs.realpathSync(resolved) : resolved;
-		const vaultPath = exists ? this.vaultPathOf(escaping) : null;
+		const vaultPath = exists ? this.view.shownAt(escaping) : null;
 		if (vaultPath !== null) return { kind: "in-vault", vaultPath };
 		const sourcesDir = path.join(this.note.noteRealDir, "sources");
 		const worktree = PASEO_WORKTREE.exec(escaping)?.[1];
@@ -319,7 +266,7 @@ export class VaultLinker {
 				reason: `main checkout file ${mapped} resolves to ${realMapped}, inside a worktree`,
 			};
 		}
-		const mappedVaultPath = this.vaultPathOf(realMapped);
+		const mappedVaultPath = this.view.shownAt(realMapped);
 		if (mappedVaultPath !== null) {
 			return { kind: "in-vault", vaultPath: mappedVaultPath };
 		}

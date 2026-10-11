@@ -296,6 +296,33 @@ describe("jact vault-link — single target", () => {
 		expect(result.stderr).toContain(".agents");
 		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
 	});
+
+	it("Given a hand-made file symlink to a file the vault already shows through a folder symlink, When validated and then --all runs, Then validate flags it and --all rewrites the link to the shown path", () => {
+		symlinkSync(path.join(mainCheckout, "docs"), path.join(vault, "repo-docs"), "dir");
+		mkdirSync(path.join(notesDir, "sources"));
+		symlinkSync(
+			path.join(mainCheckout, "docs", "spec.md"),
+			path.join(notesDir, "sources", "spec.md"),
+			"file",
+		);
+		writeFileSync(note, "See [spec](sources/spec.md#Second).\n");
+		writeFileSync(
+			path.join(configHome, "jact", "config.json"),
+			JSON.stringify({ rules: { "obsidian/no-unindexed-link": "error" } }),
+		);
+
+		const before = jact(["validate", note]);
+		const fixed = jact(["vault-link", note, "--all"]);
+		const after = jact(["validate", note]);
+
+		expect(before.status).toBe(1);
+		expect(before.stdout).toContain("obsidian/no-unindexed-link");
+		expect(fixed.status, fixed.stderr).toBe(0);
+		expect(readFileSync(note, "utf8")).toBe(
+			"See [spec](../repo-docs/spec.md#Second).\n",
+		);
+		expect(after.status, after.stdout).toBe(0);
+	});
 });
 
 describe("jact vault-link --all", () => {

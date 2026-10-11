@@ -105,13 +105,13 @@ The scope helpers find the project root, index it, and skip ignored paths. Order
 
 Boundary: the scope helpers never parse Markdown.
 
-### `vaultEscape.ts`, `VaultLink/vaultLink.ts` — vault-escape fixer
+### `vaultEscape.ts`, `obsidianVaultView.ts`, `VaultLink/vaultLink.ts` — vault link fixer
 
-`vaultEscape.ts` holds the one check for whether a link target leaves the Obsidian vault; the `obsidian/no-vault-escape-link` rule and `jact vault-link` both call it. `VaultLink/vaultLink.ts` maps an escaping target to the repo's main checkout, makes a per-file symlink under `sources/` beside the note, and rewrites links for `--all`. Command contract: [`jact vault-link <note> [target]`](../../../../docs/spec/005-interfaces.md#`jact vault-link <note> [target]`).
+`vaultEscape.ts` holds the one check for whether a link target leaves the Obsidian vault; the `obsidian/no-vault-escape-link` rule and `jact vault-link` both call it. `obsidianVaultView.ts` models which vault paths Obsidian shows: it finds the vault's followed folder symlinks once per instance, maps a real file to the vault path that shows it, and says why Obsidian skips an in-vault path; the `obsidian/no-unindexed-link` rule and `jact vault-link` both use it. `VaultLink/vaultLink.ts` maps an escaping target to the repo's main checkout, makes a per-file symlink under `sources/` beside the note, and rewrites links for `--all`. Command contract: [`jact vault-link <note> [target]`](../../../../docs/spec/005-interfaces.md#`jact vault-link <note> [target]`).
 
 - **Main checkout only.** A target inside a linked worktree maps to the same repo-relative path in the first entry of `git worktree list --porcelain`; a file missing there is refused.
 - **Never overwrite.** An identical symlink is reused; anything else at the symlink path is refused.
-- **Reuse what Obsidian shows.** A file already in the vault, or under a vault folder symlink, links to that vault path with no new symlink; paths under dot-named folders are refused.
+- **Reuse what Obsidian shows.** A file already in the vault, or under a vault folder symlink, links to that vault path with no new symlink; an in-vault link through a symlink Obsidian skips is rewritten to that path; paths under dot-named folders are refused.
 
 Boundary: `src/cli.ts` parses options and sets exit codes; the module returns results and never prints.
 

@@ -65,6 +65,7 @@ The default preset is `commonmark`, which enables no additional rules. It does n
 | `obsidian/no-reference-note-link` | Reject local-file split-style links: `[text][label]`, `[label][]`, and `[label]` with a reference definition. The first definition of a label decides, as in CommonMark: a label whose first definition is a `scheme:` URL such as `https:` or `obsidian:` is skipped even when a later definition is a local file. Also skip footnotes, same-file `#anchor` definitions, and unused definitions. |
 | `obsidian/anchor-dropped-chars` | Enable [Anchors with characters Obsidian drops](006-behavior.md#Anchors with characters Obsidian drops). This check no longer runs with no configuration. |
 | `obsidian/no-vault-escape-link` | Only in a vault: the nearest folder above the file's real path that contains `.obsidian`. With no vault, the rule does nothing. Inside a vault, a Markdown link is an error when its target is an absolute path, a `file:` URL, contains `.paseo/worktrees/`, or is a relative path that leaves the vault root. Relative paths are resolved from the note's real folder as text, without following symlinks, so a link to a symlink inside the vault passes even when the symlink points outside. Skip web URLs, `#anchor`-only links, wikilinks, and footnotes. The one-line message names a paste-ready fix: [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) with this note and the target as written, plus a hint to use `--all` for every such link in the note. |
+| `obsidian/no-unindexed-link` | Only in a vault, as for `obsidian/no-vault-escape-link`. A Markdown link whose target stays inside the vault is an error when Obsidian will not open it at that path: a path segment starts with a dot, or the path goes through a symlink whose real file Obsidian already shows at another vault path (in the vault itself, or under a vault folder symlink whose target is disjoint from the vault). jact resolves such links, but Obsidian skips them. For the symlink case, the message names the vault path Obsidian shows and the same paste-ready [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) fix. |
 
 Setting a rule to `"error"` enables it regardless of preset; `"off"` disables it. For example, a project can keep the Obsidian preset but opt out of one check:
 
@@ -228,7 +229,7 @@ Human output for a single file prints `Source:` and `Destination:` lines; a batc
 jact vault-link <note> [target] [--all] [--dry-run]
 ```
 
-`jact vault-link` fixes links that `obsidian/no-vault-escape-link` reports. It creates a symlink inside the vault, beside the note, that points at the file in the repository's main checkout, and gives the relative link to write. It uses the same escape check as the rule.
+`jact vault-link` fixes links that `obsidian/no-vault-escape-link` and `obsidian/no-unindexed-link` report. For a link that leaves the vault, it creates a symlink inside the vault, beside the note, that points at the file in the repository's main checkout. For a link that goes through a symlink Obsidian skips, it uses the vault path Obsidian already shows. Either way it gives the relative link to write. It uses the same checks as the rules.
 
 | Argument or flag | Default | Description |
 |---|---|---|
@@ -251,9 +252,9 @@ Exactly one of `[target]` or `--all` is required.
 
 **Link to write.** The path from the note's folder to the symlink (or to the reused vault path), with `/` separators and space, `(`, `)`, `%`, `#`, and `?` percent-encoded in each segment, followed by the original `#anchor`.
 
-**Output.** With a target, jact prints `created|reused|would create|would reuse symlink <symlink> -> <main-checkout file>`, or `already in vault: <vault path>`, then the link to write as the last line; the note is not edited. With `--all`, jact rewrites each escaping destination in place, keeping link text, title, and anchor, and prints `line <n>: <old target> -> <new target>` or `line <n>: refused: <reason>` per link, then `vault-link: <r> links rewritten, <c> symlinks created, <u> reused, <v> already in vault, <f> refused`. Refused links stay unchanged.
+**Output.** With a target, jact prints `created|reused|would create|would reuse symlink <symlink> -> <main-checkout file>`, or `already in vault: <vault path>`, then the link to write as the last line; the note is not edited. With `--all`, jact rewrites each destination Obsidian cannot open in place, keeping link text, title, and anchor, and prints `line <n>: <old target> -> <new target>` or `line <n>: refused: <reason>` per link, then `vault-link: <r> links rewritten, <c> symlinks created, <u> reused, <v> already in vault, <f> refused`. Refused links stay unchanged.
 
-**Exit codes:** `0` every requested link fixed (or planned, with `--dry-run`); `1` the target does not leave the vault, or a link was refused; `2` usage error, missing note, or a note outside any Obsidian vault.
+**Exit codes:** `0` every requested link fixed (or planned, with `--dry-run`); `1` Obsidian can already open the target, or a link was refused; `2` usage error, missing note, or a note outside any Obsidian vault.
 
 ---
 
@@ -419,6 +420,7 @@ Single-file `validate` writes its full report to a piped standard output before 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-10 | Added `obsidian/no-unindexed-link` for in-vault links through symlinks or dot folders Obsidian skips; `jact vault-link` rewrites those links to the vault path Obsidian shows |
 | 1.0.0-draft | 2026-10-10 | `jact vault-link` links to a vault path Obsidian already shows instead of making a symlink Obsidian would skip, and refuses symlinks under dot-named folders |
 | 1.0.0-draft | 2026-10-09 | Added `jact vault-link`; the `obsidian/no-vault-escape-link` message now names the exact `jact vault-link` fix command |
 | 1.0.0-draft | 2026-10-09 | Package plugins resolve with ESM import conditions; configuration errors escape control characters; `obsidian/no-reference-note-link` follows first-definition precedence |

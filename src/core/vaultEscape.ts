@@ -30,6 +30,29 @@ export function resolveVaultEscape(
 	noteRealDir: string,
 	vaultRoot: string,
 ): string | null {
+	const target = classifyTarget(raw, noteRealDir, vaultRoot);
+	return target?.inside === false ? target.path : null;
+}
+
+/**
+ * The absolute path a relative markdown link target resolves to when it stays
+ * inside the vault, read as {@link resolveVaultEscape} reads it; null for a
+ * target that leaves the vault or is not a local path.
+ */
+export function resolveVaultTarget(
+	raw: string,
+	noteRealDir: string,
+	vaultRoot: string,
+): string | null {
+	const target = classifyTarget(raw, noteRealDir, vaultRoot);
+	return target?.inside === true ? target.path : null;
+}
+
+function classifyTarget(
+	raw: string,
+	noteRealDir: string,
+	vaultRoot: string,
+): { path: string; inside: boolean } | null {
 	const written = (raw.split(ANCHOR_START, 1)[0] ?? "")
 		.replace(/\\([!-/:-@[-`{-~])/g, "$1")
 		.replace(/^<|>$/g, "");
@@ -37,16 +60,27 @@ export function resolveVaultEscape(
 	if (/^file:/i.test(target)) {
 		// Decode only the scheme: %23 or %3F in the path must stay part of the name.
 		try {
-			return fileURLToPath(written.replace(/^file%3A/i, "file:"));
+			return {
+				path: fileURLToPath(written.replace(/^file%3A/i, "file:")),
+				inside: false,
+			};
 		} catch {
-			return path.resolve(target.replace(/^file:(\/\/)?/i, "/"));
+			return {
+				path: path.resolve(target.replace(/^file:(\/\/)?/i, "/")),
+				inside: false,
+			};
 		}
 	}
 	if (target === "" || URL_SCHEME.test(target)) return null;
-	if (path.isAbsolute(target)) return path.normalize(target);
+	if (path.isAbsolute(target)) {
+		return { path: path.normalize(target), inside: false };
+	}
 	const resolved = path.resolve(noteRealDir, target);
-	if (target.includes(".paseo/worktrees/")) return resolved;
-	return isInside(vaultRoot, resolved) ? null : resolved;
+	return {
+		path: resolved,
+		inside:
+			!target.includes(".paseo/worktrees/") && isInside(vaultRoot, resolved),
+	};
 }
 
 function decode(text: string): string {

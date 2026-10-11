@@ -531,14 +531,18 @@ Exit Codes:
 program
 	.command("vault-link")
 	.description(
-		"Fix links that leave an Obsidian vault: create a symlink beside the note that points at the file in the repo's main checkout, and give (or write, with --all) the relative link",
+		"Fix links Obsidian cannot open: links that leave the vault get a symlink beside the note that points at the file in the repo's main checkout; links through a symlink Obsidian skips get the vault path Obsidian shows. Gives (or writes, with --all) the relative link",
 	)
 	.argument("<note>", "markdown note inside an Obsidian vault")
 	.argument(
 		"[target]",
-		"one escaping link target exactly as written in the note, optionally with #anchor",
+		"one link target exactly as written in the note, optionally with #anchor",
 	)
-	.option("--all", "fix every escaping link in the note in place", false)
+	.option(
+		"--all",
+		"fix every link in the note that Obsidian cannot open, in place",
+		false,
+	)
 	.option(
 		"--dry-run",
 		"print the plan without creating symlinks or writing the note",
@@ -557,16 +561,17 @@ Behavior:
   the file in the repo's main checkout, never a .paseo/worktrees path. A file
   outside any git repo links as <note dir>/sources/<file name>. An existing
   symlink to the same file is reused; anything else at that path is refused.
+  When Obsidian already shows the file (it lies in the vault, or under a vault
+  folder symlink), the link points at that vault path and no symlink is made.
+  This also fixes a link inside the vault that goes through a symlink Obsidian
+  skips. Paths under a folder or file whose name starts with a dot are
+  refused, because Obsidian does not index them.
   With a target, the last stdout line is the link to write; the note is not
-  edited. With --all, each escaping link in the note is rewritten in place.
+  edited. With --all, each such link in the note is rewritten in place.
 
 Exit Codes:
   0  Every requested link was fixed (or would be, with --dry-run)
-  When Obsidian already shows the file (it lies in the vault, or under a vault
-  folder symlink), the link points at that vault path and no symlink is made.
-  Paths under a folder or file whose name starts with a dot are refused,
-  because Obsidian does not index them.
-  1  A target does not leave the vault, or a link was refused
+  1  Obsidian can already open the target, or a link was refused
   2  Usage error, missing note, or the note is not inside an Obsidian vault
 `,
 	)
@@ -602,7 +607,7 @@ Exit Codes:
 			if (target !== undefined) {
 				const outcome = linker.link(target);
 				if (outcome === null) {
-					console.error("ERROR: target does not leave the vault");
+					console.error("ERROR: Obsidian can already open this target");
 					process.exitCode = 1;
 				} else if (outcome.kind === "refused") {
 					console.error(`ERROR: ${terminalText(outcome.reason)}`);
