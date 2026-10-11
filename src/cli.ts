@@ -552,7 +552,7 @@ program
 		"after",
 		`
 Examples:
-    $ jact vault-link notes/plan.md '/Users/me/code/repo/docs/spec.md#Ask'
+    $ jact vault-link notes/plan.md '/path/to/repo/docs/spec.md#Ask'
     $ jact vault-link notes/plan.md --all
     $ jact vault-link notes/plan.md --all --dry-run
 
