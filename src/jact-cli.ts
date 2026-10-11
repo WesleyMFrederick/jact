@@ -1,8 +1,9 @@
 /**
  * JactCli — orchestration and scope management for citation operations.
  *
- * This module exports the JactCli class only. Commander CLI wiring lives in
- * cli.ts so JactCli can be imported programmatically without activating Commander.
+ * This module exports the JactCli class, its outline and file-extraction
+ * outcome types, and the linked-content hint builder. Commander CLI wiring lives
+ * in cli.ts so JactCli can be imported programmatically without activating Commander.
  *
  * @module jact
  */

@@ -65,9 +65,10 @@ Boundary: neither file builds the parser, caches, checker, extractor, or validat
 
 ### Component Factory (`src/factories/`)
 
-The factory builds each component with production defaults and accepts a replacement for every dependency.
+The factory builds each component with production defaults. Most builders take optional replacements for their component dependencies; `null` or an omitted argument selects the default.
 
-- Tests inject fakes through the factory and the dependency interfaces, not through concrete classes.
+- Only two builders accept dependency interfaces: the checker builder (parsed-document lifecycle and file cache) and the linked-header query builder (backlink candidate filter). Tests inject fakes there without importing production classes.
+- The other builders, such as the extractor and validate workflow builders, are typed with concrete classes, so a replacement must be a production instance or match the class shape.
 - The extractor gets its eligibility rules in fixed precedence: stop marker, force marker, section link, CLI flag. Rules: [Extraction Eligibility Order](006-behavior.md#Extraction%20Eligibility%20Order).
 
 Boundary: the factory wires components; it holds no parsing, checking, or extraction logic.
@@ -185,6 +186,7 @@ The opt-out directive imports only syntax-tree types, so these imports form no c
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1.1 | 2026-10-11 | Component Factory states which builders accept dependency interfaces; the others take concrete classes |
 | 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
 | 1.0.0-draft | 2026-08-24 | Added the stateless backlink candidate filter and its excludes-only correctness boundary |
 | 1.0.0-draft | 2026-07-01 | Initial architecture doc, replacing per-component design-docs guides |
