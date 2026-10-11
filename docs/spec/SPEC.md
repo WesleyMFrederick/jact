@@ -50,6 +50,7 @@ This specification is the **canonical source of truth** for how jact is designed
 | `src/core/` | [`src/core` Living Specification](../../src/core/docs/spec/SPEC.md#%60src/core%60%20Living%20Specification) |
 | `src/validate/` | [validate Module Living Specification](../../src/validate/docs/spec/SPEC.md#validate%20Module%20Living%20Specification) |
 | `src/types/` | [`src/types` Living Specification](../../src/types/docs/spec/SPEC.md#%60src/types%60%20Living%20Specification) |
+| `src/cli.ts`, `src/jact-cli.ts`, `src/factories/` | [`src/cli` Living Specification](../../src/cli/docs/spec/SPEC.md#%60src/cli%60%20Living%20Specification) |
 
 ---
 
