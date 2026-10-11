@@ -1,6 +1,6 @@
 # `src/cli` Living Specification
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** done
 
 The command-line interface (CLI) layer turns a `jact` command line into calls on the domain components, then prints the result and sets the exit code. It spans `src/cli.ts`, `src/jact-cli.ts`, and `src/factories/`. Command contracts live in the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -82,3 +82,4 @@ Each row records one version of this module spec.
 | Version | Changes |
 |---|---|
 | 1.0.0 | 2026-10-11: Initial module spec for the CLI layer |
+| 1.1.0 | 2026-10-11: `vault-link --all` no longer writes the note itself; the core vault link fixer applies the plan |
