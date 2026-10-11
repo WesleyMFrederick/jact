@@ -337,7 +337,7 @@ jact extract header <target-file> <header-name> [options]
 
 With `--extract-linked-content`, the markdown output labels each block `Source: file:start-end`, and each linked block `Via: file:line` (the link that pulled it in). Next-step hints and the `--max-chars` content map work as in [`jact extract file <target-file>`](#`jact extract file <target-file>`). The header content map also lists backlinks and failures.
 
-**Exit codes:** `0` header extracted and all linked content resolved; `1` header not found, or some linked content failed; `2` system error, such as a missing file.
+**Exit codes:** `0` header extracted and all linked content resolved; `1` header not found, or some linked content failed; `2` system error, such as a missing file, or a usage error: with `--extract-linked-content`, a target outside the resolved scope (the message names the `--scope` to retry with).
 
 ---
 
@@ -421,6 +421,7 @@ Single-file `validate` writes its full report to a piped standard output before 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-11 | `extract header --extract-linked-content` with a target outside the resolved scope exits `2` (usage error) instead of `1` |
 | 1.0.0-draft | 2026-10-11 | `validate --format` rejects values other than `cli` and `json` instead of printing CLI output |
 | 1.0.0-draft | 2026-10-11 | Added `obsidian/no-unstable-symlink-link` for links through file or folder symlinks into `.paseo/worktrees/` or folder symlinks inside a `sources` folder; `jact vault-link` no longer reuses such folder symlinks, relinks links through such symlinks, and refuses when only such a folder symlink shows the file |
 | 1.0.0-draft | 2026-10-10 | Added `obsidian/no-unindexed-link` for in-vault links through symlinks or dot folders Obsidian skips; `jact vault-link` rewrites those links to the vault path Obsidian shows |

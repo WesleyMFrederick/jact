@@ -539,7 +539,8 @@ export class JactCli {
 					console.error(
 						`Target file is outside the resolved scope. Retry with --scope ${shellArgument(path.dirname(canonicalTarget))}.`,
 					);
-					process.exitCode = 1;
+					// The target and scope arguments conflict: a usage error, not a content failure.
+					process.exitCode = 2;
 					return undefined;
 				}
 			} else {

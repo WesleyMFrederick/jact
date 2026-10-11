@@ -998,7 +998,7 @@ Examples:
 Exit Codes:
   0  Header extracted successfully; all linked content resolved
   1  Header failed to resolve, or some linked content failed to resolve
-  2  System error (file not found, permission denied, incomplete scope scan)
+  2  System error (file not found, permission denied, incomplete scope scan), or a target outside scope with --extract-linked-content
 `,
 	)
 	.action(
