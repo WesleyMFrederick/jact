@@ -448,6 +448,15 @@ describe("jact vault-link — single target", () => {
 		const symlinkPath = path.join(notesDir, "sources", "new\nline-repo", "docs", "spec.md");
 		expect(readlinkSync(symlinkPath)).toBe(target);
 	});
+
+	it("Given a target inside the vault that does not exist, When vault-link runs on it, Then it refuses with exit 1 and names the missing path", () => {
+		writeFileSync(note, "See [gone](missing.md).\n");
+
+		const result = jact(["vault-link", note, "missing.md"]);
+
+		expect(result.status).toBe(1);
+		expect(result.stderr).toContain(`${path.join(notesDir, "missing.md")} does not exist`);
+	});
 });
 
 describe("jact vault-link --all", () => {

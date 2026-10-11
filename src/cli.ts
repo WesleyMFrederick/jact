@@ -28,6 +28,7 @@ import {
 	VaultLinker,
 	vaultNote,
 } from "./core/VaultLink/vaultLink.js";
+import { resolveVaultTarget } from "./core/vaultEscape.js";
 import { createRuleSetResolver } from "./core/ValidationRules/loadConfig.js";
 import {
 	createMarkdownParser,
@@ -612,7 +613,16 @@ Exit Codes:
 			if (target !== undefined) {
 				const outcome = linker.link(target);
 				if (outcome === null) {
-					console.error("ERROR: Obsidian can already open this target");
+					const inside = resolveVaultTarget(
+						target,
+						context.noteRealDir,
+						context.vaultRoot,
+					);
+					console.error(
+						inside !== null && !existsSync(inside)
+							? `ERROR: ${terminalText(inside)} does not exist`
+							: "ERROR: Obsidian can already open this target",
+					);
 					process.exitCode = 1;
 				} else if (outcome.kind === "refused") {
 					console.error(`ERROR: ${terminalText(outcome.reason)}`);
