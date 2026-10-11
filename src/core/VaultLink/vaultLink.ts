@@ -182,6 +182,9 @@ export class VaultLinker {
 	 */
 	private map(resolved: string): Mapping {
 		const exists = fs.existsSync(resolved);
+		if (exists && !fs.statSync(resolved).isFile()) {
+			return { kind: "refused", reason: `${resolved} is not a file` };
+		}
 		const escaping = exists ? fs.realpathSync(resolved) : resolved;
 		const shown = exists ? this.view.shownAt(escaping) : null;
 		if (shown !== null && (shown.via === null || shown.via.unstable === null)) {
@@ -249,6 +252,9 @@ export class VaultLinker {
 				kind: "refused",
 				reason: `main checkout has no ${mapped}; land the file on the main checkout first`,
 			};
+		}
+		if (!fs.statSync(mapped).isFile()) {
+			return { kind: "refused", reason: `${mapped} is not a file` };
 		}
 		const realMapped = fs.realpathSync(mapped);
 		const linkedWorktree = worktrees?.slice(1).find((linked) => {

@@ -560,6 +560,21 @@ describe("jact vault-link --all", () => {
 		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
 		expect(readFileSync(note, "utf8")).toBe(original);
 	});
+
+	it("Given a note links folders outside the vault, inside and outside a repo, When --all runs, Then it refuses both as not files, creates nothing under sources, and leaves the note unchanged", () => {
+		const outsideFolder = path.join(root, "outside-folder");
+		mkdirSync(outsideFolder);
+		const original = `- [outside](${outsideFolder})\n- [docs](${path.join(mainCheckout, "docs")})\n`;
+		writeFileSync(note, original);
+
+		const result = jact(["vault-link", note, "--all"]);
+
+		expect(result.status).toBe(1);
+		expect(result.stdout).toContain(`${outsideFolder} is not a file`);
+		expect(result.stdout).toContain(`${path.join(mainCheckout, "docs")} is not a file`);
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+		expect(readFileSync(note, "utf8")).toBe(original);
+	});
 });
 
 describe("obsidian/no-vault-escape-link message", () => {
