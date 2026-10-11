@@ -65,7 +65,10 @@ type Mapping =
 export class VaultLinker {
 	readonly note: VaultNote;
 	private readonly view: ObsidianVaultView;
-	private worktreeLists = new Map<string, string[] | null>();
+	private worktreeLists = new Map<
+		string,
+		{ bare: boolean; paths: string[] } | null
+	>();
 	private symlinks = new Map<
 		string,
 		{ mapped: string; status: "created" | "reused" }
@@ -232,7 +235,13 @@ export class VaultLinker {
 			};
 		}
 		const worktrees = this.worktrees(toplevel);
-		const main = worktrees?.[0];
+		if (worktrees?.bare) {
+			return {
+				kind: "refused",
+				reason: `bare repository: no main checkout for ${toplevel}`,
+			};
+		}
+		const main = worktrees?.paths[0];
 		if (main === undefined) {
 			return {
 				kind: "refused",
@@ -263,7 +272,7 @@ export class VaultLinker {
 			return { kind: "refused", reason: `${mapped} is not a file` };
 		}
 		const realMapped = fs.realpathSync(mapped);
-		const linkedWorktree = worktrees?.slice(1).find((linked) => {
+		const linkedWorktree = worktrees?.paths.slice(1).find((linked) => {
 			let realLinked = linked;
 			try {
 				realLinked = fs.realpathSync(linked);
@@ -309,15 +318,36 @@ export class VaultLinker {
 		};
 	}
 
-	/** Worktree paths of a repository, main checkout first. */
-	private worktrees(toplevel: string): string[] | null {
+	/**
+	 * Worktree paths of a repository, main checkout first, from NUL-separated
+	 * porcelain output so a path may hold a newline. `bare` is true when the
+	 * first entry is a bare repository, which has no main checkout; it is
+	 * left out of `paths`.
+	 */
+	private worktrees(
+		toplevel: string,
+	): { bare: boolean; paths: string[] } | null {
 		let worktrees = this.worktreeLists.get(toplevel);
 		if (worktrees === undefined) {
-			const list = git(toplevel, ["worktree", "list", "--porcelain"]);
-			worktrees =
-				list === null
-					? null
-					: [...list.matchAll(/^worktree (.+)$/gm)].map((match) => match[1] ?? "");
+			const list = git(toplevel, ["worktree", "list", "--porcelain", "-z"]);
+			if (list === null) {
+				worktrees = null;
+			} else {
+				const entries: { path: string; bare: boolean }[] = [];
+				let current: { path: string; bare: boolean } | undefined;
+				for (const field of list.split("\0")) {
+					if (field.startsWith("worktree ")) {
+						current = { path: field.slice("worktree ".length), bare: false };
+						entries.push(current);
+					} else if (field === "bare" && current !== undefined) {
+						current.bare = true;
+					}
+				}
+				worktrees = {
+					bare: entries[0]?.bare ?? false,
+					paths: entries.filter((entry) => !entry.bare).map((entry) => entry.path),
+				};
+			}
 			this.worktreeLists.set(toplevel, worktrees);
 		}
 		return worktrees;

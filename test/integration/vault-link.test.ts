@@ -420,6 +420,38 @@ describe("jact vault-link — single target", () => {
 		const symlinkPath = path.join(notesDir, "sources", REPO_NAME, "docs", "spec.md");
 		expect(readlinkSync(symlinkPath)).toBe(path.join(mainCheckout, "docs", "spec.md"));
 	});
+
+	it("Given a bare repository with a linked worktree, When vault-link runs on a file in that worktree, Then it refuses with exit 1 because a bare repository has no main checkout", () => {
+		const bare = path.join(root, "bare.git");
+		git(root, ["clone", "--bare", mainCheckout, bare]);
+		const checkout = path.join(root, "bare-main");
+		git(bare, ["worktree", "add", checkout, "main"]);
+		const target = path.join(checkout, "docs", "spec.md");
+		writeFileSync(note, `See [spec](${target}).\n`);
+
+		const result = jact(["vault-link", note, target]);
+
+		expect(result.status).toBe(1);
+		expect(result.stderr).toContain("bare repository: no main checkout");
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+	});
+
+	it("Given a repository folder whose name holds a newline, When vault-link runs on a file in it, Then the symlink points at that file", () => {
+		const repo = path.join(root, "new\nline-repo");
+		mkdirSync(path.join(repo, "docs"), { recursive: true });
+		const target = path.join(repo, "docs", "spec.md");
+		writeFileSync(target, "# Spec\n");
+		git(repo, ["init"]);
+		git(repo, ["add", "."]);
+		git(repo, ["commit", "-m", "init"]);
+		writeFileSync(note, "See the spec.\n");
+
+		const result = jact(["vault-link", note, target]);
+
+		expect(result.status, result.stderr).toBe(0);
+		const symlinkPath = path.join(notesDir, "sources", "new\nline-repo", "docs", "spec.md");
+		expect(readlinkSync(symlinkPath)).toBe(target);
+	});
 });
 
 describe("jact vault-link --all", () => {
