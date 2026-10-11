@@ -58,7 +58,7 @@ The configuration keys are:
 
 Only the user config may list `plugins`; a project config that lists them exits `2` before any plugin code runs because a downloaded repository could run code with your permissions.
 
-The default preset is `commonmark`, which enables no additional rules. It does not change the parser's supported syntax or turn off ordinary link checks. The `obsidian` preset enables all three built-in rules:
+The default preset is `commonmark`, which enables no additional rules. It does not change the parser's supported syntax or turn off ordinary link checks. The `obsidian` preset enables all built-in rules:
 
 | Rule ID | Check |
 |---|---|

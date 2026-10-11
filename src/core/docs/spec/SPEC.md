@@ -1,6 +1,6 @@
 # `src/core` Living Specification
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 **Status:** done
 
 `src/core` is the domain layer of jact: it parses Markdown, checks links, extracts linked content, and plans or applies file edits. It has no command registration, no output formatting, and no exit codes. Those belong to the command-line interface (CLI) layer in the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
