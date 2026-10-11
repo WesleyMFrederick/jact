@@ -110,7 +110,7 @@ The screen only drops files. jact parses every remaining file and resolves each 
 
 A cross-document link's file check returns the first rule that applies. A path with malformed percent-encoding fails first with `Malformed percent-encoding in link path`.
 
-jact first picks a candidate file, trying in order: `~/` from the home folder; the path relative to the source note (decoded, then raw); the Obsidian vault-absolute form (`0_SoftwareDevelopment/...`); and the path relative to the note's real location when the note is a symbolic link. If none exists, the candidate is the plain relative path.
+jact first picks a candidate file, trying in order: `~/` from the home folder; the path relative to the source note (decoded, then raw); the Obsidian vault-absolute form (`0_SoftwareDevelopment/...`); and the path relative to the note's real location when the note is a symbolic link. If none exists, the candidate is the plain relative path. A note inside an Obsidian vault (a folder above its real location has `.obsidian`) always resolves from its real location, as Obsidian does, so a link that works only through a symbolic link path to the note fails.
 
 | # | Rule | Result |
 |---|---|---|

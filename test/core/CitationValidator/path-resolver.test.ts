@@ -1,3 +1,13 @@
+import {
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { PathResolver } from "../../../src/core/CitationValidator/PathResolver.js";
 import type { LinkObject } from "../../../src/types/citationTypes.js";
@@ -71,9 +81,7 @@ describe("PathResolver complete outcomes", () => {
 		).toBe(true);
 		expect(subject.isObsidianAbsolutePath("/absolute/path.md")).toBe(false);
 		expect(subject.isObsidianAbsolutePath("relative/file.md")).toBe(true);
-		expect(subject.isObsidianAbsolutePath("/starts/with/slash.md")).toBe(
-			false,
-		);
+		expect(subject.isObsidianAbsolutePath("/starts/with/slash.md")).toBe(false);
 	});
 
 	it("returns a complete warning outcome for folder targets", () => {
@@ -114,5 +122,33 @@ describe("PathResolver complete outcomes", () => {
 			"/base/source.md",
 		);
 		expect(info).toContain("Tried:");
+	});
+});
+
+describe("PathResolver for notes inside an Obsidian vault", () => {
+	it("Given a vault note reached through a symlinked folder, When a relative link exists only beside the symlink, Then it is an error because Obsidian resolves from the note's real folder", () => {
+		const root = realpathSync(
+			mkdtempSync(path.join(tmpdir(), "jact-vault-alias-")),
+		);
+		try {
+			const vaultNotes = path.join(root, "vault", "notes");
+			mkdirSync(path.join(root, "vault", ".obsidian"), { recursive: true });
+			mkdirSync(vaultNotes);
+			const note = path.join(vaultNotes, "note.md");
+			writeFileSync(note, "[x](../shadow.md)\n");
+			const repo = path.join(root, "repo");
+			mkdirSync(repo);
+			writeFileSync(path.join(repo, "shadow.md"), "# Shadow\n");
+			symlinkSync(vaultNotes, path.join(repo, "docs"), "dir");
+
+			const outcome = resolver().resolveCitationPath(
+				citation("../shadow.md"),
+				path.join(repo, "docs", "note.md"),
+			);
+
+			expect(outcome.kind).toBe("error");
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });
