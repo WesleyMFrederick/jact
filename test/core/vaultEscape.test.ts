@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolveVaultEscape } from "../../src/core/vaultEscape.js";
+import { destinationSpan, resolveVaultEscape } from "../../src/core/vaultEscape.js";
 
 const vault = "/vault";
 const noteDir = "/vault/notes";
@@ -24,5 +24,27 @@ describe("resolveVaultEscape", () => {
 		expect(resolveVaultEscape("../../repo/spec\\_v1\\.md#A", noteDir, vault)).toBe(
 			path.resolve(noteDir, "../../repo/spec_v1.md"),
 		);
+	});
+});
+
+describe("destinationSpan", () => {
+	it("Given an inline link whose title holds escaped quotes, When located, Then the destination is the path alone and the title stays after it", () => {
+		const fullMatch = '[q](/abs/e.md "say \\"hi\\" now")';
+		const span = destinationSpan(fullMatch);
+		expect(span?.text).toBe("/abs/e.md");
+		expect(fullMatch.slice(span?.end)).toBe(' "say \\"hi\\" now")');
+	});
+
+	it("Given a reference definition whose title holds escaped quotes, When located, Then the destination is the path alone", () => {
+		const span = destinationSpan('[q]: /abs/e.md "say \\"hi\\" now"');
+		expect(span?.text).toBe("/abs/e.md");
+	});
+
+	it("Given an angle destination holding an escaped >, When located, Then the destination runs to the first unescaped > and resolves to the unescaped path", () => {
+		const fullMatch = "[q](</abs/a\\>b.md>)";
+		const span = destinationSpan(fullMatch);
+		expect(span?.text).toBe("/abs/a\\>b.md");
+		expect(span?.end).toBe(fullMatch.length - 1);
+		expect(resolveVaultEscape(span?.text ?? "", noteDir, vault)).toBe("/abs/a>b.md");
 	});
 });

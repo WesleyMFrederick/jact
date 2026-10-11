@@ -126,14 +126,20 @@ export function destinationSpan(fullMatch: string): DestinationSpan | null {
 	let start = close + 2;
 	while (/\s/.test(fullMatch[start] ?? "")) start++;
 	if (fullMatch[start] === "<") {
-		const end = fullMatch.indexOf(">", start);
-		if (end < 0) return null;
+		let end = start + 1;
+		while (end < fullMatch.length && fullMatch[end] !== ">") {
+			end += fullMatch[end] === "\\" ? 2 : 1;
+		}
+		if (end >= fullMatch.length) return null;
 		return { start, end: end + 1, text: fullMatch.slice(start + 1, end) };
 	}
 	const rest = inline
 		? fullMatch.slice(start, fullMatch.lastIndexOf(")"))
 		: fullMatch.slice(start);
-	const titled = /^(\S+)(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*$/.exec(rest);
+	const titled =
+		/^(\S+)(?:\s+(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\((?:[^()\\]|\\.)*\)))?\s*$/.exec(
+			rest,
+		);
 	const text = titled?.[1] ?? rest.trimEnd();
 	if (text === "") return null;
 	return { start, end: start + text.length, text };
