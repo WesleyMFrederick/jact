@@ -219,22 +219,17 @@ describe("jact vault-link — single target", () => {
 		expect(existsSync(path.join(outside, REPO_NAME))).toBe(false);
 	});
 
-	it("Given the main checkout file is a symlink into a linked worktree, When vault-link runs on it, Then it refuses with exit 1 and creates no symlink", () => {
-		writeFileSync(path.join(worktree, "docs", "wt-only.md"), "# Only\n");
-		symlinkSync(
-			path.join(worktree, "docs", "wt-only.md"),
-			path.join(mainCheckout, "docs", "linked.md"),
-			"file",
-		);
-		const target = path.join(mainCheckout, "docs", "linked.md");
-		writeFileSync(note, `See [linked](${target}).\n`);
+	it("Given the main checkout file is a symlink into a linked worktree, When vault-link runs on it, Then the worktree guard refuses with exit 1 and creates no symlink", () => {
+		const target = path.join(mainCheckout, "docs", "spec.md");
+		rmSync(target);
+		symlinkSync(path.join(worktree, "docs", "spec.md"), target, "file");
+		writeFileSync(note, `See [spec](${target}).\n`);
 
 		const result = jact(["vault-link", note, target]);
 
 		expect(result.status).toBe(1);
-		expect(
-			isSymlink(path.join(notesDir, "sources", REPO_NAME, "docs", "linked.md")),
-		).toBe(false);
+		expect(result.stderr).toContain("inside a worktree");
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
 	});
 
 	it("Given a file symlink outside any repo points into a linked worktree, When vault-link runs on the symlink, Then the real worktree location maps to the main checkout", () => {
