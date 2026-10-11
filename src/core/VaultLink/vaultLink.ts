@@ -158,7 +158,12 @@ export class VaultLinker {
 		};
 	}
 
-	/** Relative, percent-encoded link from the note to `to`, keeping the written `#anchor`. */
+	/**
+	 * Relative, percent-encoded link from the note to `to`, keeping the written
+	 * `#anchor`. Every character that would end, break or change the link
+	 * destination is encoded: `% ( ) # ? \ < >`, whitespace and control
+	 * characters.
+	 */
 	private relativeLink(to: string, written: string): string {
 		const hash = written.search(ANCHOR_START);
 		return (
@@ -166,13 +171,11 @@ export class VaultLinker {
 				.relative(this.note.noteRealDir, to)
 				.split(path.sep)
 				.map((segment) =>
-					segment
-						.replaceAll("%", "%25")
-						.replaceAll(" ", "%20")
-						.replaceAll("(", "%28")
-						.replaceAll(")", "%29")
-						.replaceAll("#", "%23")
-						.replaceAll("?", "%3F"),
+					segment.replace(/[%()#?\\<>\s\p{Cc}]/gu, (character) =>
+						[...Buffer.from(character)]
+							.map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`)
+							.join(""),
+					),
 				)
 				.join("/") + (hash < 0 ? "" : written.slice(hash))
 		);

@@ -21,6 +21,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { shellArgument } from "../../src/shellArgument.js";
+import { resolveVaultTarget } from "../../src/core/vaultEscape.js";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const cliPath = path.resolve(testDir, "../../dist/cli.js");
@@ -618,6 +619,28 @@ describe("jact vault-link --all", () => {
 		expect(result.stdout).toContain(`${path.join(mainCheckout, "docs")} is not a file`);
 		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
 		expect(readFileSync(note, "utf8")).toBe(original);
+	});
+
+	it("Given file names holding a tab, a newline and a backslash, When --all links them, Then each new link reads back as its symlink and validate passes", () => {
+		const outside = path.join(root, "outside");
+		mkdirSync(outside);
+		const names = ["tab\tname.md", "new\nline.md", "back\\.md"];
+		for (const name of names) writeFileSync(path.join(outside, name), "# Doc\n");
+		writeFileSync(
+			note,
+			`- [a](${outside}/tab%09name.md)\n- [b](${outside}/new%0Aline.md)\n- [c](${outside}/back%5C.md)\n`,
+		);
+
+		const result = jact(["vault-link", note, "--all"]);
+
+		expect(result.status, result.stderr).toBe(0);
+		const targets = [...readFileSync(note, "utf8").matchAll(/\]\(([^)]*)\)/g)].map(
+			(match) => match[1] ?? "",
+		);
+		expect(targets.map((target) => resolveVaultTarget(target, notesDir, vault))).toEqual(
+			names.map((name) => path.join(notesDir, "sources", name)),
+		);
+		expect(jact(["validate", note]).status).toBe(0);
 	});
 });
 
