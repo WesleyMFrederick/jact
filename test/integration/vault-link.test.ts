@@ -70,7 +70,10 @@ function git(cwd: string, args: string[]): void {
 	}
 }
 
-function jact(args: string[], env: NodeJS.ProcessEnv = {}): SpawnSyncReturns<string> {
+function jact(
+	args: string[],
+	env: NodeJS.ProcessEnv = {},
+): SpawnSyncReturns<string> {
 	return spawnSync(process.execPath, [cliPath, ...args], {
 		cwd: root,
 		encoding: "utf8",
@@ -414,8 +417,16 @@ describe("jact vault-link — single target", () => {
 		});
 
 		expect(result.status, result.stderr).toBe(0);
-		const symlinkPath = path.join(notesDir, "sources", REPO_NAME, "docs", "spec.md");
-		expect(readlinkSync(symlinkPath)).toBe(path.join(mainCheckout, "docs", "spec.md"));
+		const symlinkPath = path.join(
+			notesDir,
+			"sources",
+			REPO_NAME,
+			"docs",
+			"spec.md",
+		);
+		expect(readlinkSync(symlinkPath)).toBe(
+			path.join(mainCheckout, "docs", "spec.md"),
+		);
 	});
 
 	it("Given a bare repository with a linked worktree, When vault-link runs on a file in that worktree, Then it refuses with exit 1 because a bare repository has no main checkout", () => {
@@ -446,7 +457,13 @@ describe("jact vault-link — single target", () => {
 		const result = jact(["vault-link", note, target]);
 
 		expect(result.status, result.stderr).toBe(0);
-		const symlinkPath = path.join(notesDir, "sources", "new\nline-repo", "docs", "spec.md");
+		const symlinkPath = path.join(
+			notesDir,
+			"sources",
+			"new\nline-repo",
+			"docs",
+			"spec.md",
+		);
 		expect(readlinkSync(symlinkPath)).toBe(target);
 	});
 
@@ -456,7 +473,9 @@ describe("jact vault-link — single target", () => {
 		const result = jact(["vault-link", note, "missing.md"]);
 
 		expect(result.status).toBe(1);
-		expect(result.stderr).toContain(`${path.join(notesDir, "missing.md")} does not exist`);
+		expect(result.stderr).toContain(
+			`${path.join(notesDir, "missing.md")} does not exist`,
+		);
 	});
 });
 
@@ -626,7 +645,9 @@ describe("jact vault-link --all", () => {
 
 		expect(result.status).toBe(1);
 		expect(result.stdout).toContain(`${outsideFolder} is not a file`);
-		expect(result.stdout).toContain(`${path.join(mainCheckout, "docs")} is not a file`);
+		expect(result.stdout).toContain(
+			`${path.join(mainCheckout, "docs")} is not a file`,
+		);
 		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
 		expect(readFileSync(note, "utf8")).toBe(original);
 	});
@@ -635,7 +656,8 @@ describe("jact vault-link --all", () => {
 		const outside = path.join(root, "outside");
 		mkdirSync(outside);
 		const names = ["tab\tname.md", "new\nline.md", "back\\.md"];
-		for (const name of names) writeFileSync(path.join(outside, name), "# Doc\n");
+		for (const name of names)
+			writeFileSync(path.join(outside, name), "# Doc\n");
 		writeFileSync(
 			note,
 			`- [a](${outside}/tab%09name.md)\n- [b](${outside}/new%0Aline.md)\n- [c](${outside}/back%5C.md)\n`,
@@ -644,38 +666,41 @@ describe("jact vault-link --all", () => {
 		const result = jact(["vault-link", note, "--all"]);
 
 		expect(result.status, result.stderr).toBe(0);
-		const targets = [...readFileSync(note, "utf8").matchAll(/\]\(([^)]*)\)/g)].map(
-			(match) => match[1] ?? "",
-		);
-		expect(targets.map((target) => resolveVaultTarget(target, notesDir, vault))).toEqual(
-			names.map((name) => path.join(notesDir, "sources", name)),
-		);
+		const targets = [
+			...readFileSync(note, "utf8").matchAll(/\]\(([^)]*)\)/g),
+		].map((match) => match[1] ?? "");
+		expect(
+			targets.map((target) => resolveVaultTarget(target, notesDir, vault)),
+		).toEqual(names.map((name) => path.join(notesDir, "sources", name)));
 		expect(jact(["validate", note]).status).toBe(0);
 	});
 
-	it.runIf(tmpIsCaseInsensitive)("Given two targets whose symlink paths differ only by case on a case-insensitive disk, When --all runs with and without --dry-run, Then both runs refuse the second link the same way", () => {
-		const outside = path.join(root, "outside");
-		mkdirSync(path.join(outside, "one"), { recursive: true });
-		mkdirSync(path.join(outside, "two"), { recursive: true });
-		writeFileSync(path.join(outside, "one", "Same.md"), "# One\n");
-		writeFileSync(path.join(outside, "two", "same.md"), "# Two\n");
-		writeFileSync(
-			note,
-			`- [one](${outside}/one/Same.md)\n- [two](${outside}/two/same.md)\n`,
-		);
+	it.runIf(tmpIsCaseInsensitive)(
+		"Given two targets whose symlink paths differ only by case on a case-insensitive disk, When --all runs with and without --dry-run, Then both runs refuse the second link the same way",
+		() => {
+			const outside = path.join(root, "outside");
+			mkdirSync(path.join(outside, "one"), { recursive: true });
+			mkdirSync(path.join(outside, "two"), { recursive: true });
+			writeFileSync(path.join(outside, "one", "Same.md"), "# One\n");
+			writeFileSync(path.join(outside, "two", "same.md"), "# Two\n");
+			writeFileSync(
+				note,
+				`- [one](${outside}/one/Same.md)\n- [two](${outside}/two/same.md)\n`,
+			);
 
-		const dryRun = jact(["vault-link", note, "--all", "--dry-run"]);
-		const run = jact(["vault-link", note, "--all"]);
+			const dryRun = jact(["vault-link", note, "--all", "--dry-run"]);
+			const run = jact(["vault-link", note, "--all"]);
 
-		for (const result of [dryRun, run]) {
-			expect(result.status).toBe(1);
-			expect(result.stdout).toContain("line 2: refused");
-			expect(lastLine(result.stdout)).toContain("1 links rewritten");
-		}
-		expect(readlinkSync(path.join(notesDir, "sources", "Same.md"))).toBe(
-			path.join(outside, "one", "Same.md"),
-		);
-	});
+			for (const result of [dryRun, run]) {
+				expect(result.status).toBe(1);
+				expect(result.stdout).toContain("line 2: refused");
+				expect(lastLine(result.stdout)).toContain("1 links rewritten");
+			}
+			expect(readlinkSync(path.join(notesDir, "sources", "Same.md"))).toBe(
+				path.join(outside, "one", "Same.md"),
+			);
+		},
+	);
 });
 
 describe("obsidian/no-vault-escape-link message", () => {

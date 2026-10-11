@@ -184,7 +184,10 @@ export class VaultLinker {
 				.map((segment) =>
 					segment.replace(/[%()#?\\<>\s\p{Cc}]/gu, (character) =>
 						[...Buffer.from(character)]
-							.map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, "0")}`)
+							.map(
+								(byte) =>
+									`%${byte.toString(16).toUpperCase().padStart(2, "0")}`,
+							)
 							.join(""),
 					),
 				)
@@ -359,7 +362,9 @@ export class VaultLinker {
 				}
 				worktrees = {
 					bare: entries[0]?.bare ?? false,
-					paths: entries.filter((entry) => !entry.bare).map((entry) => entry.path),
+					paths: entries
+						.filter((entry) => !entry.bare)
+						.map((entry) => entry.path),
 				};
 			}
 			this.worktreeLists.set(toplevel, worktrees);
@@ -469,7 +474,9 @@ export interface PlannedSymlink {
  */
 export function createVaultSymlinks(
 	planned: readonly PlannedSymlink[],
-): { kind: "created"; remove: () => void } | { kind: "refused"; reason: string } {
+):
+	| { kind: "created"; remove: () => void }
+	| { kind: "refused"; reason: string } {
 	const made: string[] = [];
 	const remove = () => {
 		for (const madePath of [...made].reverse()) {

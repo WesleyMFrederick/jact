@@ -108,7 +108,11 @@ describe("obsidian/no-unstable-symlink-link", () => {
 	it("Given a sources folder symlink nested inside a stable vault folder symlink, When a note links through the inner symlink, Then one finding names the inner sources folder symlink", () => {
 		const external = path.join(root, "external");
 		mkdirSync(path.join(external, "sources"), { recursive: true });
-		symlinkSync(path.join(root, "skills", "lfg"), path.join(external, "sources", "lfg"), "dir");
+		symlinkSync(
+			path.join(root, "skills", "lfg"),
+			path.join(external, "sources", "lfg"),
+			"dir",
+		);
 		symlinkSync(external, path.join(vault, "external"), "dir");
 		const findings = check("[l](../external/sources/lfg/SKILL.md)\n");
 		expect(findings).toHaveLength(1);
@@ -118,7 +122,11 @@ describe("obsidian/no-unstable-symlink-link", () => {
 
 	it("Given a vault folder symlink whose target holds a symlink back to itself, When a note links through it, Then the scan ends and no finding is reported", () => {
 		symlinkSync(path.join(root, "repo"), path.join(vault, "repo-docs"), "dir");
-		symlinkSync(path.join(root, "repo"), path.join(root, "repo", "loop"), "dir");
+		symlinkSync(
+			path.join(root, "repo"),
+			path.join(root, "repo", "loop"),
+			"dir",
+		);
 		expect(check("[d](../repo-docs/docs/spec.md)\n")).toEqual([]);
 	});
 });

@@ -1,6 +1,9 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { destinationSpan, resolveVaultEscape } from "../../src/core/vaultEscape.js";
+import {
+	destinationSpan,
+	resolveVaultEscape,
+} from "../../src/core/vaultEscape.js";
 
 const vault = "/vault";
 const noteDir = "/vault/notes";
@@ -45,6 +48,8 @@ describe("destinationSpan", () => {
 		const span = destinationSpan(fullMatch);
 		expect(span?.text).toBe("/abs/a\\>b.md");
 		expect(span?.end).toBe(fullMatch.length - 1);
-		expect(resolveVaultEscape(span?.text ?? "", noteDir, vault)).toBe("/abs/a>b.md");
+		expect(resolveVaultEscape(span?.text ?? "", noteDir, vault)).toBe(
+			"/abs/a>b.md",
+		);
 	});
 });
