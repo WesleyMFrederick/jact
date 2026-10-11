@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import path from "node:path";
 import type { LinkObject } from "../../types/citationTypes.js";
-import { ObsidianVaultView } from "../obsidianVaultView.js";
+import { ObsidianVaultView, unstableReason } from "../obsidianVaultView.js";
 import { findVaultRoot } from "../resolveScope.js";
 import {
 	ANCHOR_START,
@@ -92,13 +92,21 @@ export class VaultLinker {
 			mapping = this.map(escaping);
 		} else {
 			const inside = resolveVaultTarget(written, noteRealDir, vaultRoot);
-			const reason = inside === null ? null : this.view.unindexed(inside);
-			if (inside === null || reason === null) return null;
-			// A dot path maps to itself so the dot check below refuses it.
-			mapping = {
-				kind: "in-vault",
-				vaultPath: reason.kind === "dot" ? inside : reason.vaultPath,
-			};
+			if (inside === null) return null;
+			const reason = this.view.unindexed(inside);
+			if (reason?.kind === "dot") {
+				// A dot path maps to itself so the dot check below refuses it.
+				mapping = { kind: "in-vault", vaultPath: inside };
+			} else if (
+				(reason === null && this.view.unstableAlias(inside) === null) ||
+				!fs.existsSync(inside)
+			) {
+				return null;
+			} else {
+				// Obsidian skips this path, or a folder symlink on it can break:
+				// link the real file the way an escaping link is linked.
+				mapping = this.map(inside);
+			}
 		}
 		if (mapping.kind === "refused") return mapping;
 		const placedAt =
@@ -182,8 +190,10 @@ export class VaultLinker {
 	private map(resolved: string): Mapping {
 		const exists = fs.existsSync(resolved);
 		const escaping = exists ? fs.realpathSync(resolved) : resolved;
-		const vaultPath = exists ? this.view.shownAt(escaping) : null;
-		if (vaultPath !== null) return { kind: "in-vault", vaultPath };
+		const shown = exists ? this.view.shownAt(escaping) : null;
+		if (shown !== null && (shown.via === null || shown.via.unstable === null)) {
+			return { kind: "in-vault", vaultPath: shown.vaultPath };
+		}
 		const sourcesDir = path.join(this.note.noteRealDir, "sources");
 		const worktree = PASEO_WORKTREE.exec(escaping)?.[1];
 		if (worktree !== undefined && !fs.existsSync(worktree)) {
@@ -209,11 +219,11 @@ export class VaultLinker {
 			if (!fs.existsSync(escaping)) {
 				return { kind: "refused", reason: `${escaping} does not exist` };
 			}
-			return {
-				kind: "mapped",
-				mapped: escaping,
-				symlinkPath: path.join(sourcesDir, path.basename(escaping)),
-			};
+			return this.reuseOrLink(
+				escaping,
+				escaping,
+				path.join(sourcesDir, path.basename(escaping)),
+			);
 		}
 
 		if (
@@ -266,14 +276,31 @@ export class VaultLinker {
 				reason: `main checkout file ${mapped} resolves to ${realMapped}, inside a worktree`,
 			};
 		}
-		const mappedVaultPath = this.view.shownAt(realMapped);
-		if (mappedVaultPath !== null) {
-			return { kind: "in-vault", vaultPath: mappedVaultPath };
+		return this.reuseOrLink(
+			realMapped,
+			mapped,
+			path.join(sourcesDir, path.basename(main), repoRelative),
+		);
+	}
+
+	/**
+	 * Use the vault path Obsidian shows `realFile` at; refuse when only an
+	 * unstable folder symlink shows it, since Obsidian would skip a second
+	 * symlink to the same file; otherwise plan a symlink to `mapped`.
+	 */
+	private reuseOrLink(
+		realFile: string,
+		mapped: string,
+		symlinkPath: string,
+	): Mapping {
+		const shown = this.view.shownAt(realFile);
+		if (shown === null) return { kind: "mapped", mapped, symlinkPath };
+		if (shown.via === null || shown.via.unstable === null) {
+			return { kind: "in-vault", vaultPath: shown.vaultPath };
 		}
 		return {
-			kind: "mapped",
-			mapped,
-			symlinkPath: path.join(sourcesDir, path.basename(main), repoRelative),
+			kind: "refused",
+			reason: `Obsidian already shows ${realFile} through folder symlink ${shown.via.vaultPath}, which ${unstableReason(shown.via)}; Obsidian will not open a second symlink to the same file. Remove that folder symlink, then rerun`,
 		};
 	}
 

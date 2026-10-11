@@ -323,6 +323,60 @@ describe("jact vault-link — single target", () => {
 		);
 		expect(after.status, after.stdout).toBe(0);
 	});
+
+	it("Given another note's sources folder symlinks the worktree, When vault-link runs on a worktree file, Then it links the main checkout beside this note instead of reusing the other note's folder", () => {
+		mkdirSync(path.join(vault, "other", "sources"), { recursive: true });
+		symlinkSync(worktree, path.join(vault, "other", "sources", "wt"), "dir");
+		const target = `${path.join(worktree, "docs", "spec.md")}#Second`;
+		writeFileSync(note, `See [spec](${target}).\n`);
+
+		const result = jact(["vault-link", note, target]);
+
+		expect(result.status, result.stderr).toBe(0);
+		expect(lastLine(result.stdout)).toBe(
+			`sources/${REPO_NAME}/docs/spec.md#Second`,
+		);
+		expect(
+			readlinkSync(
+				path.join(notesDir, "sources", REPO_NAME, "docs", "spec.md"),
+			),
+		).toBe(path.join(mainCheckout, "docs", "spec.md"));
+	});
+
+	it("Given a link through a vault folder symlink into the worktree, When validated and then --all runs, Then validate flags it and --all relinks it to the main checkout", () => {
+		symlinkSync(worktree, path.join(vault, "wt"), "dir");
+		writeFileSync(note, "See [spec](../wt/docs/spec.md#Second).\n");
+		writeFileSync(
+			path.join(configHome, "jact", "config.json"),
+			JSON.stringify({ preset: "obsidian" }),
+		);
+
+		const before = jact(["validate", note]);
+		const fixed = jact(["vault-link", note, "--all"]);
+		const after = jact(["validate", note]);
+
+		expect(before.status).toBe(1);
+		expect(before.stdout).toContain("obsidian/no-unstable-symlink-link");
+		expect(fixed.status, fixed.stderr).toBe(0);
+		expect(readFileSync(note, "utf8")).toBe(
+			`See [spec](sources/${REPO_NAME}/docs/spec.md#Second).\n`,
+		);
+		expect(after.status, after.stdout).toBe(0);
+	});
+
+	it("Given another note's sources folder symlinks the main checkout folder, When vault-link runs on a file in it, Then it refuses with exit 1 and names that folder symlink", () => {
+		const folder = path.join(vault, "other", "sources", "docs");
+		mkdirSync(path.dirname(folder), { recursive: true });
+		symlinkSync(path.join(mainCheckout, "docs"), folder, "dir");
+		const target = path.join(mainCheckout, "docs", "spec.md");
+		writeFileSync(note, `See [spec](${target}).\n`);
+
+		const result = jact(["vault-link", note, target]);
+
+		expect(result.status).toBe(1);
+		expect(result.stderr).toContain(folder);
+		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
+	});
 });
 
 describe("jact vault-link --all", () => {

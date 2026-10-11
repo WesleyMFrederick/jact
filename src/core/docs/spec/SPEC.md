@@ -73,3 +73,4 @@ Each row records one version of this module spec.
 | 1.0.0 | Initial module spec for `src/core` |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
 | 1.2.0 | 2026-10-09: Added validation rule layer ownership and canonical configuration contract |
+| 1.3.0 | 2026-10-11: Vault link fixer marks folder symlinks into `.paseo/worktrees` or inside a `sources` folder as unstable, never reuses them, and flags links through them |

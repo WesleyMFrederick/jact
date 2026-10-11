@@ -8,6 +8,25 @@ export type UnindexedReason =
 	| { kind: "shown-elsewhere"; vaultPath: string };
 
 /**
+ * A folder symlink Obsidian follows. `unstable` says why links through it
+ * can break: its target is in a temporary `.paseo/worktrees` checkout, or it
+ * sits in a `sources` folder, which holds only the per-file symlinks
+ * `jact vault-link` makes for one note.
+ */
+export interface FolderSymlink {
+	vaultPath: string;
+	target: string;
+	unstable: "worktree" | "sources" | null;
+}
+
+/** Plain-language reason a folder symlink is unstable, for messages. */
+export function unstableReason(symlink: FolderSymlink): string {
+	return symlink.unstable === "worktree"
+		? "points into a temporary .paseo worktree"
+		: "sits in a note's sources folder, which holds only jact vault-link's per-file symlinks";
+}
+
+/**
  * The files Obsidian shows in one vault: real files outside dot-named folders,
  * plus files under folder symlinks whose targets are disjoint from the vault.
  * Obsidian skips a symlink whose target overlaps the vault or another
@@ -16,9 +35,7 @@ export type UnindexedReason =
  */
 export class ObsidianVaultView {
 	readonly realRoot: string;
-	private folderSymlinkList:
-		| { vaultPath: string; target: string }[]
-		| undefined;
+	private folderSymlinkList: FolderSymlink[] | undefined;
 
 	constructor(vaultRoot: string) {
 		this.realRoot = fs.realpathSync(vaultRoot);
@@ -26,17 +43,40 @@ export class ObsidianVaultView {
 
 	/**
 	 * Vault path where Obsidian already shows a real file: the file itself when
-	 * it lies in the vault, or its path under a vault folder symlink. Null when
-	 * the vault does not reach it.
+	 * it lies in the vault, or its path under a vault folder symlink, which
+	 * `via` names. Null when the vault does not reach it.
 	 */
-	shownAt(realFile: string): string | null {
-		if (isInside(this.realRoot, realFile)) return realFile;
-		for (const { vaultPath, target } of this.folderSymlinks()) {
-			if (isInside(target, realFile)) {
-				return path.join(vaultPath, path.relative(target, realFile));
+	shownAt(
+		realFile: string,
+	): { vaultPath: string; via: FolderSymlink | null } | null {
+		if (isInside(this.realRoot, realFile)) {
+			return { vaultPath: realFile, via: null };
+		}
+		for (const symlink of this.folderSymlinks()) {
+			if (isInside(symlink.target, realFile)) {
+				return {
+					vaultPath: path.join(
+						symlink.vaultPath,
+						path.relative(symlink.target, realFile),
+					),
+					via: symlink,
+				};
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * The unstable folder symlink that `vaultPath`, a path inside the vault
+	 * under its real root, goes through; null when it goes through none.
+	 */
+	unstableAlias(vaultPath: string): FolderSymlink | null {
+		return (
+			this.folderSymlinks().find(
+				(symlink) =>
+					symlink.unstable !== null && isInside(symlink.vaultPath, vaultPath),
+			) ?? null
+		);
 	}
 
 	/**
@@ -57,18 +97,19 @@ export class ObsidianVaultView {
 		}
 		if (real === vaultPath) return null;
 		const shown = this.shownAt(real);
-		return shown === null || shown === vaultPath
+		return shown === null || shown.vaultPath === vaultPath
 			? null
-			: { kind: "shown-elsewhere", vaultPath: shown };
+			: { kind: "shown-elsewhere", vaultPath: shown.vaultPath };
 	}
 
 	/**
 	 * Folder symlinks Obsidian follows: outside dot folders, with a target
-	 * disjoint from the vault. Found once per instance, in path order.
+	 * disjoint from the vault. Found once per instance; stable ones first, then
+	 * in path order, so a file reachable both ways maps to the stable path.
 	 */
-	private folderSymlinks(): { vaultPath: string; target: string }[] {
+	private folderSymlinks(): FolderSymlink[] {
 		if (this.folderSymlinkList !== undefined) return this.folderSymlinkList;
-		const found: { vaultPath: string; target: string }[] = [];
+		const found: FolderSymlink[] = [];
 		const pending = [this.realRoot];
 		for (let dir = pending.pop(); dir !== undefined; dir = pending.pop()) {
 			let entries: fs.Dirent[];
@@ -94,12 +135,29 @@ export class ObsidianVaultView {
 						!isInside(this.realRoot, target) &&
 						!isInside(target, this.realRoot)
 					) {
-						found.push({ vaultPath: entryPath, target });
+						found.push({
+							vaultPath: entryPath,
+							target,
+							unstable: target.includes(
+								`${path.sep}.paseo${path.sep}worktrees${path.sep}`,
+							)
+								? "worktree"
+								: path
+											.relative(this.realRoot, entryPath)
+											.split(path.sep)
+											.includes("sources")
+									? "sources"
+									: null,
+						});
 					}
 				}
 			}
 		}
-		found.sort((a, b) => a.vaultPath.localeCompare(b.vaultPath));
+		found.sort(
+			(a, b) =>
+				Number(a.unstable !== null) - Number(b.unstable !== null) ||
+				a.vaultPath.localeCompare(b.vaultPath),
+		);
 		this.folderSymlinkList = found;
 		return found;
 	}

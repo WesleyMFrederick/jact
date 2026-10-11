@@ -12,6 +12,7 @@ import type {
 import { anchorDroppedChars } from "./rules/anchorDroppedChars.js";
 import { noReferenceNoteLink } from "./rules/noReferenceNoteLink.js";
 import { noUnindexedLink } from "./rules/noUnindexedLink.js";
+import { noUnstableSymlinkLink } from "./rules/noUnstableSymlinkLink.js";
 import { noVaultEscapeLink } from "./rules/noVaultEscapeLink.js";
 
 /** Preset used when no config selects one: plain CommonMark, no extra rules. */
@@ -35,6 +36,7 @@ export class RuleRegistry {
 					anchorDroppedChars,
 					noVaultEscapeLink,
 					noUnindexedLink,
+					noUnstableSymlinkLink,
 				],
 			},
 			"jact",
