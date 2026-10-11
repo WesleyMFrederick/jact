@@ -116,13 +116,16 @@ export class ObsidianVaultView {
 
 	/**
 	 * Folder symlinks Obsidian follows: outside dot folders, with a target
-	 * disjoint from the vault. Found once per instance; stable ones first, then
-	 * in path order, so a file reachable both ways maps to the stable path.
+	 * disjoint from the vault, including ones nested inside a followed folder
+	 * symlink. Each target folder is scanned once, so a symlink loop ends.
+	 * Found once per instance; stable ones first, then in path order, so a
+	 * file reachable both ways maps to the stable path.
 	 */
 	private folderSymlinks(): VaultSymlink[] {
 		if (this.folderSymlinkList !== undefined) return this.folderSymlinkList;
 		const found: VaultSymlink[] = [];
 		const pending = [this.realRoot];
+		const scannedTargets = new Set<string>();
 		for (let dir = pending.pop(); dir !== undefined; dir = pending.pop()) {
 			let entries: fs.Dirent[];
 			try {
@@ -159,6 +162,10 @@ export class ObsidianVaultView {
 									? "sources"
 									: null,
 						});
+						if (!scannedTargets.has(target)) {
+							scannedTargets.add(target);
+							pending.push(entryPath);
+						}
 					}
 				}
 			}
