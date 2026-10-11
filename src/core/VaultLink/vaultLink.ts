@@ -240,6 +240,12 @@ export class VaultLinker {
 			};
 		}
 		const repoRelative = path.relative(toplevel, realPath);
+		if (repoRelative.startsWith("..") || path.isAbsolute(repoRelative)) {
+			return {
+				kind: "refused",
+				reason: `${escaping} is outside its git repository ${toplevel}`,
+			};
+		}
 		const mapped = path.join(main, repoRelative);
 		if (mapped.includes(`${path.sep}.paseo${path.sep}worktrees${path.sep}`)) {
 			return {
@@ -380,11 +386,26 @@ export class VaultLinker {
 	}
 }
 
-/** Run git and return trimmed stdout, or null when git fails. */
+/**
+ * Run git and return trimmed stdout, or null when git fails. Variables that
+ * point git at another repository, such as those a git hook sets, are
+ * dropped so `-C cwd` decides the repository.
+ */
 function git(cwd: string, args: string[]): string | null {
+	const env = { ...process.env };
+	for (const name of [
+		"GIT_DIR",
+		"GIT_WORK_TREE",
+		"GIT_COMMON_DIR",
+		"GIT_INDEX_FILE",
+		"GIT_PREFIX",
+	]) {
+		delete env[name];
+	}
 	try {
 		return execFileSync("git", ["-C", cwd, ...args], {
 			encoding: "utf8",
+			env,
 			stdio: ["ignore", "pipe", "ignore"],
 		}).trim();
 	} catch {

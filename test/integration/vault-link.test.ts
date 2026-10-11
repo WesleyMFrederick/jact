@@ -403,6 +403,23 @@ describe("jact vault-link — single target", () => {
 		expect(result.stderr).toContain(folder);
 		expect(existsSync(path.join(notesDir, "sources"))).toBe(false);
 	});
+
+	it("Given GIT_DIR and GIT_WORK_TREE point at another repository, When vault-link runs on a worktree target, Then it still maps the target's own main checkout", () => {
+		const otherRepo = path.join(root, "other-repo");
+		mkdirSync(otherRepo);
+		git(otherRepo, ["init"]);
+		const target = path.join(worktree, "docs", "spec.md");
+		writeFileSync(note, `See [spec](${target}).\n`);
+
+		const result = jact(["vault-link", note, target], {
+			GIT_DIR: path.join(otherRepo, ".git"),
+			GIT_WORK_TREE: otherRepo,
+		});
+
+		expect(result.status, result.stderr).toBe(0);
+		const symlinkPath = path.join(notesDir, "sources", REPO_NAME, "docs", "spec.md");
+		expect(readlinkSync(symlinkPath)).toBe(path.join(mainCheckout, "docs", "spec.md"));
+	});
 });
 
 describe("jact vault-link --all", () => {
