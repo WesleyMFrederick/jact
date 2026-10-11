@@ -79,6 +79,19 @@ describe("obsidian/no-unstable-symlink-link", () => {
 		expect(findings[0]?.message).toContain("sources folder");
 	});
 
+	it("Given a per-file symlink into a .paseo worktree, When a note links to it, Then one finding names that symlink and the worktree", () => {
+		mkdirSync(path.join(vault, "notes", "sources"), { recursive: true });
+		symlinkSync(
+			path.join(worktree, "docs", "spec.md"),
+			path.join(vault, "notes", "sources", "spec.md"),
+			"file",
+		);
+		const findings = check("[s](sources/spec.md#Spec)\n");
+		expect(findings).toHaveLength(1);
+		expect(findings[0]?.message).toContain("symlink sources/spec.md");
+		expect(findings[0]?.message).toContain(".paseo worktree");
+	});
+
 	it("Given a stable folder symlink outside any sources folder and a per-file symlink under sources, When a note links through them, Then no finding is reported", () => {
 		symlinkSync(path.join(root, "repo"), path.join(vault, "repo-docs"), "dir");
 		mkdirSync(path.join(vault, "notes", "sources"), { recursive: true });

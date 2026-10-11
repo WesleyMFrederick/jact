@@ -103,7 +103,7 @@ export class VaultLinker {
 			) {
 				return null;
 			} else {
-				// Obsidian skips this path, or a folder symlink on it can break:
+				// Obsidian skips this path, or a symlink on it can break:
 				// link the real file the way an escaping link is linked.
 				mapping = this.map(inside);
 			}

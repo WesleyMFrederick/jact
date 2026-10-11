@@ -8,19 +8,21 @@ export type UnindexedReason =
 	| { kind: "shown-elsewhere"; vaultPath: string };
 
 /**
- * A folder symlink Obsidian follows. `unstable` says why links through it
- * can break: its target is in a temporary `.paseo/worktrees` checkout, or it
- * sits in a `sources` folder, which holds only the per-file symlinks
+ * A vault symlink links can go through. `unstable` says why such links can
+ * break: its target is in a temporary `.paseo/worktrees` checkout, or it sits
+ * in a `sources` folder, which holds only the per-file symlinks
  * `jact vault-link` makes for one note.
  */
-export interface FolderSymlink {
+export interface VaultSymlink {
 	vaultPath: string;
 	target: string;
 	unstable: "worktree" | "sources" | null;
 }
 
-/** Plain-language reason a folder symlink is unstable, for messages. */
-export function unstableReason(symlink: FolderSymlink): string {
+const WORKTREE_SEGMENT = `${path.sep}.paseo${path.sep}worktrees${path.sep}`;
+
+/** Plain-language reason a symlink is unstable, for messages. */
+export function unstableReason(symlink: VaultSymlink): string {
 	return symlink.unstable === "worktree"
 		? "points into a temporary .paseo worktree"
 		: "sits in a note's sources folder, which holds only jact vault-link's per-file symlinks";
@@ -35,7 +37,7 @@ export function unstableReason(symlink: FolderSymlink): string {
  */
 export class ObsidianVaultView {
 	readonly realRoot: string;
-	private folderSymlinkList: FolderSymlink[] | undefined;
+	private folderSymlinkList: VaultSymlink[] | undefined;
 
 	constructor(vaultRoot: string) {
 		this.realRoot = fs.realpathSync(vaultRoot);
@@ -48,7 +50,7 @@ export class ObsidianVaultView {
 	 */
 	shownAt(
 		realFile: string,
-	): { vaultPath: string; via: FolderSymlink | null } | null {
+	): { vaultPath: string; via: VaultSymlink | null } | null {
 		if (isInside(this.realRoot, realFile)) {
 			return { vaultPath: realFile, via: null };
 		}
@@ -67,16 +69,26 @@ export class ObsidianVaultView {
 	}
 
 	/**
-	 * The unstable folder symlink that `vaultPath`, a path inside the vault
-	 * under its real root, goes through; null when it goes through none.
+	 * The unstable symlink that `vaultPath`, a path inside the vault under its
+	 * real root, goes through: an unstable folder symlink on the path, or else
+	 * `vaultPath` itself when a symlink sends it into a `.paseo/worktrees`
+	 * checkout. Null when it goes through none.
 	 */
-	unstableAlias(vaultPath: string): FolderSymlink | null {
-		return (
-			this.folderSymlinks().find(
-				(symlink) =>
-					symlink.unstable !== null && isInside(symlink.vaultPath, vaultPath),
-			) ?? null
+	unstableAlias(vaultPath: string): VaultSymlink | null {
+		const folder = this.folderSymlinks().find(
+			(symlink) =>
+				symlink.unstable !== null && isInside(symlink.vaultPath, vaultPath),
 		);
+		if (folder !== undefined) return folder;
+		let target: string;
+		try {
+			target = fs.realpathSync(vaultPath);
+		} catch {
+			return null;
+		}
+		return target.includes(WORKTREE_SEGMENT) && !isInside(this.realRoot, target)
+			? { vaultPath, target, unstable: "worktree" }
+			: null;
 	}
 
 	/**
@@ -107,9 +119,9 @@ export class ObsidianVaultView {
 	 * disjoint from the vault. Found once per instance; stable ones first, then
 	 * in path order, so a file reachable both ways maps to the stable path.
 	 */
-	private folderSymlinks(): FolderSymlink[] {
+	private folderSymlinks(): VaultSymlink[] {
 		if (this.folderSymlinkList !== undefined) return this.folderSymlinkList;
-		const found: FolderSymlink[] = [];
+		const found: VaultSymlink[] = [];
 		const pending = [this.realRoot];
 		for (let dir = pending.pop(); dir !== undefined; dir = pending.pop()) {
 			let entries: fs.Dirent[];
@@ -138,9 +150,7 @@ export class ObsidianVaultView {
 						found.push({
 							vaultPath: entryPath,
 							target,
-							unstable: target.includes(
-								`${path.sep}.paseo${path.sep}worktrees${path.sep}`,
-							)
+							unstable: target.includes(WORKTREE_SEGMENT)
 								? "worktree"
 								: path
 											.relative(this.realRoot, entryPath)

@@ -564,8 +564,11 @@ Behavior:
   When Obsidian already shows the file (it lies in the vault, or under a vault
   folder symlink), the link points at that vault path and no symlink is made.
   This also fixes a link inside the vault that goes through a symlink Obsidian
-  skips. Paths under a folder or file whose name starts with a dot are
-  refused, because Obsidian does not index them.
+  skips. A folder symlink into a .paseo worktree or inside a sources folder is
+  never reused, and a link through it, or through any symlink into a .paseo
+  worktree, is relinked to the main checkout. Paths under a folder or file
+  whose name starts with a dot are refused, because Obsidian does not index
+  them.
   With a target, the last stdout line is the link to write; the note is not
   edited. With --all, each such link in the note is rewritten in place.
 

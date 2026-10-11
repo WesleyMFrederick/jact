@@ -364,6 +364,32 @@ describe("jact vault-link — single target", () => {
 		expect(after.status, after.stdout).toBe(0);
 	});
 
+	it("Given a hand-made per-file symlink into the worktree, When validated and then --all runs, Then validate flags it and --all relinks it to the main checkout", () => {
+		mkdirSync(path.join(notesDir, "sources"), { recursive: true });
+		symlinkSync(
+			path.join(worktree, "docs", "spec.md"),
+			path.join(notesDir, "sources", "spec.md"),
+			"file",
+		);
+		writeFileSync(note, "See [spec](sources/spec.md#Second).\n");
+		writeFileSync(
+			path.join(configHome, "jact", "config.json"),
+			JSON.stringify({ preset: "obsidian" }),
+		);
+
+		const before = jact(["validate", note]);
+		const fixed = jact(["vault-link", note, "--all"]);
+		const after = jact(["validate", note]);
+
+		expect(before.status).toBe(1);
+		expect(before.stdout).toContain("obsidian/no-unstable-symlink-link");
+		expect(fixed.status, fixed.stderr).toBe(0);
+		expect(readFileSync(note, "utf8")).toBe(
+			`See [spec](sources/${REPO_NAME}/docs/spec.md#Second).\n`,
+		);
+		expect(after.status, after.stdout).toBe(0);
+	});
+
 	it("Given another note's sources folder symlinks the main checkout folder, When vault-link runs on a file in it, Then it refuses with exit 1 and names that folder symlink", () => {
 		const folder = path.join(vault, "other", "sources", "docs");
 		mkdirSync(path.dirname(folder), { recursive: true });

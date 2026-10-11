@@ -13,11 +13,11 @@ export const NO_UNSTABLE_SYMLINK_LINK_RULE =
 	"obsidian/no-unstable-symlink-link";
 
 /**
- * A markdown link that stays inside the vault must not go through a folder
- * symlink that can disappear: one whose target is a temporary
- * `.paseo/worktrees` checkout, or one in a note's `sources` folder. Obsidian
- * opens such a link today, and it breaks without warning when the worktree
- * or the folder symlink is removed.
+ * A markdown link that stays inside the vault must not go through a symlink
+ * that can disappear: a file or folder symlink whose target is in a temporary
+ * `.paseo/worktrees` checkout, or a folder symlink in a note's `sources`
+ * folder. Obsidian opens such a link today, and it breaks without warning
+ * when the worktree or the symlink is removed.
  */
 export const noUnstableSymlinkLink: ValidationRule = {
 	id: NO_UNSTABLE_SYMLINK_LINK_RULE,
@@ -55,7 +55,7 @@ export const noUnstableSymlinkLink: ValidationRule = {
 				ruleId: NO_UNSTABLE_SYMLINK_LINK_RULE,
 				line: link.line,
 				column: link.column,
-				message: `Link goes through folder symlink ${path.relative(noteDir, alias.vaultPath)}, which ${unstableReason(alias)}, so the link breaks without warning when it is removed. Fix: jact vault-link ${shellArgument(filePath)} ${shellArgument(written)} (or --all for every such link in this note)`,
+				message: `Link goes through symlink ${path.relative(noteDir, alias.vaultPath)}, which ${unstableReason(alias)}, so the link breaks without warning when it is removed. Fix: jact vault-link ${shellArgument(filePath)} ${shellArgument(written)} (or --all for every such link in this note)`,
 				source: link.fullMatch,
 			});
 		}
