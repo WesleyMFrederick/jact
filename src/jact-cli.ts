@@ -1,8 +1,9 @@
 /**
  * JactCli — orchestration and scope management for citation operations.
  *
- * This module exports the JactCli class only. Commander CLI wiring lives in
- * cli.ts so JactCli can be imported programmatically without activating Commander.
+ * This module exports the JactCli class, its outline and file-extraction
+ * outcome types, and the linked-content hint builder. Commander CLI wiring lives
+ * in cli.ts so JactCli can be imported programmatically without activating Commander.
  *
  * @module jact
  */
@@ -539,7 +540,8 @@ export class JactCli {
 					console.error(
 						`Target file is outside the resolved scope. Retry with --scope ${shellArgument(path.dirname(canonicalTarget))}.`,
 					);
-					process.exitCode = 1;
+					// The target and scope arguments conflict: a usage error, not a content failure.
+					process.exitCode = 2;
 					return undefined;
 				}
 			} else {

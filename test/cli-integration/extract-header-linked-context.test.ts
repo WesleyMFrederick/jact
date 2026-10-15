@@ -148,7 +148,7 @@ describe("extract header --extract-linked-content", () => {
 		expect(result.outgoingLinks[0]).toMatchObject({ status: "failed" });
 	});
 
-	it("rejects a selected file outside the explicit backlink scope", () => {
+	it("rejects a selected file outside the explicit backlink scope as a usage error", () => {
 		const outsideTarget = join(
 			repositoryRoot,
 			"test/fixtures/us2.1/e2e-mixed-markers.md",
@@ -168,7 +168,7 @@ describe("extract header --extract-linked-content", () => {
 			{ cwd: repositoryRoot, encoding: "utf8" },
 		);
 
-		expect(execution.status).toBe(1);
+		expect(execution.status).toBe(2);
 		expect(execution.stderr).toContain("outside the resolved scope");
 		expect(execution.stderr).toContain("--scope");
 	});

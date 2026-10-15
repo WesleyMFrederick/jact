@@ -65,9 +65,11 @@ Boundary: neither file builds the parser, caches, checker, extractor, or validat
 
 ### Component Factory (`src/factories/`)
 
-The factory builds each component with production defaults and accepts a replacement for every dependency.
+The factory builds each component with production defaults. Most builders take optional replacements for their component dependencies. For parameters that accept `null`, `null` or an omitted argument selects the default. `resolveRuleSet` is typed `RuleSetResolver | undefined`, so it does not accept `null`; omitting it or passing `undefined` selects the default (no rules, the `commonmark` preset).
 
-- Tests inject fakes through the factory and the dependency interfaces, not through concrete classes.
+- The checker builder accepts parsed-document lifecycle and file-cache interfaces. The linked-header query builder accepts a backlink-candidate interface. Tests can inject fakes for those dependencies without importing production classes.
+- The extractor builder's parsed-document cache and the validate workflow builder's parsed-document cache, file cache, and checker are typed with concrete classes (`ParsedFileCache`, `FileCache`, `CitationValidator`). A replacement must be assignable to the declared class types.
+- The extractor builder's `strategies` parameter is an array of the `ExtractionEligibilityStrategy` interface, so any objects that satisfy the interface are accepted. The validate workflow builder's optional `resolveRuleSet` parameter is a `RuleSetResolver` callback, `(filePath: string) => Promise<RuleSet>`, not a class instance.
 - The extractor gets its eligibility rules in fixed precedence: stop marker, force marker, section link, CLI flag. Rules: [Extraction Eligibility Order](006-behavior.md#Extraction%20Eligibility%20Order).
 
 Boundary: the factory wires components; it holds no parsing, checking, or extraction logic.
@@ -185,6 +187,7 @@ The opt-out directive imports only syntax-tree types, so these imports form no c
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1.1 | 2026-10-15 | Correct Component Factory documentation to distinguish dependency interfaces from concrete component replacements |
 | 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
 | 1.0.0-draft | 2026-08-24 | Added the stateless backlink candidate filter and its excludes-only correctness boundary |
 | 1.0.0-draft | 2026-07-01 | Initial architecture doc, replacing per-component design-docs guides |

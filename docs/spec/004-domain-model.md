@@ -75,7 +75,7 @@ Parser output is the complete parsed form of one document. `jact ast` prints it.
 - `filePath`, `content` — the source path and text
 - `ast` — the Markdown syntax tree (mdast)
 - `validationDisabled` — `true` when the document opts out of validation; the directive rules are in [`jact validate`](005-interfaces.md#`jact validate`)
-- `links`, `embeds`, `headings`, `anchors` — lists of the entities above
+- `links`, `linkReferences`, `embeds`, `headings`, `anchors` — lists of the entities above; `linkReferences` holds reference-style link uses, whose definitions are in `links`
 
 ---
 
@@ -181,6 +181,7 @@ ProcessedLinkEntry 1───1 EnrichedLinkObject (sourceLink)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-15 | Include existing reference-style link uses in the documented parser output fields |
 | 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
 | 1.0.0-draft | 2026-10-06 | Added typed inline-image and wiki-embed references to the required parser output contract |
 | 1.0.0-draft | 2026-08-13 | Added optional extracted-content start lines for source-numbered command output |

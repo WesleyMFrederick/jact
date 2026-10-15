@@ -26,7 +26,7 @@ Validation writes no files unless `--fix` is set. `--fix --dry-run` also writes 
 
 | Flag | Default | Description |
 |---|---|---|
-| `--format <type>` | `cli` | `cli` or `json`; single-file mode only |
+| `--format <type>` | `cli` | `cli` or `json`; jact rejects any other value before validating; single-file mode only |
 | `--lines <range>` | - | Check one line range, such as `150-160` or `157` |
 | `--scope <folder>` | smart default | Bounds file resolution and `--fix` prose-path candidates |
 | `--fix` | - | Single-file mode only: apply citation anchor and path fixes, and convert resolved prose `.md` paths into links |
@@ -300,7 +300,7 @@ After the tree, jact prints next-step commands: expand collapsed branches, filte
 jact ast <file> [--scope <folder>]
 ```
 
-`jact ast` prints the parser output for one file as JSON, for debugging. The top-level keys are `filePath`, `content`, `ast`, `links`, `embeds`, `headings`, `anchors`, and `validationDisabled`. The fields are in [ParserOutput](004-domain-model.md#ParserOutput). Errors exit `2`.
+`jact ast` prints the parser output for one file as JSON, for debugging. The top-level keys are `filePath`, `content`, `ast`, `links`, `linkReferences`, `embeds`, `headings`, `anchors`, and `validationDisabled`. The fields are in [ParserOutput](004-domain-model.md#ParserOutput). Errors exit `2`.
 
 ---
 
@@ -347,7 +347,7 @@ jact extract header <target-file> <header-name> [options]
 
 With `--extract-linked-content`, the markdown output labels each block `Source: file:start-end`, and each linked block `Via: file:line` (the link that pulled it in). Next-step hints and the `--max-chars` content map work as in [`jact extract file <target-file>`](#`jact extract file <target-file>`). The header content map also lists backlinks and failures.
 
-**Exit codes:** `0` header extracted and all linked content resolved; `1` header not found, or some linked content failed; `2` system error, such as a missing file.
+**Exit codes:** `0` header extracted and all linked content resolved; `1` header not found, or some linked content failed; `2` system error, such as a missing file, or a usage error: with `--extract-linked-content`, a target outside the resolved scope (the message names the `--scope` to retry with).
 
 ---
 
@@ -415,7 +415,7 @@ Every command uses three exit codes, and hooks depend on them.
 |---|---|
 | `0` | Success: links valid, files passed, extraction produced content, outline printed, or rename succeeded; `--changed` with no changes |
 | `1` | Content failure: errors found, no eligible links, header or target file not found by extraction, outline selector unresolved, or rename plan refused |
-| `2` | System or usage error: missing file, permission denied, parse error, missing source position, bad flag combination, a glob that matched nothing when nothing else was selected, or not a git repository |
+| `2` | System or usage error: missing file, permission denied, parse error, missing source position, bad flag combination, an unknown command or option, a missing required argument, a value outside its choices, an invalid argument value, a glob that matched nothing when nothing else was selected, or not a git repository |
 
 The three-code contract is a recorded decision: D4 in [Decision](../../design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md#Decision).
 
@@ -431,6 +431,7 @@ Single-file `validate` writes its full report to a piped standard output before 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-15 | Command-line rejections and an extraction target outside the linked-content scope exit `2`; help and version keep `0`, and missing rename paths keep refused-plan exit `1`. Reject invalid `validate --format` values before validation; align help with command usage and all AST fields |
 | 1.0.0-draft | 2026-10-14 | `vault-link --all` retains and reports the actual displaced note, exclusively installs without overwriting a recreated note, and attempts non-overwriting restoration on failure; documents persistent recovery, manual cleanup, late descriptor saves and the brief missing-note interval instead of an unchanged-note overwrite guarantee |
 | 1.0.0-draft | 2026-10-11 | `jact vault-link --all` plans first, writes the note only if it is unchanged (else exit `1`, nothing written), and creates symlinks only for rewritten links; refuses targets that are not files and bare repositories; reads the worktree list NUL-separated and ignores repository-redirecting git variables; percent-encodes whitespace, control characters, `\`, `<`, `>`; detects case-only symlink collisions; names a missing in-vault target; finds folder symlinks nested in followed folder symlinks |
 | 1.0.0-draft | 2026-10-11 | Added `obsidian/no-unstable-symlink-link` for links through file or folder symlinks into `.paseo/worktrees/` or folder symlinks inside a `sources` folder; `jact vault-link` no longer reuses such folder symlinks, relinks links through such symlinks, and refuses when only such a folder symlink shows the file |
