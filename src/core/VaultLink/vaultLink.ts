@@ -223,7 +223,13 @@ export class VaultLinker {
 		while (!fs.existsSync(startDir)) startDir = path.dirname(startDir);
 		const realStart = fs.realpathSync(startDir);
 		const realPath = path.join(realStart, path.relative(startDir, escaping));
-		const toplevel = git(realStart, ["rev-parse", "--show-toplevel"]);
+		const toplevelOutput = git(realStart, ["rev-parse", "--show-toplevel"]);
+		const toplevel =
+			toplevelOutput === null
+				? null
+				: toplevelOutput.endsWith("\n")
+					? toplevelOutput.slice(0, -1)
+					: toplevelOutput;
 
 		if (toplevel === null) {
 			if (worktree !== undefined) {
@@ -436,9 +442,9 @@ export class VaultLinker {
 }
 
 /**
- * Run git and return trimmed stdout, or null when git fails. Variables that
- * point git at another repository, such as those a git hook sets, are
- * dropped so `-C cwd` decides the repository.
+ * Run git and return raw stdout, or null when git fails. Variables that point
+ * git at another repository, such as those a git hook sets, are dropped so
+ * `-C cwd` decides the repository.
  */
 function git(cwd: string, args: string[]): string | null {
 	const env = { ...process.env };
@@ -456,7 +462,7 @@ function git(cwd: string, args: string[]): string | null {
 			encoding: "utf8",
 			env,
 			stdio: ["ignore", "pipe", "ignore"],
-		}).trim();
+		});
 	} catch {
 		return null;
 	}

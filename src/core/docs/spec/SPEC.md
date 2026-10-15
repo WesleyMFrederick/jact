@@ -1,6 +1,6 @@
 # `src/core` Living Specification
 
-**Version:** 1.4.0
+**Version:** 1.4.1
 **Status:** done
 
 `src/core` is the domain layer of jact: it parses Markdown, checks links, extracts linked content, and plans or applies file edits. It has no command registration, no output formatting, and no exit codes. Those belong to the command-line interface (CLI) layer in the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -75,3 +75,4 @@ Each row records one version of this module spec.
 | 1.2.0 | 2026-10-09: Added validation rule layer ownership and canonical configuration contract |
 | 1.3.0 | 2026-10-11: Vault link fixer marks folder symlinks into `.paseo/worktrees` or inside a `sources` folder, and file symlinks into `.paseo/worktrees`, as unstable, never reuses them, and flags links through them |
 | 1.4.0 | 2026-10-11: Vault link fixer plans before it writes, creates symlinks only for applied rewrites, and replaces the note through a checked temp-file rename shared with `--fix`; it refuses non-file targets and bare repositories |
+| 1.4.1 | 2026-10-14: Vault link fixer preserves whitespace in Git checkout paths, including a trailing newline, by removing only Git's line-output separator |
