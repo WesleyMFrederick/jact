@@ -181,7 +181,9 @@ describe("jact validate — rule presets", () => {
 		const result = run(["vault/note.md"]);
 		expect(result.status).toBe(1);
 		expect(result.stdout).toContain("[obsidian/no-vault-escape-link]");
-		expect(result.stdout).toContain("symlink");
+		expect(result.stdout).toMatch(
+			/Fix: jact vault-link \S*note\.md \.\.\/target\.md \(or --all/,
+		);
 	});
 
 	it("Given a non-vault note under the obsidian preset, When it links to a parent folder, Then it exits 0", () => {

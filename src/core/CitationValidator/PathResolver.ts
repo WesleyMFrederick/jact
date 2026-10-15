@@ -20,6 +20,7 @@ import type {
 	DuplicatePathSuggestion,
 	PathConversion,
 } from "../../types/validationTypes.js";
+import { findVaultRoot } from "../resolveScope.js";
 import { CacheFallbackStrategy } from "./pathResolutionStrategies/CacheFallbackStrategy.js";
 import { FileFoundStrategy } from "./pathResolutionStrategies/FileFoundStrategy.js";
 import { FolderLinkStrategy } from "./pathResolutionStrategies/FolderLinkStrategy.js";
@@ -70,6 +71,7 @@ export type PathResolutionOutcome =
 export class PathResolver {
 	private fileCache: FileCacheLike;
 	private strategies: PathResolutionStrategy[];
+	private resolutionSources = new Map<string, string>();
 
 	constructor(fileCache: FileCacheLike) {
 		this.fileCache = fileCache;
@@ -179,16 +181,15 @@ export class PathResolver {
 				error: `Malformed percent-encoding in link path: ${rawPath}`,
 			};
 		}
-		const sourceDir = dirname(sourceFile);
+		// Obsidian resolves a vault note's links from its real folder, so a
+		// path through a symlink outside the vault must not change the result.
+		const base = this.resolutionSource(sourceFile);
+		const sourceDir = dirname(base);
 		const standardPath = resolve(sourceDir, decodedPath);
-		const candidatePath = this.findCandidatePath(
-			rawPath,
-			decodedPath,
-			sourceFile,
-		);
+		const candidatePath = this.findCandidatePath(rawPath, decodedPath, base);
 		const context = {
 			citation,
-			sourceFile,
+			sourceFile: base,
 			candidatePath,
 			standardPath,
 			pathResolver: this,
@@ -204,6 +205,19 @@ export class PathResolver {
 			kind: "error",
 			error: "Path resolution failed: no strategy matched",
 		};
+	}
+
+	/** The note's real path when it sits inside an Obsidian vault; else the path as given. */
+	private resolutionSource(sourceFile: string): string {
+		let base = this.resolutionSources.get(sourceFile);
+		if (base === undefined) {
+			base =
+				findVaultRoot(sourceFile) === null
+					? sourceFile
+					: this.safeRealpathSync(sourceFile);
+			this.resolutionSources.set(sourceFile, base);
+		}
+		return base;
 	}
 
 	private findCandidatePath(

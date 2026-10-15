@@ -58,13 +58,15 @@ The configuration keys are:
 
 Only the user config may list `plugins`; a project config that lists them exits `2` before any plugin code runs because a downloaded repository could run code with your permissions.
 
-The default preset is `commonmark`, which enables no additional rules. It does not change the parser's supported syntax or turn off ordinary link checks. The `obsidian` preset enables all three built-in rules:
+The default preset is `commonmark`, which enables no additional rules. It does not change the parser's supported syntax or turn off ordinary link checks. The `obsidian` preset enables all built-in rules:
 
 | Rule ID | Check |
 |---|---|
 | `obsidian/no-reference-note-link` | Reject local-file split-style links: `[text][label]`, `[label][]`, and `[label]` with a reference definition. The first definition of a label decides, as in CommonMark: a label whose first definition is a `scheme:` URL such as `https:` or `obsidian:` is skipped even when a later definition is a local file. Also skip footnotes, same-file `#anchor` definitions, and unused definitions. |
 | `obsidian/anchor-dropped-chars` | Enable [Anchors with characters Obsidian drops](006-behavior.md#Anchors with characters Obsidian drops). This check no longer runs with no configuration. |
-| `obsidian/no-vault-escape-link` | Only in a vault: the nearest folder above the file's real path that contains `.obsidian`. With no vault, the rule does nothing. Inside a vault, a Markdown link is an error when its target is an absolute path, a `file:` URL, contains `.paseo/worktrees/`, or is a relative path that leaves the vault root. Relative paths are resolved from the note's real folder as text, without following symlinks, so a link to a symlink inside the vault passes even when the symlink points outside. Skip web URLs, `#anchor`-only links, wikilinks, and footnotes. The message tells you to create a symlink beside the note that points at the stable main checkout, then link to it relatively. |
+| `obsidian/no-vault-escape-link` | Only in a vault: the nearest folder above the file's real path that contains `.obsidian`. With no vault, the rule does nothing. Inside a vault, a Markdown link is an error when its target is an absolute path, a `file:` URL, contains `.paseo/worktrees/`, or is a relative path that leaves the vault root. Relative paths are resolved from the note's real folder as text, without following symlinks, so a link to a symlink inside the vault passes even when the symlink points outside. Skip web URLs, `#anchor`-only links, wikilinks, and footnotes. The one-line message names a paste-ready fix: [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) with this note and the target as written, plus a hint to use `--all` for every such link in the note. |
+| `obsidian/no-unindexed-link` | Only in a vault, as for `obsidian/no-vault-escape-link`. A Markdown link whose target stays inside the vault is an error when Obsidian will not open it at that path: a path segment starts with a dot, or the path goes through a symlink whose real file Obsidian already shows at another vault path (in the vault itself, or under a vault folder symlink whose target is disjoint from the vault). jact resolves such links, but Obsidian skips them. For the symlink case, the message names the vault path Obsidian shows and the same paste-ready [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) fix. |
+| `obsidian/no-unstable-symlink-link` | Only in a vault, as for `obsidian/no-vault-escape-link`. A Markdown link whose target stays inside the vault is an error when its path goes through an unstable symlink: a file or folder symlink whose real target lies in a `.paseo/worktrees/` checkout, or a folder symlink with a folder named `sources` on its vault path (that folder holds only the per-file symlinks `jact vault-link` makes for one note). Obsidian opens such a link, but it breaks without warning when the worktree or the symlink is removed. The message names the symlink, the reason, and the same paste-ready [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) fix. |
 
 Setting a rule to `"error"` enables it regardless of preset; `"off"` disables it. For example, a project can keep the Obsidian preset but opt out of one check:
 
@@ -219,6 +221,51 @@ Reference search follows symlinks. A shortcut to a note inside scope is allowed.
 Human output for a single file prints `Source:` and `Destination:` lines; a batch prints a `Moves:` list.
 
 **Exit codes:** `0` preview or apply succeeded; `1` invalid or unsafe plan, no writes; `2` file-system, parse, commit, or recovery failure.
+
+---
+
+## `jact vault-link <note> [target]`
+
+```
+jact vault-link <note> [target] [--all] [--dry-run]
+```
+
+`jact vault-link` fixes links that `obsidian/no-vault-escape-link`, `obsidian/no-unindexed-link`, and `obsidian/no-unstable-symlink-link` report. For a link that leaves the vault, it creates a symlink inside the vault, beside the note, that points at the file in the repository's main checkout. For a link that goes through a symlink Obsidian skips, it uses the vault path Obsidian already shows. For a link through an unstable symlink, it links the real file as it would link an escaping target, so a worktree file maps to the main checkout. It gives the relative link to write. It uses the same checks as the rules.
+
+| Argument or flag | Default | Description |
+|---|---|---|
+| `<note>` | - | Markdown note inside an Obsidian vault |
+| `[target]` | - | One escaping target exactly as written in the note, optionally with `#anchor`. Relative targets resolve from the note's real folder |
+| `--all` | `false` | Fix every escaping Markdown link in the note in place, including reference definitions; footnote definitions are skipped |
+| `--dry-run` | `false` | Print the same plan, but create no folders or symlinks and write no files |
+
+Exactly one of `[target]` or `--all` is required.
+
+**Main checkout.** jact resolves an existing target to its real location, then finds the git repository that holds it and takes its main checkout from the first entry of `git worktree list --porcelain -z`. Git variables that point git at another repository (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`, `GIT_PREFIX`), as a git hook sets them, are dropped first. A file in a linked worktree maps to the same repository-relative path in the main checkout, including when the written target is a symlink outside the repository that points into the worktree. jact refuses a link when the target or the main-checkout file is not a regular file (`<path> is not a file`), when the main checkout lacks that file (the message names the missing path), when the repository is bare (`bare repository: no main checkout`), when a `.paseo/worktrees/` target's repository cannot be found, or when the main-checkout file's real path lies in a linked worktree or a `.paseo/worktrees` path. A file outside any repository links as itself if it exists.
+
+**Target text.** Targets are read as the escape rule reads them: the `#anchor` is set aside, Markdown backslash escapes are removed, and percent-encoding is decoded before the target is classified. An encoded `file%3A` scheme is recognized without decoding the rest of its URL first, so `%23` and `%3F` remain filename characters instead of becoming a fragment or query.
+
+**Symlink.** The symlink is `<note folder>/sources/<repo name>/<repository-relative path>`, where the repo name is the main checkout's folder name; a file outside git uses `<note folder>/sources/<file name>`. Missing folders are created as real folders. An existing folder on that path that is a symlink or not a folder is refused, so the symlink always stays inside the vault. The symlink holds the absolute main-checkout path. A symlink already pointing at that path is reused; any other file, folder, or symlink at that path is refused and never overwritten. Links to one file share one symlink. When the note's disk ignores letter case, two symlink paths that differ only by case are the same path, and the second link is refused in `--dry-run` and in the real run alike.
+
+**Already in the vault.** Before making a symlink, jact checks whether Obsidian already shows the real file: either the file lies inside the vault, or it lies under a vault folder symlink whose target is outside the vault. Obsidian skips a symlink whose target overlaps another symlink's target, so a new file symlink there would never open. In that case the link points at the existing vault path and no symlink is created. jact checks the target's real location first, then the mapped main-checkout file. It finds folder symlinks once per command, including folder symlinks nested inside a followed folder symlink, and skips folders whose names start with a dot. It never reuses an unstable folder symlink (see `obsidian/no-unstable-symlink-link`); when only such a folder symlink shows the mapped file, jact refuses the link and names the folder symlink to remove.
+
+**Dot names.** Obsidian does not index a file or folder whose name starts with a dot. jact refuses a link when the new symlink, or the vault path it would reuse, sits under such a name, and the message names it.
+
+**Link to write.** The path from the note's folder to the symlink (or to the reused vault path), with `/` separators and `%`, `(`, `)`, `#`, `?`, `\`, `<`, `>`, whitespace, and control characters percent-encoded (UTF-8 bytes) in each segment, followed by the original `#anchor`.
+
+**Output.** With a target, jact prints `created|reused|would create|would reuse symlink <symlink> -> <main-checkout file>`, or `already in vault: <vault path>`, then the link to write as the last line; the note is not edited. A target inside the vault that does not exist is refused with `<path> does not exist`. With `--all`, jact rewrites each destination Obsidian cannot open in place, keeping link text, title, and anchor, and prints `line <n>: <old target> -> <new target>` or `line <n>: refused: <reason>` per link, then `vault-link: <r> links rewritten, <c> symlinks created, <u> reused, <v> already in vault, <f> refused`. Refused links stay unchanged, and only rewritten links count toward symlinks created or reused. An applied rewrite prints `Recovery file: <path>` before the per-link output; no-op and dry runs create no recovery file.
+
+### Writing the note
+
+`--all` plans every rewrite before changing anything. It checks that the note can be written and still holds the planning text, creates only the symlinks the rewritten links need, and stages the rewritten text beside the note. If a final text check detects a change before displacement, it leaves the note untouched, removes the symlinks this run created, and prints `ERROR: <note> changed while vault-link ran; nothing was written. Run vault-link again`. If the note cannot be written, no symlink is created.
+
+The writer moves the **actual note**, not a copy of the planning text, into a uniquely created `.<note filename>.recovery-<random suffix>/` directory beside its resolved real path. The recovery file keeps the note's filename. It then checks that displaced file against the planning text and installs the staged rewrite with an exclusive hard link, which fails if an editor has recreated the note path. A detected change refuses the rewrite, removes newly created symlinks, and reports the recovery path. Restoration on refusal or an installation error also uses an exclusive hard link: it restores the old pathname only if absent, never over an editor's new note. An error after displacement reports the retained recovery path and any restoration failure.
+
+Recovery is retained **after success as well as failure**. A writer holding an earlier open file descriptor can still save into that displaced inode; inspect both files before deleting the recovery directory manually. A symlinked note remains a symlink; its resolved target is the file displaced. Staging cleanup is best effort and never removes recovery after displacement.
+
+This is recoverable replacement, **not** compare-and-swap or an atomic edit sequence. The note path is briefly absent. It requires same-filesystem hard-link support and does not promise crash durability or protection against another process deleting recovery. A save detected before displacement or in the missing-path interval refuses the rewrite; a later save through an old descriptor remains recoverable, but does not change a successful exit status.
+
+**Exit codes:** `0` every requested link fixed (or planned, with `--dry-run`); `1` Obsidian can already open the target, a single in-vault target does not exist, a link or symlink was refused (including a symlink that cannot be created), or the note changed during the run; `2` usage error, missing note, a note outside any Obsidian vault, or a note that cannot be read or written.
 
 ---
 
@@ -384,6 +431,12 @@ Single-file `validate` writes its full report to a piped standard output before 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-10-14 | `vault-link --all` retains and reports the actual displaced note, exclusively installs without overwriting a recreated note, and attempts non-overwriting restoration on failure; documents persistent recovery, manual cleanup, late descriptor saves and the brief missing-note interval instead of an unchanged-note overwrite guarantee |
+| 1.0.0-draft | 2026-10-11 | `jact vault-link --all` plans first, writes the note only if it is unchanged (else exit `1`, nothing written), and creates symlinks only for rewritten links; refuses targets that are not files and bare repositories; reads the worktree list NUL-separated and ignores repository-redirecting git variables; percent-encodes whitespace, control characters, `\`, `<`, `>`; detects case-only symlink collisions; names a missing in-vault target; finds folder symlinks nested in followed folder symlinks |
+| 1.0.0-draft | 2026-10-11 | Added `obsidian/no-unstable-symlink-link` for links through file or folder symlinks into `.paseo/worktrees/` or folder symlinks inside a `sources` folder; `jact vault-link` no longer reuses such folder symlinks, relinks links through such symlinks, and refuses when only such a folder symlink shows the file |
+| 1.0.0-draft | 2026-10-10 | Added `obsidian/no-unindexed-link` for in-vault links through symlinks or dot folders Obsidian skips; `jact vault-link` rewrites those links to the vault path Obsidian shows |
+| 1.0.0-draft | 2026-10-10 | `jact vault-link` links to a vault path Obsidian already shows instead of making a symlink Obsidian would skip, and refuses symlinks under dot-named folders |
+| 1.0.0-draft | 2026-10-09 | Added `jact vault-link`; the `obsidian/no-vault-escape-link` message now names the exact `jact vault-link` fix command |
 | 1.0.0-draft | 2026-10-09 | Package plugins resolve with ESM import conditions; configuration errors escape control characters; `obsidian/no-reference-note-link` follows first-definition precedence |
 | 1.0.0-draft | 2026-10-09 | Moved project configuration to `.jact/config.json`. Restricted plugins to user configuration. Project plugin lists cause exit `2` before plugin code runs. |
 | 1.0.0-draft | 2026-10-09 | Added renderer presets, user/project configuration, per-rule overrides, plugin contract, findings output, and exit-2 configuration failures; Obsidian dropped-character checking is no longer enabled by default |

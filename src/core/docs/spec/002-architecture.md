@@ -105,6 +105,18 @@ The scope helpers find the project root, index it, and skip ignored paths. Order
 
 Boundary: the scope helpers never parse Markdown.
 
+### `vaultEscape.ts`, `obsidianVaultView.ts`, `VaultLink/vaultLink.ts` — vault link fixer
+
+`vaultEscape.ts` holds the one check for whether a link target leaves the Obsidian vault; the `obsidian/no-vault-escape-link` rule and `jact vault-link` both call it. `obsidianVaultView.ts` models which vault paths Obsidian shows: it finds the vault's followed folder symlinks once per instance, marks each one unstable when its target is in a `.paseo/worktrees` checkout or it sits in a `sources` folder, maps a real file to the vault path that shows it, and says why Obsidian skips an in-vault path; the `obsidian/no-unindexed-link` and `obsidian/no-unstable-symlink-link` rules and `jact vault-link` all use it. `VaultLink/vaultLink.ts` maps an escaping target to the repo's main checkout, makes a per-file symlink under `sources/` beside the note, and rewrites links for `--all`. Command contract: [`jact vault-link <note> [target]`](../../../../docs/spec/005-interfaces.md#`jact vault-link <note> [target]`).
+
+- **Main checkout only.** A target inside a linked worktree maps to the same repo-relative path in the first entry of `git worktree list --porcelain -z`; a file missing there, or a target that is not a regular file, is refused. A bare repository lists itself first and has no main checkout, so its worktrees are refused. Git variables that point at another repository (`GIT_DIR`, `GIT_WORK_TREE`, and similar) are dropped before git runs.
+- **Preserve Git path text.** Repository paths retain whitespace, including a trailing newline. Only the final line separator from `rev-parse --show-toplevel` is removed; NUL-delimited worktree output stays intact.
+- **Never overwrite.** An identical symlink is reused; anything else at the symlink path is refused.
+- **Reuse what Obsidian shows, if it is stable.** A file already in the vault, or under a stable vault folder symlink, links to that vault path with no new symlink; an in-vault link through a symlink Obsidian skips, through an unstable folder symlink, or through any symlink into a `.paseo/worktrees` checkout, is relinked; a file only an unstable folder symlink shows is refused; paths under dot-named folders are refused.
+- **Recoverable note application.** `replaceFile.ts` owns persistent displacement and non-overwriting installation for the [note recovery contract](../../../../docs/spec/005-interfaces.md#Writing%20the%20note); citation fixes keep their unconditional replacement path. The vault link fixer returns the retained recovery path and removes newly created symlinks on refusal or error.
+
+Boundary: `src/cli.ts` parses options and sets exit codes; the module returns results and never prints.
+
 ### `computeValidationSummary.ts`, `getLinkClass.ts` — result helpers
 
 The result helpers count link statuses and classify a link as `wiki`, `caret`, or `markdown` for reports. Both are pure functions.
@@ -113,7 +125,7 @@ The result helpers count link statuses and classify a link as `wiki`, `caret`, o
 
 ## Boundary
 
-Core imports types, shared utilities, and injected services, never the CLI layer or formatters. Two files write user files: `apply-citation-fixes.ts` and `rename-markdown-file.ts`.
+Core imports types, shared utilities, and injected services, never the CLI layer or formatters. `apply-citation-fixes.ts`, `rename-markdown-file.ts`, and `VaultLink/vaultLink.ts` apply changes to user files; `replaceFile.ts` owns note replacement primitives.
 
 Three imports cross the layer line:
 
@@ -135,3 +147,4 @@ Each row records one version of this architecture section.
 |---------|---------|
 | 1.0.0 | Initial architecture for `src/core` |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
+| 1.2.0 | 2026-10-14: Added recoverable note application ownership and corrected the user-file writer boundary |

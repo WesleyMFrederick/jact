@@ -17,7 +17,8 @@ Every capability below ships in this checkout.
 | Check only the links and rule findings inside a line range | `jact validate --lines N-M` |
 | Select renderer validation presets with user defaults and nearest-project overrides | [Validation configuration and presets](005-interfaces.md#Validation configuration and presets) |
 | Enable or disable individual rules and load custom validation plugins | [Validation configuration and presets](005-interfaces.md#Validation configuration and presets) |
-| Detect Obsidian local-file split-style links, dropped-character anchors, and links that leave the vault | `obsidian/no-reference-note-link`, `obsidian/anchor-dropped-chars`, `obsidian/no-vault-escape-link` under the `obsidian` preset |
+| Detect Obsidian local-file split-style links, dropped-character anchors, links that leave the vault, in-vault links Obsidian skips, and links through folder symlinks that can disappear | `obsidian/no-reference-note-link`, `obsidian/anchor-dropped-chars`, `obsidian/no-vault-escape-link`, `obsidian/no-unindexed-link`, `obsidian/no-unstable-symlink-link` under the `obsidian` preset |
+| Fix links Obsidian cannot open, by symlinking the main-checkout file beside the note or reusing the vault path Obsidian shows, and rewriting the link | [`jact vault-link`](005-interfaces.md#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) |
 | Rewrite split-style note links inline and delete their definitions | `jact validate --fix` with `obsidian/no-reference-note-link` enabled |
 | Repair broken citation paths and anchors, with a dry-run preview and an optional backup | `jact validate --fix` |
 | Turn a prose `.md` path into a Markdown link when it resolves to exactly one file; code and commands keep their text | `jact validate --fix` |
