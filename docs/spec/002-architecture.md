@@ -65,10 +65,11 @@ Boundary: neither file builds the parser, caches, checker, extractor, or validat
 
 ### Component Factory (`src/factories/`)
 
-The factory builds each component with production defaults. Most builders take optional replacements for their component dependencies; `null` or an omitted argument selects the default.
+The factory builds each component with production defaults. Most builders take optional replacements for their component dependencies. For parameters that accept `null`, `null` or an omitted argument selects the default. `resolveRuleSet` is typed `RuleSetResolver | undefined`, so it does not accept `null`; omitting it or passing `undefined` selects the default (no rules, the `commonmark` preset).
 
 - The checker builder accepts parsed-document lifecycle and file-cache interfaces. The linked-header query builder accepts a backlink-candidate interface. Tests can inject fakes for those dependencies without importing production classes.
-- Other component replacements, such as the extractor and validate workflow dependencies, are typed with concrete classes. A replacement must be a production instance or match the class shape.
+- The extractor builder's parsed-document cache and the validate workflow builder's parsed-document cache, file cache, and checker are typed with concrete classes (`ParsedFileCache`, `FileCache`, `CitationValidator`). A replacement must be assignable to the declared class types.
+- The extractor builder's `strategies` parameter is an array of the `ExtractionEligibilityStrategy` interface, so any objects that satisfy the interface are accepted. The validate workflow builder's optional `resolveRuleSet` parameter is a `RuleSetResolver` callback, `(filePath: string) => Promise<RuleSet>`, not a class instance.
 - The extractor gets its eligibility rules in fixed precedence: stop marker, force marker, section link, CLI flag. Rules: [Extraction Eligibility Order](006-behavior.md#Extraction%20Eligibility%20Order).
 
 Boundary: the factory wires components; it holds no parsing, checking, or extraction logic.
