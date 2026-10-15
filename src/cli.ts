@@ -113,6 +113,24 @@ program.configureOutput({
 	},
 });
 
+// Commander rejections (unknown command or option, bad choice, missing or
+// invalid argument) are usage errors: exit 2 per the exit-code contract.
+// Help and version output keep exit 0.
+program.exitOverride((error) => {
+	process.exit(error.exitCode === 0 ? 0 : 2);
+});
+
+// List each command in the parent's help with the command's own usage line.
+program.configureHelp({
+	subcommandTerm: (command) => `${command.name()} ${command.usage()}`,
+});
+
+// Shared option descriptions — kept in one place so wording stays consistent across subcommands
+const SCOPE_OPTION_DESCRIPTION =
+	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
+const VERBOSE_OPTION_DESCRIPTION =
+	"Include outgoingLinksReport + stats in output";
+
 /** Read all of process.stdin to a UTF-8 string (used by `validate --stdin`). */
 async function readAllStdin(): Promise<string> {
 	const chunks: Buffer[] = [];
@@ -131,7 +149,7 @@ interface CliBatchValidateOptions extends CliValidateOptions {
 program
 	.command("validate")
 	.description(
-		"Validate citations in a markdown file, checking that target files exist and anchors resolve correctly",
+		"Validate citations in one or more markdown files, checking that target files exist and anchors resolve correctly",
 	)
 	// Optional at the Commander level so --stdin's missing-<file-path> case can exit 2
 	// with our own message (D2) instead of Commander's generic usage error.
@@ -139,15 +157,16 @@ program
 		"[paths...]",
 		"path(s) to markdown file(s) and/or glob patterns; omit when using --changed alone; with --stdin, exactly one path (the intended on-disk path, not read from disk)",
 	)
-	.option("--format <type>", "output format (cli, json)", "cli")
+	.addOption(
+		new Option("--format <type>", "output format")
+			.choices(["cli", "json"])
+			.default("cli"),
+	)
 	.option(
 		"--lines <range>",
 		'validate specific line range (e.g., "150-160" or "157")',
 	)
-	.option(
-		"--scope <folder>",
-		"limit file resolution to specific folder (enables smart filename matching)",
-	)
+	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
 	.option(
 		"--fix",
 		"automatically fix citation anchors including kebab-case conversions and missing anchor corrections; one on-disk file only (not with batch selection or --stdin)",
@@ -401,20 +420,16 @@ Exit Codes:
 		}
 	});
 
-// Shared option descriptions — kept in one place so wording stays consistent across subcommands
-const SCOPE_OPTION_DESCRIPTION =
-	"Folder to search for filename matches. Defaults to nearest ancestor of cwd containing .git or package.json; falls back to target file's ancestors. Required only when neither cwd nor target reveal a project root.";
-const VERBOSE_OPTION_DESCRIPTION =
-	"Include outgoingLinksReport + stats in output";
-
 program
 	.command("rename")
 	.description(
 		"Preview (default) or apply (--fix) a move of files or directories and update incoming, outgoing, and between-moved-file links and plain paths in scope",
 	)
 	.usage("[options] <source...> <destination>")
+	// Optional at the Commander level so a missing source or destination exits 1
+	// (refused plan) with our own message instead of Commander's usage error.
 	.argument(
-		"<source-and-destination...>",
+		"[source-and-destination...]",
 		"one or more sources, then the destination (<source...> <destination>). A source is a file of any type, a quoted glob, or a directory. Existing source paths take literal precedence over glob expansion, including bracketed names; only non-existing glob sources are expanded. With one file source, the destination is a new file path, a directory (existing, or ending in /), or a bare filename that renames in place. With one directory source, the tree moves into the destination if it is an existing directory, otherwise to the destination path (like `mv`). With several sources or a glob, the destination is a directory and each source lands at <destination>/<basename>. Missing destination directories are created on --fix.",
 	)
 	.option("--scope <folder>", SCOPE_OPTION_DESCRIPTION)
@@ -544,7 +559,7 @@ program
 	)
 	.option(
 		"--all",
-		"fix every link in the note that Obsidian cannot open, in place",
+		"fix every link in the note that Obsidian cannot open, in place; footnote definitions are skipped",
 		false,
 	)
 	.option(
@@ -806,11 +821,20 @@ Examples:
     $ jact ast plan.md                        # smart default scope (cwd-git/pkg)
     $ jact ast plan.md --scope ./other-repo   # explicit override
 
-Output includes:
+Output fields (top-level JSON keys):
+  - filePath: Path of the parsed file
+  - content: Raw file text
   - ast: Markdown AST (mdast) from the micromark parser
   - links: Detected citation links with anchor metadata
+  - linkReferences: Reference-style link uses; definitions are in links
+  - embeds: Inline image and wiki embeds
   - headings: Parsed heading structure
   - anchors: Available anchor points (headers and blocks)
+  - validationDisabled: true when the document opts out of validation
+
+Exit Codes:
+  0  AST printed
+  2  File lookup, scope, permission, or parse error
 `,
 	)
 	.action(async (file: string, options: { scope?: string }) => {
@@ -1015,7 +1039,7 @@ Examples:
 Exit Codes:
   0  Header extracted successfully; all linked content resolved
   1  Header failed to resolve, or some linked content failed to resolve
-  2  System error (file not found, permission denied, incomplete scope scan)
+  2  System error (file not found, permission denied, incomplete scope scan), or a target outside scope with --extract-linked-content
 `,
 	)
 	.action(
@@ -1104,7 +1128,7 @@ Examples:
 
 Exit Codes:
   0  File extracted successfully
-  1  File not found or validation failed
+  1  Target file not found or invalid, or a linked target failed
   2  System error (permission denied, parse error)
 `,
 	)

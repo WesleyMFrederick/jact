@@ -28,7 +28,7 @@ Each help page is part of the command contract. A reviewer compares it with the 
 
 | Help part | Rule |
 |---|---|
-| Usage line | Matches the usage block in the contract section |
+| Usage line | Matches the usage block in the contract section; a parent's command list shows each command's own usage line |
 | Arguments and options | Each flag, default, and value list matches the contract table |
 | Value lists | A flag with a fixed set of values declares Commander choices, so a wrong value fails before the action runs |
 | Shared flags | Every `--scope` flag uses the shared scope description; the three `extract` commands share one `-v, --verbose` description |
@@ -47,16 +47,17 @@ Some commands add blocks between the examples and the exit codes.
 | `rename` | Safety |
 | `vault-link` | Behavior |
 | `outline` | Default heading ceiling |
-| `ast` | Output fields |
+| `ast` | Output fields: every top-level JSON key |
 
 ---
 
 ## Parser Rejections
 
-Commander rejects an unknown command, an unknown flag, a value outside its choices, or an argument that fails a custom parser. It does so before any action runs, so nothing is read or written.
+Commander rejects an unknown command, an unknown flag, a missing required argument, a value outside its choices, or an argument that fails a custom parser. It does so before any action runs, so nothing is read or written.
 
 - A known synonym, such as `check` for `validate` or `json` for `--format json`, gets a "Did you mean" line instead of the default message.
-- Commander picks the exit code for these rejections; the action exit codes in [Exit Codes](../../../../docs/spec/005-interfaces.md#Exit%20Codes) do not cover them.
+- Every rejection exits `2`, the usage-error code in [Exit Codes](../../../../docs/spec/005-interfaces.md#Exit%20Codes); help and version output exit `0`.
+- `rename` declares its paths optional, so a missing source or destination reaches the action and exits `1` as a refused plan.
 
 ---
 
@@ -83,4 +84,5 @@ The outline session ID comes from the environment, as in [Environment Variables]
 
 | Version | Changes |
 |---|---|
+| 1.1.0 | 2026-10-15: Parser rejections exit `2`; command lists show each command's own usage; `ast` lists all output fields and exit codes; `validate` declares format choices and reuses the shared scope description |
 | 1.0.0 | 2026-10-11: Initial command-to-code map and help-text contract |
