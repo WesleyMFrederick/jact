@@ -575,6 +575,10 @@ Behavior:
   them.
   With a target, the last stdout line is the link to write; the note is not
   edited. With --all, each such link in the note is rewritten in place.
+  An applied --all rewrite keeps the displaced note in a recovery file and
+  prints its path. Keep it until you have checked for editor saves, then
+  delete it manually. The note path is briefly absent during installation;
+  an editor's recreated note is never overwritten.
 
 Exit Codes:
   0  Every requested link was fixed (or would be, with --dry-run)
@@ -675,6 +679,7 @@ Exit Codes:
 						process.exitCode = 1;
 						return;
 					}
+					console.log(terminalText(`Recovery file: ${applied.recoveryPath}`));
 				}
 				console.log(lines.map(terminalText).join("\n"));
 				process.exitCode = refused > 0 ? 1 : 0;

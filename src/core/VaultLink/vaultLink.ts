@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import path from "node:path";
 import type { LinkObject } from "../../types/citationTypes.js";
 import { ObsidianVaultView, unstableReason } from "../obsidianVaultView.js";
-import { replaceFile } from "../replaceFile.js";
+import { replaceFileWithRecovery } from "../replaceFile.js";
 import { findVaultRoot } from "../resolveScope.js";
 import {
 	ANCHOR_START,
@@ -523,17 +523,17 @@ export function createVaultSymlinks(
 }
 
 /**
- * Apply an `--all` plan: create its symlinks and write the rewritten note,
- * but only while the note still holds `original`, the text the plan was made
- * from. The note is checked before anything is created and again just before
- * its new text replaces it; a changed note leaves no symlink behind. Throws
- * when the note cannot be written.
+ * Apply an `--all` plan and retain the actual displaced note for recovery.
+ * Earlier changes are refused; late saves survive in the recovery inode or
+ * at a pathname an editor recreates. Installation never replaces that path.
  */
 export function applyVaultLinkPlan(
 	notePath: string,
 	original: string,
 	plan: { content: string; symlinks: readonly PlannedSymlink[] },
-): { kind: "written" } | { kind: "refused"; reason: string } {
+):
+	| { kind: "written"; recoveryPath: string }
+	| { kind: "refused"; reason: string } {
 	const realNote = fs.realpathSync(notePath);
 	fs.accessSync(realNote, fs.constants.W_OK);
 	const mode = fs.statSync(realNote).mode & 0o777;
@@ -546,15 +546,26 @@ export function applyVaultLinkPlan(
 	const created = createVaultSymlinks(plan.symlinks);
 	if (created.kind === "refused") return created;
 	try {
-		if (!replaceFile(realNote, plan.content, mode, unchanged)) {
+		const replaced = replaceFileWithRecovery(
+			realNote,
+			plan.content,
+			mode,
+			original,
+		);
+		if (replaced.kind === "refused") {
 			created.remove();
-			return changed;
+			return replaced.recoveryPath === undefined
+				? changed
+				: {
+						kind: "refused",
+						reason: `${notePath} changed while vault-link ran; rewrite not installed. Displaced note retained at ${replaced.recoveryPath}. Check both files before retrying`,
+					};
 		}
+		return replaced;
 	} catch (error) {
 		created.remove();
 		throw error;
 	}
-	return { kind: "written" };
 }
 
 /** One escaping link handled by `--all`. */

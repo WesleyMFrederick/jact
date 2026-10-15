@@ -40,7 +40,7 @@ The command registry declares each command with Commander, checks usage, calls t
 - **Shared flag text.** Every `--scope` flag uses one description; the three `extract` commands share one `-v, --verbose` description.
 - **Extract output.** The registry formats `extract` results, prints the content map above `--max-chars`, and owns the `extract links --session` cache.
 
-Boundary: the registry holds no parse, check, or move logic. It builds components only through the factory; the vault link fixer has no factory method, so `vault-link` creates it directly and, on `--all`, hands the plan back to the fixer, which creates the symlinks and writes the note only while it is unchanged.
+Boundary: the registry holds no parse, check, or move logic. It builds components only through the factory; the vault link fixer has no factory method, so `vault-link` creates it directly and, on `--all`, hands the plan back to the fixer under the [note recovery contract](../../../../docs/spec/005-interfaces.md#Writing%20the%20note). The registry reports the retained recovery path before the per-link output and summary.
 
 ### `src/jact-cli.ts` — orchestrator
 
@@ -80,3 +80,4 @@ Boundary: the factory only builds the object. The checker validates it, and only
 | Version | Changes |
 |---|---|
 | 1.0.0 | 2026-10-11: Initial architecture for the CLI layer |
+| 1.1.0 | 2026-10-14: Replaced the unchanged-note claim with core-owned recoverable application and CLI-owned recovery reporting |

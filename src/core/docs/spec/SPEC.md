@@ -1,6 +1,6 @@
 # `src/core` Living Specification
 
-**Version:** 1.4.1
+**Version:** 2.0.0
 **Status:** done
 
 `src/core` is the domain layer of jact: it parses Markdown, checks links, extracts linked content, and plans or applies file edits. It has no command registration, no output formatting, and no exit codes. Those belong to the command-line interface (CLI) layer in the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -49,7 +49,7 @@ These summaries show what core is, is not, and guarantees.
 - The **checker**: each parsed link to a valid, warning, or error result
 - The **rule layer** (`src/core/ValidationRules/`): preset registry, configuration and plugin loading, and post-link checks; contracts live in [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation configuration and presets)
 - The **extractor**: linked sections, blocks, and files to deduplicated content
-- The **editors**: `--fix` citation repair, `jact rename` move planning, and the vault link fixer (`src/core/VaultLink/`, which plans symlinks and note rewrites without touching disk, then for `jact vault-link --all` creates the planned symlinks and writes the note only while it still holds the text the plan was made from), the only code that changes user files
+- The **editors**: `--fix` citation repair, `jact rename` move planning, and the vault link fixer (`src/core/VaultLink/`), the only code that changes user files. The fixer plans before writing and applies through the [note recovery contract](../../../../docs/spec/005-interfaces.md#Writing%20the%20note), rather than promising concurrent editors cannot change the note.
 
 ### What `src/core` Is Not
 
@@ -76,3 +76,4 @@ Each row records one version of this module spec.
 | 1.3.0 | 2026-10-11: Vault link fixer marks folder symlinks into `.paseo/worktrees` or inside a `sources` folder, and file symlinks into `.paseo/worktrees`, as unstable, never reuses them, and flags links through them |
 | 1.4.0 | 2026-10-11: Vault link fixer plans before it writes, creates symlinks only for applied rewrites, and replaces the note through a checked temp-file rename shared with `--fix`; it refuses non-file targets and bare repositories |
 | 1.4.1 | 2026-10-14: Vault link fixer preserves whitespace in Git checkout paths, including a trailing newline, by removing only Git's line-output separator |
+| 2.0.0 | 2026-10-14: Replaced the unchanged-note overwrite claim with recoverable displacement and exclusive installation; persistent recovery retains late editor saves, including writes through old descriptors |
