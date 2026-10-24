@@ -143,7 +143,7 @@ Boundary: the cache holds no parsing logic; the injected parser does the work.
 
 The file index maps Markdown file names to paths inside the scope folder, for links that do not resolve by relative path.
 
-- It resolves the scope folder to its real path and scans each real folder once. Directory symlinks are followed only inside that real scope; special entries are not indexed. Regular-file symlinks remain discoverable.
+- It resolves the scope folder to its real path and scans each real folder once. Directory symlinks are followed only inside that real scope; containment is rechecked at each descent in case an entry changed after listing. Special entries are not indexed. Regular-file symlinks remain discoverable.
 - It obeys `.gitignore` unless `--allow-gitignore` is set, and always obeys `.jactignore` and the default ignore patterns.
 - A name that matches more than one file is an error with ranked candidates; a near-miss name gets suggestions.
 

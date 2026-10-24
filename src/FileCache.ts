@@ -253,6 +253,15 @@ export class FileCache {
 		try {
 			// Scan each real directory once. This stops symlink loops.
 			const realDir = this.fs.realpathSync(dirPath);
+			// Recheck at descent: an entry may have changed since the listing.
+			const relativeToRoot = this.path.relative(scanRoot, realDir);
+			if (
+				relativeToRoot === ".." ||
+				relativeToRoot.startsWith(`..${this.path.sep}`) ||
+				this.path.isAbsolute(relativeToRoot)
+			) {
+				return;
+			}
 			if (visitedRealDirs.has(realDir)) return;
 			visitedRealDirs.add(realDir);
 			const entries = this.fs.readdirSync(dirPath, { withFileTypes: true });

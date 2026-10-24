@@ -198,6 +198,33 @@ describe("FileCache — scan safety", () => {
 		expect(cache.resolveFile("external.md").found).toBe(false);
 	});
 
+	it("refuses a directory replaced by an external symlink after listing", () => {
+		writeFile("scope/inside.md");
+		writeFile("outside/external.md");
+		const replaced = path.join(scope, "replaced");
+		fs.mkdirSync(replaced);
+		const realRead = fs.readdirSync as (...args: unknown[]) => unknown;
+		let swapped = false;
+		vi.spyOn(fs, "readdirSync").mockImplementation(((
+			target: PathLike,
+			...rest: unknown[]
+		) => {
+			const entries = realRead(target, ...rest);
+			if (String(target) === scope && !swapped) {
+				swapped = true;
+				fs.rmdirSync(replaced);
+				fs.symlinkSync(outside, replaced, "dir");
+			}
+			return entries;
+		}) as typeof fs.readdirSync);
+
+		cache.buildCache(scope);
+
+		expect(swapped).toBe(true);
+		expect(names()).toEqual(["inside.md"]);
+		expect(cache.resolveFile("external.md").found).toBe(false);
+	});
+
 	it("never stats entries behind an external directory symlink, even when the target would fail with EBADF", () => {
 		writeFile("scope/inside.md");
 		writeFile("outside/external.md");
