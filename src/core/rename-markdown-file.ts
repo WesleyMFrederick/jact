@@ -285,8 +285,13 @@ function rewritePlainPath(
 			rewritten = `./${rewritten}`;
 		}
 	}
+	if (rewritten === "") rewritten = ".";
 	rewritten = rewritten.split(path.sep).join("/");
-	return `${rewritten}${reference.suffix}`;
+	// A bare directory name (or "." / "..") would no longer scan as a path.
+	const needsSlash = rawPath.endsWith("/") ||
+		(!rewritten.includes("/") && statSync(currentTarget).isDirectory());
+	const slash = needsSlash && !rewritten.endsWith("/") ? "/" : "";
+	return `${rewritten}${slash}${reference.suffix}`;
 }
 
 function existingTarget(link: LinkObject): string | null {
@@ -588,6 +593,7 @@ function brokenEmbeds(
 async function planFiles(
 	deps: RenameMarkdownFilesDeps,
 	moved: Map<string, string>,
+	moves: PlannedMove[],
 	scope: string,
 ): Promise<PlannedFile[]> {
 	const movedMarkdown = [...moved.keys()].filter((filePath) =>
@@ -642,17 +648,18 @@ async function planFiles(
 			expectedTargets.push(nextTarget);
 		}
 		for (const reference of findPlainFilePaths(content)) {
-			const resolution = resolvePlainFilePath(reference, filePath, scope);
+			const resolution = resolvePlainFilePath(reference, filePath, scope, true);
 			const currentTarget =
 				resolution.target === null
 					? null
 					: canonicalExisting(resolution.target);
 			const targetMoves =
-				currentTarget !== null && moved.has(currentTarget);
-			const ambiguousMove = resolution.candidates.some(
-				(candidate) =>
-					existsSync(candidate) && moved.has(canonicalExisting(candidate)),
-			);
+				currentTarget !== null && pathAfterMoves(currentTarget, moves) !== currentTarget;
+			const ambiguousMove = resolution.candidates.some((candidate) => {
+				if (!existsSync(candidate)) return false;
+				const canonicalCandidate = canonicalExisting(candidate);
+				return pathAfterMoves(canonicalCandidate, moves) !== canonicalCandidate;
+			});
 			if (!targetMoves && !changesDirectory && !ambiguousMove) continue;
 			if (currentTarget === null) {
 				const reason =
@@ -668,7 +675,7 @@ async function planFiles(
 					`Plain path text changed at ${filePath}:${reference.line}. No files were changed.`,
 				);
 			}
-			const nextTarget = moved.get(currentTarget) ?? currentTarget;
+			const nextTarget = pathAfterMoves(currentTarget, moves);
 			const replacement = rewritePlainPath(
 				reference,
 				currentTarget,
@@ -806,7 +813,7 @@ async function verifyRelationships(
 			const actual =
 				reference === undefined
 					? null
-					: resolvePlainFilePath(reference, finalPath, scope).target;
+					: resolvePlainFilePath(reference, finalPath, scope, true).target;
 			if (
 				reference?.raw !== expected.raw ||
 				actual === null ||
@@ -956,7 +963,7 @@ export async function renameMarkdownFiles(
 ): Promise<RenameMarkdownFilesResult> {
 	const canonicalScope = canonicalExisting(scopeFolder);
 	const plan = planMoves(request, scopeFolder, canonicalScope);
-	const plannedFiles = await planFiles(deps, plan.moved, canonicalScope);
+	const plannedFiles = await planFiles(deps, plan.moved, plan.moves, canonicalScope);
 	const links = plannedFiles.reduce((total, file) => total + file.links, 0);
 	const backups = options.fix
 		? await commitPlan(

@@ -169,7 +169,11 @@ One request is one plan. jact rewrites, relative to final locations:
 
 jact never parses or rewrites the content of a moved non-Markdown file. A rewrite that leaves the reference text unchanged is not counted.
 
-Plain references resolve against the disk before the move, by exact path only. Rewrites keep `#anchor` and `:line` suffixes, quotes, backticks, code formatting, and command syntax such as `/goal plan:`. Rename changes path text; it never turns a plain reference into a Markdown link. An already-broken reference that the move does not affect stays unchanged.
+Plain references resolve against the disk before the move, by exact path only. Rename accepts existing files and directories, with or without a trailing slash, and preserves the directory target when a note or directory moves. Rewrites keep trailing slashes, `#anchor` and `:line` suffixes, quotes, backticks, code formatting, and command syntax such as `/goal plan:`. Rename changes path text; it never turns a plain reference into a Markdown link. An already-broken reference that the move does not affect stays unchanged.
+
+Directory paths beginning with `./` or `../` resolve relative to the note. Other relative directory paths try the note folder and scope root. File paths retain both candidate bases; missing or ambiguous affected file references still stop the plan.
+
+If a rewritten directory path becomes a single name, `.` or `..`, rename adds a trailing `/` so it remains recognizable as a path.
 
 Destination rules follow `mv`:
 
@@ -198,7 +202,7 @@ jact refuses the plan with exit `1` and writes nothing when:
 - a note that needs a reference edit resolves physically outside scope, including through a symlink
 - a move would break an image embed
 
-Reference search follows symlinks. A shortcut to a note inside scope is allowed. An outside note that needs no edit stays unchanged. An outside note that needs an edit refuses the whole plan before any write. Its error, on standard error in both human and `--json` modes, tells the agent to ask the user whether to widen scope, to preview first, and to apply only after the preview succeeds.
+Reference search follows directory symlinks only when their real target stays inside scope; external directory shortcuts are skipped, and each real directory is scanned once. Special entries such as sockets, devices, and named pipes are not indexed. Regular-file shortcuts remain discoverable. An outside note reached through a file shortcut that needs an edit refuses the whole plan before any write. Its error, on standard error in both human and `--json` modes, tells the agent to ask the user whether to widen scope, to preview first, and to apply only after the preview succeeds.
 
 **Non-Markdown files and embeds.** Any file can move, alone, in a batch, or inside a directory. Parsed links such as `[text](file.pdf)` or `[[dir/file.png]]` and plain paths are rewritten when their target moves; non-Markdown references keep their formatting. Image embeds (`![alt](path)`, `![[dir/file]]`) are outside the jact link model, so rename cannot rewrite them and `jact validate` cannot check them. Rename refuses a plan that would break an embed and lists each `file:line`. These embeds do not block a move:
 

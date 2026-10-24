@@ -78,10 +78,10 @@ Boundary: `citationFixer.ts` only rewrites strings; file reads and writes stay i
 
 ### `plain-file-paths.ts` — plain path scanner
 
-The plain path scanner finds file paths written as plain text or code and resolves each to one exact file. Rules: [Plain File Paths](../../../../docs/spec/006-behavior.md#Plain%20File%20Paths).
+The plain path scanner finds paths written as plain text or code. The citation fixer resolves exact files only; rename also resolves directories under the [rename reference contract](../../../../docs/spec/005-interfaces.md#%60jact%20rename%20%3Csource...%3E%20%3Cdestination%3E%60).
 
 - **Two callers only.** The citation fixer and the rename planner call it; validation never does.
-- **Exact match.** Resolution checks only the note folder and scope root, with no file-name search. Two existing candidates are ambiguous, never guessed.
+- **Exact match.** Resolution uses no file-name search and refuses ambiguous candidates. Directory references with an explicit `./` or `../` base resolve only relative to the note; file references retain both note-folder and scope-root candidates.
 
 Boundary: the scanner parses with the parser's extension set and never writes.
 
@@ -148,3 +148,4 @@ Each row records one version of this architecture section.
 | 1.0.0 | Initial architecture for `src/core` |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
 | 1.2.0 | 2026-10-14: Added recoverable note application ownership and corrected the user-file writer boundary |
+| 1.3.0 | 2026-10-23: Rename resolves and preserves directory references without changing the citation fixer's file-only contract |

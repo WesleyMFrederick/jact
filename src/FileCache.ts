@@ -255,22 +255,20 @@ export class FileCache {
 			const realDir = this.fs.realpathSync(dirPath);
 			if (visitedRealDirs.has(realDir)) return;
 			visitedRealDirs.add(realDir);
-			const entries = this.fs.readdirSync(dirPath);
+			const entries = this.fs.readdirSync(dirPath, { withFileTypes: true });
 
-			for (const entry of entries) {
+			for (const dirent of entries) {
+				const entry = dirent.name;
 				const fullPath = this.path.join(dirPath, entry);
-				let stat: ReturnType<typeof this.fs.statSync>;
-				try {
-					stat = this.fs.statSync(fullPath);
-				} catch (error) {
-					// A dangling symlink (or an entry deleted mid-scan) makes
-					// statSync throw ENOENT. Skip it silently and keep scanning
-					// the rest of the directory — one bad entry must not abort
-					// the whole scan or emit noise.
-					if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
-					throw error;
+				let isDir = dirent.isDirectory();
+				let isFile = dirent.isFile();
+				if (dirent.isSymbolicLink()) {
+					const target = this.classifySymlink(fullPath, scanRoot);
+					if (target === null) continue;
+					isDir = target === "directory";
+					isFile = target === "file";
 				}
-				const isDir = stat.isDirectory();
+				if (!isDir && !isFile) continue;
 				// `ignore` lib expects POSIX-style paths relative to scanRoot;
 				// directory entries must end with "/" to match dir-only patterns.
 				const relative = this.path.relative(scanRoot, fullPath);
@@ -308,6 +306,29 @@ export class FileCache {
 			console.warn(
 				`Warning: Could not read directory ${dirPath}: ${errorMessage}`,
 			);
+		}
+	}
+
+	private classifySymlink(
+		fullPath: string,
+		scanRoot: string,
+	): "directory" | "file" | null {
+		try {
+			const stat = this.fs.statSync(fullPath);
+			if (stat.isFile()) return "file";
+			if (!stat.isDirectory()) return null;
+			const relative = this.path.relative(
+				scanRoot,
+				this.fs.realpathSync(fullPath),
+			);
+			const inside =
+				relative === "" ||
+				(!this.path.isAbsolute(relative) &&
+					relative !== ".." &&
+					!relative.startsWith(`..${this.path.sep}`));
+			return inside ? "directory" : null;
+		} catch {
+			return null;
 		}
 	}
 
