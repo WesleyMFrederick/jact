@@ -143,7 +143,7 @@ Boundary: the cache holds no parsing logic; the injected parser does the work.
 
 The file index maps Markdown file names to paths inside the scope folder, for links that do not resolve by relative path.
 
-- It resolves the scope folder and each subfolder to its real path, and scans each real folder once.
+- It resolves the scope folder to its real path and scans each real folder once. Directory symlinks are followed only inside that real scope; containment is rechecked at each descent in case an entry changed after listing. Special entries are not indexed. Regular-file symlinks remain discoverable.
 - It obeys `.gitignore` unless `--allow-gitignore` is set, and always obeys `.jactignore` and the default ignore patterns.
 - A name that matches more than one file is an error with ranked candidates; a near-miss name gets suggestions.
 
@@ -187,6 +187,7 @@ The opt-out directive imports only syntax-tree types, so these imports form no c
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1.2 | 2026-10-23 | Bound directory-symlink traversal to the real scope and exclude special entries from the file index |
 | 1.1.1 | 2026-10-15 | Correct Component Factory documentation to distinguish dependency interfaces from concrete component replacements |
 | 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
 | 1.0.0-draft | 2026-08-24 | Added the stateless backlink candidate filter and its excludes-only correctness boundary |

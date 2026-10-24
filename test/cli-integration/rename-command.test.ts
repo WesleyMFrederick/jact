@@ -667,9 +667,7 @@ describe("jact rename CLI batch moves", () => {
 
 	it.each([
 		{ shortcutKind: "file", referenceKind: "plain" },
-		{ shortcutKind: "folder", referenceKind: "plain" },
 		{ shortcutKind: "file", referenceKind: "markdown" },
-		{ shortcutKind: "folder", referenceKind: "markdown" },
 	])(
 		"Given an affected external $referenceKind note through a $shortcutKind shortcut When renamed Then preview and apply refuse before any writes",
 		({ shortcutKind, referenceKind }) => {
@@ -718,6 +716,48 @@ describe("jact rename CLI batch moves", () => {
 					expect(readdirSync(path.join(batchDir, "data"))).toEqual(["old.json"]);
 					expect(readdirSync(outside)).toEqual(["outside.md"]);
 				}
+			} finally {
+				rmSync(outside, { recursive: true, force: true });
+			}
+		},
+	);
+
+	it.each(["plain", "markdown"])(
+		"Given an external %s note behind a folder shortcut When renamed Then the scan skips the shortcut and the external note stays unchanged",
+		(referenceKind) => {
+			writeTree({
+				"data/old.json": '{"value":1}\n',
+				"a-index.md": "# Index\n\nSee data/old.json.\n",
+			});
+			const outside = mkdtempSync(`${batchDir}-outside-`);
+			const outsideFile = path.join(outside, "outside.md");
+			const movedFile = realpathSync(path.join(batchDir, "data/old.json"));
+			const content = `# Outside\n\n${
+				referenceKind === "plain" ? `See ${movedFile}.` : `[Data](${movedFile})`
+			}\n`;
+			writeFileSync(outsideFile, content);
+			const shortcut = path.join(batchDir, "z-alias");
+			symlinkSync(outside, shortcut);
+
+			try {
+				for (const extra of [[], ["--fix"]]) {
+					const result = runBatch([
+						"data/old.json",
+						"archive/nested/new.json",
+						...extra,
+					]);
+
+					expect(result.status, result.stderr).toBe(0);
+					expect(readFileSync(outsideFile, "utf8")).toBe(content);
+					expect(readlinkSync(shortcut)).toBe(outside);
+					expect(readdirSync(outside)).toEqual(["outside.md"]);
+				}
+				expect(readFileSync(path.join(batchDir, "a-index.md"), "utf8")).toBe(
+					"# Index\n\nSee archive/nested/new.json.\n",
+				);
+				expect(existsSync(path.join(batchDir, "archive/nested/new.json"))).toBe(
+					true,
+				);
 			} finally {
 				rmSync(outside, { recursive: true, force: true });
 			}
@@ -935,6 +975,170 @@ describe("jact rename CLI batch moves", () => {
 		expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
 			"Read archive/deep/note.md#Note.\n",
 		);
+	});
+
+	it.each(["", "/"])(
+		"Given existing absolute directory paths ending in '%s' When a note moves Then preview and fix preserve their spelling",
+		(slash) => {
+			const directory = path.join(realpathSync(batchDir), "reference");
+			const note = `# Note\n\n\`${directory}${slash}\`\n`;
+			writeTree({ "docs/note.md": note, "reference/shared.txt": "shared\n" });
+			const before = snapshot(batchDir, { includeBackups: true });
+
+			const preview = runBatch(["docs/note.md", "archive/deep/note.md"]);
+
+			expect(preview.status, preview.stderr).toBe(0);
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+
+			const applied = runBatch(["docs/note.md", "archive/deep/note.md", "--fix"]);
+
+			expect(applied.status, applied.stderr).toBe(0);
+			expect(readFileSync(path.join(batchDir, "archive/deep/note.md"), "utf8")).toBe(note);
+			expect(readFileSync(path.join(directory, "shared.txt"), "utf8")).toBe("shared\n");
+		},
+	);
+
+	it("Given relative directory paths When a note moves Then note-relative paths rebase and scope-relative paths retain their base and slash", () => {
+		writeTree({
+			"docs/note.md": "# Note\n\n`../reference` and `../reference/`\n\n`reference/`\n\n`../archive/deep/`\n",
+			"reference/shared.txt": "shared\n",
+			"archive/deep/keep.txt": "keep\n",
+		});
+		const before = snapshot(batchDir, { includeBackups: true });
+
+		const preview = runBatch(["docs/note.md", "archive/deep/note.md"]);
+
+		expect(preview.status, preview.stderr).toBe(0);
+		expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+
+		const applied = runBatch(["docs/note.md", "archive/deep/note.md", "--fix"]);
+
+		expect(applied.status, applied.stderr).toBe(0);
+		expect(readFileSync(path.join(batchDir, "archive/deep/note.md"), "utf8")).toBe(
+			"# Note\n\n`../../reference` and `../../reference/`\n\n`reference/`\n\n`./`\n",
+		);
+	});
+
+	it("Given plain references to a moved directory and its empty descendant When previewed and fixed Then incoming and internal directory references follow", () => {
+		const oldDirectory = path.join(realpathSync(batchDir), "notes");
+		const nextDirectory = path.join(realpathSync(batchDir), "archive/deep");
+		const index = `# Index\n\n\`./notes\` and \`notes/\`\n\n\`${oldDirectory}\` and \`${oldDirectory}/\`\n\n\`notes/empty/\`\n`;
+		writeTree({
+			"notes/one.md": "# One\n\n`./empty/`\n\n`../reference/`\n",
+			"reference/shared.txt": "shared\n",
+			"index.md": index,
+		});
+		mkdirSync(path.join(batchDir, "notes/empty"));
+		const before = snapshot(batchDir, { includeBackups: true });
+
+		const preview = runBatch(["notes", "archive/deep"]);
+
+		expect(preview.status, preview.stderr).toBe(0);
+		expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+
+		const applied = runBatch(["notes", "archive/deep", "--fix"]);
+
+		expect(applied.status, applied.stderr).toBe(0);
+		expect(readFileSync(path.join(batchDir, "index.md"), "utf8")).toBe(
+			`# Index\n\n\`./archive/deep\` and \`archive/deep/\`\n\n\`${nextDirectory}\` and \`${nextDirectory}/\`\n\n\`archive/deep/empty/\`\n`,
+		);
+		expect(readFileSync(path.join(nextDirectory, "one.md"), "utf8")).toBe(
+			"# One\n\n`./empty/`\n\n`../../reference/`\n",
+		);
+		expect(readdirSync(path.join(nextDirectory, "empty"))).toEqual([]);
+	});
+
+	it.each([
+		{
+			name: "scope-relative single name",
+			note: "notes/index.md",
+			args: ["docs/guides", "guides"],
+			noteAfter: "notes/index.md",
+			directoryAfter: "guides",
+			expected: "guides/",
+		},
+		{
+			name: "note-relative single name",
+			note: "index.md",
+			args: ["index.md", "docs/index.md"],
+			noteAfter: "docs/index.md",
+			directoryAfter: "docs/guides",
+			expected: "guides/",
+		},
+		{
+			name: "note's own directory",
+			note: "index.md",
+			args: ["index.md", "docs/guides/index.md"],
+			noteAfter: "docs/guides/index.md",
+			directoryAfter: "docs/guides",
+			expected: "./",
+		},
+		{
+			name: "note's parent directory",
+			note: "index.md",
+			args: ["index.md", "docs/guides/nested/index.md"],
+			noteAfter: "docs/guides/nested/index.md",
+			directoryAfter: "docs/guides",
+			expected: "../",
+		},
+	])(
+		"Given a directory reference shortened to $name When previewed and fixed Then its target remains detectable",
+		({ note, args, noteAfter, directoryAfter, expected }) => {
+			writeTree({
+				[note]: "# Index\n\n`docs/guides`\n",
+				"docs/guides/keep.txt": "keep\n",
+			});
+			const before = snapshot(batchDir, { includeBackups: true });
+
+			const preview = runBatch(args);
+
+			expect(preview.status, preview.stderr).toBe(0);
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+
+			const applied = runBatch([...args, "--fix"]);
+
+			expect(applied.status, applied.stderr).toBe(0);
+			expect(readFileSync(path.join(batchDir, noteAfter), "utf8")).toBe(
+				`# Index\n\n\`${expected}\`\n`,
+			);
+			expect(
+				readFileSync(path.join(batchDir, directoryAfter, "keep.txt"), "utf8"),
+			).toBe("keep\n");
+		},
+	);
+
+	it.each(["", "/"])(
+		"Given ambiguous incoming directory references ending in '%s' When one candidate moves Then preview and fix refuse before writes",
+		(slash) => {
+			writeTree({
+				"data/reference/a.txt": "scope\n",
+				"docs/data/reference/b.txt": "note\n",
+				"docs/note.md": `# Note\n\n\`data/reference${slash}\`\n`,
+			});
+			const before = snapshot(batchDir, { includeBackups: true });
+
+			for (const extra of [[], ["--fix"]]) {
+				const result = runBatch(["data/reference", "archive/reference", ...extra]);
+
+				expect(result.status).toBe(1);
+				expect(result.stderr).toContain("is ambiguous");
+				expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+			}
+		},
+	);
+
+	it("Given a missing outgoing directory path When its note moves Then preview and fix refuse before writes", () => {
+		writeTree({ "docs/note.md": "# Note\n\n`../missing/`\n" });
+		const before = snapshot(batchDir, { includeBackups: true });
+
+		for (const extra of [[], ["--fix"]]) {
+			const result = runBatch(["docs/note.md", "archive/note.md", ...extra]);
+
+			expect(result.status).toBe(1);
+			expect(result.stderr).toContain("does not resolve");
+			expect(result.stderr).toContain("../missing/");
+			expect(snapshot(batchDir, { includeBackups: true })).toEqual(before);
+		}
 	});
 
 	it("Given Markdown and data sources When moved as one batch Then between-file plain references remain usable", () => {
@@ -1329,12 +1533,12 @@ describe("rename Windows physical containment", () => {
 		destinationFile = path.join(scope, "archive", "result.json");
 		localNote = path.join(scope, "a-local.md");
 		outsideNote = path.join(outside, "note.md");
-		shortcut = path.join(scope, "z-external");
+		shortcut = path.join(scope, "z-external.md");
 		originalReference = `See ${sourceFile}.\n`;
 		writeFileSync(sourceFile, sourceContent);
 		writeFileSync(localNote, originalReference);
 		writeFileSync(outsideNote, originalReference);
-		symlinkSync(outside, shortcut, "junction");
+		symlinkSync(outsideNote, shortcut, "file");
 		const fileCache = createFileCache();
 		fileCache.buildCache(scope);
 		deps = {
@@ -1395,11 +1599,11 @@ describe("rename Windows physical containment", () => {
 		expect(readFileSync(sourceFile, "utf8")).toBe(sourceContent);
 		expect(readFileSync(localNote, "utf8")).toBe(originalReference);
 		expect(readFileSync(outsideNote, "utf8")).toBe(originalReference);
-		expect(readlinkSync(shortcut)).toBe(outside);
+		expect(readlinkSync(shortcut)).toBe(outsideNote);
 		expect(readdirSync(scope).sort()).toEqual([
 			"a-local.md",
 			"source.json",
-			"z-external",
+			"z-external.md",
 		]);
 		expect(readdirSync(outside)).toEqual(["note.md"]);
 	}
@@ -1447,7 +1651,7 @@ describe("rename Windows physical containment", () => {
 			);
 			expect(readFileSync(outsideNote, "utf8")).toBe(outsideContent);
 			expect(readdirSync(outside)).toEqual(["note.md"]);
-			expect(readlinkSync(shortcut)).toBe(outside);
+			expect(readlinkSync(shortcut)).toBe(outsideNote);
 		},
 	);
 

@@ -250,7 +250,7 @@ Step 2 refuses the whole plan before any write when:
 - a note whose reference text would change is physically outside the canonical scope, including another Windows drive or an unrelated network root;
 - the moves would break an image embed, which is outside the link model.
 
-Reference discovery through internal symbolic links stays allowed. An outside note with no selected edits does not trigger the containment check. Reference-style images such as `![picture][pic]` use parsed definitions such as `[pic]: notes/p.png`, which follow the link-rewrite rules.
+Reference discovery follows internal directory symlinks but skips directory shortcuts whose real target leaves scope. Each real directory is scanned once; special entries are not indexed. Regular-file shortcuts remain discoverable, with the physical containment check applied before edits. Reference-style images such as `![picture][pic]` use parsed definitions such as `[pic]: notes/p.png`, which follow the link-rewrite rules.
 
 Recovery attempts to reverse every completed move, remove every created folder, and restore every edited file from backups. It continues after recovery errors. It keeps nonempty folders rather than delete files that another process created.
 
@@ -262,6 +262,7 @@ A valid Markdown image with bracketed description text, such as `![[caption]](fo
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.0-draft | 2026-10-23 | Rename preserves existing directory references with and without trailing slashes; scope scans skip external directory shortcuts and special entries while retaining internal symlink discovery and file-reference safety checks |
 | 1.0.0-draft | 2026-10-09 | Rule edits stop when the note differs from the parsed content; reference-note fixes withhold edits for container definitions and follow first-definition precedence |
 | 1.0.0-draft | 2026-10-09 | Added preflight configuration, per-file batch presets, post-link rule checks, findings filtering, rule edits and overlap handling; gated Obsidian dropped-character matching behind its rule |
 | 1.0.0-draft | 2026-10-07 | `--fix` exits `0` when no link errors are left, `1` when errors remain after fixing or during `--dry-run`, and `2` on `ERROR:`. `--fix`, `--dry-run`, and `--no-backup` with batch selection or `--stdin` are usage errors (exit `2`) |

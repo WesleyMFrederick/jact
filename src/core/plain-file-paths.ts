@@ -80,7 +80,7 @@ export function findPlainFilePaths(content: string): PlainFilePath[] {
 			const suffixMatch = /(?:#[^\s]+|:L?\d+(?:[,-]L?\d+)*)$/.exec(raw);
 			const suffix = suffixMatch?.[0] ?? "";
 			const filePath = suffix ? raw.slice(0, -suffix.length) : raw;
-			if (!filePath || filePath.endsWith("/") || filePath.includes(":")) continue;
+			if (!filePath || /^\/+$/.test(filePath) || filePath.includes(":")) continue;
 			if (!filePath.includes("/") && !/^[\p{L}\p{N}_.@+-]*\.[a-z][a-z0-9_-]*$/iu.test(filePath)) continue;
 			if (filePath.includes("/") && !/^(?:~\/|\/|\.\.?\/)?[\p{L}\p{N}_.@+%/-]+$/u.test(filePath)) continue;
 			const position = location(tokenStart);
@@ -110,21 +110,30 @@ export function findPlainFilePaths(content: string): PlainFilePath[] {
 	return references.sort((left, right) => left.start - right.start);
 }
 
-/** Exact files only. Two distinct existing candidates are ambiguous, never guessed. */
+/**
+ * Exact files (and optionally directories). Distinct candidates are never guessed.
+ * An explicit `./` or `../` directory is relative to its note only; file references
+ * keep both the note and scope bases.
+ */
 export function resolvePlainFilePath(
 	reference: PlainFilePath,
 	sourceFile: string,
 	scope: string,
+	allowDirectories = false,
 ): { target: string | null; candidates: string[] } {
 	const rawPath = reference.path.startsWith("~/")
 		? path.join(homedir(), reference.path.slice(2))
 		: reference.path;
+	const noteCandidate = path.resolve(path.dirname(sourceFile), rawPath);
+	const explicitRelative = /^\.\.?(?:\/|$)/.test(rawPath);
 	const possible = path.isAbsolute(rawPath)
 		? [path.normalize(rawPath)]
-		: [path.resolve(path.dirname(sourceFile), rawPath), path.resolve(scope, rawPath)];
+		: [noteCandidate, path.resolve(scope, rawPath)];
 	const candidates = [...new Set(possible)].filter((candidate) => {
 		try {
-			return statSync(candidate).isFile();
+			const stats = statSync(candidate);
+			return stats.isFile() || (allowDirectories && stats.isDirectory() &&
+				(!explicitRelative || candidate === noteCandidate));
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code === "ENOENT" ||
 				(error as NodeJS.ErrnoException).code === "ENOTDIR") return false;
