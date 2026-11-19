@@ -82,6 +82,24 @@ GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=WesleyMFrederick/jact PR_NUMBE
 
 `DRY_RUN=1` prints the review instead of posting it.
 
+## Inspect a past run
+
+GitHub's job log shows only counts. The full record of every run (each agent's suspects, each prover's verdict, the workflow, the cost) stays in the Anthropic Console workspace. Read it there to learn why a run found or missed a bug.
+
+1. Sign in once per machine: `brew install anthropics/tap/ant`, then `ant auth login`. This signs in to the Console (platform.claude.com). A Claude subscription (Claude Code or claude.ai) is a separate account and cannot read Console sessions. The login is stored in `~/.config/anthropic/`, never in the repo or a `.env` file.
+2. Find the session id (`sesn_...`) in the job log.
+3. Read it with the SDK in this folder. The SDK picks up the `ant` login with no environment variables. These calls only read and cost nothing:
+
+   ```js
+   import Anthropic from "@anthropic-ai/sdk";
+   const client = new Anthropic();
+   await client.beta.sessions.retrieve(sessionId);                     // status, title, usage
+   for await (const t of client.beta.sessions.threads.list(sessionId)) {} // one thread per agent
+   for await (const e of client.beta.sessions.events.list(sessionId)) {}  // the event stream
+   ```
+
+Never call `sessions.create` or `events.send` while inspecting: those start paid work.
+
 ## Sources and open questions
 
 - The talk says Bug Hunter is "available as a template and also in Claude Code". As of 2026-11-19, no Bug Hunter template, template API, or official GitHub Action for it appears in the [Managed Agents docs index](https://platform.claude.com/llms.txt). So this is a hand-built version of the flow on the slide.
