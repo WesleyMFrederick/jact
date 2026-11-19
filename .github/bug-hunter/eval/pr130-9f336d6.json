@@ -1,0 +1,254 @@
+{
+  "pr": 130,
+  "head": "9f336d6",
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "high",
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 344,
+      "title": "Slice upload passes an un-awaited toFile() Promise; every real run crashes",
+      "body": "client.beta.files.upload({ file: toFile(...) }) passes a Promise. In SDK 1.11.0 toFile returns Promise<File> (internal/to-file.d.mts:43) and the multipart builder throws on thenables (internal/uploads.mjs:141). Trigger: any PR with at least one reviewable file. Result: exit 2 before a session is created, no review posted. Evidence: CI run 44610964708 at 9f336d6 logged 'TypeError: Received a Promise for file; await it first' from main (bug-hunter.mjs:341); reproduced offline with a fake fetch; the later commit 5da3da7 adds the await.",
+      "confidence": "certain"
+    },
+    {
+      "id": "F2",
+      "severity": "high",
+      "file": ".github/workflows/bug-hunter.yml",
+      "line": 52,
+      "title": "OIDC token fetched once; runs past ~9.5 min die with 401 and leak the session",
+      "body": "The workflow writes GitHub's OIDC JWT to the token file once (lines 48-54) and nothing refreshes it. The JWT expires about 5 minutes after issue, and the SDK rereads the file each time it renews its 600-second Anthropic token (WIF GitHub Actions docs: 'rerun the fetch step periodically'). Trigger: any run that reaches the mandatory token refresh, about 9.5 minutes in (the runner allows 50). Result: the token exchange returns 401 inside the poll loop (bug-hunter.mjs:375), exit 2, no review; stopSession fails with the same 401, so the session keeps running and spending. Evidence: CI run 44611146379 died 9m36s after session start with 'Token exchange failed with status 401' and 'could not archive'; the next run found that session still running. Also attributable to bug-hunter.mjs:64. At 9f336d6 this is masked by F1, which crashes first.",
+      "confidence": "certain"
+    },
+    {
+      "id": "F3",
+      "severity": "medium",
+      "file": ".github/workflows/bug-hunter.yml",
+      "line": 21,
+      "title": "Any label event cancels a running hunt, then skips its own job",
+      "body": "concurrency (group bug-hunter-<PR number>, cancel-in-progress: true, lines 19-21) is set at workflow level, while the label filter lives only in the job `if` (line 30). Every `labeled` event (line 10) queues a new workflow run in the same group, which cancels the in-progress hunt; that new run then skips its job. Trigger: a person or bot adds any label other than bug-hunt while a hunt runs, or a PR is opened with other labels. Result: no review is posted, the spend so far is wasted, and with F4/F5 the session can keep running. Evidence: GitHub applies workflow-level concurrency per workflow run, before job conditions. Not reproduced, because that needs a write to GitHub.",
+      "confidence": "likely"
+    },
+    {
+      "id": "F4",
+      "severity": "medium",
+      "file": ".github/workflows/bug-hunter.yml",
+      "line": 71,
+      "title": "Cancel signals never reach node (child of bash); session keeps spending",
+      "body": "The step is `run: node bug-hunter.mjs`, so bash is the step's entry process and node is its child. On cancellation GitHub sends SIGINT, then SIGTERM, only to the entry process, then kills the process tree (GitHub docs: workflow cancellation reference). Bash does not forward them, so the SIGINT/SIGTERM handlers at bug-hunter.mjs:427-435 never run in CI. Trigger: the job is cancelled (concurrency cancel on re-label, manual cancel) or hits timeout-minutes. Result: the Managed Agents session and its workflow runs continue until they finish or hit the budget cap; README line 22 ('stops and archives the session so nothing keeps spending') is false. Evidence: reproduced locally. Signalling only the `bash -e step.sh` parent left the child node alive with no signal delivered; with `exec node` the child received SIGINT.",
+      "confidence": "certain"
+    },
+    {
+      "id": "F5",
+      "severity": "medium",
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 252,
+      "title": "stopSession archives while still running; runs are not actually stopped",
+      "body": "stopSession (lines 249-253) sends the 'stop all workflow runs' message, immediately sends user.interrupt, then immediately calls archive. Docs: an interrupt 'stops the agent's turn. It ends no run' (workflow-runs, Interrupt a session with runs open), so it likely cuts short the very turn that would act on the stop message; 'A running session cannot be archived' until it goes idle (session-operations, Archiving a session); and archive may return 400 while a run is open. Trigger: the 50-minute timeout, or any failure path that calls stopSession while a run is working. Result: archive is rejected and only logged as 'could not archive', the session stays live, and its runs can keep spending up to the budget while the runner reports it stopped. The later commit 3be0371 adds a wait before archiving.",
+      "confidence": "likely"
+    },
+    {
+      "id": "F6",
+      "severity": "medium",
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 236,
+      "title": "parseReport breaks when a finding body contains a ``` fence",
+      "body": "The fence regex is non-greedy, so it ends the block at the first ``` after the opening json tag. If any JSON string in the report contains ``` (for example a finding body that quotes a code fence), the captured text is cut short and JSON.parse throws. Because the run finished, the error is rethrown (line 411): exit 2 and the whole paid review is lost. Trigger: a finding whose title or body includes triple backticks, plausible for a markdown tool such as this repo. Evidence: reproduced with node. A body containing ``` gives 'SyntaxError: Unterminated string in JSON'; the same report without it parses.",
+      "confidence": "certain"
+    },
+    {
+      "id": "F7",
+      "severity": "medium",
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 118,
+      "title": "Files GitHub returns without a patch are silently dropped from review",
+      "body": "planSlices keeps only files that have f.patch. GitHub's PR files API omits `patch` for large text diffs, not only for binary files: in this repo PR #87 lists a 3149-line added text file with no patch field. Such a file goes to `skipped`, is described to the agent as 'removed or binary' (line 199), and is never mentioned in the posted review. Trigger: a PR with a very large diff in one source file. Result: the biggest change is unread while the review says 'no confirmed bugs', or 'Nothing to review: this PR changes only lockfiles, build output, planning docs, or removed or binary files' (line 337) when it is the only file. Evidence: ran planSlices on a file entry without patch: zero slices, file in skipped.",
+      "confidence": "certain"
+    },
+    {
+      "id": "F8",
+      "severity": "medium",
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 226,
+      "title": "retries_exhausted/refusal idles are polled for 50 min, reported as timeout",
+      "body": "assess returns 'working' for a session.status_idle whose stop reason is retries_exhausted or refusal. Docs (workflow-runs, Know when the work is done): after retries_exhausted the session can stay idle until the caller acts, and the reference sample stops on any reason other than end_turn or requires_action. Trigger: a turn that fails on a non-retryable error (for example a billing failure) or a refusal. Result: the runner polls an idle session every 15 seconds until the 50-minute deadline, then posts 'Timed out after 50 minutes' and exits 0, hiding the real error. README says a broken review exits 2.",
+      "confidence": "likely"
+    },
+    {
+      "id": "F9",
+      "severity": "low",
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 381,
+      "title": "Wrap-up message can be sent to an already finished session",
+      "body": "The loop sends the 75% wrap-up message (lines 378-382) before it checks whether the session is done, and assess ignores events after the last idle. Trigger: the final report request is what pushes spend past 75% of the budget, so the first poll that sees the threshold also sees the finished session. Result: the verdict is 'done' and stopSession is skipped, yet the session has just received a new user message and starts another turn that nobody watches or stops; the cost shown in the review is read while that turn runs. Extra spend is bounded by the session budget.",
+      "confidence": "likely"
+    },
+    {
+      "id": "F10",
+      "severity": "low",
+      "file": ".github/bug-hunter/system-prompt.md",
+      "line": 13,
+      "title": "Provers told to run npm ci concurrently in one shared sandbox checkout",
+      "body": "The prompt tells each of up to 8 parallel provers to run `npm ci --ignore-scripts` and then vitest in the repo. Docs: 'A run's threads work in the session's sandbox, so every thread works with the same files' (workflow-runs, A run's threads). npm ci deletes and rebuilds node_modules, so concurrent provers race in the one checkout, and their scratch test files share it too. Result: installs or tests fail for reasons unrelated to the claim, so provers can reject real bugs or burn budget retrying. Not reproduced; that needs a live session.",
+      "confidence": "likely"
+    },
+    {
+      "id": "F11",
+      "severity": "low",
+      "file": ".github/workflows/bug-hunter.yml",
+      "line": 54,
+      "title": "Token fetch step has no pipefail; a failed curl leaves the step green",
+      "body": "The step pipes `curl -sSf ... | jq -r .value > $TOKEN_FILE`. With no `shell:` set, GitHub runs `bash -e {0}` without pipefail (the CI log shows `shell: /usr/bin/bash -e {0}`), so the step's status is jq's. Trigger: the OIDC token request fails. Result: the step passes and writes an empty token file; the failure only appears in the next step as 'Identity token file ... is empty'. The job still fails, so the impact is a misleading failure point. Evidence: reproduced locally with bash -e: exit 0 and a 0-byte file.",
+      "confidence": "certain"
+    },
+    {
+      "id": "F12",
+      "severity": "low",
+      "file": ".github/bug-hunter/README.md",
+      "line": 29,
+      "title": "Documented federation rule matches every repo workflow run, not only PRs",
+      "body": "Setup tells the user to create the federation rule with subject prefix `repo:WesleyMFrederick/jact:`. Per the WIF docs, pull-request runs have sub `repo:<owner>/<repo>:pull_request` and branch pushes `repo:<owner>/<repo>:ref:refs/heads/<branch>`, so that prefix matches every workflow run in the repo on any event or branch. README line 59 and bug-hunter.yml lines 6-7 state the opposite ('the Anthropic federation rule accepts only pull_request runs') and give it as the reason there is no manual trigger. Result: the rule is broader than documented; any workflow in the repo with id-token: write can obtain a workspace:developer token. The prefix would need to end in `:pull_request` for the claim to hold.",
+      "confidence": "certain"
+    },
+    {
+      "id": "F13",
+      "severity": "low",
+      "file": ".github/bug-hunter/README.md",
+      "line": 57,
+      "title": "bug-hunt label on a draft PR is silently ignored, contrary to the docs",
+      "body": "README says Bug Hunter runs 'When you add the bug-hunt label', and AGENTS.md line 38 tells agents to always re-add the label to get a fresh review. The job condition (bug-hunter.yml line 29) requires a non-draft PR for every event, including `labeled`. Trigger: the label is added to a draft PR. Result: the job is skipped with no review and no message. Neither document mentions the exception.",
+      "confidence": "certain"
+    },
+    {
+      "id": "F14",
+      "severity": "low",
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 415,
+      "title": "Uploaded slice files are deleted only on the success path",
+      "body": "files.delete runs only after a review is posted (line 415). Every other exit leaves the uploaded slice diffs in the workspace's file storage: a throw from sessions.create, the token failure in F2, a blocked or terminated session, a report parse error (F6), a failed review post, or cancellation. Result: PR diff files accumulate with no cleanup. Minor: it does not change the review result.",
+      "confidence": "certain"
+    }
+  ],
+  "rejected_suspects": [
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 357,
+      "claim": "Mounting the repo without authorization_token makes the clone fail",
+      "why_rejected": "The docs and SDK typings say a public repository clones without a token. CI run 44613043107 mounted it this way and completed."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 351,
+      "claim": "Budget shape or units are wrong (cents vs dollars, string vs number)",
+      "why_rejected": "Matches the budgets docs and typings: amount is an integer string in minor units (cents)."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 152,
+      "claim": "The multiagent, toolset or environment config shapes are invalid",
+      "why_rejected": "They match SDK 1.11.0 typings, and a real run created the agent, environment, session and a workflow run."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 207,
+      "claim": "events.list returns newest-first or one page, so assess reads the wrong order",
+      "why_rejected": "The order defaults to ascending and the SDK iterator pages automatically. A real run parsed its events correctly."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 230,
+      "claim": "The session_thread_id filter picks a sub-agent message or drops the lead's report",
+      "why_rejected": "agent.message has no session_thread_id field in the typings, so the filter is a harmless no-op and the fallback is never needed."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 64,
+      "claim": "Missing beta header, or an empty ANTHROPIC_WORKSPACE_ID, breaks authentication",
+      "why_rejected": "The SDK adds the managed-agents beta header itself and treats empty env values as unset. Checked offline with a fake fetch."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 397,
+      "claim": "A timeout or budget stop should fail the check instead of exiting 0",
+      "why_rejected": "Documented, intended behaviour: README line 67 says these pass with a 'did not finish' heading and a warning."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 418,
+      "claim": "An unfinished run with a high finding exits 1, contradicting the README",
+      "why_rejected": "Failing on a confirmed blocking finding is reasonable, and it is only reachable when a partial report still parses."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 56,
+      "claim": "Skipping docs/, design-docs/ and .scratch/ hides reviewable changes",
+      "why_rejected": "Documented design choice (README line 9)."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 239,
+      "claim": "A malformed report (empty object, unknown or capitalised severity) passes as no findings",
+      "why_rejected": "It only happens if the model breaks the output contract in system-prompt.md. Speculative; no evidence it occurs."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 333,
+      "claim": "PR metadata and file list are fetched separately, so a push in between mismatches head and diff",
+      "why_rejected": "The window is milliseconds between two consecutive requests and needs a push inside it."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 125,
+      "claim": "Slice packing is unbalanced at the 6-slice cap, and added files use a/ instead of /dev/null headers",
+      "why_rejected": "Cosmetic. Every reviewable file still lands in a slice (checked with synthetic inputs)."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 103,
+      "claim": "commentableLines miscounts lines on blank context rows or section text after the hunk header",
+      "why_rejected": "Checked against real GitHub patches for this PR: blank context rows are a single space and the line numbers come out right."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 43,
+      "claim": "A non-numeric BUDGET_CENTS becomes NaN and breaks the run",
+      "why_rejected": "Operator misconfiguration; the API rejects it and the run exits 2."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 298,
+      "claim": "A review cut short by the 75% wrap-up is reported as finished with no warning",
+      "why_rejected": "By design: the wrap-up asks the agent to list unfinished work in not_covered, which the review prints (line 304)."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 36,
+      "claim": "Missing env vars exit 1 instead of the documented 2",
+      "why_rejected": "Cosmetic. The required vars are always set by the workflow, and missing Anthropic credentials fail inside main with exit 2 (checked offline)."
+    },
+    {
+      "file": ".github/bug-hunter/bug-hunter.mjs",
+      "line": 322,
+      "claim": "The 422 fallback hides other 422 causes, for example a force-push making commit_id invalid",
+      "why_rejected": "Cannot be verified read-only, and at worst the run exits 2. Speculative."
+    },
+    {
+      "file": ".github/workflows/bug-hunter.yml",
+      "line": 10,
+      "claim": "A PR author can change the runner or prompt and get the OIDC token (pull_request runs PR code)",
+      "why_rejected": "Only same-repo branches run (line 28 skips forks), and those authors already have write access."
+    },
+    {
+      "file": ".github/workflows/bug-hunter.yml",
+      "line": 34,
+      "claim": "The pinned action SHAs do not match their version comments",
+      "why_rejected": "Checked: both SHAs are exactly the v7.0.1 and v7.0.0 tags."
+    },
+    {
+      "file": ".github/bug-hunter/README.md",
+      "line": 59,
+      "claim": "The 'needs a rebase first' statement is wrong, and the AGENTS.md link anchor is broken",
+      "why_rejected": "The rebase claim is inaccurate (pull_request runs use the merge commit, which already has main's workflow) but harmless. The AGENTS.md link validates with jact."
+    }
+  ]
+}
