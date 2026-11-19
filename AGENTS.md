@@ -33,6 +33,10 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 - **WHEN** browser rendering, DOM inspection, screengrabs, or other headless browser work is required, **ALWAYS** use `ws-chromium` as the pointer to Chromium under `~/Applications`; **NEVER** infer Chromium is unavailable from a failed `open`, PATH lookup, or system Chrome launch, **BECAUSE** the pointer resolves the canonical browser source without copying launch details that drift or become stale.
 
+## Bug Hunter PR review
+
+- **WHEN** a PR needs a fresh Bug Hunter review after new commits, **ALWAYS** remove and re-add the `bug-hunt` label (`gh pr edit <N> --remove-label bug-hunt` then `--add-label bug-hunt`); **NEVER** expect a push to trigger it, **BECAUSE** each run costs up to $3, so it runs only on PR open, ready-for-review, and that label. See [Bug Hunter · When it runs](.github/bug-hunter/README.md#When%20it%20runs).
+
 ## Delta design research
 
 - **WHEN** proposing a delta or delta hypothesis, **ALWAYS** research how established expert repositories, tools, or domain authorities already solve the same problem before choosing names or interfaces, and cite the evidence that affects the proposal, **BECAUSE** observed conventions prevent local invention and make the change predictable.
