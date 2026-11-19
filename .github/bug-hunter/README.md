@@ -4,23 +4,23 @@ Bug Hunter is a multi-agent PR review that runs on Claude Managed Agents and pos
 
 ## How it works
 
-The slide's rule is "no agent reviews its own finding". Every step uses fresh agents:
+The slide's rule is "no agent reviews its own finding". Every step after the first uses fresh agents:
 
-1. **Split.** Plain code cuts the diff into even slices.
-2. **Read the code.** One agent per slice lists suspected bugs.
-3. **Second look.** A fresh agent re-reads every slice, including slices with no hits, for what the first one missed.
-4. **Pick the candidates.** Plain code merges and ranks the suspects.
-5. **Prove each candidate.** A prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap. A rejected claim goes to one more fresh prover.
-6. **Report.** Only confirmed findings come back.
+1. **Split.** `bug-hunter.mjs` cuts the PR into at most 6 slices of whole files, about 400 changed lines each, in plain code. It skips lockfiles, `dist/`, snapshots, and planning docs (`docs/`, `design-docs/`, `.scratch/`). It uploads each slice as a diff file into the agent's sandbox. A PR with nothing left to review gets a short "nothing to review" comment and no session.
+2. **Read.** One agent per slice reads its diff and the code around it, and lists at most 5 suspected bugs.
+3. **Pick.** Plain code merges the suspects, drops duplicates, and keeps the top 8.
+4. **Prove.** A fresh prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap.
+5. **Report.** Only confirmed findings come back.
 
-The phases live in `system-prompt.md`. The agent runs them as a Managed Agents **dynamic workflow**: it writes a small program that runs many agents in phases, and the server runs it in the background.
+Steps 2 to 5 live in `system-prompt.md`. The agent runs them as a Managed Agents **dynamic workflow**: a small program that runs many agents in phases, which the server runs in the background. The lead agent only gets a short manifest (title, description, slice paths), never the full diff, and is told to start the workflow before reading anything.
 
 `bug-hunter.mjs` handles the plumbing:
 
 - It finds or creates the agent and its cloud environment. Each name carries a hash of its config, so editing `system-prompt.md` creates a new agent instead of changing the old one.
-- It starts a session with the repo mounted at the PR head commit, a cost cap, and the diff in the first message.
-- It polls until every workflow run has ended and the session is idle with `end_turn`. That is the documented definition of done.
-- It posts one PR review. Findings on changed lines become inline comments, and the rest go in the review body.
+- It starts a session with the repo mounted at the PR head commit, the slice files beside it, and a cost cap.
+- It polls until every workflow run has ended and the session is idle with `end_turn`. That is the documented definition of done. At 75% of the budget it tells the agent to stop its runs and report what is already confirmed.
+- If the CI job is cancelled or crashes, it stops and archives the session so nothing keeps spending.
+- It posts one PR review. Findings on changed lines become inline comments, and the rest go in the review body. It prints a cost table (per agent role and model) in the job log and the job summary.
 
 ## Setup
 
@@ -35,7 +35,7 @@ The phases live in `system-prompt.md`. The agent runs them as a Managed Agents *
       gh variable set ANTHROPIC_WORKSPACE_ID      -R WesleyMFrederick/jact --body wrkspc_...   # only if the rule covers more than one workspace
       ```
 2. Create the trigger label: `gh label create bug-hunt -R WesleyMFrederick/jact --description "Run Bug Hunter on this PR"`.
-3. Optional: set repo variables to tune it: `BUG_HUNTER_BUDGET_CENTS` (default `300`), `BUG_HUNTER_MODEL` (default `claude-opus-5-5`), and `BUG_HUNTER_FAIL_ON` (`high`, `medium`, `low`, or `none`; default `high`).
+3. Optional: set repo variables to tune it: `BUG_HUNTER_BUDGET_CENTS` (default `1500`), `BUG_HUNTER_MODEL` (default `claude-opus-5-5`), and `BUG_HUNTER_FAIL_ON` (`high`, `medium`, `low`, or `none`; default `high`).
 
 ## Where secrets live
 
@@ -55,7 +55,8 @@ If the agent ever needs to call an outside API, store that key in a Managed Agen
 
 - When a non-draft PR opens, or when a draft PR is marked ready for review.
 - When you add the `bug-hunt` label. To run it again, remove the label and add it back.
-- On demand from the main branch: `gh workflow run bug-hunter.yml -f pr_number=128`.
+
+There is no manual `gh workflow run` trigger: the Anthropic federation rule accepts only `pull_request` runs. A labeled run uses the workflow file from the PR's own merge commit, so a PR branched before Bug Hunter merged needs a rebase first.
 
 It does not run on every push, because each run spends API credit. Fork PRs are skipped, because GitHub gives them no secrets.
 
@@ -63,13 +64,13 @@ It does not run on every push, because each run spends API credit. Fork PRs are 
 
 | Exit | Check | Meaning |
 | ---- | ----- | ------- |
-| 0 | pass | No confirmed finding at or above `FAIL_ON` severity. A budget stop or timeout still passes, with a warning. |
+| 0 | pass | No confirmed finding at or above `FAIL_ON` severity. A budget stop or timeout also passes, but the review heading says "did not finish" and the job shows a warning. |
 | 1 | fail | At least one confirmed finding at or above `FAIL_ON` severity. |
 | 2 | fail | The review itself broke, for example a bad API key or an unreadable report. |
 
 ## Cost
 
-Each session has a hard cap (`BUDGET_CENTS`, default $3.00). At the cap the run pauses, and the script reports partial results. The cap can overshoot by about one model request per working agent. The Console's monthly spend limit applies on top of this; at $10 a month, expect about three full runs. Raise the limit under **Spending & usage** in the Console before you rely on this check.
+Each session has a hard cap (`BUDGET_CENTS`, default $15.00). At the cap the run pauses, the script stops the session, and the review says it did not finish. The cap can overshoot by about one model request per working agent. The Console's monthly spend limit applies on top of this. Each run's real cost appears in the review footer and in a per-agent cost table in the job summary; set `BUG_HUNTER_BUDGET_CENTS` to about 1.5 times the cost of a typical finished run.
 
 ## Run it locally
 

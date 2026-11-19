@@ -35,7 +35,7 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 ## Bug Hunter PR review
 
-- **WHEN** a PR needs a fresh Bug Hunter review after new commits, **ALWAYS** remove and re-add the `bug-hunt` label (`gh pr edit <N> --remove-label bug-hunt` then `--add-label bug-hunt`); **NEVER** expect a push to trigger it, **BECAUSE** each run costs up to $3, so it runs only on PR open, ready-for-review, and that label. See [Bug Hunter · When it runs](.github/bug-hunter/README.md#When%20it%20runs).
+- **WHEN** a PR needs a fresh Bug Hunter review after new commits, **ALWAYS** remove and re-add the `bug-hunt` label (`gh pr edit <N> --remove-label bug-hunt` then `--add-label bug-hunt`); **NEVER** expect a push to trigger it, **BECAUSE** each run spends up to its session budget ($15 by default), so it runs only on PR open, ready-for-review, and that label. See [Bug Hunter · When it runs](.github/bug-hunter/README.md#When%20it%20runs).
 
 ## Delta design research
 

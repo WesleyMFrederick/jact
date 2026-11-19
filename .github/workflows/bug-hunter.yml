@@ -3,19 +3,11 @@ name: Bug Hunter
 # Multi-agent PR review on Claude Managed Agents. See .github/bug-hunter/README.md.
 # Runs once when a PR opens or leaves draft, and again whenever the `bug-hunt`
 # label is added. It does not run on every push, because each run spends API
-# credit (capped per run by BUDGET_CENTS).
+# credit (capped per run by BUDGET_CENTS). There is no manual trigger: the
+# Anthropic federation rule accepts only `pull_request` runs.
 on:
   pull_request:
     types: [opened, ready_for_review, labeled]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: Pull request number to review
-        required: true
-      budget_cents:
-        description: Session budget in US cents (300 = $3.00)
-        required: false
-        default: '300'
 
 permissions:
   contents: read
@@ -25,7 +17,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: bug-hunter-${{ github.event.pull_request.number || inputs.pr_number }}
+  group: bug-hunter-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -33,10 +25,9 @@ jobs:
     # Same-repo PRs only: fork PRs get no secrets. Skip drafts, and skip label
     # events for any label other than `bug-hunt`.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository &&
-       !github.event.pull_request.draft &&
-       (github.event.action != 'labeled' || github.event.label.name == 'bug-hunt'))
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft &&
+      (github.event.action != 'labeled' || github.event.label.name == 'bug-hunt')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -73,8 +64,8 @@ jobs:
           ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
           ANTHROPIC_WORKSPACE_ID: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
           GITHUB_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
-          BUDGET_CENTS: ${{ inputs.budget_cents || vars.BUG_HUNTER_BUDGET_CENTS || '300' }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BUDGET_CENTS: ${{ vars.BUG_HUNTER_BUDGET_CENTS || '1500' }}
           BUG_HUNTER_MODEL: ${{ vars.BUG_HUNTER_MODEL || 'claude-opus-5-5' }}
           FAIL_ON: ${{ vars.BUG_HUNTER_FAIL_ON || 'high' }}
         run: node bug-hunter.mjs

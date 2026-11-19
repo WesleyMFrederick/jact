@@ -1,17 +1,21 @@
 #!/usr/bin/env node
 // Bug Hunter: multi-agent PR review on Claude Managed Agents.
 //
-// 1. Finds or creates the Bug Hunter agent and its cloud environment.
-//    Both names carry a hash of their config, so a config change makes new ones.
-// 2. Starts a session with the repo mounted at the PR head and the PR diff in the message.
-//    The agent runs a dynamic workflow: split -> read -> second look -> pick -> prove -> report.
-// 3. Polls until every workflow run has ended and the session idles with end_turn.
-// 4. Posts the confirmed findings as one PR review with inline comments.
+// 1. Splits the PR into slices here, in plain code, and uploads each slice as a diff file.
+//    Lockfiles, build output and planning docs are skipped. No reviewable change, no session.
+// 2. Finds or creates the agent and its cloud environment. Both names carry a hash of
+//    their config, so a config change makes new ones.
+// 3. Starts a session with the repo mounted at the PR head, the slice files mounted beside
+//    it, and a short manifest as the first message. The agent runs a dynamic workflow:
+//    read each slice -> pick candidates -> prove each candidate -> report.
+// 4. Polls until every workflow run has ended and the session idles with end_turn.
+//    At 75% of the budget it asks the agent to stop its runs and report.
+// 5. Posts the confirmed findings as one PR review, and prints what the session cost.
 //
 // Env: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/name), PR_NUMBER, plus Anthropic credentials:
 // in CI the Workload Identity Federation vars (no stored key); locally ANTHROPIC_API_KEY.
 // Optional: REPO_TOKEN (repo mount, private repos only; never set by default), BUG_HUNTER_MODEL,
-// BUDGET_CENTS (default 300 = $3.00), FAIL_ON (high|medium|low|none, default high),
+// BUDGET_CENTS (default 1500 = $15.00), FAIL_ON (high|medium|low|none, default high),
 // TIMEOUT_MINUTES (default 50), DRY_RUN=1 (print the review instead of posting it).
 //
 // Exit codes: 0 no blocking findings, 1 blocking findings, 2 the review itself failed.
@@ -20,7 +24,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, { toFile } from "@anthropic-ai/sdk";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const env = (name, fallback) => {
@@ -36,15 +40,23 @@ const GITHUB_TOKEN = env("GITHUB_TOKEN");
 // Set REPO_TOKEN (a read-only, single-repo token) only for a private repo.
 const REPO_TOKEN = process.env.REPO_TOKEN || undefined;
 const MODEL = process.env.BUG_HUNTER_MODEL || "claude-opus-5-5";
-const BUDGET_CENTS = String(Number(process.env.BUDGET_CENTS || 300));
+const BUDGET_CENTS = String(Number(process.env.BUDGET_CENTS || 1500));
 const FAIL_ON = process.env.FAIL_ON || "high";
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MINUTES || 50) * 60_000;
 const DRY_RUN = process.env.DRY_RUN === "1";
 const MOUNT_PATH = "/workspace/repo";
+const SLICE_DIR = "/workspace/slices";
 const POLL_MS = 15_000;
-const MAX_DIFF_CHARS = 400_000;
+// At this share of the budget, the runner asks the agent to stop its runs and report,
+// so the final report is never the request that runs out of money.
+const WRAP_UP_AT = 0.75;
+const SLICE_LINES = 400;
+const MAX_SLICES = 6;
+// Files no reviewer needs: lockfiles, build output, snapshots, and planning docs.
+const SKIP = /(^|\/)(package-lock\.json|[^/]*\.lock|pnpm-lock\.yaml)$|^dist\/|\.snap$|\.min\.[a-z]+$|^(docs|design-docs|\.scratch)\//;
 
 const SEVERITY_RANK = { high: 3, medium: 2, low: 1, none: 99 };
+const dollars = (cents) => `$${(Number(cents) / 100).toFixed(2)}`;
 // In CI there is no API key: the SDK reads ANTHROPIC_IDENTITY_TOKEN_FILE and the federation
 // IDs, swaps GitHub's OIDC token for a short-lived Anthropic token, and refreshes it.
 // https://platform.claude.com/docs/en/manage-claude/wif-providers/github-actions
@@ -69,32 +81,62 @@ async function gh(path, { method = "GET", body, accept = "application/vnd.github
     err.status = res.status;
     throw err;
   }
-  return accept.includes("diff") ? res.text() : res.json();
+  return res.json();
+}
+
+async function prFiles() {
+  const all = [];
+  for (let page = 1; ; page++) {
+    const files = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100&page=${page}`);
+    all.push(...files);
+    if (files.length < 100) return all;
+  }
 }
 
 // Lines on the new side of the diff that GitHub accepts inline comments on.
-async function commentableLines() {
+function commentableLines(files) {
   const lines = new Map();
-  for (let page = 1; ; page++) {
-    const files = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}/files?per_page=100&page=${page}`);
-    for (const f of files) {
-      const set = new Set();
-      let newLine = 0;
-      for (const row of (f.patch || "").split("\n")) {
-        const hunk = row.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-        if (hunk) { newLine = Number(hunk[1]); continue; }
-        if (row.startsWith("-")) continue;
-        if (row.startsWith("+") || row.startsWith(" ")) { set.add(newLine); newLine++; }
-      }
-      lines.set(f.filename, set);
+  for (const f of files) {
+    const set = new Set();
+    let newLine = 0;
+    for (const row of (f.patch || "").split("\n")) {
+      const hunk = row.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (hunk) { newLine = Number(hunk[1]); continue; }
+      if (row.startsWith("-")) continue;
+      if (row.startsWith("+") || row.startsWith(" ")) { set.add(newLine); newLine++; }
     }
-    if (files.length < 100) return lines;
+    lines.set(f.filename, set);
   }
+  return lines;
+}
+
+// ---------- Slicing (plain code, no model) ----------
+
+// Packs whole files, in PR order, into at most MAX_SLICES slices of about SLICE_LINES
+// changed lines. A file larger than a slice gets a slice of its own.
+function planSlices(files) {
+  const reviewable = files.filter((f) => f.patch && f.status !== "removed" && !SKIP.test(f.filename));
+  const skipped = files.filter((f) => !reviewable.includes(f)).map((f) => f.filename);
+  const total = reviewable.reduce((n, f) => n + f.changes, 0);
+  const target = Math.max(SLICE_LINES, Math.ceil(total / MAX_SLICES));
+  const slices = [];
+  for (const f of reviewable) {
+    let last = slices.at(-1);
+    if (!last || (last.lines + f.changes > target && slices.length < MAX_SLICES)) {
+      last = { id: `s${slices.length + 1}`, files: [], lines: 0, text: "" };
+      slices.push(last);
+    }
+    last.files.push(f.filename);
+    last.lines += f.changes;
+    last.text += `diff --git a/${f.previous_filename || f.filename} b/${f.filename}\n--- a/${f.previous_filename || f.filename}\n+++ b/${f.filename}\n${f.patch}\n`;
+  }
+  return { slices, skipped };
 }
 
 // ---------- Managed Agents setup ----------
 
-const systemPrompt = readFileSync(join(here, "system-prompt.md"), "utf8");
+// The vault's formatter adds YAML frontmatter to markdown files; the agent never needs it.
+const systemPrompt = readFileSync(join(here, "system-prompt.md"), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
 const agentConfig = {
   model: MODEL,
   system: systemPrompt,
@@ -144,22 +186,19 @@ async function ensureEnvironment() {
 
 // ---------- Session ----------
 
-function userMessage(pr, diff) {
-  const clipped = diff.length > MAX_DIFF_CHARS;
+function manifest(pr, slices, skipped) {
   return [
     `Review pull request #${PR_NUMBER} in ${REPO}: "${pr.title}".`,
-    `The repository is mounted at ${MOUNT_PATH}, checked out at the PR head commit ${pr.head.sha}.`,
-    `The PR merges ${pr.head.ref} into ${pr.base.ref} (base commit ${pr.base.sha}).`,
+    `Repository: ${MOUNT_PATH}, checked out at the PR head commit ${pr.head.sha} (base ${pr.base.ref} at ${pr.base.sha}).`,
     "",
     "PR description:",
-    pr.body || "(none)",
+    (pr.body || "(none)").slice(0, 4000),
     "",
-    clipped
-      ? `The diff is ${diff.length} characters, so it is cut at ${MAX_DIFF_CHARS}. List the changed files with git in the mounted repo to cover the rest.`
-      : "Full unified diff:",
-    "```diff",
-    diff.slice(0, MAX_DIFF_CHARS),
-    "```",
+    "Slices (each is a unified diff file already in the sandbox):",
+    ...slices.map((s) => `- ${s.id}: ${SLICE_DIR}/${s.id}.diff (${s.lines} changed lines) ${s.files.join(", ")}`),
+    skipped.length ? `\nNot reviewed (lockfiles, build output, planning docs, removed or binary files): ${skipped.join(", ")}` : "",
+    "",
+    "Start the workflow run now.",
   ].join("\n");
 }
 
@@ -201,14 +240,54 @@ function parseReport(text) {
   return report;
 }
 
+const say = (sessionId, text) =>
+  client.beta.sessions.events.send(sessionId, { events: [{ type: "user.message", content: [{ type: "text", text }] }] });
+
+// Best effort: ask the agent to end its runs, stop its turn, and archive the session so
+// nothing keeps spending after the CI job is gone. Archiving can also end open runs.
+// https://platform.claude.com/docs/en/managed-agents/workflow-runs#interrupt-a-session-with-runs-open
+async function stopSession(sessionId) {
+  await say(sessionId, "Stop all workflow runs now and start no new work.").catch(() => {});
+  await client.beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
+  await client.beta.sessions.archive(sessionId).catch((err) => console.log(`  could not archive ${sessionId}: ${err.message}`));
+}
+
+// What the session cost, in total and by agent. Thread figures leave out runtime cost,
+// so they sum to a little less than the session total.
+async function costReport(sessionId) {
+  const session = await client.beta.sessions.retrieve(sessionId);
+  const byAgent = new Map();
+  for await (const t of client.beta.sessions.threads.list(sessionId)) {
+    if (!t.usage) continue;
+    const model = typeof t.agent?.model === "string" ? t.agent.model : t.agent?.model?.id ?? "?";
+    const role = t.workflow_run_id ? (t.agent?.name || "workflow agent").replace(/[-_ ]?\d+$/, "") : "lead";
+    const key = `${role} (${model})`;
+    const row = byAgent.get(key) ?? { threads: 0, cents: 0, input: 0, cached: 0, output: 0 };
+    row.threads++;
+    row.cents += Number(t.usage.list_cost?.amount ?? 0);
+    row.input += t.usage.input_tokens ?? 0;
+    row.cached += t.usage.cache_read_input_tokens ?? 0;
+    row.output += t.usage.output_tokens ?? 0;
+    byAgent.set(key, row);
+  }
+  const total = session.usage?.list_cost?.amount;
+  const table = [
+    "| Agent | Threads | Cost | Input | Cached input | Output |",
+    "| ----- | ------- | ---- | ----- | ------------ | ------ |",
+    ...[...byAgent].sort((a, b) => b[1].cents - a[1].cents).map(([k, r]) => `| ${k} | ${r.threads} | ${dollars(r.cents)} | ${r.input} | ${r.cached} | ${r.output} |`),
+    `| **Session total** (includes runtime, ${session.usage?.active_seconds ?? "?"}s) | | **${total === undefined ? "?" : dollars(total)}** | | | |`,
+  ].join("\n");
+  return { total, table };
+}
+
 // ---------- Report ----------
 
 function formatFinding(f) {
   return `**[${String(f.severity).toUpperCase()}] ${f.title}**\n\n${f.body}\n\n<sub>Bug Hunter (Claude Managed Agents)</sub>`;
 }
 
-async function postReview(pr, report, sessionId, note) {
-  const lines = await commentableLines();
+async function postReview(pr, files, report, { sessionId, note, finished, cost }) {
+  const lines = commentableLines(files);
   const inline = [];
   const elsewhere = [];
   for (const f of report.findings) {
@@ -216,18 +295,19 @@ async function postReview(pr, report, sessionId, note) {
     else elsewhere.push(f);
   }
   const counts = ["high", "medium", "low"].map((s) => `${report.findings.filter((f) => f.severity === s).length} ${s}`).join(", ");
+  const heading = !finished ? "did not finish" : report.findings.length ? counts : "no confirmed bugs";
   const body = [
-    `## Bug Hunter: ${report.findings.length ? counts : "no confirmed bugs"}`,
+    `## Bug Hunter: ${heading}`,
     "",
     report.summary || "",
     note ? `\n> ${note}` : "",
     report.not_covered?.length ? `\nNot covered: ${report.not_covered.join(", ")}` : "",
     ...elsewhere.map((f) => `\n---\n\`${f.file}:${f.line}\`\n\n${formatFinding(f)}`),
-    `\n<sub>Managed Agents session \`${sessionId}\` · model \`${MODEL}\` · budget $${(Number(BUDGET_CENTS) / 100).toFixed(2)}</sub>`,
+    `\n<sub>Managed Agents session \`${sessionId ?? "none"}\` · model \`${MODEL}\` · cost ${cost?.total === undefined ? "n/a" : dollars(cost.total)} of ${dollars(BUDGET_CENTS)} budget</sub>`,
   ].join("\n");
 
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-  if (summaryPath) appendFileSync(summaryPath, `${body}\n`);
+  if (summaryPath) appendFileSync(summaryPath, `${body}\n${cost?.table ? `\n### Cost\n\n${cost.table}\n` : ""}`);
   if (DRY_RUN) {
     console.log("DRY_RUN: review not posted.\n", body, "\nInline:", JSON.stringify(inline, null, 2));
     return;
@@ -246,10 +326,23 @@ async function postReview(pr, report, sessionId, note) {
 
 // ---------- Main ----------
 
+let liveSession; // the session to stop if this process is cancelled or crashes
+
 async function main() {
   const pr = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
-  const diff = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`, { accept: "application/vnd.github.v3.diff" });
-  const [agentId, environmentId] = await Promise.all([ensureAgent(), ensureEnvironment()]);
+  const files = await prFiles();
+  const { slices, skipped } = planSlices(files);
+  console.log(`Slices: ${slices.map((s) => `${s.id}=${s.lines} lines/${s.files.length} files`).join(", ") || "none"}; skipped ${skipped.length} files.`);
+  if (!slices.length) {
+    await postReview(pr, files, { summary: "Nothing to review: this PR changes only lockfiles, build output, planning docs, or removed or binary files.", findings: [] }, { finished: true });
+    return;
+  }
+
+  const [agentId, environmentId, uploads] = await Promise.all([
+    ensureAgent(),
+    ensureEnvironment(),
+    Promise.all(slices.map((s) => client.beta.files.upload({ file: toFile(Buffer.from(s.text), `${s.id}.diff`, { type: "text/plain" }) }))),
+  ]);
 
   const session = await client.beta.sessions.create({
     agent: agentId,
@@ -264,14 +357,16 @@ async function main() {
         ...(REPO_TOKEN ? { authorization_token: REPO_TOKEN } : {}),
         checkout: { type: "commit", sha: pr.head.sha },
       },
+      ...uploads.map((u, i) => ({ type: "file", file_id: u.id, mount_path: `${SLICE_DIR}/${slices[i].id}.diff` })),
     ],
   });
-  console.log(`Session ${session.id} started for ${REPO}#${PR_NUMBER} (budget ${BUDGET_CENTS} cents).`);
-  await client.beta.sessions.events.send(session.id, {
-    events: [{ type: "user.message", content: [{ type: "text", text: userMessage(pr, diff) }] }],
-  });
+  liveSession = session.id;
+  console.log(`Session ${session.id} started for ${REPO}#${PR_NUMBER} (budget ${dollars(BUDGET_CENTS)}).`);
+  await say(session.id, manifest(pr, slices, skipped));
 
   const deadline = Date.now() + TIMEOUT_MS;
+  const wrapUpCents = Number(BUDGET_CENTS) * WRAP_UP_AT;
+  let askedToWrapUp = false;
   let verdict = { state: "working" };
   let events = [];
   let seen = 0;
@@ -279,6 +374,12 @@ async function main() {
     await new Promise((r) => setTimeout(r, POLL_MS));
     const current = await client.beta.sessions.retrieve(session.id);
     if (current.status === "terminated") throw new Error(`Session ${session.id} terminated.`);
+    const spent = Number(current.usage?.list_cost?.amount ?? 0);
+    if (!askedToWrapUp && spent >= wrapUpCents) {
+      askedToWrapUp = true;
+      console.log(`  spent ${dollars(spent)}: asking the agent to stop its runs and report.`);
+      await say(session.id, "The budget is nearly spent. Stop your workflow runs now, start no new agents, and write the final report from the findings that a prover has already confirmed. List everything unfinished in not_covered.").catch((err) => console.log(`  wrap-up message failed: ${err.message}`));
+    }
     if (current.status !== "idle") continue;
     events = await listEvents(session.id);
     const fresh = events.slice(seen);
@@ -293,33 +394,49 @@ async function main() {
   }
 
   let note = "";
-  if (verdict.state === "working") note = `Timed out after ${TIMEOUT_MS / 60000} minutes; findings may be partial.`;
-  if (verdict.state === "budget") note = `Stopped at the $${(Number(BUDGET_CENTS) / 100).toFixed(2)} session budget; findings may be partial.`;
+  if (verdict.state === "working") note = `Timed out after ${TIMEOUT_MS / 60000} minutes before the review finished.`;
+  if (verdict.state === "budget") note = `Stopped at the ${dollars(BUDGET_CENTS)} session budget before the review finished.`;
   if (verdict.state === "blocked") throw new Error(`Session ${session.id} is waiting on a tool confirmation; check the agent's permission policy.`);
-  if (verdict.state !== "done") {
-    await client.beta.sessions.archive(session.id).catch(() => {});
-  }
+  const finished = verdict.state === "done";
+  if (!finished) await stopSession(session.id);
+  liveSession = undefined;
+
+  const cost = await costReport(session.id).catch((err) => ({ table: `Cost unavailable: ${err.message}` }));
+  console.log(`\nCost:\n${cost.table}\n`);
 
   let report;
   try {
     report = parseReport(finalText(events));
   } catch (err) {
-    if (verdict.state === "done") throw err;
-    report = { summary: "The review did not finish, so there is no report.", findings: [] };
+    if (finished) throw err;
+    report = { summary: "No report: the review did not finish, so this PR has not been checked.", findings: [] };
   }
-  await postReview(pr, report, session.id, note);
+  await postReview(pr, files, report, { sessionId: session.id, note, finished, cost });
+  await Promise.all(uploads.map((u) => client.beta.files.delete(u.id).catch(() => {})));
 
   const threshold = SEVERITY_RANK[FAIL_ON] ?? SEVERITY_RANK.high;
   const blocking = report.findings.filter((f) => (SEVERITY_RANK[f.severity] ?? 0) >= threshold);
-  if (note) console.log(`::warning title=Bug Hunter::${note}`);
+  if (note) console.log(`::warning title=Bug Hunter did not finish::${note}`);
   if (blocking.length) {
     console.log(`::error title=Bug Hunter::${blocking.length} finding(s) at or above "${FAIL_ON}" severity. See the PR review.`);
     process.exit(1);
   }
 }
 
-main().catch((err) => {
+// GitHub sends SIGINT, then SIGTERM, when a newer run cancels this one.
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, async () => {
+    if (liveSession) {
+      console.log(`${signal}: stopping session ${liveSession}.`);
+      await stopSession(liveSession);
+    }
+    process.exit(2);
+  });
+}
+
+main().catch(async (err) => {
   console.error(`::error title=Bug Hunter failed::${err.message.split("\n")[0]}`);
   console.error(err);
+  if (liveSession) await stopSession(liveSession);
   process.exit(2);
 });
