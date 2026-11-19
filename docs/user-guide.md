@@ -1,0 +1,353 @@
+# jact user guide
+
+Install details, a quick start, and every command with examples.
+
+- For the exact contract of each flag, see [005. Interfaces](spec/005-interfaces.md#005.%20Interfaces).
+- To make an agent harness run jact by itself, see [Wire jact into an agent harness](harness-hooks.md#Wire%20jact%20into%20an%20agent%20harness).
+
+## Install
+
+You need Node.js 22.12 or later.
+
+**From GitHub:**
+
+```bash
+npm install -g --allow-git=root github:WesleyMFrederick/jact
+jact --help
+```
+
+npm 12 and later block installs from git by default. `--allow-git=root` allows only the git package that you name in the command. It does not allow git packages that other packages request. npm builds jact during the install.
+
+If the install fails with `EALLOWSCRIPTS`, an `allow-scripts` line in your `~/.npmrc` is the cause. npm 12 rejects that setting while it builds a git package. Remove only that setting for the install, then put it back:
+
+```bash
+npm config get allow-scripts          # Write down this value.
+npm config delete allow-scripts --location=user
+npm install -g --allow-git=root github:WesleyMFrederick/jact
+npm config set allow-scripts=<value you wrote down> --location=user
+```
+
+Do not clear your whole npm user configuration. It can hold your registry, certificate, and authentication settings.
+
+**From npm:** not published yet. Once it is, the install will be `npm install -g @wesleymfrederick/jact`.
+
+**From source** (to change the code): see [Development](../README.md#Development).
+
+## Quick start
+
+Given `docs/guide.md`:
+
+```markdown
+See [Setup notes](setup.md#Prerequisites) and [Missing](setup.md#Nope).
+Also [Gone](gone.md).
+```
+
+Validate it:
+
+```text
+$ jact validate docs/guide.md
+ERRORS (2)
+- Line 9: [Missing](setup.md#Nope)
+  error: Anchor not found: #Nope
+  suggestion: Available headers: "Setup" → #Setup, "Prerequisites" → #Prerequisites, "Troubleshooting" → #Troubleshooting
+- Line 10: [Gone](gone.md)
+  error: File not found: gone.md
+  ...
+
+FAILED: 2 errors
+```
+
+A clean file prints one line, for example `OK: 4 citations valid`, and exits with code `0`.
+
+Validate many files at once with a glob:
+
+```text
+$ jact validate "docs/**/*.md"
+❌ /project/docs/guide.md
+   Line 9: Anchor not found: #Nope
+   Line 10: File not found: gone.md
+✅ /project/docs/setup.md
+---
+2 files · 1 passed · 1 failed · 0 skipped
+```
+
+## Using jact with AI agents
+
+jact was built to give AI coding agents precise context without loading whole files.
+
+- `outline` followed by `extract header` lets an agent read one section instead of a full document.
+- `extract ... --extract-linked-content` gathers a section and the sections it references in one call.
+- `validate --stdin` checks a draft before the agent saves it, so it works well in an editor hook.
+- `validate --json` gives one result per line for scripts and CI.
+- `extract links --session <id>` skips work already extracted in the same session.
+- When the environment variable `JACT_SESSION_ID` is set, `outline` shows its usage tips once per session instead of on every call.
+
+Tell your agent to run `jact -h` (and `jact <command> -h`) to learn the commands and options. Each help page includes examples and exit codes, so the agent does not need a copy of this README. For example, add this to your agent instructions file (such as `AGENTS.md` or `CLAUDE.md`):
+
+````markdown
+## `jact` — Markdown Context Tool
+
+`jact` = source of truth for Markdown links, structure, extraction. **Markdown files only (`.md`). Never run jact on `.ts`, `.json`, `.yaml`, or non-markdown — fail or garbage.**
+
+Use before `Read` on large markdown files.
+
+**Discovery first:** No memorize commands. Run `jact -h` or `jact <cmd> -h` — options self-document.
+
+**Core principle — orient before extract:**
+1. Orient: `jact outline <file>` → heading tree. Go deeper with `jact outline <file> H3` or `--expand "Section"`.
+2. Extract: `jact extract header <file> "Section"` → only what task needs. Duplicate name → add `--within "Parent"`.
+3. Follow links (optional): add `--extract-linked-content` → section plus the sections it links to.
+
+Never `Read` large file cold. Orient first. Extract narrow.
+
+**Validation:** Run `jact validate <file>` after Write/Edit on `.md`. Skip if a hook already runs it. Unsaved draft → `cat draft.md | jact validate <path> --stdin`.
+
+**Fallback:** jact unavailable → `Read` with explicit offset/limit.
+
+**HARD RULE — Markdown only:** File no end `.md`, do NOT use jact. Use `Read` or `Grep`.
+````
+
+## Commands
+
+Every command has a full help page: `jact <command> --help`.
+
+### `validate` — check links
+
+```bash
+jact validate docs/design.md                 # one file
+jact validate docs/design.md --verbose       # full report, including valid links
+jact validate "docs/**/*.md"                 # glob (batch mode)
+jact validate a.md b.md c.md                 # several files (batch mode)
+jact validate --changed                      # Markdown files changed in your git working tree
+jact validate docs/design.md --lines 100-200 # only links on these lines
+jact validate docs/design.md --format json   # full JSON report for one file
+jact validate "**/*.md" --json               # one JSON line per file (for CI)
+cat draft.md | jact validate docs/draft.md --stdin   # check text that is not saved yet
+```
+
+With `--stdin`, jact reads the Markdown from standard input. The path you give is where the file *would* live; jact uses it to resolve relative links but does not read it.
+
+### Validation presets
+
+By default, jact checks links without extra renderer-specific rules. For Obsidian notes, create `~/.config/jact/config.json`:
+
+```json
+{"preset":"obsidian"}
+```
+
+This enables checks for split-style links that Obsidian opens as web links and heading anchors with characters Obsidian drops. `jact validate note.md --fix --dry-run` previews available repairs; `--fix` applies them.
+
+A project can override your default with a `.jact/config.json` in the note's folder or an ancestor:
+
+```json
+{"preset":"commonmark"}
+```
+
+Only the nearest `.jact/config.json` is used. For individual rule overrides, user-config plugins, and the alternative user config location, see [Validation configuration and presets](spec/005-interfaces.md#Validation configuration and presets).
+
+
+### `validate --fix` — repair heading links
+
+`--fix` rewrites heading links that point at a real heading but use the wrong form (for example a lowercase, dash-separated slug instead of the exact heading text).
+
+```text
+$ jact validate docs/plan.md --fix --dry-run
+DRY RUN — 1 fix would be applied to docs/plan.md:
+
+  Line 3 (anchor):
+    - [install steps](guide.md#install)
+    + [install steps](guide.md#Install)
+
+No files were written (--dry-run).
+```
+
+- `--dry-run` shows the changes and writes nothing.
+- Without `--dry-run`, jact saves a timestamped `.bak` copy of the file before it writes. Add `--no-backup` to skip the copy.
+- `--fix` writes only to a regular file inside the scope. It refuses a symbolic link, a file whose real path is outside the scope, and a backup path that already exists. It writes a temporary file in the same folder and then renames it over the original.
+
+### `rename` — move files or folders and update their links
+
+`rename` previews by default. Add `--fix` to apply. Give it one or more sources and then a destination, like `mv`. A source can be a file of any type, a quoted glob, or a folder.
+
+```text
+$ jact rename docs/setup.md getting-started.md
+Rename preview.
+Source: /project/docs/setup.md
+Destination: /project/docs/getting-started.md
+Updated links: 3 in 2 files
+  2  /project/docs/guide.md
+  1  /project/docs/plan.md
+No files written. Re-run with --fix to apply this plan.
+```
+
+```bash
+jact rename docs/old.md new-name.md --fix     # rename in place
+jact rename docs/old.md archive/ --fix        # move into a folder
+jact rename docs/old.md archive/new.md --json # machine-readable plan
+jact rename a.md b.md new/dir/ --fix          # move several files; creates new/dir
+jact rename "concepts/*.md" archive/          # move every match of a glob
+jact rename notes/old-folder archive/ --fix   # move a whole folder (images included)
+jact rename data/results.json output.json --fix # rename a non-Markdown file
+jact rename "src/*.ts" archive/src/ --fix     # move non-Markdown glob matches
+```
+
+Existing source paths take literal precedence over glob expansion, even when their names contain glob characters such as brackets. Only non-existing glob sources are expanded. With several sources or a glob, the destination is a folder and each file keeps its name. A folder moves into the destination if that folder exists, otherwise it becomes the destination. Missing folders are created on `--fix`.
+
+A symlink is a file or folder shortcut that points to another location. If a source folder contains one, jact stops with exit code `1` and reports its path. This rule applies to preview and `--fix`, including file and folder shortcuts in subfolders. No files are changed.
+
+The whole command is one plan. Parsed links and plain paths into moved files, between moved files, and out of moved Markdown notes are updated together. Plain paths stay plain: prose, backticks, quotes and commands keep their format, as do heading and line-number suffixes. jact resolves exact paths relative to the note or scope; it does not guess by filename. An affected path with two possible files, or an unresolved outgoing path in a note that changes folders, stops the plan before writing. Already-broken references that the move does not affect stay unchanged.
+
+With `--fix`, jact backs up edited notes and individually moved files, applies the plan, then checks rewritten links and plain paths against their intended files. If a step fails, recovery is best-effort: jact attempts to undo every change and exits `2`. A recovery error does not stop the remaining recovery steps; jact reports errors and retained backup paths for manual recovery. It never deletes another process's files to remove a newly created folder. Preview never writes files or backups. URLs, glob patterns and path templates are not plain file references.
+
+jact does not rewrite inline image embeds (`![alt](path)`) or wiki image embeds (`![[folder/image.png]]`). If a move would break one, rename refuses with exit code `1` and lists them; nothing changes. Reference-style images such as `![picture][pic]` use ordinary parsed definitions such as `[pic]: notes/p.png`; those definitions are rewritten when their target moves or their file changes directory.
+
+Escaped embed examples such as `\!\[\[folder/image.png\]\]` and examples inside inline or fenced code do not count as embeds and do not block a move. In `\![[notes/a.md]]`, only the bang is escaped, so the ordinary wiki link is still rewritten.
+
+### `outline` — show the heading tree
+
+```text
+$ jact outline docs/guide.md
+"Guide"
+├── "Install"
+└── "Usage"
+```
+
+```bash
+jact outline docs/guide.md H3                            # show headings down to level 3 (default: H2)
+jact outline docs/guide.md --exact-heading-level H2 -n   # only level-2 headings, with line numbers
+jact outline docs/guide.md --expand "Install,Usage"      # show everything under these headings
+jact outline handbook.md --within "Guide"                # only the branch under "Guide"
+```
+
+`[*]` after a heading means it has hidden subheadings. Use `jact ast` if you need the full parser output as JSON.
+
+### `extract` — pull content out of Markdown
+
+**One section** — the heading and everything under it, with source line numbers:
+
+```text
+$ jact extract header docs/setup.md "Prerequisites"
+     3	## Prerequisites
+     4
+     5	Node 20+.
+```
+
+If two sections share a name, pick one with `--within "<parent heading>"`.
+
+**One whole file:**
+
+```bash
+jact extract file docs/architecture.md
+jact extract file docs/architecture.md --format json
+```
+
+**A file or section plus what it links to:**
+
+```bash
+jact extract file docs/plan.md --extract-linked-content      # follow links one level deep
+jact extract file docs/plan.md --extract-linked-content 3    # follow links three levels deep
+jact extract header docs/plan.md "Overview" --extract-linked-content
+```
+
+Each linked block is labeled with where it came from (`Source: setup.md:3-6`, `Via: guide.md:9`). Broken links are listed under `## Failures`. If the output is larger than `--max-chars` (default 28000), jact prints a map of the content instead of the content.
+
+**Every link in a document**, returned as JSON with duplicate content removed:
+
+```bash
+jact extract links docs/design.md
+jact extract links docs/design.md --full-files   # also include links to whole files
+jact extract links docs/design.md | jq '.extractedContentBlocks'
+```
+
+By default, `extract links` includes links to sections and skips links to whole files. Control single links with a marker after the link:
+
+```markdown
+- [whole guide](guide.md) %%force-extract%%
+- [not needed](setup.md#Troubleshooting) %%stop-extract-link%%
+```
+
+**Links stay inside the project.** When jact follows a link, it reads the target only if the target is inside the project (the scope root). A link to `/etc/...`, `~/...`, `../../...`, or a symbolic link that points out of the project is skipped. jact prints `Blocked: target is outside the project. To allow, add --allow-read <dir>.` on stderr. To permit more folders, add `--allow-read <dir>` once for each folder:
+
+```bash
+jact extract links docs/design.md --allow-read ../shared-docs
+jact extract file docs/plan.md --extract-linked-content --allow-read ~/notes
+```
+
+A file that you name on the command line is always read. `validate` does not use this rule.
+
+### `ast` — debug the parser
+
+```bash
+jact ast docs/design.md | jq '.links'
+jact ast docs/design.md | jq '.anchors | length'
+```
+
+Prints the parsed Markdown tree, detected links, headings, and anchors as JSON.
+
+## Supported link syntax
+
+| Syntax | Example |
+|---|---|
+| Markdown link to a heading | `[Setup](setup.md#Prerequisites)` |
+| Markdown link to a heading with spaces | `[Guide](guide.md#Getting%20Started)` |
+| Markdown link to a file | `[Guide](guide.md)` |
+| Link within the same file | `[Above](#Install)` |
+| Home-relative path | `[Notes](~/notes/todo.md)` |
+| Wiki link | `[[setup#Troubleshooting\|fixes]]` |
+| Block anchor | `- Must be fast. ^NFR1` |
+| Link to a block anchor | `[[#^NFR1]]` |
+
+**Heading anchors use the exact heading text.** Write `#Getting%20Started` (or `#Getting Started` inside wiki links), not the lowercase slug `#getting-started`. jact reports slugs as errors and suggests the exact form; `--fix` rewrites them. This matches how Obsidian resolves links.
+
+jact also reports heading links that contain characters Obsidian removes from links, such as `:`, and suggests the corrected anchor.
+
+## How links are resolved
+
+For each link, jact tries these steps in order:
+
+1. The path relative to the file that contains the link.
+2. An Obsidian vault-style path (relative to a parent folder of the source file).
+3. The same path after following symlinks.
+4. A filename search inside the **scope** folder.
+
+The scope folder defaults to the nearest parent of your current folder that contains `.git` or `package.json`. Use `--scope <folder>` to set it yourself, for example when you check files in another project.
+
+Step 4 lets jact find `setup.md` even if the relative path is wrong. If two files in scope have the same name, jact does not guess: it reports the link as broken and lists both matches.
+
+## Ignoring files
+
+### `.jactignore`
+
+Put a `.jactignore` file (same syntax as `.gitignore`) in the folder you scan:
+
+```gitignore
+# .jactignore
+test/fixtures/
+archive/
+```
+
+- Ignore rules apply to globs, folders, `--changed`, and scope scans.
+- A file you name directly is always checked, even if it is ignored.
+- jact also skips files that `.gitignore` excludes. Use `--allow-gitignore` to include them. `.jactignore` still applies.
+- jact always skips folders such as `node_modules/`, `dist/`, and `.git/`.
+
+### Skip one document
+
+Put this comment as the first line of the document (after YAML front matter, if any):
+
+```markdown
+<!-- jact-validate-disable -->
+```
+
+`validate` then reports the file as `SKIPPED`.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success. All links are valid, or the command finished. |
+| `1` | Something failed a check: a broken link, a missing heading, or an unsafe rename plan. |
+| `2` | System error: file not found, permission denied, parse error, or a glob that matched nothing. |
+
+Each command's `--help` page lists its exact exit codes.
+
