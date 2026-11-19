@@ -54,7 +54,7 @@ If the agent ever needs to call an outside API, store that key in a Managed Agen
 ## When it runs
 
 - When a non-draft PR opens, or when a draft PR is marked ready for review.
-- When you add the `bug-hunt` label. To run it again, remove the label and add it back.
+- When you add the `bug-hunt` label to a non-draft PR. To run it again, remove the label and add it back. On a draft PR the label does nothing: the check shows as skipped. Mark the PR ready for review instead.
 
 There is no manual `gh workflow run` trigger: the Anthropic federation rule accepts only `pull_request` runs. A labeled run uses the workflow file from the PR's own merge commit, so a PR branched before Bug Hunter merged needs a rebase first.
 

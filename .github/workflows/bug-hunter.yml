@@ -69,4 +69,5 @@ jobs:
           BUDGET_CENTS: ${{ vars.BUG_HUNTER_BUDGET_CENTS || '1500' }}
           BUG_HUNTER_MODEL: ${{ vars.BUG_HUNTER_MODEL || 'claude-opus-5-5' }}
           FAIL_ON: ${{ vars.BUG_HUNTER_FAIL_ON || 'high' }}
-        run: node bug-hunter.mjs
+        # exec: node replaces bash, so it receives GitHub's cancel signal directly.
+        run: exec node bug-hunter.mjs

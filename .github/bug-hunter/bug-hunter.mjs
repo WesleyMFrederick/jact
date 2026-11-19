@@ -229,12 +229,15 @@ function assess(events) {
   const open = new Set();
   let lastRunEnd = -1;
   let lastIdle;
+  let lastUserMessage = -1;
   events.forEach((e, i) => {
+    if (e.type === "user.message") lastUserMessage = i;
     if (e.type === "workflow_run.created") open.add(e.workflow_run_id);
     if (e.type === "workflow_run.status_ended") { open.delete(e.workflow_run_id); lastRunEnd = i; }
     if (e.type === "session.status_idle") lastIdle = { index: i, reason: e.stop_reason?.type };
   });
-  if (!lastIdle) return { state: "working" };
+  // A message sent after the last idle (such as the wrap-up request) starts a new turn.
+  if (!lastIdle || lastUserMessage > lastIdle.index) return { state: "working" };
   if (lastIdle.reason === "budget_reached") return { state: "budget" };
   if (lastIdle.reason === "requires_action") return { state: "blocked" };
   if (lastIdle.reason === "end_turn" && open.size === 0 && lastIdle.index > lastRunEnd) return { state: "done" };
@@ -268,11 +271,17 @@ const say = (sessionId, text) =>
 // Best effort: ask the agent to end its runs, stop its turn, and archive the session so
 // nothing keeps spending after the CI job is gone. Archiving can also end open runs.
 // https://platform.claude.com/docs/en/managed-agents/workflow-runs#interrupt-a-session-with-runs-open
-async function stopSession(sessionId) {
-  await say(sessionId, "Stop all workflow runs now and start no new work.").catch(() => {});
-  await client.beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
+// `quick` skips the wait, for the cancel path: GitHub kills the process about 10 seconds
+// after it signals, and the next run's stopStaleSessions() catches anything left over.
+async function stopSession(sessionId, { quick = false } = {}) {
+  const { status } = await client.beta.sessions.retrieve(sessionId).catch(() => ({}));
+  if (status === "running" || status === "rescheduling") {
+    // Only a working session gets the stop message: on an idle one it would start a new turn.
+    await say(sessionId, "Stop all workflow runs now and start no new work.").catch(() => {});
+    await client.beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
+  }
   // A running session can't be archived; give the interrupt up to 30 seconds to land.
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < (quick ? 0 : 6); i++) {
     const { status } = await client.beta.sessions.retrieve(sessionId).catch(() => ({}));
     if (status !== "running" && status !== "rescheduling") break;
     await new Promise((r) => setTimeout(r, 5_000));
@@ -422,7 +431,7 @@ async function main() {
     const current = await client.beta.sessions.retrieve(session.id);
     if (current.status === "terminated") throw new Error(`Session ${session.id} terminated.`);
     const spent = Number(current.usage?.list_cost?.amount ?? 0);
-    if (!askedToWrapUp && spent >= wrapUpCents) {
+    if (!askedToWrapUp && spent >= wrapUpCents && current.status === "running") {
       askedToWrapUp = true;
       console.log(`  spent ${dollars(spent)}: asking the agent to stop its runs and report.`);
       await say(session.id, "The budget is nearly spent. Stop your workflow runs now, start no new agents, and write the final report from the findings that a prover has already confirmed. List everything unfinished in not_covered.").catch((err) => console.log(`  wrap-up message failed: ${err.message}`));
@@ -449,7 +458,10 @@ async function main() {
   if (verdict.state === "budget") note = `Stopped at the ${dollars(BUDGET_CENTS)} session budget before the review finished.`;
   if (verdict.state === "blocked") throw new Error(`Session ${session.id} is waiting on a tool confirmation; check the agent's permission policy.`);
   const finished = verdict.state === "done";
+  // Archive in every case: a finished session has nothing left to do, and an unfinished one
+  // must not keep spending after this job ends.
   if (!finished) await stopSession(session.id);
+  else await client.beta.sessions.archive(session.id).catch((err) => console.log(`  could not archive ${session.id}: ${err.message}`));
   liveSession = undefined;
 
   const cost = await costReport(session.id).catch((err) => ({ table: `Cost unavailable: ${err.message}` }));
@@ -480,7 +492,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, async () => {
     if (liveSession) {
       console.log(`${signal}: stopping session ${liveSession}.`);
-      await stopSession(liveSession);
+      await stopSession(liveSession, { quick: true });
     }
     process.exit(2);
   });
