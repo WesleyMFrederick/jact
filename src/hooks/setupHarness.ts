@@ -3,7 +3,8 @@
  *
  * Writes the wiring that makes a harness call `jact hook <harness>` after it
  * writes or reads a file. JSON-configured harnesses get one merged entry;
- * existing entries from other tools stay untouched. pi and omp get one
+ * existing entries from other tools stay untouched. Antigravity CLI keys its
+ * hooks file by hook name, so jact owns the one key `jact`. pi and omp get one
  * generated extension file.
  *
  * @module hooks/setupHarness
@@ -58,7 +59,19 @@ interface FileTarget {
 	notes: string[];
 }
 
+/** A hooks file whose top-level keys are hook names, as Antigravity CLI reads it. */
+interface NamedHookTarget {
+	kind: "named";
+	file: string;
+	notes: string[];
+}
+
 type JsonRecord = Record<string, unknown>;
+
+/** The key jact owns in a hooks file that is keyed by hook name. */
+const HOOK_NAME = "jact";
+const ANTIGRAVITY_FILE_TOOLS =
+	"write_to_file|replace_file_content|multi_replace_file_content|view_file";
 
 function isRecord(value: unknown): value is JsonRecord {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -67,9 +80,21 @@ function isRecord(value: unknown): value is JsonRecord {
 function target(
 	harness: Harness,
 	options: SetupOptions,
-): JsonTarget | FileTarget {
+): JsonTarget | FileTarget | NamedHookTarget {
 	const base = options.global ? options.home : options.cwd;
 	switch (harness) {
+		case "antigravity":
+			return {
+				kind: "named",
+				// Antigravity CLI does not load hooks from ~/.gemini/antigravity-cli/settings.json.
+				file: options.global
+					? join(base, ".gemini", "config", "hooks.json")
+					: join(base, ".agents", "hooks.json"),
+				notes: [
+					"Start agy and run /hooks. The list must show a hook named jact.",
+					"Antigravity CLI gives a tool hook no way to answer, so the model gets jact's report before its next step.",
+				],
+			};
 		case "claude":
 			return {
 				kind: "json",
@@ -127,6 +152,30 @@ function target(
 /** The exact command a harness runs. Also how setup recognizes its own entry. */
 export function hookCommand(harness: Harness, command: string): string {
 	return `${command} hook ${harness}`;
+}
+
+/**
+ * The hook definition for Antigravity CLI. Each command carries its event,
+ * because Antigravity CLI does not put the event name in the hook input.
+ * Only tool events take a matcher; the other events list their handlers directly.
+ */
+function antigravityHooks(command: string): JsonRecord {
+	const handler = (event: string, timeout: number) => ({
+		type: "command",
+		command: `${hookCommand("antigravity", command)} --event ${event}`,
+		timeout,
+	});
+	return {
+		PostToolUse: [
+			{
+				matcher: ANTIGRAVITY_FILE_TOOLS,
+				// Longer than jact's own 30-second limit, so jact always gets to answer.
+				hooks: [handler("PostToolUse", 60)],
+			},
+		],
+		PreInvocation: [handler("PreInvocation", 10)],
+		Stop: [handler("Stop", 10)],
+	};
 }
 
 function isOwnGroup(group: unknown, harness: Harness): boolean {
@@ -257,6 +306,17 @@ export function plannedConfig(
 			notes: configTarget.notes,
 		};
 	const config = readJsonConfig(configTarget.file);
+	if (configTarget.kind === "named") {
+		const { [HOOK_NAME]: _replaced, ...others } = config;
+		return {
+			path: configTarget.file,
+			content: serialize({
+				...others,
+				[HOOK_NAME]: antigravityHooks(options.command),
+			}),
+			notes: configTarget.notes,
+		};
+	}
 	const kept = eventGroups(config, configTarget.event).filter(
 		(group) => !isOwnGroup(group, harness),
 	);
@@ -340,6 +400,13 @@ export function removeHarness(
 		return { path: configTarget.file, action: "removed", notes: [] };
 	}
 	const config = readJsonConfig(configTarget.file);
+	if (configTarget.kind === "named") {
+		if (!(HOOK_NAME in config))
+			return { path: configTarget.file, action: "absent", notes: [] };
+		const { [HOOK_NAME]: _removed, ...others } = config;
+		writeConfigFile(configTarget.file, serialize(others));
+		return { path: configTarget.file, action: "removed", notes: [] };
+	}
 	const groups = eventGroups(config, configTarget.event);
 	const kept = groups.filter((group) => !isOwnGroup(group, harness));
 	if (kept.length === groups.length)

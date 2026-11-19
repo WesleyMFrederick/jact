@@ -9,7 +9,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-	type Harness,
 	type JactRunner,
 	MAX_READ_CONTEXT_CHARS,
 	parseHookPayload,
@@ -46,6 +45,31 @@ function event(
 		...extra,
 	});
 }
+
+// Antigravity CLI events, in the shape of https://antigravity.google/docs/hooks.
+function antigravityEvent(fields: object, conversationId: string): string {
+	return JSON.stringify({
+		conversationId,
+		workspacePaths: [project],
+		transcriptPath: `~/.gemini/antigravity/brain/${conversationId}/.system_generated/logs/transcript.jsonl`,
+		artifactDirectoryPath: `~/.gemini/antigravity/brain/${conversationId}`,
+		modelName: "gemini-3.6-flash-medium",
+		...fields,
+	});
+}
+
+const antigravityTool = (name: string, args: object, conversationId = "c-0") =>
+	antigravityEvent(
+		{ toolCall: { name, args }, stepIdx: 5, error: "" },
+		conversationId,
+	);
+const antigravityModelCall = (conversationId: string) =>
+	antigravityEvent({ invocationNum: 1, initialNumSteps: 6 }, conversationId);
+const antigravityStop = (conversationId: string) =>
+	antigravityEvent(
+		{ executionNum: 0, terminationReason: "model_stop", fullyIdle: true },
+		conversationId,
+	);
 
 describe("parseHookPayload reads each harness's tool event", () => {
 	it("Claude Code: Write, Edit and MultiEdit carry tool_input.file_path", () => {
@@ -104,6 +128,34 @@ describe("parseHookPayload reads each harness's tool event", () => {
 		expect(
 			parseHookPayload(event("read_file", { file_path: "docs/note.md" })),
 		).toMatchObject({ kind: "read", paths: [note] });
+	});
+
+	it("Antigravity CLI: the tool sits under toolCall, with TargetFile or AbsolutePath", () => {
+		for (const tool of [
+			"write_to_file",
+			"replace_file_content",
+			"multi_replace_file_content",
+		])
+			expect(
+				parseHookPayload(
+					antigravityTool(tool, { TargetFile: note }, "c-parse"),
+				),
+			).toEqual({
+				kind: "write",
+				paths: [note],
+				cwd: project,
+				sessionId: "c-parse",
+			});
+		expect(
+			parseHookPayload(
+				antigravityTool("view_file", { AbsolutePath: note }, "c-parse"),
+			),
+		).toMatchObject({ kind: "read", paths: [note] });
+		expect(
+			parseHookPayload(
+				antigravityTool("run_command", { CommandLine: "npm test" }),
+			),
+		).toBeUndefined();
 	});
 
 	it("pi and omp: write, edit and read carry tool_input.path, relative or @-prefixed", () => {
@@ -278,5 +330,140 @@ describe("runHarnessHook on a read", () => {
 		);
 		expect(parsed.context.length).toBeLessThan(MAX_READ_CONTEXT_CHARS + 200);
 		expect(parsed.context).toContain("linked content cut at");
+	});
+});
+
+describe("runHarnessHook for Antigravity CLI, whose tool hook cannot answer the model", () => {
+	const broken: JactRunner = () => ({
+		status: 1,
+		stdout: "ERRORS (1)\n- Line 1: [x](missing.md)\n",
+	});
+	const clean: JactRunner = () => ({ status: 0, stdout: "" });
+	const linked: JactRunner = () => ({
+		status: 0,
+		stdout: JSON.stringify({
+			extractedContentBlocks: {
+				abc123: { content: "## Details\n\nThe answer." },
+			},
+		}),
+	});
+	const antigravityHook = (
+		event: string,
+		payload: string,
+		run: JactRunner = clean,
+	) => runHarnessHook("antigravity", payload, run, event);
+	const write = (conversationId: string) =>
+		antigravityTool("write_to_file", { TargetFile: note }, conversationId);
+	const read = (conversationId: string) =>
+		antigravityTool("view_file", { AbsolutePath: note }, conversationId);
+
+	it("holds a broken-link report, then hands it over one time before the next model call", () => {
+		expect(antigravityHook("PostToolUse", write("c-1"), broken)).toBe("{}");
+		const delivered = JSON.parse(
+			antigravityHook("PreInvocation", antigravityModelCall("c-1")),
+		);
+		expect(delivered.injectSteps).toHaveLength(1);
+		expect(delivered.injectSteps[0].ephemeralMessage).toContain("missing.md");
+		expect(antigravityHook("PreInvocation", antigravityModelCall("c-1"))).toBe(
+			"{}",
+		);
+	});
+
+	it("hands over the sections that a read file links to", () => {
+		expect(antigravityHook("PostToolUse", read("c-2"), linked)).toBe("{}");
+		const delivered = JSON.parse(
+			antigravityHook("PreInvocation", antigravityModelCall("c-2")),
+		);
+		expect(delivered.injectSteps[0].ephemeralMessage).toContain(
+			"## Details\n\nThe answer.",
+		);
+	});
+
+	it("withdraws a report when the same file is written again with valid links", () => {
+		antigravityHook("PostToolUse", write("c-3"), broken);
+		antigravityHook("PostToolUse", write("c-3"), clean);
+		expect(antigravityHook("PreInvocation", antigravityModelCall("c-3"))).toBe(
+			"{}",
+		);
+	});
+
+	it("keeps the report of each conversation apart", () => {
+		antigravityHook("PostToolUse", write("c-4"), broken);
+		expect(
+			antigravityHook("PreInvocation", antigravityModelCall("c-other")),
+		).toBe("{}");
+		expect(
+			antigravityHook("PreInvocation", antigravityModelCall("c-4")),
+		).toContain("missing.md");
+	});
+
+	it("Stop: a report the model has not seen makes the agent continue, one time", () => {
+		antigravityHook("PostToolUse", write("c-5"), broken);
+		const held = JSON.parse(antigravityHook("Stop", antigravityStop("c-5")));
+		expect(held.decision).toBe("continue");
+		expect(held.reason).toContain("missing.md");
+		expect(JSON.parse(antigravityHook("Stop", antigravityStop("c-5")))).toEqual(
+			{
+				decision: "stop",
+			},
+		);
+	});
+
+	it("Stop: linked content from a read never holds the agent", () => {
+		antigravityHook("PostToolUse", read("c-6"), linked);
+		expect(JSON.parse(antigravityHook("Stop", antigravityStop("c-6")))).toEqual(
+			{
+				decision: "stop",
+			},
+		);
+		expect(antigravityHook("PreInvocation", antigravityModelCall("c-6"))).toBe(
+			"{}",
+		);
+	});
+
+	it("skips a tool call that Antigravity reports as failed", () => {
+		const failedWrite = antigravityEvent(
+			{
+				toolCall: { name: "write_to_file", args: { TargetFile: note } },
+				stepIdx: 5,
+				error: "permission denied",
+			},
+			"c-7",
+		);
+		expect(antigravityHook("PostToolUse", failedWrite, broken)).toBe("{}");
+		expect(antigravityHook("PreInvocation", antigravityModelCall("c-7"))).toBe(
+			"{}",
+		);
+	});
+
+	it("always answers with JSON, because Antigravity reads an answer from each hook", () => {
+		const noTool = antigravityEvent({ toolCall: null, stepIdx: 1 }, "c-8");
+		for (const payload of ["", "not json", "[]", noTool]) {
+			expect(antigravityHook("PostToolUse", payload, broken)).toBe("{}");
+			expect(antigravityHook("PreInvocation", payload)).toBe("{}");
+			expect(JSON.parse(antigravityHook("Stop", payload))).toEqual({
+				decision: "stop",
+			});
+		}
+		expect(antigravityHook("SomeNewEvent", antigravityModelCall("c-8"))).toBe(
+			"{}",
+		);
+	});
+
+	it("treats a call without an event name as PostToolUse", () => {
+		expect(runHarnessHook("antigravity", write("c-9"), broken)).toBe("{}");
+		expect(
+			antigravityHook("PreInvocation", antigravityModelCall("c-9")),
+		).toContain("missing.md");
+	});
+
+	it("leaves the other harnesses unchanged when an event name is passed", () => {
+		const output = runHarnessHook(
+			"claude",
+			event("Write", { file_path: note }),
+			broken,
+			"PostToolUse",
+		);
+		expect(JSON.parse(output).decision).toBe("block");
 	});
 });

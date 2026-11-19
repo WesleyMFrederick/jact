@@ -30,14 +30,17 @@ If the install fails, see [Install](docs/user-guide.md#Install).
 Agents: to set up jact for your harness, run one line in the project folder.
 
 ```bash
-jact setup claude   # Claude Code: writes .claude/settings.json
-jact setup codex    # Codex:       writes .codex/hooks.json
-jact setup gemini   # Gemini CLI:  writes .gemini/settings.json
-jact setup pi       # pi:          writes .pi/extensions/jact.ts
-jact setup omp      # omp:         writes .omp/extensions/jact.ts
+jact setup claude        # Claude Code:           writes .claude/settings.json
+jact setup codex         # Codex:                 writes .codex/hooks.json
+jact setup antigravity   # Antigravity CLI (agy): writes .agents/hooks.json
+jact setup gemini        # Gemini CLI:            writes .gemini/settings.json
+jact setup pi            # pi:                    writes .pi/extensions/jact.ts
+jact setup omp           # omp:                   writes .omp/extensions/jact.ts
 ```
 
 Then confirm: `jact setup <harness> --check` exits with code 0.
+
+Google's command-line agent is now Antigravity CLI. Use `antigravity` when you run `agy`. Use `gemini` only where the `gemini` command still runs.
 
 If setup prints `Cannot write`, your sandbox protects the harness config (Codex does this for `.codex/`). Give the user the same line to run in a terminal.
 
@@ -50,7 +53,8 @@ Setup merges into an existing file and keeps other tools' hooks. Add `--global` 
 
 | You need | Go to |
 |---|---|
-| The trust step for Codex, Gemini CLI, or pi | [Set up in one command](docs/harness-hooks.md#Set%20up%20in%20one%20command) |
+| The extra step for Codex, Antigravity CLI, Gemini CLI, or pi | [Set up in one command](docs/harness-hooks.md#Set%20up%20in%20one%20command) |
+| What each harness was tested with | [Verified harness versions](docs/harness-hooks.md#Verified%20harness%20versions) |
 | Proof that the hook runs | [Check that it works](docs/harness-hooks.md#Check%20that%20it%20works) |
 | A harness that is not in the list | [Any other harness](docs/harness-hooks.md#Any%20other%20harness) |
 | An agent with no hook support | [Rule for agents without hooks](docs/harness-hooks.md#Rule%20for%20agents%20without%20hooks) |

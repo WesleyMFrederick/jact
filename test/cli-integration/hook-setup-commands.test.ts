@@ -84,6 +84,20 @@ describe("jact setup", () => {
 		expect(existsSync(join(project, ".gemini"))).toBe(false);
 	});
 
+	it("antigravity: writes .agents/hooks.json and --check agrees", () => {
+		expect(run(["setup", "antigravity", "--check"]).exitCode).toBe(1);
+		const first = run(["setup", "antigravity"]);
+		expect(first.exitCode).toBe(0);
+		expect(first.stdout).toContain("antigravity: installed");
+		const hooks = JSON.parse(
+			readFileSync(join(project, ".agents", "hooks.json"), "utf8"),
+		);
+		expect(hooks.jact.PostToolUse[0].hooks[0].command).toBe(
+			"jact hook antigravity --event PostToolUse",
+		);
+		expect(run(["setup", "antigravity", "--check"]).exitCode).toBe(0);
+	});
+
 	it("--command sets what the harness runs", () => {
 		run(["setup", "pi", "--command", "node /opt/jact/dist/cli.js"]);
 		expect(
@@ -161,6 +175,45 @@ describe("jact hook, through the real CLI", () => {
 				exitCode: 0,
 				stdout: "",
 			});
+	});
+
+	it("Antigravity CLI: the write hook answers {}, and the next model call gets the report", () => {
+		const antigravityEvent = (fields: object) =>
+			JSON.stringify({
+				conversationId: "cli-agy",
+				workspacePaths: [project],
+				...fields,
+			});
+		const write = antigravityEvent({
+			toolCall: {
+				name: "write_to_file",
+				args: { TargetFile: join(project, "docs", "broken.md") },
+			},
+			stepIdx: 2,
+			error: "",
+		});
+		const hook = (event: string, input: string) =>
+			run(["hook", "antigravity", "--event", event], input);
+
+		expect(hook("PostToolUse", write)).toMatchObject({
+			exitCode: 0,
+			stdout: "{}\n",
+		});
+		const next = hook("PreInvocation", antigravityEvent({ invocationNum: 1 }));
+		expect(next.exitCode).toBe(0);
+		expect(JSON.parse(next.stdout).injectSteps[0].ephemeralMessage).toContain(
+			"File not found: missing.md",
+		);
+		expect(
+			hook("PreInvocation", antigravityEvent({ invocationNum: 2 })).stdout,
+		).toBe("{}\n");
+		expect(JSON.parse(hook("Stop", antigravityEvent({})).stdout)).toEqual({
+			decision: "stop",
+		});
+		expect(hook("Stop", "not json")).toMatchObject({
+			exitCode: 0,
+			stdout: '{"decision":"stop"}\n',
+		});
 	});
 
 	it("JACT_HOOK_LOG records each call", () => {

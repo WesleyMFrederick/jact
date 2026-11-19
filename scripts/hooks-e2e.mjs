@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Proves that `jact setup <harness>` wires a real harness on the first try.
 //
-//   node scripts/hooks-e2e.mjs <claude|codex|gemini|pi|omp|all> [--synthetic] [--keep]
+//   node scripts/hooks-e2e.mjs <claude|codex|antigravity|gemini|pi|omp|all> [--synthetic] [--keep]
 //
 // For each harness it builds a throwaway project, runs `jact setup`, starts the
 // harness without a UI, and asks it to write one Markdown file with a broken
@@ -29,11 +29,12 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const HARNESSES = ["claude", "codex", "gemini", "pi", "omp"];
+const HARNESSES = ["claude", "codex", "antigravity", "gemini", "pi", "omp"];
 // Codex reads files through shell commands, so it has no read event to hook.
 const HAS_READ_HOOK = {
 	claude: true,
 	codex: false,
+	antigravity: true,
 	gemini: true,
 	pi: true,
 	omp: true,
@@ -95,6 +96,9 @@ function harnessCommand(harness, project) {
 				`projects.${JSON.stringify(project)}.trust_level="trusted"`,
 				PROMPT,
 			];
+		case "antigravity":
+			// Without a UI, agy denies each tool it was not allowed. This project is throwaway.
+			return ["agy", "-p", PROMPT, "--dangerously-skip-permissions"];
 		case "gemini":
 			// Gemini ignores project hooks in a folder it does not trust.
 			return ["gemini", "-p", PROMPT, "--approval-mode=yolo", "--skip-trust"];
@@ -137,6 +141,73 @@ function syntheticEvents(harness, project) {
 	];
 }
 
+// Antigravity CLI does not name the event in the hook input, and its tool hook
+// cannot answer the model. So this plays the harness: it reads the installed
+// hooks file and runs the command of each event, in the documented input shape.
+// Returns the problems it found.
+function playAntigravity(project) {
+	const problems = [];
+	const installed =
+		JSON.parse(readFileSync(join(project, ".agents", "hooks.json"), "utf8"))
+			.jact ?? {};
+	const send = (handler, fields) => {
+		const { stdout } = spawnSync(handler.command, {
+			cwd: project,
+			shell: true,
+			encoding: "utf8",
+			input: JSON.stringify({
+				conversationId: "e2e-synthetic",
+				workspacePaths: [project],
+				...fields,
+			}),
+		});
+		try {
+			return JSON.parse(stdout);
+		} catch {
+			problems.push(`"${handler.command}" did not print JSON: ${stdout}`);
+			return {};
+		}
+	};
+	const toolCalls = [
+		["write_to_file", { TargetFile: join(project, "docs", "broken.md") }, true],
+		["view_file", { AbsolutePath: join(project, "docs", "index.md") }, true],
+		["run_command", { CommandLine: "ls", Cwd: project }, false],
+	];
+	for (const [name, toolArgs, wanted] of toolCalls) {
+		const handlers = (installed.PostToolUse ?? [])
+			.filter((group) => new RegExp(group.matcher).test(name))
+			.flatMap((group) => group.hooks);
+		if (handlers.length > 0 !== wanted)
+			problems.push(`the PostToolUse matcher is wrong for the tool ${name}`);
+		for (const handler of handlers) {
+			const answer = send(handler, {
+				toolCall: { name, args: toolArgs },
+				stepIdx: 1,
+				error: "",
+			});
+			if (Object.keys(answer).length > 0)
+				problems.push(`PostToolUse must answer {} but answered for ${name}`);
+		}
+	}
+	const told = (installed.PreInvocation ?? [])
+		.map((handler) => send(handler, { invocationNum: 1, initialNumSteps: 3 }))
+		.flatMap((answer) => answer.injectSteps ?? [])
+		.map((step) => step.ephemeralMessage ?? "")
+		.join("\n");
+	if (!told.includes("missing.md"))
+		problems.push("PreInvocation did not hand the broken link to the model");
+	if (!told.includes("4242"))
+		problems.push("PreInvocation did not hand the linked section to the model");
+	for (const handler of installed.Stop ?? []) {
+		const answer = send(handler, { executionNum: 0, fullyIdle: true });
+		if (answer.decision !== "stop")
+			problems.push(
+				`Stop must let the agent stop but answered ${JSON.stringify(answer)}`,
+			);
+	}
+	return problems;
+}
+
 function runOne(harness) {
 	const project = realpathSync(
 		mkdtempSync(join(tmpdir(), `jact-hook-e2e-${harness}-`)),
@@ -176,13 +247,15 @@ function runOne(harness) {
 			join(project, "docs", "broken.md"),
 			"See [the missing page](missing.md).\n",
 		);
-		for (const event of syntheticEvents(harness, project))
-			spawnSync(`${command} hook ${harness}`, {
-				cwd: project,
-				shell: true,
-				input: JSON.stringify(event),
-				encoding: "utf8",
-			});
+		if (harness === "antigravity") problems.push(...playAntigravity(project));
+		else
+			for (const event of syntheticEvents(harness, project))
+				spawnSync(`${command} hook ${harness}`, {
+					cwd: project,
+					shell: true,
+					input: JSON.stringify(event),
+					encoding: "utf8",
+				});
 	} else {
 		// JACT_E2E_ARGS adds harness flags, for example: JACT_E2E_ARGS="--model <id>"
 		const extra = (process.env.JACT_E2E_ARGS ?? "").split(" ").filter(Boolean);
@@ -221,6 +294,19 @@ function runOne(harness) {
 		problems.push("the write hook did not report the broken link");
 	if (HAS_READ_HOOK[harness] && !enrichedRead)
 		problems.push("the read hook did not return linked content");
+	// Antigravity CLI: a caught write counts only when a later event handed it to the model.
+	const handedOver = [
+		...new Set(
+			calls.filter((call) => call.deliveredChars > 0).map((call) => call.event),
+		),
+	];
+	if (harness === "antigravity") {
+		if (handedOver.length === 0)
+			problems.push(
+				"no PreInvocation or Stop call handed a result to the model",
+			);
+		else console.log(`  handed to the model by: ${handedOver.join(", ")}`);
+	}
 
 	if (flags.has("--keep")) console.log(`  kept ${project}`);
 	else rmSync(project, { recursive: true, force: true });

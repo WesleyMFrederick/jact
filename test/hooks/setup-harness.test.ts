@@ -192,6 +192,109 @@ describe("setup is safe to run on a config other tools also use", () => {
 	});
 });
 
+describe("setup for Antigravity CLI, whose hooks file is keyed by hook name", () => {
+	const file = () => join(options.cwd, ".agents", "hooks.json");
+
+	it("writes one hook named jact in .agents/hooks.json, with the event in each command", () => {
+		const outcome = installHarness("antigravity", options);
+		expect(outcome.action).toBe("installed");
+		expect(outcome.path).toBe(file());
+		const { jact } = readJson(file());
+		expect(Object.keys(jact)).toEqual(["PostToolUse", "PreInvocation", "Stop"]);
+		expect(jact.PostToolUse).toHaveLength(1);
+		expect(jact.PostToolUse[0].hooks[0]).toMatchObject({
+			type: "command",
+			command: "jact hook antigravity --event PostToolUse",
+		});
+		// Antigravity has no matcher for these two events: each entry is the handler.
+		expect(jact.PreInvocation).toEqual([
+			{
+				type: "command",
+				command: "jact hook antigravity --event PreInvocation",
+				timeout: 10,
+			},
+		]);
+		expect(jact.Stop[0].command).toBe("jact hook antigravity --event Stop");
+	});
+
+	it("matches the four Antigravity file tools and no other tool", () => {
+		installHarness("antigravity", options);
+		const matcher = new RegExp(
+			`^(?:${readJson(file()).jact.PostToolUse[0].matcher})$`,
+		);
+		for (const tool of [
+			"write_to_file",
+			"replace_file_content",
+			"multi_replace_file_content",
+			"view_file",
+		])
+			expect(tool).toMatch(matcher);
+		for (const tool of ["run_command", "list_dir", "grep_search"])
+			expect(tool).not.toMatch(matcher);
+	});
+
+	it("--global writes ~/.gemini/config/hooks.json, the file Antigravity loads", () => {
+		const outcome = installHarness("antigravity", { ...options, global: true });
+		expect(outcome.path).toBe(
+			join(options.home, ".gemini", "config", "hooks.json"),
+		);
+		expect(existsSync(join(options.cwd, ".agents"))).toBe(false);
+	});
+
+	it("keeps hooks with other names, replaces its own, and removes only its own", () => {
+		const others = {
+			"my-linter": {
+				PostToolUse: [
+					{ matcher: "*", hooks: [{ type: "command", command: "lint" }] },
+				],
+			},
+			"session-log": {
+				enabled: false,
+				Stop: [{ type: "command", command: "log" }],
+			},
+		};
+		mkdirSync(join(options.cwd, ".agents"));
+		writeFileSync(file(), JSON.stringify(others));
+
+		expect(installHarness("antigravity", options).action).toBe("updated");
+		expect(readJson(file())).toMatchObject(others);
+		expect(installHarness("antigravity", options).action).toBe("unchanged");
+
+		const moved = { ...options, command: "node /opt/jact/dist/cli.js" };
+		expect(installHarness("antigravity", moved).action).toBe("updated");
+		expect(Object.keys(readJson(file()))).toEqual([
+			"my-linter",
+			"session-log",
+			"jact",
+		]);
+		expect(readJson(file()).jact.Stop[0].command).toBe(
+			"node /opt/jact/dist/cli.js hook antigravity --event Stop",
+		);
+
+		expect(removeHarness("antigravity", moved).action).toBe("removed");
+		expect(readJson(file())).toEqual(others);
+		expect(removeHarness("antigravity", moved).action).toBe("absent");
+	});
+
+	it("refuses to touch a hooks file that is not valid JSON", () => {
+		mkdirSync(join(options.cwd, ".agents"));
+		writeFileSync(file(), "{ not json");
+		expect(() => installHarness("antigravity", options)).toThrow(
+			/not valid JSON/,
+		);
+		expect(() => removeHarness("antigravity", options)).toThrow(
+			/not valid JSON/,
+		);
+		expect(readFileSync(file(), "utf8")).toBe("{ not json");
+	});
+
+	it("tells the user how to confirm that Antigravity loaded the hook", () => {
+		expect(installHarness("antigravity", options).notes.join(" ")).toContain(
+			"/hooks",
+		);
+	});
+});
+
 describe("--check and --print", () => {
 	it.each(HARNESSES)(
 		"%s: not installed, then installed, then not installed",

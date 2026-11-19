@@ -43,6 +43,7 @@ import {
 	HARNESSES,
 	type Harness,
 	runHarnessHook,
+	silentHookOutput,
 } from "./hooks/harnessHook.js";
 import {
 	installHarness,
@@ -1232,12 +1233,16 @@ program
 Examples:
     $ jact setup claude            # this project: .claude/settings.json
     $ jact setup codex --global    # every project: ~/.codex/hooks.json
+    $ jact setup antigravity       # Antigravity CLI (agy): .agents/hooks.json
     $ jact setup gemini --print    # show the file, write nothing
     $ jact setup pi --check        # is it installed?
     $ jact setup omp --remove      # take it out again
 
 Each harness then runs \`jact hook <harness>\` after a write or read.
 Hooks from other tools in the same file are kept.
+
+Google moved most accounts from Gemini CLI to Antigravity CLI in June 2026.
+Use \`antigravity\` for agy. Use \`gemini\` only where the gemini command still runs.
 
 Exit Codes:
   0  Done, or --check found the wiring
@@ -1293,6 +1298,10 @@ program
 			...HARNESSES,
 		]),
 	)
+	.option(
+		"--event <name>",
+		"hook event, for a harness that does not name it in the input (antigravity)",
+	)
 	.addHelpText(
 		"after",
 		`
@@ -1304,19 +1313,33 @@ Any other event prints nothing.
 
     $ echo '{"tool_name":"Write","tool_input":{"file_path":"docs/a.md"},"cwd":"."}' | jact hook claude
 
+Antigravity CLI gives a tool hook no way to answer the model. There, the
+PostToolUse call holds the result and prints {}. The PreInvocation call hands
+it to the model before the next step. The Stop call makes the agent continue
+one time when a broken-link report was not handed over.
+
+    $ jact hook antigravity --event PostToolUse    # also: PreInvocation, Stop
+
 Set JACT_HOOK_LOG=<file> to append one line for each call.
 
 Exit Codes:
   0  Always. A hook must never break the harness.
 `,
 	)
-	.action((harness: Harness) => {
+	.action((harness: Harness, options: { event?: string }) => {
+		let output: string;
 		try {
-			const output = runHarnessHook(harness, readFileSync(0, "utf8"));
-			if (output.length > 0) process.stdout.write(`${output}\n`);
+			output = runHarnessHook(
+				harness,
+				readFileSync(0, "utf8"),
+				undefined,
+				options.event,
+			);
 		} catch {
-			// A hook that fails stays silent so the harness keeps working.
+			// A hook that fails says nothing, so the harness keeps working.
+			output = silentHookOutput(harness, options.event);
 		}
+		if (output.length > 0) process.stdout.write(`${output}\n`);
 		process.exitCode = 0;
 	});
 

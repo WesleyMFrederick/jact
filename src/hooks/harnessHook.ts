@@ -7,15 +7,33 @@
  * the harness expects. A hook never fails the harness: bad input yields no
  * output.
  *
+ * Antigravity CLI is the one harness whose tool hook cannot answer the model.
+ * For it, the tool hook holds the result in a file, and the hook that runs
+ * before the next model call hands it over.
+ *
  * @module hooks/harnessHook
  */
 
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync } from "node:fs";
+import {
+	appendFileSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+} from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
-export const HARNESSES = ["claude", "codex", "gemini", "pi", "omp"] as const;
+export const HARNESSES = [
+	"claude",
+	"codex",
+	"antigravity",
+	"gemini",
+	"pi",
+	"omp",
+] as const;
 export type Harness = (typeof HARNESSES)[number];
 
 export type HookKind = "write" | "read";
@@ -50,9 +68,18 @@ const WRITE_TOOLS = new Set([
 	"apply_patch",
 	"write_file",
 	"replace",
+	"write_to_file",
+	"replace_file_content",
+	"multi_replace_file_content",
 ]);
-const READ_TOOLS = new Set(["read", "read_file"]);
-const PATH_FIELDS = ["file_path", "path", "absolute_path"];
+const READ_TOOLS = new Set(["read", "read_file", "view_file"]);
+const PATH_FIELDS = [
+	"file_path",
+	"path",
+	"absolute_path",
+	"TargetFile",
+	"AbsolutePath",
+];
 // Codex sends an edit as patch text. Each changed file has a header line.
 const PATCH_HEADER = /^\*\*\* (?:Add File|Update File|Move to): (.+)$/gm;
 
@@ -60,6 +87,23 @@ type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function firstText(...values: unknown[]): string | undefined {
+	for (const value of values)
+		if (typeof value === "string" && value.length > 0) return value;
+	return undefined;
+}
+
+/** The project folder an event names: `cwd`, or Antigravity CLI's first workspace path. */
+function eventFolder(payload: JsonRecord): string {
+	const workspaces = payload["workspacePaths"];
+	return (
+		firstText(
+			payload["cwd"],
+			Array.isArray(workspaces) ? workspaces[0] : undefined,
+		) ?? process.cwd()
+	);
 }
 
 function stringLeaves(value: unknown, depth = 0): string[] {
@@ -109,8 +153,15 @@ export function parseHookPayload(payloadText: string): HookRequest | undefined {
 		return undefined;
 	}
 	if (!isRecord(payload)) return undefined;
-	const toolName = payload["tool_name"];
-	if (typeof toolName !== "string") return undefined;
+	// Antigravity CLI puts the tool under `toolCall`. The other harnesses use flat fields.
+	const toolCall = isRecord(payload["toolCall"])
+		? payload["toolCall"]
+		: undefined;
+	// Antigravity CLI also runs the hook after a tool call that failed.
+	if (toolCall !== undefined && firstText(payload["error"]) !== undefined)
+		return undefined;
+	const toolName = firstText(payload["tool_name"], toolCall?.["name"]);
+	if (toolName === undefined) return undefined;
 	const name = toolName.toLowerCase();
 	const kind: HookKind | undefined = WRITE_TOOLS.has(name)
 		? "write"
@@ -118,24 +169,20 @@ export function parseHookPayload(payloadText: string): HookRequest | undefined {
 			? "read"
 			: undefined;
 	if (kind === undefined) return undefined;
-	const rawCwd = payload["cwd"];
-	const cwd =
-		typeof rawCwd === "string" && rawCwd.length > 0 ? rawCwd : process.cwd();
+	const cwd = eventFolder(payload);
 	const paths = [
 		...new Set(
-			candidatePaths(payload["tool_input"])
+			candidatePaths(payload["tool_input"] ?? toolCall?.["args"])
 				.map((raw) => absoluteMarkdownPath(raw, cwd))
 				.filter((value): value is string => value !== undefined),
 		),
 	];
 	if (paths.length === 0) return undefined;
-	const session = payload["session_id"];
 	return {
 		kind,
 		paths,
 		cwd,
-		sessionId:
-			typeof session === "string" && session.length > 0 ? session : undefined,
+		sessionId: firstText(payload["session_id"], payload["conversationId"]),
 	};
 }
 
@@ -198,7 +245,10 @@ function extractReads(request: HookRequest, run: JactRunner): HookResult {
 	return { context, failed: false };
 }
 
-/** Formats a result the way the harness reads hook output. Empty string means say nothing. */
+/**
+ * Formats a result the way the harness reads hook output. Empty string means say nothing.
+ * Antigravity CLI is not handled here: its tool hook cannot answer the model.
+ */
 export function formatHookOutput(harness: Harness, result: HookResult): string {
 	if (result.context.length === 0) return "";
 	if (harness === "pi" || harness === "omp") return JSON.stringify(result);
@@ -245,15 +295,184 @@ function logInvocation(entry: JsonRecord): void {
 	}
 }
 
+/** One result that waits for Antigravity CLI's next model call. */
+interface HeldResult extends HookResult {
+	/** Tool kind plus file. A later result for the same key replaces an earlier one. */
+	key: string;
+}
+
+interface Conversation {
+	folder: string;
+	id: string;
+}
+
+/** Folder for held results, beside jact's other per-project state in `.jact/`. */
+const HELD_DIR = join(".jact", "hook-pending");
+const ANTIGRAVITY_NOTHING = "{}";
+// Antigravity CLI needs a decision from a Stop hook. Any value but "continue" lets it stop.
+const ANTIGRAVITY_MAY_STOP = JSON.stringify({ decision: "stop" });
+
+/**
+ * What a hook prints when jact has nothing to say.
+ * Contract: an empty string for each harness but Antigravity CLI, which reads
+ * JSON from each hook: `{"decision":"stop"}` for the Stop event, else `{}`.
+ */
+export function silentHookOutput(harness: Harness, event?: string): string {
+	if (harness !== "antigravity") return "";
+	return event?.toLowerCase() === "stop"
+		? ANTIGRAVITY_MAY_STOP
+		: ANTIGRAVITY_NOTHING;
+}
+
+function conversationOf(payloadText: string): Conversation | undefined {
+	let payload: unknown;
+	try {
+		payload = JSON.parse(payloadText);
+	} catch {
+		return undefined;
+	}
+	if (!isRecord(payload)) return undefined;
+	return {
+		folder: eventFolder(payload),
+		id: firstText(payload["conversationId"]) ?? "no-conversation",
+	};
+}
+
+function heldFile(conversation: Conversation): string {
+	const name = conversation.id.replace(/[^A-Za-z0-9_-]/g, "_");
+	return join(conversation.folder, HELD_DIR, `${name}.jsonl`);
+}
+
+function holdResult(conversation: Conversation, held: HeldResult): void {
+	try {
+		const file = heldFile(conversation);
+		// An empty result only matters when it withdraws an earlier one.
+		if (held.context.length === 0 && !existsSync(file)) return;
+		mkdirSync(dirname(file), { recursive: true });
+		appendFileSync(file, `${JSON.stringify(held)}\n`);
+	} catch {
+		// A result that cannot be stored is dropped. The harness keeps working.
+	}
+}
+
+/** Returns the held results and removes them, so each one reaches the model one time. */
+function takeHeldResults(conversation: Conversation): HeldResult[] {
+	const file = heldFile(conversation);
+	const taken = `${file}.${process.pid}.taken`;
+	let text: string;
+	try {
+		// Rename first: a tool hook that runs at the same moment starts a new file.
+		renameSync(file, taken);
+		text = readFileSync(taken, "utf8");
+	} catch {
+		return [];
+	}
+	try {
+		rmSync(taken, { force: true });
+	} catch {
+		// A leftover file is harmless: no later call reads it.
+	}
+	const latest = new Map<string, HeldResult>();
+	for (const line of text.split("\n")) {
+		let entry: unknown;
+		try {
+			entry = JSON.parse(line);
+		} catch {
+			continue;
+		}
+		if (!isRecord(entry)) continue;
+		const { key, context, failed } = entry;
+		if (typeof key !== "string" || typeof context !== "string") continue;
+		latest.delete(key);
+		latest.set(key, { key, context, failed: failed === true });
+	}
+	return [...latest.values()].filter((held) => held.context.length > 0);
+}
+
+/**
+ * Antigravity CLI. Its PostToolUse hook must print `{}`, so the result waits in
+ * a file. PreInvocation, which runs before a model call, hands it over. Stop is
+ * the fallback: a broken-link report the model has not seen makes the agent
+ * continue one time.
+ * Contract: always returns JSON, and never throws.
+ * Contract: each held result is handed over at most one time. A later result
+ * for the same file replaces an earlier one, so a fixed file withdraws its report.
+ */
+function runAntigravityHook(
+	payloadText: string,
+	run: JactRunner,
+	event: string,
+): string {
+	const harness: Harness = "antigravity";
+	const conversation = conversationOf(payloadText);
+	const eventName = event.toLowerCase();
+
+	if (eventName === "posttooluse") {
+		const request = parseHookPayload(payloadText);
+		if (request === undefined || conversation === undefined) {
+			logInvocation({ harness, event, handled: false });
+			return ANTIGRAVITY_NOTHING;
+		}
+		const result =
+			request.kind === "write"
+				? validateWrites(request, run)
+				: extractReads(request, run);
+		holdResult(conversation, {
+			key: `${request.kind}:${request.paths.join("|")}`,
+			...result,
+		});
+		logInvocation({
+			harness,
+			event,
+			handled: true,
+			kind: request.kind,
+			paths: request.paths,
+			failed: result.failed,
+			contextChars: result.context.length,
+		});
+		return ANTIGRAVITY_NOTHING;
+	}
+
+	if (eventName !== "preinvocation" && eventName !== "stop") {
+		logInvocation({ harness, event, handled: false });
+		return ANTIGRAVITY_NOTHING;
+	}
+
+	const held = conversation === undefined ? [] : takeHeldResults(conversation);
+	const reports = held.filter((result) => result.failed);
+	// At Stop the turn is over: only a broken-link report is worth one more step.
+	const delivered =
+		eventName === "stop"
+			? reports
+			: [...reports, ...held.filter((result) => !result.failed)];
+	const text = delivered.map((result) => result.context).join("\n\n");
+	logInvocation({
+		harness,
+		event,
+		handled: delivered.length > 0,
+		failed: reports.length > 0,
+		deliveredChars: text.length,
+	});
+	if (text.length === 0) return silentHookOutput(harness, event);
+	return eventName === "stop"
+		? JSON.stringify({ decision: "continue", reason: text })
+		: JSON.stringify({ injectSteps: [{ ephemeralMessage: text }] });
+}
+
 /**
  * Handles one hook call. Returns the text to print, or an empty string.
  * Contract: input jact cannot use returns an empty string, never an error.
+ * Contract: for Antigravity CLI the answer is always JSON. `event` names the
+ * hook event, because Antigravity CLI does not put it in the input.
  */
 export function runHarnessHook(
 	harness: Harness,
 	payloadText: string,
 	run: JactRunner = spawnJact,
+	event?: string,
 ): string {
+	if (harness === "antigravity")
+		return runAntigravityHook(payloadText, run, event ?? "PostToolUse");
 	const request = parseHookPayload(payloadText);
 	if (request === undefined) {
 		logInvocation({ harness, handled: false });

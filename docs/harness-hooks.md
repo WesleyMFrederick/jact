@@ -14,15 +14,18 @@ jact setup <harness>
 |---|---|---|---|---|
 | Claude Code | `jact setup claude` | `.claude/settings.json` | `Write`, `Edit`, `MultiEdit`, `Read` | None |
 | Codex | `jact setup codex` | `.codex/hooks.json` | `apply_patch` | Run the command in your own terminal, not through Codex. Then start `codex`, run `/hooks`, trust the jact entry |
+| Antigravity CLI (`agy`) | `jact setup antigravity` | `.agents/hooks.json` | `write_to_file`, `replace_file_content`, `multi_replace_file_content`, `view_file` | Start `agy` and run `/hooks`. The list must show a hook named `jact`. |
 | Gemini CLI | `jact setup gemini` | `.gemini/settings.json` | `write_file`, `replace`, `read_file` | Trust the folder when Gemini asks |
 | pi | `jact setup pi` | `.pi/extensions/jact.ts` | `write`, `edit`, `read` | Start `pi` and trust the project, or run `/trust` |
 | omp | `jact setup omp` | `.omp/extensions/jact.ts` | `write`, `edit`, `read` | None |
+
+**Which Google command do you run?** Google moved unpaid, Google One, and Google AI Pro and Ultra accounts from Gemini CLI to Antigravity CLI on 2026-06-18. If you start your agent with `agy`, use `jact setup antigravity`. Use `jact setup gemini` only where the `gemini` command still runs, which is a paid API key or an enterprise account. Antigravity CLI does not read the file that `jact setup gemini` writes.
 
 Options, the same for each harness:
 
 | Option | Effect |
 |---|---|
-| `--global` | Write the user-level file instead, so each project gets the hook: `~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/settings.json`, `~/.pi/agent/extensions/jact.ts`, `~/.omp/agent/extensions/jact.ts` |
+| `--global` | Write the user-level file instead, so each project gets the hook: `~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/config/hooks.json` (Antigravity CLI), `~/.gemini/settings.json` (Gemini CLI), `~/.pi/agent/extensions/jact.ts`, `~/.omp/agent/extensions/jact.ts` |
 | `--print` | Print the file that setup would write. Write nothing. |
 | `--check` | Exit 0 when the wiring is installed, 1 when it is not |
 | `--remove` | Remove only the entry that jact wrote |
@@ -53,6 +56,18 @@ In a clone of this repository, `node scripts/hooks-e2e.mjs <harness>` runs steps
 
 A hook call always exits 0. If jact fails, the hook prints nothing and the harness continues. The read hook stores its session cache in `.jact/` in the project; add that folder to `.gitignore`.
 
+### Antigravity CLI: the model sees it one step later
+
+Antigravity CLI gives a tool hook no way to answer the model. So jact uses three hooks there, and one name, `jact`, holds all three in `.agents/hooks.json`.
+
+| Hook | When Antigravity CLI runs it | What jact does |
+|---|---|---|
+| `PostToolUse` | After a file write or read | Runs the check. Holds the result in `.jact/hook-pending/` in the project. Prints `{}`. |
+| `PreInvocation` | Before a model call | Hands the held result to the model, one time. Prints `{}` when nothing is held. |
+| `Stop` | When the agent is about to stop | If a broken-link report is still held, makes the agent continue one time with that report. Otherwise lets it stop. |
+
+If the agent repairs the file before the report is handed over, jact withdraws the report.
+
 ## Any other harness
 
 A harness needs one thing: a point that runs code after a tool call. Then follow these steps.
@@ -77,10 +92,11 @@ A harness needs one thing: a point that runs code after a tool call. Then follow
 
 | Field | Values |
 |---|---|
-| `tool_name` | A write: `write`, `edit`, `multiedit`, `write_file`, `replace`, `apply_patch`. A read: `read`, `read_file`. Letter case does not matter. Other names are ignored. |
-| `tool_input` | The file, in one of: `file_path`, `path`, `absolute_path`, a `paths` list, or patch text that has `*** Add File:`, `*** Update File:`, or `*** Move to:` lines |
-| `cwd` | The project folder. Relative paths resolve from it. Default: the current folder. |
-| `session_id` | Optional. Lets the read hook add each linked section one time only. |
+| `tool_name`, or `toolCall.name` | A write: `write`, `edit`, `multiedit`, `write_file`, `replace`, `apply_patch`, `write_to_file`, `replace_file_content`, `multi_replace_file_content`. A read: `read`, `read_file`, `view_file`. Letter case does not matter. Other names are ignored. |
+| `tool_input`, or `toolCall.args` | The file, in one of: `file_path`, `path`, `absolute_path`, `TargetFile`, `AbsolutePath`, a `paths` list, or patch text that has `*** Add File:`, `*** Update File:`, or `*** Move to:` lines |
+| `cwd`, or the first entry of `workspacePaths` | The project folder. Relative paths resolve from it. Default: the current folder. |
+| `session_id`, or `conversationId` | Optional. Lets the read hook add each linked section one time only. |
+| `error` | Read only beside `toolCall`. Text here means the tool call failed, and jact does nothing. |
 
 The harness name selects the output format:
 
@@ -89,6 +105,9 @@ The harness name selects the output format:
 | `pi`, `omp` | `{"context", "failed": true}` | `{"context", "failed": false}` |
 | `claude`, `codex` | `{"decision": "block", "reason"}` | `{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext"}}` |
 | `gemini` | `{"hookSpecificOutput": {"hookEventName": "AfterTool", "additionalContext"}}` | The same shape |
+| `antigravity` | `{}` now. Later `{"injectSteps": [{"ephemeralMessage"}]}` from `--event PreInvocation`, or `{"decision": "continue", "reason"}` from `--event Stop` | `{}` now. Later the same `injectSteps` shape from `--event PreInvocation` |
+
+`jact hook antigravity` takes `--event PostToolUse`, `--event PreInvocation`, or `--event Stop`, because Antigravity CLI does not name the event in the input. Use this name for another harness whose tool hook cannot answer the model.
 
 A harness that accepts Claude Code hook settings can use `jact hook claude` without changes. A harness with no hook point can use the rule in [Rule for agents without hooks](#Rule%20for%20agents%20without%20hooks).
 
@@ -106,6 +125,9 @@ Before you read a long Markdown file, run `jact outline <file>`, then `jact extr
 - **Codex has no read hook.** Codex reads files through shell commands, so there is no read event. jact runs on writes only.
 - **Codex cannot wire itself.** The `workspace-write` sandbox keeps a project's `.codex/` folder read-only, so `jact setup codex` fails when Codex runs it. A person must run that one command.
 - **Trust steps are the harness's own.** Codex, Gemini CLI, and pi do not run a project's hooks until you trust them. Without a UI, the flags are `--dangerously-bypass-hook-trust` (Codex), `--skip-trust` (Gemini CLI), and `--approve` (pi).
+- **Antigravity CLI support has not run in a live session.** It is built from Google's hook documentation and checked with sample events. `agy` was not installed on the test machine. Two points need a live run to confirm: that the hook before a model call runs at each step and not one time for each request, and that the model reads the message jact hands over. To confirm on your machine, run `node scripts/hooks-e2e.mjs antigravity` in a clone of this repository. It prints which hook handed the report over.
+- **Antigravity CLI gets the report one step later**, and its `PreInvocation` hook adds about 0.09 seconds before each model call.
+- **Gemini CLI serves fewer accounts.** Since 2026-06-18 it works only with a paid API key or an enterprise account. An update of Gemini CLI does not change that. Other Google accounts use Antigravity CLI.
 - **Cost.** One hook call takes about 0.35 seconds. See [Measured value](#Measured%20value).
 
 ## Verified harness versions
@@ -118,7 +140,8 @@ Checked on 2026-11-19 with `scripts/hooks-e2e.mjs`. "Live" means a real model se
 | Codex | 0.160.0 | Pass | Pass: write caught | Blocked by Codex's sandbox. Codex gave the user the command to run, in 73 seconds. |
 | pi | 1.4.0 | Pass | Pass: write caught, read enriched | Pass in 14 seconds |
 | omp | 19.0.0 | Pass | Pass: write caught, read enriched | Pass in 90 seconds. omp also ran the check in a new session. |
-| Gemini CLI | 0.41.2 | Pass | Not run: Google refused the login of this CLI version. The event fields were checked against the CLI's own code. | Not run |
+| Antigravity CLI | Not installed | Pass, with the event shapes in Google's documentation | Not run: `agy` was not on the test machine | Not run |
+| Gemini CLI | 0.41.2 | Pass | Not run: Google moved this account type to Antigravity CLI, so the server refused the session. The event fields were checked against the CLI's own code. | Not run |
 
 For the last column, the agent had only `README.md` and this guide, and one request: "Set up jact for this harness. The instructions are in README.md." Pass means `jact setup <harness> --check` exited 0 afterward, on the first attempt.
 
