@@ -16,10 +16,6 @@ permissions:
   # 10-minute access token (Workload Identity Federation). No API key is stored.
   id-token: write
 
-concurrency:
-  group: bug-hunter-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
 jobs:
   hunt:
     # Same-repo PRs only: fork PRs get no secrets. Skip drafts, and skip label
@@ -29,6 +25,11 @@ jobs:
       !github.event.pull_request.draft &&
       (github.event.action != 'labeled' || github.event.label.name == 'bug-hunt')
     runs-on: ubuntu-latest
+    # Job-level, not workflow-level: a skipped event (an unrelated label) never joins
+    # the group, so it cannot cancel a review that is already running.
+    concurrency:
+      group: bug-hunter-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

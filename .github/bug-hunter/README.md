@@ -65,8 +65,8 @@ It does not run on every push, because each run spends API credit. Fork PRs are 
 | Exit | Check | Meaning |
 | ---- | ----- | ------- |
 | 0 | pass | No confirmed finding at or above `FAIL_ON` severity. A budget stop or timeout also passes, but the review heading says "did not finish" and the job shows a warning. |
-| 1 | fail | At least one confirmed finding at or above `FAIL_ON` severity. |
-| 2 | fail | The review itself broke, for example a bad API key or an unreadable report. |
+| 1 | fail | A finished review has at least one confirmed finding at or above `FAIL_ON` severity. |
+| 2 | fail | The review itself broke: a failed login, an agent stopped by repeated API errors (`retries_exhausted`), or a report that breaks the JSON schema. |
 
 ## Cost
 

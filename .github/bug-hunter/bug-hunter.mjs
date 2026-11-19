@@ -251,7 +251,14 @@ function parseReport(text) {
   const blocks = [...text.matchAll(/```json\s*\n([\s\S]*?)```/g)];
   if (!blocks.length) throw new Error(`Agent's final message has no json block:\n${text.slice(-2000)}`);
   const report = JSON.parse(blocks.at(-1)[1]);
-  report.findings = Array.isArray(report.findings) ? report.findings : [];
+  // A report that breaks the schema is a failed review, not a clean one.
+  if (!report || !Array.isArray(report.findings)) throw new Error("Agent's report has no findings array.");
+  for (const f of report.findings) {
+    if (!["high", "medium", "low"].includes(f?.severity) || typeof f.file !== "string" || typeof f.title !== "string" || !Number.isInteger(Number(f.line))) {
+      throw new Error(`Agent's report has an invalid finding: ${JSON.stringify(f).slice(0, 300)}`);
+    }
+  }
+  if (report.not_covered !== undefined && !Array.isArray(report.not_covered)) throw new Error("Agent's report has a non-array not_covered.");
   return report;
 }
 
@@ -367,6 +374,9 @@ async function main() {
   setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
   const pr = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
   const files = await prFiles();
+  // The PR object and its file list come from two calls; a push between them would mix two heads.
+  const recheck = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
+  if (recheck.head.sha !== pr.head.sha) throw new Error(`PR head moved from ${pr.head.sha} to ${recheck.head.sha} during setup; the newer push's run reviews it.`);
   const { slices, skipped } = planSlices(files);
   console.log(`Slices: ${slices.map((s) => `${s.id}=${s.lines} lines/${s.files.length} files`).join(", ") || "none"}; skipped ${skipped.length} files.`);
   if (!slices.length) {
@@ -430,6 +440,10 @@ async function main() {
     if (verdict.state !== "working") break;
   }
 
+  if (verdict.state === "working" && verdict.reason === "retries_exhausted") {
+    const errors = events.filter((e) => e.type === "session.error").map((e) => JSON.stringify(e.error ?? e)).slice(-3);
+    throw new Error(`Session ${session.id} stopped with retries_exhausted. Last errors: ${errors.join(" | ") || "none logged"}`);
+  }
   let note = "";
   if (verdict.state === "working") note = `Timed out after ${TIMEOUT_MS / 60000} minutes before the review finished.`;
   if (verdict.state === "budget") note = `Stopped at the ${dollars(BUDGET_CENTS)} session budget before the review finished.`;
@@ -454,7 +468,8 @@ async function main() {
   const threshold = SEVERITY_RANK[FAIL_ON] ?? SEVERITY_RANK.high;
   const blocking = report.findings.filter((f) => (SEVERITY_RANK[f.severity] ?? 0) >= threshold);
   if (note) console.log(`::warning title=Bug Hunter did not finish::${note}`);
-  if (blocking.length) {
+  // An unfinished review passes with its warning, even if it already confirmed something.
+  if (blocking.length && finished) {
     console.log(`::error title=Bug Hunter::${blocking.length} finding(s) at or above "${FAIL_ON}" severity. See the PR review.`);
     process.exit(1);
   }
