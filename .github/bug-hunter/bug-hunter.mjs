@@ -21,7 +21,7 @@
 // Exit codes: 0 no blocking findings, 1 blocking findings, 2 the review itself failed.
 
 import { createHash } from "node:crypto";
-import { readFileSync, appendFileSync } from "node:fs";
+import { readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic, { toFile } from "@anthropic-ai/sdk";
@@ -62,6 +62,21 @@ const dollars = (cents) => `$${(Number(cents) / 100).toFixed(2)}`;
 // https://platform.claude.com/docs/en/manage-claude/wif-providers/github-actions
 // Locally, an ANTHROPIC_API_KEY in the environment takes precedence.
 const client = new Anthropic();
+
+// GitHub's OIDC token expires about 5 minutes after it is issued, and the SDK rereads
+// ANTHROPIC_IDENTITY_TOKEN_FILE each time it renews its 10-minute Anthropic token. So in CI,
+// fetch a fresh GitHub token into that file every 4 minutes for as long as the job runs.
+// https://platform.claude.com/docs/en/manage-claude/wif-providers/github-actions
+async function refreshGithubIdToken() {
+  const url = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+  const file = process.env.ANTHROPIC_IDENTITY_TOKEN_FILE;
+  if (!url || !file) return;
+  const res = await fetch(`${url}&audience=https://api.anthropic.com`, {
+    headers: { authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}` },
+  });
+  if (!res.ok) throw new Error(`GitHub OIDC token request -> ${res.status}`);
+  writeFileSync(file, (await res.json()).value);
+}
 
 // ---------- GitHub ----------
 
@@ -249,7 +264,26 @@ const say = (sessionId, text) =>
 async function stopSession(sessionId) {
   await say(sessionId, "Stop all workflow runs now and start no new work.").catch(() => {});
   await client.beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
+  // A running session can't be archived; give the interrupt up to 30 seconds to land.
+  for (let i = 0; i < 6; i++) {
+    const { status } = await client.beta.sessions.retrieve(sessionId).catch(() => ({}));
+    if (status !== "running" && status !== "rescheduling") break;
+    await new Promise((r) => setTimeout(r, 5_000));
+  }
   await client.beta.sessions.archive(sessionId).catch((err) => console.log(`  could not archive ${sessionId}: ${err.message}`));
+}
+
+// A cancelled or crashed earlier run can leave its session alive and spending.
+// Stop any live Bug Hunter session for this PR before starting a new one.
+async function stopStaleSessions() {
+  const prefix = `Bug Hunter ${REPO}#${PR_NUMBER} `;
+  let checked = 0;
+  for await (const s of client.beta.sessions.list()) {
+    if (++checked > 200) break;
+    if (!s.title?.startsWith(prefix) || s.archived_at || s.status === "terminated") continue;
+    console.log(`Stopping stale session ${s.id} (${s.status}).`);
+    await stopSession(s.id);
+  }
 }
 
 // What the session cost, in total and by agent. Thread figures leave out runtime cost,
@@ -329,6 +363,8 @@ async function postReview(pr, files, report, { sessionId, note, finished, cost }
 let liveSession; // the session to stop if this process is cancelled or crashes
 
 async function main() {
+  await refreshGithubIdToken();
+  setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
   const pr = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
   const files = await prFiles();
   const { slices, skipped } = planSlices(files);
@@ -338,6 +374,7 @@ async function main() {
     return;
   }
 
+  await stopStaleSessions();
   const [agentId, environmentId, uploads] = await Promise.all([
     ensureAgent(),
     ensureEnvironment(),
