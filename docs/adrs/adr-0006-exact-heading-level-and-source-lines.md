@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 ## ADR-0006 — Exact heading-level filtering and source lines
 
 **Context:** The positional H-level is an inclusive ceiling, so selecting only H3 headings currently requires a second search. The [delta design](../../design-docs/features/20260714T184423-jact-outline-cli/jact-outline-cli-delta-design.md#Recommendation) records the evidence and alternatives.

@@ -1,24 +1,21 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # JACT — Test Guide
 
 ## Import Strategy
 
-Tests import from `dist/` (compiled output), not `src/` (TypeScript source).
-
-**Why**: TypeScript source must be compiled to JavaScript before test execution. Tests run against the transpiled code in `dist/`.
+Vitest runs TypeScript directly, so most tests import from `src/` (TypeScript source) using the `.js` suffix that NodeNext resolution requires. No build is needed for these imports.
 
 **Example**:
 
-```javascript
-// Correct — import compiled output
-import { JactCli } from "../dist/jact-cli.js";
-
-// Wrong — TypeScript source not directly executable by test runner
-import { JactCli } from "../src/jact.ts";
+```typescript
+// Typical — import TypeScript source with the NodeNext .js suffix
+import { createMarkdownParser } from "../../src/factories/componentFactory.js";
 ```
 
-**Build before testing**: Run `npx tsc --build` if `dist/` is stale.
-
-See commit `51a60a3` for the migration that established this pattern.
+**Build before CLI tests**: CLI integration tests run the compiled `dist/cli.js` in a child process, and a few older unit tests still import from `dist/`. Run `npm run build` first when `dist/` is stale, or those tests exercise old code.
 
 ## Path Resolution
 
@@ -36,20 +33,17 @@ const fixturePath = "/Users/someone/project/test/fixtures/sample.md";
 
 - Use `__dirname` or `import.meta.url` for file-relative paths
 - Use `process.cwd()` only when testing CLI behavior from project root
-- All test fixtures live in `test/fixtures/`
+- Shared Markdown fixtures live in `test/fixtures/`; a suite may keep its own `fixtures/` folder beside it (for example `test/hardening-pipeline/fixtures/`), and many tests build small trees under the OS temp directory
 
 ## Worktree Constraints
 
-This project uses git worktrees with macOS Seatbelt sandboxing. Tests must be **self-contained** within the worktree.
+Tests may run from git worktrees, so they must be **self-contained** within the checkout.
 
 **Constraints**:
 
-- Sandbox is **deny-by-default** — writes outside the worktree are blocked
-- Tests must not read from or write to paths outside the worktree directory
-- Temporary files should use OS temp directories (`/tmp/`) which are whitelisted
+- Tests must not read from or write to paths outside the checkout, except the OS temp directory
+- Temporary files should go under `os.tmpdir()`
 - Test cleanup (`afterEach`/`afterAll`) must remove any temp files created
-
-**Full sandbox documentation**: See `packages/sandbox/SEATBELT-GUIDE.md` and `packages/sandbox/AUTOMATED-WORKTREE-SETUP.md`.
 
 ## Running Tests
 
@@ -63,24 +57,28 @@ npm run test:watch
 # With coverage
 npm run test:coverage
 
-# Unit tests only
-npm run test:unit
+# Vitest UI
+npm run test:ui
 
-# Integration tests only
-npm run test:integration
-
-# Citation-specific tests
-npm run test:citation
+# One file or folder
+npx vitest run test/cli-integration/rename-command.test.ts
 ```
 
 ## Test Organization
 
 ```text
 test/
-├── fixtures/          # Self-contained markdown test files
-├── helpers/           # Shared test utilities
+├── fixtures/          # Shared self-contained Markdown test files
+├── helpers/           # Shared test utilities (CLI runner, in-memory file cache)
 ├── unit/              # Unit tests (types, factories, modules)
+├── core/              # Component tests for src/core modules
 ├── integration/       # Integration tests
-├── cli-integration/   # CLI end-to-end tests
-└── setup.js           # Test environment setup (process cleanup, NODE_ENV)
+├── cli-integration/   # CLI end-to-end tests against dist/cli.js
+├── cache/             # Cache-check tests
+├── outline/           # Outline rendering tests
+├── validate/          # Validate batch runner and renderers
+├── hardening-pipeline/ # Injectable-ban and portability checks
+├── regressions/       # One test per fixed GitHub issue (see its README)
+├── scratch/           # Proofs of concept and benchmarks
+└── *.test.{js,ts}     # Older top-level suites
 ```

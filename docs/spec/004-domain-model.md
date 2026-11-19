@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 004. Domain Model
 
 **Status:** done

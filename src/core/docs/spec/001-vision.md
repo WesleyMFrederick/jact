@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 001. Vision
 
 **Status:** done
@@ -14,7 +18,7 @@ Core gives each command the same parser, the same link checks, and the same safe
 
 1. **One parse model** — validation, extraction, fix, and rename read the same syntax tree
 2. **One link verdict** — every link gets a valid, warning, or error result from one checker
-3. **Safe edits** — the two write paths refuse unsafe targets and write nothing on a partial failure
+3. **Safe edits** — the three write paths refuse unsafe targets and write nothing on a partial failure
 
 ### What `src/core` Is Not
 
@@ -42,7 +46,7 @@ Three principles decide where new core code goes.
 
 ### 3. Writes Are Opt-In and All-or-Nothing
 
-**Principle:** Only the fix and rename paths write user files, and each writes all planned edits or none.
+**Principle:** Only the fix, rename, and vault link paths write user files, and each writes all planned edits or none.
 
 **Implications:**
 - The repository read-only rule: [3. Read-Only by Default](../../../../docs/spec/001-vision.md#3.%20Read-Only%20by%20Default)
@@ -68,6 +72,7 @@ Core serves jact's own orchestration code and its tests, not end users.
 | User | Use Case |
 |------|----------|
 | **`src/jact-cli.ts`** | Runs extract, fix, and rename through core components |
+| **`src/cli.ts`** | Runs `vault-link` through the vault link fixer |
 | **`src/validate/`** | Runs single-file and batch validation through the checker |
 | **Test suites** | Inject fakes through narrow interfaces in place of production classes |
 
@@ -79,3 +84,4 @@ Each row records one version of this vision.
 |---------|---------|
 | 1.0.0 | Initial vision for `src/core` |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
+| 1.2.0 | 2026-11-19: The vault link fixer counts as a third write path; `src/cli.ts` is a direct core caller |

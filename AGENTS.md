@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # jact — Agent Operating Rules
 
 Canonical operating doc for agents working in the jact repo. Referenced by the squid `/plan` workflow and by any agent authoring plans, ADRs, or task files here.
@@ -132,7 +136,7 @@ Core Components:
 ```
 src/
 ├── cli.ts / jact-cli.ts          # Commander entry + JactCli orchestration class
-├── CitationValidator.ts          # Link/anchor validation logic
+├── core/CitationValidator/       # Link/anchor validation (CitationValidator.ts, AnchorMatcher.ts, PathResolver.ts)
 ├── FileCache.ts                  # File path resolution and caching
 ├── ParsedDocument.ts             # Facade over MarkdownParser output
 ├── ParsedFileCache.ts            # Caches ParsedDocument instances
@@ -151,7 +155,7 @@ src/
 └── types/                        # TypeScript type definitions
     ├── citationTypes.ts
     ├── validationTypes.ts
-    └── contentExtractorTypes.ts
+    └── extraction-types.ts
 ```
 
 ### Key Design Patterns
@@ -192,10 +196,9 @@ npm run test:watch    # Watch mode for development
 test/
 ├── unit/                           # Component unit tests
 │   ├── jact-*.test.ts
-│   ├── factories/
-│   └── types/
+│   └── factories/
 ├── integration/                    # End-to-end workflow tests
-└── types/                          # Type contract validation
+└── *.test.js / *.test.ts           # Top-level and per-area suites (core/, validate/, outline/, ...)
 ```
 
 ## Component Interaction Patterns
@@ -203,7 +206,7 @@ test/
 ### Workflow: Extract Links Command
 1. **CLI Orchestrator** receives `extract links` command
 2. Creates `CitationValidator` and `ContentExtractor` via factory
-3. **Phase 0**: Calls `validator.validateFile()` to discover and validate links
+3. **Phase 0**: Calls `validator.validateDocument()` to discover and validate links
 4. **Phase 1**: Passes enriched links to `contentExtractor.extractContent()`
 5. **Phase 2**: ContentExtractor retrieves target documents via `ParsedFileCache`
 6. **Phase 3**: Deduplicates content and outputs JSON
@@ -237,6 +240,7 @@ The project includes extensive architecture documentation:
 ## Path Resolution Strategy
 
 The tool supports multiple path resolution strategies (in order):
+0. Home-directory expansion for `~/` paths
 1. Standard relative path from source location
 2. Obsidian absolute path format (`0_SoftwareDevelopment/...`)
 3. Symlink-aware resolution (resolves symlinks and retries)
@@ -263,10 +267,10 @@ The tool supports multiple path resolution strategies (in order):
 3. Add factory method if new component created
 4. Wire through CLI orchestrator
 5. Add tests in `test/` mirroring source structure
-6. Update component guide in `design-docs/`
+6. Update the [jact Living Specification](docs/spec/SPEC.md#jact Living Specification) (component guides in `design-docs/component-guides/` are deprecated)
 
 ### When Fixing Bugs:
-1. Check component guides for expected behavior
+1. Check the [jact Living Specification](docs/spec/SPEC.md#jact Living Specification) for expected behavior
 2. Write failing test first (TDD approach)
 3. Fix implementation
 4. Verify all tests pass

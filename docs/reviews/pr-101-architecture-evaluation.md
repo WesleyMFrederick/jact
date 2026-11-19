@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # PR 101 Architecture Evaluation
 
 ## Verdict
@@ -57,7 +61,7 @@ Canonical requirements are the [rename interface](../spec/005-interfaces.md#`jac
 
 ### Medium — The canonical interface still promises unconditional recovery
 
-**Location:** `docs/spec/005-interfaces.md:126`, `:154`.
+**Location:** `docs/spec/005-interfaces.md:126`, `:154` at `dd23741` (historical line numbers; later commits rewrote this section).
 
 The [rename interface](../spec/005-interfaces.md#`jact%20rename%20<source...>%20<destination>`) still says every failure undoes moves and restores edited files. The published fix instead attempts each recovery step and reports failures and retained backups; the [rename workflow](../spec/006-behavior.md#Rename%20Workflow%20%28%60jact%20rename%60%29), README, and help now describe that limitation. The interface also omits the new existing-literal-path precedence while describing globs as expanded like validation.
 

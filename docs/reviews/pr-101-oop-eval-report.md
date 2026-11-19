@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # PR 101 — Object-Oriented Architecture Evaluation
 
 ## Evaluation Metadata
@@ -38,7 +42,7 @@
 ## Recommendations
 
 1. Add the symlink guard from Critical Issue 1 and correct the `MovePlan.moved` comment (`:108`) to match. ([Backup Creation](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^backup-creation), [JSDoc/TSDoc on Public APIs](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^jsdoc-tsdoc-on-public-apis))
-2. Update [005 · Interfaces](../spec/005-interfaces.md#`jact%20rename%20<source...>%20<destination>`) line 126 (existing paths are literal) and line 154 (recovery is attempted step by step; recovery errors report retained backups) to match README line 172 and [Rename Workflow](../spec/006-behavior.md#Rename%20Workflow%20%28%60jact%20rename%60%29) on `dd23741`.
+2. Update [005 · Interfaces](../spec/005-interfaces.md#`jact%20rename%20<source...>%20<destination>`) line 126 (existing paths are literal) and line 154 (recovery is attempted step by step; recovery errors report retained backups) to match README line 172 and [Rename Workflow](../spec/006-behavior.md#Rename%20Workflow%20%28%60jact%20rename%60%29) on `dd23741`. Line numbers are for `dd23741`, not the current file.
 3. Move wiki-embed recognition into the parser boundary so the rename service consumes tokens, not decoded text. ([Replaceable Parts via Interfaces](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^replaceable-parts-via-interfaces), [ADR-0003 — Flavor Extension Collection](../adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection))
 4. Add docblocks to `RenameMarkdownFilesDeps` and `RenameFileChange`, and a short file-level purpose header for agents. ([Selective Documentation](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^selective-documentation), [Contextual Comments](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^contextual-comments))
 5. Optional, maintainability only: when the module next changes, split it by responsibility (see Architectural Rework below). Do not add a file-system abstraction only for elegance; the existing `--import` fault test already covers rollback without one.

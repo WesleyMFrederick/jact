@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 003. ADRs
 
 **Status:** done
@@ -108,7 +112,7 @@ Neither is fixed by this spec-writing pass — they're pre-existing, already-doc
 
 The living specification in `docs/spec/` and ADRs in `docs/adrs/` replace `design-docs/component-guides/` (deprecated 2026-07-01). The most consequential drifts found between the old guides and current code:
 
-1. **Parser engine**: the old MarkdownParser guide describes `marked.js`; current code has zero `marked` imports and parses exclusively via micromark/mdast (ADR-0002 above). jact's own `CLAUDE.md` architecture section repeats this same stale claim.
+1. **Parser engine**: the old MarkdownParser guide describes `marked.js`; current code has zero `marked` imports and parses exclusively via micromark/mdast (ADR-0002 above). jact's own `CLAUDE.md` architecture section repeated this same stale claim until the 2026-07-01 merge `b53295b` corrected it to micromark.
 2. **CLI split**: the old CLI guides describe a single orchestrator class; current code is deliberately split into `src/cli.ts` (Commander registration, issue #29) and `src/jact-cli.ts` (`JactCli`, orchestration) — see [002-architecture.md](../spec/002-architecture.md#CLI%20Orchestrator%20%60src/cli.ts%60%20+%20%60src/jact-cli.ts%60).
 3. **CitationValidator modularization**: the old CitationValidator guide predates the extraction of `AnchorMatcher.ts`, `PathResolver.ts`, and the `pathResolutionStrategies/` strategy array (issue #28) — current `CitationValidator` is a thin coordinator, not a monolith.
 

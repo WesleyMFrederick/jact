@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # jact Living Specification
 
 **Version:** 1.1.0

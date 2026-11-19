@@ -1,6 +1,10 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # validate Module Living Specification
 
-**Version:** 1.2.0
+**Version:** 1.2.1
 **Status:** done
 
 The `src/validate/` module runs the `jact validate` workflow for one file or many files and reports the result. It orchestrates link checks and enabled validation rules and writes no files. This spec covers what the module owns and the rules it must keep. The repo spec owns the command-line interface (CLI) contract and the step order.
@@ -55,10 +59,11 @@ These links point to the facts that a reader of this module needs first.
 
 ## Change Log
 
-The module spec is at version 1.2.0.
+The module spec is at version 1.2.1.
 
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | First module spec: vision and architecture |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
 | 1.2.0 | 2026-10-09: Added rule orchestration and canonical configuration reference |
+| 1.2.1 | 2026-11-19: Architecture names the `--fix` recheck as a workflow entry point |

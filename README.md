@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # jact — Just Another Context Tool
 
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/WesleyMFrederick/jact?utm_source=oss&utm_medium=github&utm_campaign=WesleyMFrederick%2Fjact&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
@@ -306,12 +310,13 @@ Prints the parsed Markdown tree, detected links, headings, and anchors as JSON.
 
 **Heading anchors use the exact heading text.** Write `#Getting%20Started` (or `#Getting Started` inside wiki links), not the lowercase slug `#getting-started`. jact reports slugs as errors and suggests the exact form; `--fix` rewrites them. This matches how Obsidian resolves links.
 
-jact also reports heading links that contain characters Obsidian removes from links, such as `:`, and suggests the corrected anchor.
+With the `obsidian` preset (see [Validation presets](#Validation presets)), jact also reports heading links that contain characters Obsidian removes from links, such as `:`, and suggests the corrected anchor.
 
 ## How links are resolved
 
 For each link, jact tries these steps in order:
 
+0. For a path that starts with `~/`, the path inside your home folder.
 1. The path relative to the file that contains the link.
 2. An Obsidian vault-style path (relative to a parent folder of the source file).
 3. The same path after following symlinks.

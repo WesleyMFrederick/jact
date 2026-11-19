@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # Issue tracker: Local Markdown
 
 Issues live as Markdown files in `.scratch/`. Persistent feature specs are canonical under `design-docs/features/` and exposed to the issue tracker through symlinks.

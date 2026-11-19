@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 007. Testing
 
 **Status:** done
@@ -18,6 +22,8 @@ Each folder holds one kind of test.
 | `test/core/` | Tests that mirror the `src/core/` folders, one subfolder per component |
 | `test/validate/` | Batch-validate tests: file selection, the batch run, reports, and the end-to-end batch path |
 | `test/integration/` | Workflows that span several components (parser to checker to extractor) |
+| `test/outline/` | The heading tree that `jact outline` prints |
+| `test/cache/` | Per-session marker files for outline reminders and `extract links --session` |
 | `test/cli-integration/` | Full runs of the built CLI, one command or flag behavior per file |
 | `test/regressions/` | One test per fixed bug, named `<issue-number>-<short-slug>.test.ts` |
 | `test/hardening-pipeline/` | Architecture constraint tests, such as bans on hard-coded dependencies |
@@ -32,7 +38,7 @@ Five conventions decide how a new test is written.
 
 - **Test first for features.** A feature folder under `design-docs/features/` maps each requirement scenario to a test before the code exists.
 - **Characterization snapshots guard migrations.** Before an internal rewrite, a snapshot pins the old output, so the rewrite proves the same behavior. Example: [ADR-0002 — Regex → mdast-token migration (WMF-35)](../adrs/003-adrs.md#ADR-0002%20—%20Regex%20→%20mdast-token%20migration%20%28WMF-35%29).
-- **Injected seams, not module mocks.** Git calls and file-system reads come in as injected functions or objects. Tests pass a stub; no test mocks `node:child_process` or `node:fs`.
+- **Injected seams, not module mocks.** Git calls and file-system reads come in as injected functions or objects, and tests pass a stub. One exception: the `jact vault-link` tests partly mock `node:fs` to force `renameSync` and `linkSync` failures during the note rewrite.
 - **Factory overrides for fakes.** The component factory accepts dependency overrides, so a test injects a fake without a production class. Why: [ADR-0001 — DI-via-factory pattern](../adrs/003-adrs.md#ADR-0001%20—%20DI-via-factory%20pattern).
 - **Type-contract tests are a suite.** Type tests assert public shapes directly and catch a signature change that a behavior test misses.
 
