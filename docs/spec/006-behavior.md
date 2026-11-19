@@ -6,7 +6,7 @@ This section states what each jact workflow reads, writes, prints, and exits wit
 
 ## Validate Workflow (single file)
 
-Single-file validation checks the link syntax and enabled renderer rules in one Markdown file and prints one report. It writes no files. Before validation, the CLI resolves [Validation configuration and presets](005-interfaces.md#Validation configuration and presets); a configuration or plugin error prints `ERROR: <message>` on stderr and exits `2` without validating or writing anything. File, `--stdin`, and batch validation share steps 1–5.
+Single-file validation checks the link syntax and enabled renderer rules in one Markdown file and prints one report. It writes no files. Before validation, the CLI resolves [Validation configuration and presets](005-interfaces.md#Validation%20configuration%20and%20presets); a configuration or plugin error prints `ERROR: <message>` on stderr and exits `2` without validating or writing anything. File, `--stdin`, and batch validation share steps 1–5.
 
 ```text
 1. Resolve scope ── no root found ──▶ ERROR: cannot resolve scope … (exit 2)
@@ -136,7 +136,7 @@ Same-file `[text](#heading)` links run the same steps against their own file.
 
 ### Anchors with characters Obsidian drops
 
-This check runs only when the `obsidian/anchor-dropped-chars` rule is enabled by the `obsidian` preset or a per-rule override; see [Validation configuration and presets](005-interfaces.md#Validation configuration and presets). With no configuration, the default `commonmark` preset leaves it off.
+This check runs only when the `obsidian/anchor-dropped-chars` rule is enabled by the `obsidian` preset or a per-rule override; see [Validation configuration and presets](005-interfaces.md#Validation%20configuration%20and%20presets). With no configuration, the default `commonmark` preset leaves it off.
 
 Obsidian drops `:` `#` `|` `^` `[` `]` from heading-link anchors. It renders an anchor that keeps any of these characters as an external link. When the rule is enabled, jact decodes each header anchor (one that does not start with `^`) and checks it for these characters. If the anchor has one, jact replaces each with a space, collapses whitespace, and matches again. When a header matches, the link is an error owned by `obsidian/anchor-dropped-chars`:
 
@@ -216,7 +216,7 @@ jact parses six link patterns with its Markdown syntax extensions, not with regu
 
 Fix kinds: a path conversion, a kebab-case anchor to its raw heading, a close heading for a missing anchor, and an anchor with characters Obsidian drops when its rule is enabled. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged is not applied, counted, or reported.
 
-When `obsidian/no-reference-note-link` is enabled, each local-file split-style usage becomes `[text](dest)` and its definition line is deleted after all usages are rewritten, unless an image reference (`![alt][label]`) still uses the definition; then the definition stays. The destination is preserved byte-for-byte unless jact's own path or anchor correction is folded into it. jact edits only a definition that starts after blanks on its line and ends its line, and a multi-line definition only at the top level. A definition inside a blockquote or list item is still reported as an error, but `--fix` supplies no edit for it, so the quote or list structure is never damaged. Other excluded forms are listed in [Validation configuration and presets](005-interfaces.md#Validation configuration and presets).
+When `obsidian/no-reference-note-link` is enabled, each local-file split-style usage becomes `[text](dest)` and its definition line is deleted after all usages are rewritten, unless an image reference (`![alt][label]`) still uses the definition; then the definition stays. The destination is preserved byte-for-byte unless jact's own path or anchor correction is folded into it. jact edits only a definition that starts after blanks on its line and ends its line, and a multi-line definition only at the top level. A definition inside a blockquote or list item is still reported as an error, but `--fix` supplies no edit for it, so the quote or list structure is never damaged. Other excluded forms are listed in [Validation configuration and presets](005-interfaces.md#Validation%20configuration%20and%20presets).
 
 Rule edits and ordinary fixes share source-offset ranges and apply from the end of the document backward. A citation fix wholly contained in a rule rewrite or deletion is omitted because the rule already folds it in; any remaining overlap stops the fix before backups or writes. A changed citation also stops the fix before writing, and so does a note whose content differs from the content that was parsed when rule edits exist. Every path that ends in `ERROR:` (configuration/plugin failure, missing file, missing `--scope` for a path fix, refused write, changed source or citations, overlapping citations) exits `2`. Every other path, including `SKIPPED:`, "No auto-fixable citations found", and `--dry-run`, ends at step 7.
 

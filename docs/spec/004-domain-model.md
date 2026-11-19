@@ -8,7 +8,7 @@ Shared data shapes are declared in `src/types/`. Dependency-injection interfaces
 
 ## Core Entities
 
-Five entities describe one parsed document. [`jact ast <file>`](005-interfaces.md#`jact ast <file>`) prints them as JSON.
+Five entities describe one parsed document. [`jact ast <file>`](005-interfaces.md#%60jact%20ast%20<file>%60) prints them as JSON.
 
 ### LinkObject
 
@@ -74,7 +74,7 @@ Parser output is the complete parsed form of one document. `jact ast` prints it.
 **Fields:**
 - `filePath`, `content` — the source path and text
 - `ast` — the Markdown syntax tree (mdast)
-- `validationDisabled` — `true` when the document opts out of validation; the directive rules are in [`jact validate`](005-interfaces.md#`jact validate`)
+- `validationDisabled` — `true` when the document opts out of validation; the directive rules are in [`jact validate`](005-interfaces.md#%60jact%20validate%60)
 - `links`, `linkReferences`, `embeds`, `headings`, `anchors` — lists of the entities above; `linkReferences` holds reference-style link uses, whose definitions are in `links`
 
 ---
@@ -113,7 +113,7 @@ With `--lines`, the summary counts only the links in the range. A document that 
 
 ## Batch-Validate Types (`src/types/cli-types.ts`)
 
-A file result is the outcome of checking one file in batch mode. [`jact validate`](005-interfaces.md#`jact validate`) `--json` prints one per line.
+A file result is the outcome of checking one file in batch mode. [`jact validate`](005-interfaces.md#%60jact%20validate%60) `--json` prints one per line.
 
 **File result fields:**
 - `path` — the file as selected
@@ -154,7 +154,7 @@ Eligibility rules in `src/core/ContentExtractor/` decide which links are extract
 
 ## FileCache Types (`src/types/fileCacheTypes.ts`)
 
-A file resolution result is the outcome of finding a file by name in the scope. A failure has a reason: `not_found`, `duplicate`, or `duplicate_fuzzy`. A duplicate failure keeps every candidate, ranked by directory distance from the expected location, then by scope-relative path. Only the output formatter limits the display; see [`jact validate`](005-interfaces.md#`jact validate`).
+A file resolution result is the outcome of finding a file by name in the scope. A failure has a reason: `not_found`, `duplicate`, or `duplicate_fuzzy`. A duplicate failure keeps every candidate, ranked by directory distance from the expected location, then by scope-relative path. Only the output formatter limits the display; see [`jact validate`](005-interfaces.md#%60jact%20validate%60).
 
 ---
 
