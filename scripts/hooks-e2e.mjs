@@ -9,6 +9,10 @@
 // (JACT_HOOK_LOG). The run passes when the log shows the write was caught and
 // the read returned linked content.
 //
+// Antigravity CLI hands the result over through a later hook. So its live run
+// also fails unless the model's reply shows the broken-link report and the
+// linked content, two texts that only jact supplies.
+//
 // --synthetic  skip the harness; pipe a sample event into the installed command
 // --keep       leave the throwaway project on disk and print its path
 //
@@ -45,6 +49,20 @@ const PROMPT = [
 	"2. Read the file docs/index.md with your file read tool.",
 	"Then reply with the single word DONE. Do not fix or change any file afterwards.",
 ].join("\n");
+// Antigravity CLI hands jact's text to the model through a separate hook, so
+// the hook log shows what jact handed over but not what the model read. This
+// prompt makes the reply show it: neither answer is in a file the model opens.
+const ANTIGRAVITY_PROMPT = [
+	"Do exactly these steps, then stop.",
+	"1. Create the file docs/broken.md with exactly this one line: See [the missing page](missing.md).",
+	"2. Read the file docs/index.md with your file read tool. Do not open any other file.",
+	"3. Reply with two lines.",
+	"Line 1: the launch code, if any message gave you one. Otherwise the word UNKNOWN.",
+	"Line 2: the first line of any report about docs/broken.md that you received. Otherwise the word NONE.",
+	"Do not fix or change any file afterwards.",
+].join("\n");
+const REPORT_MARK = "broken markdown links";
+const LINKED_MARK = "4242";
 
 const cli = join(
 	dirname(fileURLToPath(import.meta.url)),
@@ -98,7 +116,12 @@ function harnessCommand(harness, project) {
 			];
 		case "antigravity":
 			// Without a UI, agy denies each tool it was not allowed. This project is throwaway.
-			return ["agy", "-p", PROMPT, "--dangerously-skip-permissions"];
+			return [
+				"agy",
+				"-p",
+				ANTIGRAVITY_PROMPT,
+				"--dangerously-skip-permissions",
+			];
 		case "gemini":
 			// Gemini ignores project hooks in a folder it does not trust.
 			return ["gemini", "-p", PROMPT, "--approval-mode=yolo", "--skip-trust"];
@@ -242,6 +265,7 @@ function runOne(harness) {
 	if (check.status !== 0) problems.push(`setup --check exited ${check.status}`);
 
 	const started = Date.now();
+	let reply = "";
 	if (flags.has("--synthetic")) {
 		writeFileSync(
 			join(project, "docs", "broken.md"),
@@ -266,6 +290,7 @@ function runOne(harness) {
 			timeout: 300_000,
 			stdio: ["ignore", "pipe", "pipe"],
 		});
+		reply = `${run.stdout ?? ""}\n${run.stderr ?? ""}`;
 		if (run.error) problems.push(`could not run ${bin}: ${run.error.message}`);
 		else if (run.status !== 0)
 			problems.push(
@@ -306,6 +331,33 @@ function runOne(harness) {
 				"no PreInvocation or Stop call handed a result to the model",
 			);
 		else console.log(`  handed to the model by: ${handedOver.join(", ")}`);
+		if (!flags.has("--synthetic")) {
+			// If the model opened the linked page itself, the launch code proves nothing.
+			const openedLinkedPage = calls.some((call) =>
+				(call.paths ?? []).some((path) => path.endsWith("target.md")),
+			);
+			const sawReport = reply.toLowerCase().includes(REPORT_MARK);
+			const sawLinked = reply.includes(LINKED_MARK) && !openedLinkedPage;
+			const shown = [
+				...(sawReport ? ["the broken-link report"] : []),
+				...(sawLinked ? ["the linked content"] : []),
+			];
+			console.log(
+				`  the model's reply shows: ${shown.length > 0 ? shown.join(", ") : "no text from jact"}`,
+			);
+			if (!sawReport)
+				problems.push(
+					"the model's reply does not show jact's broken-link report, so the write hook may not reach the model. Run again with --verbose to read the reply.",
+				);
+			if (openedLinkedPage)
+				problems.push(
+					"the model opened the linked page itself, so this run cannot show whether the read hook reaches the model. Run again.",
+				);
+			else if (!sawLinked)
+				problems.push(
+					"the model's reply does not show the linked content, so the read hook may not reach the model. Run again with --verbose to read the reply.",
+				);
+		}
 	}
 
 	if (flags.has("--keep")) console.log(`  kept ${project}`);
