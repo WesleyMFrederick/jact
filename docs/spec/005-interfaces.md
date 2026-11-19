@@ -63,7 +63,7 @@ The default preset is `commonmark`, which enables no additional rules. It does n
 | Rule ID | Check |
 |---|---|
 | `obsidian/no-reference-note-link` | Reject local-file split-style links: `[text][label]`, `[label][]`, and `[label]` with a reference definition. The first definition of a label decides, as in CommonMark: a label whose first definition is a `scheme:` URL such as `https:` or `obsidian:` is skipped even when a later definition is a local file. Also skip footnotes, same-file `#anchor` definitions, and unused definitions. |
-| `obsidian/anchor-dropped-chars` | Enable [Anchors with characters Obsidian drops](006-behavior.md#Anchors with characters Obsidian drops). This check no longer runs with no configuration. |
+| `obsidian/anchor-dropped-chars` | Enable [Anchors with characters Obsidian drops](006-behavior.md#Anchors%20with%20characters%20Obsidian%20drops). This check no longer runs with no configuration. |
 | `obsidian/no-vault-escape-link` | Only in a vault: the nearest folder above the file's real path that contains `.obsidian`. With no vault, the rule does nothing. Inside a vault, a Markdown link is an error when its target is an absolute path, a `file:` URL, contains `.paseo/worktrees/`, or is a relative path that leaves the vault root. Relative paths are resolved from the note's real folder as text, without following symlinks, so a link to a symlink inside the vault passes even when the symlink points outside. Skip web URLs, `#anchor`-only links, wikilinks, and footnotes. The one-line message names a paste-ready fix: [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) with this note and the target as written, plus a hint to use `--all` for every such link in the note. |
 | `obsidian/no-unindexed-link` | Only in a vault, as for `obsidian/no-vault-escape-link`. A Markdown link whose target stays inside the vault is an error when Obsidian will not open it at that path: a path segment starts with a dot, or the path goes through a symlink whose real file Obsidian already shows at another vault path (in the vault itself, or under a vault folder symlink whose target is disjoint from the vault). jact resolves such links, but Obsidian skips them. For the symlink case, the message names the vault path Obsidian shows and the same paste-ready [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) fix. |
 | `obsidian/no-unstable-symlink-link` | Only in a vault, as for `obsidian/no-vault-escape-link`. A Markdown link whose target stays inside the vault is an error when its path goes through an unstable symlink: a file or folder symlink whose real target lies in a `.paseo/worktrees/` checkout, or a folder symlink with a folder named `sources` on its vault path (that folder holds only the per-file symlinks `jact vault-link` makes for one note). Obsidian opens such a link, but it breaks without warning when the worktree or the symlink is removed. The message names the symlink, the reason, and the same paste-ready [`jact vault-link`](#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) fix. |
@@ -81,7 +81,7 @@ Plugins are imported as modules and must default-export `{ rules: [{ id, preset,
 
 **Configuration errors (exit `2`):** malformed JSON, unknown keys or invalid value shapes, unknown presets or rule IDs, missing or unloadable plugins, invalid default exports, and duplicate rule IDs print `ERROR: <message>` on stderr naming the configuration file or plugin. Control characters in the message print as visible `\uXXXX` escapes. Configuration for every selected file is resolved before validation begins: jact validates nothing and writes nothing on these errors, including in batch and `--fix` modes.
 
-Rule errors count in `summary.errors` and fail validation with exit `1`. `--lines` filters rule findings as well as links. Rule edits follow [Fix Workflow (`--fix`)](006-behavior.md#Fix Workflow (`--fix`)).
+Rule errors count in `summary.errors` and fail validation with exit `1`. `--lines` filters rule findings as well as links. Rule edits follow [Fix Workflow (`--fix`)](006-behavior.md#Fix%20Workflow%20%28%60--fix%60%29).
 
 
 ### Output — single-file, human (default, minimal)
@@ -279,7 +279,7 @@ This is recoverable replacement, **not** compare-and-swap or an atomic edit sequ
 jact outline <file> [level] [options]
 ```
 
-`jact outline` prints a quoted tree of the parsed headings in one file. The optional `level` is `H1` through `H6`, defaults to `H2`, and is an inclusive ceiling: `H3` shows H1 through H3. Exact-level and source-line rules follow [ADR-0006 — Exact heading-level filtering and source lines](../adrs/adr-0006-exact-heading-level-and-source-lines.md#ADR-0006 — Exact heading-level filtering and source lines).
+`jact outline` prints a quoted tree of the parsed headings in one file. The optional `level` is `H1` through `H6`, defaults to `H2`, and is an inclusive ceiling: `H3` shows H1 through H3. Exact-level and source-line rules follow [ADR-0006 — Exact heading-level filtering and source lines](../adrs/adr-0006-exact-heading-level-and-source-lines.md#ADR-0006%20—%20Exact%20heading-level%20filtering%20and%20source%20lines).
 
 | Flag | Default | Description |
 |---|---|---|
@@ -319,7 +319,7 @@ jact extract links <source-file> [options]
 | Flag | Default | Description |
 |---|---|---|
 | `--scope <folder>` | smart default | Folder for filename matches |
-| `--allow-read <dir>` | - | Also let links read files in `<dir>`; repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction Read Boundary) |
+| `--allow-read <dir>` | - | Also let links read files in `<dir>`; repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction%20Read%20Boundary) |
 | `--format <type>` | `json` | Reserved; output is always JSON |
 | `--full-files` | - | Also extract full-file links (default: sections and blocks only) |
 | `--session <id>` | - | Skip extraction when this session already extracted the file |
@@ -366,7 +366,7 @@ jact extract file <target-file> [options]
 | Flag | Default | Description |
 |---|---|---|
 | `--scope <folder>` | smart default | Folder for filename matches |
-| `--allow-read <dir>` | - | Also let links read files in `<dir>`; repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction Read Boundary) |
+| `--allow-read <dir>` | - | Also let links read files in `<dir>`; repeatable. See [Extraction Read Boundary](006-behavior.md#Extraction%20Read%20Boundary) |
 | `--extract-linked-content [depth]` | off; depth `1` | Also extract linked content, following linked files to `depth` (whole number ≥ 1) |
 | `--max-chars <n>` | `28000` | With `--extract-linked-content`: above this size, print a content map |
 | `-v, --verbose` | `false` | Add `outgoingLinksReport` and `stats` |
