@@ -27,7 +27,7 @@ const FIXTURE_DIR = join(__dirname, "../fixtures/wiki-scope-resolution");
 const SOURCE = join(FIXTURE_DIR, "wiki-scope-resolution-source.md");
 
 const WIKI = "[[target#hasAnchor(anchorId string) boolean]]";
-const MD = "[x](target.md#hasAnchor(anchorId%20string)%20boolean)";
+const MD = "[x](target.md#hasAnchor%28anchorId%20string%29%20boolean)";
 const TARGET_MD = "# Target\n\n## hasAnchor(anchorId: string): boolean\n";
 
 describe("wiki scope resolution — shared FileCache wiring", () => {

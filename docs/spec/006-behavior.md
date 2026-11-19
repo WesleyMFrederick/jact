@@ -131,8 +131,18 @@ An anchor check on a resolved target runs these steps in order.
 3. **Missing caret.** A link that matches only a block anchor and omits `^` is a warning that suggests `#^<id>`.
 4. **Kebab-case slug.** A kebab-case slug of a heading fails with a suggestion to use the raw heading text. `--fix` applies it.
 5. **No match.** The error `Anchor not found` lists similar anchors, up to five headers, and up to five block references. When a listed header is close, `--fix` uses it.
+6. **Raw characters (every preset).** A markdown link whose matched anchor keeps a raw space, `(`, or `)` is an error: see [Anchors a markdown link cannot contain](#Anchors%20a%20markdown%20link%20cannot%20contain).
 
 Same-file `[text](#heading)` links run the same steps against their own file.
+
+### Anchors a markdown link cannot contain
+
+CommonMark does not allow a raw space in a link destination. GitHub and Obsidian show such a link as plain text. This check runs under every preset, after the anchor matches a heading. Wikilinks and `^` block anchors are not checked.
+
+- `error`: `Anchor has characters a markdown link cannot contain (<space, "(", ")">): #<anchor>`
+- `suggestion` and `anchorConversion.recommended`: the canonical anchor. Space, `(`, `)`, and `` ` `` become `%20`, `%28`, `%29`, and `%60`; a `%` that does not start a `%XX` escape becomes `%25`. An encoded anchor stays unchanged.
+
+`--fix` applies the canonical anchor. Every other anchor fix uses the same encoding, so one run leaves no raw characters.
 
 ### Anchors with characters Obsidian drops
 
@@ -141,7 +151,7 @@ This check runs only when the `obsidian/anchor-dropped-chars` rule is enabled by
 Obsidian drops `:` `#` `|` `^` `[` `]` from heading-link anchors. It renders an anchor that keeps any of these characters as an external link. When the rule is enabled, jact decodes each header anchor (one that does not start with `^`) and checks it for these characters. If the anchor has one, jact replaces each with a space, collapses whitespace, and matches again. When a header matches, the link is an error owned by `obsidian/anchor-dropped-chars`:
 
 - `error`: `Anchor uses characters Obsidian drops (<chars>): #<anchor>`
-- `suggestion`: the corrected anchor, `#` + the header text with those characters replaced and whitespace collapsed, spaces encoded as `%20`. Examples: `#Q1%20Does%20the%20gap?` for the heading `Q1: Does the gap?`; `#Trace%20run%20(opsx%20continue)` for the heading `Trace: run (opsx:continue)`
+- `suggestion`: the corrected anchor, `#` + the header text with those characters replaced and whitespace collapsed, in the canonical encoding (spaces as `%20`, parentheses as `%28` and `%29`). Examples: `#Q1%20Does%20the%20gap?` for the heading `Q1: Does the gap?`; `#Trace%20run%20%28opsx%20continue%29` for the heading `Trace: run (opsx:continue)`
 - `anchorConversion`: the same correction, which `--fix` applies
 
 If no header matches after the replacement, the normal `Anchor not found` result applies. When the rule is enabled, its `Available headers` list and fuzzy-match `--fix` correction use the same replacement, so they never suggest an anchor that this rule rejects. When it is disabled, normal matching and suggestions keep those characters.
@@ -193,7 +203,7 @@ jact parses six link patterns with its Markdown syntax extensions, not with regu
 
 ## Fix Workflow (`--fix`)
 
-`--fix` repairs broken citations, applies enabled rule edits, and converts resolved prose `.md` paths in one file. It writes only that file and its backup. Configuration is resolved before any validation or write, as in [Validate Workflow (single file)](#Validate Workflow (single file)). `--fix`, `--dry-run`, or `--no-backup` with batch selection or `--stdin` is a usage error: jact prints `ERROR:` on stderr, validates and writes nothing, and exits `2`.
+`--fix` repairs broken citations, applies enabled rule edits, and converts resolved prose `.md` paths in one file. It writes only that file and its backup. Configuration is resolved before any validation or write, as in [Validate Workflow (single file)](#Validate%20Workflow%20%28single%20file%29). `--fix`, `--dry-run`, or `--no-backup` with batch selection or `--stdin` is a usage error: jact prints `ERROR:` on stderr, validates and writes nothing, and exits `2`.
 
 ```text
 1. Parse ── disable directive ──▶ SKIPPED: … (file not read again, backed up, or written)
@@ -214,7 +224,7 @@ jact parses six link patterns with its Markdown syntax extensions, not with regu
    └─ exit 0 (no errors left) or 1 (link errors or rule errors left)
 ```
 
-Fix kinds: a path conversion, a kebab-case anchor to its raw heading, a close heading for a missing anchor, and an anchor with characters Obsidian drops when its rule is enabled. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged is not applied, counted, or reported.
+Fix kinds: a path conversion, a kebab-case anchor to its raw heading, a close heading for a missing anchor, an anchor with characters Obsidian drops when its rule is enabled, and an anchor with raw characters a markdown link cannot contain. An anchor fix replaces only the anchor; the link text stays the same. A fix that leaves a citation unchanged is not applied, counted, or reported.
 
 When `obsidian/no-reference-note-link` is enabled, each local-file split-style usage becomes `[text](dest)` and its definition line is deleted after all usages are rewritten, unless an image reference (`![alt][label]`) still uses the definition; then the definition stays. The destination is preserved byte-for-byte unless jact's own path or anchor correction is folded into it. jact edits only a definition that starts after blanks on its line and ends its line, and a multi-line definition only at the top level. A definition inside a blockquote or list item is still reported as an error, but `--fix` supplies no edit for it, so the quote or list structure is never damaged. Other excluded forms are listed in [Validation configuration and presets](005-interfaces.md#Validation%20configuration%20and%20presets).
 
@@ -277,6 +287,7 @@ A valid Markdown image with bracketed description text, such as `![[caption]](fo
 | 1.0.0-draft | 2026-10-05 | Folder rename plans reject symlinks (file or folder shortcuts) before reading links or changing files |
 | 1.0.0-draft | 2026-10-06 | Added exact plain-file-path validation and prose Markdown conversion; code and commands retain plain syntax, including uncertain command-shaped lines |
 | 1.0.0-draft | 2026-10-05 | Existing rename sources with glob characters remain literal; rollback continues restoring files after directory cleanup errors and reports incomplete recovery |
+| 1.0.0-draft | 2026-11-19 | Added the error and `--fix` correction for markdown-link anchors with a raw space, `(`, or `)`, under every preset (jact#125); all anchor fixes use the canonical encoding |
 | 1.0.0-draft | 2026-10-05 | `jact rename` accepts several sources, globs, and directories as one guarded batch with best-effort recovery; creates missing destination directories; refuses moves that would break inline or wiki image embeds |
 | 1.0.0-draft | 2026-09-30 | Added the extraction read boundary and `--allow-read`; malformed percent-encoding no longer crashes |
 | 1.0.0-draft | 2026-09-25 | Added `--fix --no-backup`; `--fix` skips fixes that leave a citation unchanged |

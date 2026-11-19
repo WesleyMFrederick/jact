@@ -9,12 +9,14 @@ const fixturesDir = join(__dirname, "..", "fixtures");
 
 /**
  * A link resolves to its heading when it is valid, or when the only problem is
- * that its anchor keeps characters Obsidian drops (`: # | ^ [ ]`).
+ * that its anchor keeps characters Obsidian drops (`: # | ^ [ ]`) or raw
+ * characters a markdown link cannot contain (space, `(`, `)` — jact#125).
+ * Both errors fire only after the heading matched.
  */
 function expectResolvesToHeading(link) {
 	if (link.validation.status === "valid") return;
 	expect(link.validation.error).toMatch(
-		/^Anchor uses characters Obsidian drops/,
+		/^(Anchor uses characters Obsidian drops|Anchor has characters a markdown link cannot contain)/,
 	);
 }
 

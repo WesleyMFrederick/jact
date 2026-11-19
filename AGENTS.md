@@ -5,12 +5,12 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 ## Tracker mode
 
 - `TRACKER_MODE: file` — issues are local Markdown files, one per atomic task.
-- **ADR location:** `docs/adrs/`. See [Before exploring, read these](docs/agents/domain.md#Before exploring, read these).
+- **ADR location:** `docs/adrs/`. See [Before exploring, read these](docs/agents/domain.md#Before%20exploring,%20read%20these).
 
 ## Issue tracking and case logs
 
 - Issues: local Markdown under `.scratch/{YYYYMMDDTHHMMSS}-{module}-{slug}/` (see [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue%20tracker%20Local%20Markdown)), not Linear. `design-docs/features/<feature>/` holds the plan/spec/PRD; `/to-issues` slices it into many small tracer-bullet issues — never a 1:1 mapping.
-- `CASE-TRACKER.md` rows use the [ten-column session-log format](docs/agents/issue-tracker.md#CASE-TRACKER session log); outcome cells stay 25–40 words.
+- `CASE-TRACKER.md` rows use the [ten-column session-log format](docs/agents/issue-tracker.md#CASE-TRACKER%20session%20log); outcome cells stay 25–40 words.
 
 ## Spec and issue separation
 
@@ -232,7 +232,7 @@ The project includes extensive architecture documentation:
   - ParsedDocument Implementation Guide
   - ParsedFileCache Implementation Guide
 
-**When modifying components**: Consult the [jact Living Specification](docs/spec/SPEC.md#jact Living Specification) — `design-docs/component-guides/` is deprecated (banner-marked 2026-07-01).
+**When modifying components**: Consult the [jact Living Specification](docs/spec/SPEC.md#jact%20Living%20Specification) — `design-docs/component-guides/` is deprecated (banner-marked 2026-07-01).
 
 ## Path Resolution Strategy
 
@@ -326,8 +326,8 @@ Issues are tracked as local Markdown files under `.scratch/`. See [Issue tracker
 
 ### Triage labels
 
-Triage uses the five default role names. See [Triage Labels](docs/agents/triage-labels.md#Triage Labels).
+Triage uses the five default role names. See [Triage Labels](docs/agents/triage-labels.md#Triage%20Labels).
 
 ### Domain docs
 
-This is a single-context repository with ADRs in `docs/adrs/` and specifications in `docs/spec/`. See [Domain Docs](docs/agents/domain.md#Domain Docs).
+This is a single-context repository with ADRs in `docs/adrs/` and specifications in `docs/spec/`. See [Domain Docs](docs/agents/domain.md#Domain%20Docs).

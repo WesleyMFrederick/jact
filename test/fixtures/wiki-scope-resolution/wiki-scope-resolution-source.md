@@ -6,4 +6,4 @@ The wiki link resolves the page name via the scope-seeded FileCache.
 
 [[wiki-scope-resolution-target#hasAnchor(anchorId string) boolean]]
 
-[hasAnchor(anchorId: string): boolean](wiki-scope-resolution-target.md#hasAnchor(anchorId%20string)%20boolean)
+[hasAnchor(anchorId: string): boolean](wiki-scope-resolution-target.md#hasAnchor%28anchorId%20string%29%20boolean)

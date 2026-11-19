@@ -29,7 +29,7 @@ workflow:
   any thrown error ──► failed
 ```
 
-The step order is canonical in [Validate Workflow (single file)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20(single%20file)) and [Validate Workflow (batch)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20(batch)).
+The step order is canonical in [Validate Workflow (single file)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20%28single%20file%29) and [Validate Workflow (batch)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20%28batch%29).
 
 ---
 
@@ -44,7 +44,7 @@ The workflow checks one file or one in-memory document and returns a `completed`
 - **Never throws.** Every error becomes a `failed` outcome with the message, so each caller picks its own exit code.
 - **Skip before check.** A disabled document returns `skipped` before link checks, rule checks, nested-code-block checks, or the line filter.
 - **Intended path for memory input.** `--stdin` content resolves configuration, scope, and relative links from its stated path, and the module never reads that path from disk.
-- **Rules after links.** The workflow invokes `src/core/ValidationRules/` checks on the parsed document and validated links, using the injected per-file rule-set resolver. Configuration preflight belongs to `src/cli.ts`; see [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation configuration and presets).
+- **Rules after links.** The workflow invokes `src/core/ValidationRules/` checks on the parsed document and validated links, using the injected per-file rule-set resolver. Configuration preflight belongs to `src/cli.ts`; see [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation%20configuration%20and%20presets).
 - **Line filter recomputes totals.** `--lines` filters links and findings, then rebuilds the summary from the kept results.
 
 Tests: `test/unit/jact-validate-stdin.test.ts`, `test/validate/validate-integration.test.ts`, `test/cli-integration/plain-path-validate.test.ts`.
@@ -101,7 +101,7 @@ Boundary: it never imports the checker; the caller builds one workflow per batch
 
 ### `renderers.ts` — batch reports
 
-The human report and the JSON Lines (JSONL) report are two views of one batch summary. Shapes: [Output — batch, human (default)](../../../../docs/spec/005-interfaces.md#Output%20—%20batch,%20human%20(default)).
+The human report and the JSON Lines (JSONL) report are two views of one batch summary. Shapes: [Output — batch, human (default)](../../../../docs/spec/005-interfaces.md#Output%20—%20batch,%20human%20%28default%29).
 
 - **Collapse changes display only.** Above five total errors, human output collapses; the summary and exit code stay the same.
 - **JSONL stays complete.** The JSONL report never collapses.

@@ -11,6 +11,7 @@ Every capability below ships in this checkout.
 | Capability | Where |
 |---|---|
 | Check cross-document Markdown links and their anchors | [`jact validate`](005-interfaces.md#%60jact%20validate%60) |
+| Reject markdown-link anchors with a raw space, `(`, or `)`, which GitHub and Obsidian cannot render, and fix them to the %-encoded anchor; wikilinks are exempt | `jact validate`, `--fix`, under every preset: see [Anchors a markdown link cannot contain](006-behavior.md#Anchors%20a%20markdown%20link%20cannot%20contain) |
 | Check link syntax only: plain text, inline code, and fenced code never produce an error | `jact validate` |
 | Check unsaved content that arrives on standard input, for hooks and pipes | `jact validate --stdin` |
 | Check many files at once, chosen by path, glob, or git changes, with one summary | `jact validate <paths...>`, `--changed`, `--json` |

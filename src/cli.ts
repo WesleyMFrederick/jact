@@ -240,6 +240,11 @@ With --fix, --dry-run, or --no-backup:
   nothing runs and nothing is written. The exit code reflects the errors left in
   the file after fixing (or, with --dry-run, the errors still in it).
 
+Anchors (every preset):
+  A markdown-link anchor with a raw space, "(", or ")" is an error even when the
+  heading exists: GitHub and Obsidian show the link as plain text. Encode them as
+  %20, %28, %29; --fix rewrites the anchor. Wikilinks and #^block refs are exempt.
+
 Rules and presets:
   Settings come from ~/.config/jact/config.json ($XDG_CONFIG_HOME/jact/config.json),
   overridden by the nearest .jact/config.json above each checked file:

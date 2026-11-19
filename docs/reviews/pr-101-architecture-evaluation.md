@@ -314,7 +314,7 @@ The previously presented approval gate still stands. The proposed dedicated `!` 
 
 **Checkout:** `/Users/wesleyfrederick/.paseo/worktrees/3bzq2cjn/jact-bulk-rename`, branch `feat/bulk-rename`. Commands and root-relative evidence paths below use this checkout.
 
-The canonical contracts are the [parser component specification](../spec/002-architecture.md#MarkdownParser%20(%60src/core/MarkdownParser/%60)), [typed embed references](../spec/004-domain-model.md#EmbedReference), and [rename behavior](../spec/006-behavior.md#Rename%20Workflow%20(%60jact%20rename%60)). Rename planning now consumes parser-owned references rather than scanning decoded text. `micromark-core-commonmark` is declared directly for the image-recognition helpers.
+The canonical contracts are the [parser component specification](../spec/002-architecture.md#MarkdownParser%20%28%60src/core/MarkdownParser/%60%29), [typed embed references](../spec/004-domain-model.md#EmbedReference), and [rename behavior](../spec/006-behavior.md#Rename%20Workflow%20%28%60jact%20rename%60%29). Rename planning now consumes parser-owned references rather than scanning decoded text. `micromark-core-commonmark` is declared directly for the image-recognition helpers.
 
 ### Post-Fix Quality
 

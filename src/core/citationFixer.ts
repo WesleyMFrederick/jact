@@ -142,15 +142,17 @@ export function applyAnchorFix(
 	const linkText = link.text;
 	const filePath = link.target.path.raw;
 	const linkAnchor = link.target.anchor;
+	// A same-file link (`[text](#anchor)`) has no path.
+	const isSameFile = filePath === null && link.scope === "internal";
 	const hasMarkdownLinkParts =
 		link.linkType === "markdown" &&
 		linkText !== null &&
-		filePath !== null &&
+		(filePath !== null || isSameFile) &&
 		linkAnchor !== null;
 
 	if (!hasMarkdownLinkParts) {
 		return citation;
 	}
 
-	return `[${linkText}](${filePath}#${anchorConversion.recommended})`;
+	return `[${linkText}](${filePath ?? ""}#${anchorConversion.recommended})`;
 }

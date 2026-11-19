@@ -45,9 +45,9 @@ These links point to the facts that a reader of this module needs first.
 | Need | Canonical source |
 |------|------------------|
 | Flags, mode selection, output shapes | [`jact validate`](../../../../docs/spec/005-interfaces.md#%60jact%20validate%60) |
-| Presets, configuration, and plugins | [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation configuration and presets) |
-| Single-file step order | [Validate Workflow (single file)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20(single%20file)) |
-| Batch step order | [Validate Workflow (batch)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20(batch)) |
+| Presets, configuration, and plugins | [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation%20configuration%20and%20presets) |
+| Single-file step order | [Validate Workflow (single file)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20%28single%20file%29) |
+| Batch step order | [Validate Workflow (batch)](../../../../docs/spec/006-behavior.md#Validate%20Workflow%20%28batch%29) |
 | Exit codes | [Exit Codes](../../../../docs/spec/005-interfaces.md#Exit%20Codes) |
 | Module guarantees | [Core Guarantees](001-vision.md#Core%20Guarantees) |
 

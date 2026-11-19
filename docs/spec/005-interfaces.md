@@ -342,14 +342,14 @@ jact extract header <target-file> <header-name> [options]
 | Flag | Default | Description |
 |---|---|---|
 | `--scope <folder>` | smart default | Folder for filename matches |
-| `--allow-read <dir>` | - | As in [`jact extract links <source-file>`](#`jact extract links <source-file>`); without it, jact does not read linked targets outside scope |
+| `--allow-read <dir>` | - | As in [`jact extract links <source-file>`](#%60jact%20extract%20links%20<source-file>%60); without it, jact does not read linked targets outside scope |
 | `--within <parent>` | - | Resolve the header only among children of one unique parent |
 | `--extract-linked-content [depth]` | off; depth `1` | Also extract linked content to `depth` (whole number ≥ 1), plus backlinks to the header in scope |
 | `--max-chars <n>` | `28000` | With `--extract-linked-content`: above this size, print a content map |
 | `-v, --verbose` | `false` | Add `outgoingLinksReport` and `stats` |
 | `--format <type>` | `markdown` | `markdown` or `json` |
 
-With `--extract-linked-content`, the markdown output labels each block `Source: file:start-end`, and each linked block `Via: file:line` (the link that pulled it in). Next-step hints and the `--max-chars` content map work as in [`jact extract file <target-file>`](#`jact extract file <target-file>`). The header content map also lists backlinks and failures.
+With `--extract-linked-content`, the markdown output labels each block `Source: file:start-end`, and each linked block `Via: file:line` (the link that pulled it in). Next-step hints and the `--max-chars` content map work as in [`jact extract file <target-file>`](#%60jact%20extract%20file%20<target-file>%60). The header content map also lists backlinks and failures.
 
 **Exit codes:** `0` header extracted and all linked content resolved; `1` header not found, or some linked content failed; `2` system error, such as a missing file, or a usage error: with `--extract-linked-content`, a target outside the resolved scope (the message names the `--scope` to retry with).
 

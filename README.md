@@ -150,7 +150,7 @@ A project can override your default with a `.jact/config.json` in the note's fol
 {"preset":"commonmark"}
 ```
 
-Only the nearest `.jact/config.json` is used. For individual rule overrides, user-config plugins, and the alternative user config location, see [Validation configuration and presets](docs/spec/005-interfaces.md#Validation configuration and presets).
+Only the nearest `.jact/config.json` is used. For individual rule overrides, user-config plugins, and the alternative user config location, see [Validation configuration and presets](docs/spec/005-interfaces.md#Validation%20configuration%20and%20presets).
 
 
 ### `validate --fix` — repair heading links

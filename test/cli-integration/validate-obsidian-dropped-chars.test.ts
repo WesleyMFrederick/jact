@@ -84,11 +84,11 @@ describe("jact validate — anchors with characters Obsidian drops", () => {
 		expect(links[0]?.validation.suggestion).toBe(CANONICAL_ANCHOR);
 	});
 
-	it("accepts the canonical anchor and headings with parentheses", () => {
+	it("accepts the canonical anchor and headings with encoded parentheses", () => {
 		const { status, links } = validateJson(
 			[
 				`[Q1](target.md${CANONICAL_ANCHOR})`,
-				"[Rules](target.md#4.2%20V8%20Key%20Rules%20(Locked%20from%20V6))",
+				"[Rules](target.md#4.2%20V8%20Key%20Rules%20%28Locked%20from%20V6%29)",
 				"",
 			].join("\n"),
 		);
@@ -115,8 +115,9 @@ describe("jact validate — anchors with characters Obsidian drops", () => {
 			"[Trace](target.md#Trace:%20run%20(opsx:continue))\n",
 		);
 
+		// The suggestion is the canonical anchor, so parens are encoded too (jact#125).
 		expect(links[0]?.validation.suggestion).toBe(
-			"#Trace%20run%20(opsx%20continue)",
+			"#Trace%20run%20%28opsx%20continue%29",
 		);
 	});
 
