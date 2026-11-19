@@ -9,7 +9,7 @@
 // 4. Posts the confirmed findings as one PR review with inline comments.
 //
 // Env: ANTHROPIC_API_KEY, GITHUB_TOKEN, GITHUB_REPOSITORY (owner/name), PR_NUMBER.
-// Optional: REPO_TOKEN (repo mount; defaults to GITHUB_TOKEN), BUG_HUNTER_MODEL,
+// Optional: REPO_TOKEN (repo mount, private repos only; never set by default), BUG_HUNTER_MODEL,
 // BUDGET_CENTS (default 300 = $3.00), FAIL_ON (high|medium|low|none, default high),
 // TIMEOUT_MINUTES (default 50), DRY_RUN=1 (print the review instead of posting it).
 //
@@ -31,7 +31,9 @@ const env = (name, fallback) => {
 const REPO = env("GITHUB_REPOSITORY");
 const PR_NUMBER = Number(env("PR_NUMBER"));
 const GITHUB_TOKEN = env("GITHUB_TOKEN");
-const REPO_TOKEN = process.env.REPO_TOKEN || GITHUB_TOKEN;
+// The agent's sandbox gets no GitHub credential by default: a public repo clones without one.
+// Set REPO_TOKEN (a read-only, single-repo token) only for a private repo.
+const REPO_TOKEN = process.env.REPO_TOKEN || undefined;
 const MODEL = process.env.BUG_HUNTER_MODEL || "claude-opus-5-5";
 const BUDGET_CENTS = String(Number(process.env.BUDGET_CENTS || 300));
 const FAIL_ON = process.env.FAIL_ON || "high";
@@ -254,7 +256,7 @@ async function main() {
         type: "github_repository",
         url: `https://github.com/${REPO}`,
         mount_path: MOUNT_PATH,
-        authorization_token: REPO_TOKEN,
+        ...(REPO_TOKEN ? { authorization_token: REPO_TOKEN } : {}),
         checkout: { type: "commit", sha: pr.head.sha },
       },
     ],

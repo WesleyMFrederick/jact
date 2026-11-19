@@ -1,6 +1,6 @@
 ---
 created: 2026-11-19T11:50:44
-last_modified: 2026-11-19T11:50:44
+last_modified: 2026-11-19T11:55:54
 ---
 # Bug Hunter
 
@@ -31,6 +31,20 @@ The phases live in `system-prompt.md`. The agent runs them as a Managed Agents *
 1. Create an API key in the Claude Console under **Keys**, then add it to the repo: `gh secret set ANTHROPIC_API_KEY -R WesleyMFrederick/jact`.
 2. Create the trigger label: `gh label create bug-hunt -R WesleyMFrederick/jact --description "Run Bug Hunter on this PR"`.
 3. Optional: set repo variables to tune it: `BUG_HUNTER_BUDGET_CENTS` (default `300`), `BUG_HUNTER_MODEL` (default `claude-opus-5-5`), and `BUG_HUNTER_FAIL_ON` (`high`, `medium`, `low`, or `none`; default `high`).
+
+## Where secrets live
+
+No secret is ever written to a `.env` file, the repo, or the agent's sandbox. The talk's rule (chapter "Credential vaults & locking down tools", 1:27:50) is that credentials must never touch the sandbox, because anything on the agent's disk can be talked out of it.
+
+| Secret | Stored in | Who can read it |
+| ------ | --------- | --------------- |
+| `ANTHROPIC_API_KEY` | GitHub Actions encrypted secret | Only the CI step that calls the API. The agent never sees it. |
+| `GITHUB_TOKEN` | Issued by GitHub per job, expires when the job ends | Only the CI step, to read the PR and post the review. It is not passed to the agent. |
+| Repo access for the agent | None | jact is public, so the sandbox clones it without a token. |
+
+The agent finds bugs and returns JSON. It cannot push, comment, or call GitHub, because it has no credential to do so. Only the CI script writes to GitHub, after the session ends.
+
+If the agent ever needs to call an outside API, store that key in a Managed Agents [vault](https://platform.claude.com/docs/en/managed-agents/vaults.md) and pass `vault_ids` when creating the session. The platform swaps a placeholder for the real value at the network edge, only for the hosts you allow. The sandbox holds only the placeholder. For a private repo, set `REPO_TOKEN` to a read-only token scoped to that one repo.
 
 ## When it runs
 
