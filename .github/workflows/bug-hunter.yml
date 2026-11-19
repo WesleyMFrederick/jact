@@ -20,6 +20,9 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  # Lets the job request GitHub's OIDC token, which Anthropic exchanges for a
+  # 10-minute access token (Workload Identity Federation). No API key is stored.
+  id-token: write
 
 concurrency:
   group: bug-hunter-${{ github.event.pull_request.number || inputs.pr_number }}
@@ -51,10 +54,24 @@ jobs:
         working-directory: .github/bug-hunter
         run: npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Fetch GitHub OIDC token for Anthropic
+        env:
+          TOKEN_FILE: ${{ runner.temp }}/gha-jwt
+        run: |
+          curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.anthropic.com" \
+            | jq -r .value > "$TOKEN_FILE"
+
       - name: Run Bug Hunter
         working-directory: .github/bug-hunter
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Federation IDs are identifiers, not secrets. Set them as repo variables
+          # from the Console's Workload identity page. See README "Setup".
+          ANTHROPIC_IDENTITY_TOKEN_FILE: ${{ runner.temp }}/gha-jwt
+          ANTHROPIC_FEDERATION_RULE_ID: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
+          ANTHROPIC_ORGANIZATION_ID: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
+          ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
+          ANTHROPIC_WORKSPACE_ID: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           BUDGET_CENTS: ${{ inputs.budget_cents || vars.BUG_HUNTER_BUDGET_CENTS || '300' }}

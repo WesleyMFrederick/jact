@@ -8,7 +8,8 @@
 // 3. Polls until every workflow run has ended and the session idles with end_turn.
 // 4. Posts the confirmed findings as one PR review with inline comments.
 //
-// Env: ANTHROPIC_API_KEY, GITHUB_TOKEN, GITHUB_REPOSITORY (owner/name), PR_NUMBER.
+// Env: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/name), PR_NUMBER, plus Anthropic credentials:
+// in CI the Workload Identity Federation vars (no stored key); locally ANTHROPIC_API_KEY.
 // Optional: REPO_TOKEN (repo mount, private repos only; never set by default), BUG_HUNTER_MODEL,
 // BUDGET_CENTS (default 300 = $3.00), FAIL_ON (high|medium|low|none, default high),
 // TIMEOUT_MINUTES (default 50), DRY_RUN=1 (print the review instead of posting it).
@@ -44,7 +45,11 @@ const POLL_MS = 15_000;
 const MAX_DIFF_CHARS = 400_000;
 
 const SEVERITY_RANK = { high: 3, medium: 2, low: 1, none: 99 };
-const client = new Anthropic({ apiKey: env("ANTHROPIC_API_KEY") });
+// In CI there is no API key: the SDK reads ANTHROPIC_IDENTITY_TOKEN_FILE and the federation
+// IDs, swaps GitHub's OIDC token for a short-lived Anthropic token, and refreshes it.
+// https://platform.claude.com/docs/en/manage-claude/wif-providers/github-actions
+// Locally, an ANTHROPIC_API_KEY in the environment takes precedence.
+const client = new Anthropic();
 
 // ---------- GitHub ----------
 
