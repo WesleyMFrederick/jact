@@ -2,15 +2,16 @@
 
 **Status:** done
 
-jact connects to four outside systems: editor hooks, AI agent sessions, the npm global link, and the npm release workflow. Each section states the contract that system relies on.
+jact connects to four outside systems: agent harness hooks, AI agent sessions, the npm global link, and the npm release workflow. Each section states the contract that system relies on.
 
-## Claude Code hook (primary integration)
+## Harness hooks (primary integration)
 
-An editor hook runs `jact validate` on each Markdown write. Contract:
+`jact setup <harness>` writes the wiring. The harness then runs `jact hook <harness>` after each file write or read. Steps for each harness: [Wire jact into an agent harness](../harness-hooks.md#Wire%20jact%20into%20an%20agent%20harness). Contract:
 
-- Input: a file path, or `--stdin` content with its intended path. jact infers the scope as described in [Scope Resolution Order](006-behavior.md#Scope%20Resolution%20Order).
-- Output: exit 0 allows the write; exit 1 blocks it. The error list (line, link, error, suggestion) goes to standard output.
-- Machine data: a caller that acts on a fix reads the `pathConversion` and `anchorConversion` fields of `--format json` output. It never parses the human `suggestion` text, which can change.
+- Input: the tool event as JSON on standard input. A Markdown write runs `jact validate`; a Markdown read runs `jact extract links`.
+- Output: text for the model in that harness's format, or nothing. The exit code is always 0.
+- Setup keeps other tools' hooks and refuses a config file that is not valid JSON.
+- Machine data: a caller that acts on a fix reads `pathConversion` and `anchorConversion` from `jact validate --format json`. It never parses the human `suggestion` text, which can change.
 
 ## Agent workflows (orient-before-extract)
 

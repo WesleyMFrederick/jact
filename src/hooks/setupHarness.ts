@@ -1,0 +1,352 @@
+/**
+ * Harness setup — `jact setup <harness>`.
+ *
+ * Writes the wiring that makes a harness call `jact hook <harness>` after it
+ * writes or reads a file. JSON-configured harnesses get one merged entry;
+ * existing entries from other tools stay untouched. pi and omp get one
+ * generated extension file.
+ *
+ * @module hooks/setupHarness
+ */
+
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
+import type { Harness } from "./harnessHook.js";
+
+export interface SetupOptions {
+	/** Write to the user-level config instead of the project. */
+	global: boolean;
+	/** Command that runs jact from the harness. */
+	command: string;
+	/** Project folder. */
+	cwd: string;
+	/** User home folder. */
+	home: string;
+}
+
+export type SetupAction =
+	| "installed"
+	| "updated"
+	| "unchanged"
+	| "removed"
+	| "absent";
+
+export interface SetupOutcome {
+	path: string;
+	action: SetupAction;
+	notes: string[];
+}
+
+interface JsonTarget {
+	kind: "json";
+	file: string;
+	event: string;
+	matcher: string;
+	named: boolean;
+	notes: string[];
+}
+
+interface FileTarget {
+	kind: "file";
+	file: string;
+	notes: string[];
+}
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function target(
+	harness: Harness,
+	options: SetupOptions,
+): JsonTarget | FileTarget {
+	const base = options.global ? options.home : options.cwd;
+	switch (harness) {
+		case "claude":
+			return {
+				kind: "json",
+				file: join(base, ".claude", "settings.json"),
+				event: "PostToolUse",
+				matcher: "Write|Edit|MultiEdit|Read",
+				named: false,
+				notes: [],
+			};
+		case "codex":
+			return {
+				kind: "json",
+				file: join(base, ".codex", "hooks.json"),
+				event: "PostToolUse",
+				matcher: "apply_patch",
+				named: false,
+				notes: [
+					"Codex runs a new hook only after you trust it: start codex, run /hooks, and trust the jact entry.",
+					"Codex reads files through shell commands, so jact runs on writes only.",
+				],
+			};
+		case "gemini":
+			return {
+				kind: "json",
+				file: join(base, ".gemini", "settings.json"),
+				event: "AfterTool",
+				matcher: "write_file|replace|read_file",
+				named: true,
+				notes: [],
+			};
+		case "pi":
+			return {
+				kind: "file",
+				file: options.global
+					? join(base, ".pi", "agent", "extensions", "jact.ts")
+					: join(base, ".pi", "extensions", "jact.ts"),
+				notes: options.global
+					? ["Restart pi, or run /reload, to load the extension."]
+					: [
+							"pi loads a project extension only after you trust the project: start pi and accept the trust prompt, or run /trust.",
+							"Without a UI, pass --approve: pi -p --approve '<prompt>'.",
+						],
+			};
+		case "omp":
+			return {
+				kind: "file",
+				file: options.global
+					? join(base, ".omp", "agent", "extensions", "jact.ts")
+					: join(base, ".omp", "extensions", "jact.ts"),
+				notes: ["Restart omp to load the extension."],
+			};
+	}
+}
+
+/** The exact command a harness runs. Also how setup recognizes its own entry. */
+export function hookCommand(harness: Harness, command: string): string {
+	return `${command} hook ${harness}`;
+}
+
+function isOwnGroup(group: unknown, harness: Harness): boolean {
+	if (!isRecord(group)) return false;
+	const hooks = group["hooks"];
+	if (!Array.isArray(hooks)) return false;
+	return hooks.some((hook) => {
+		if (!isRecord(hook)) return false;
+		const command = hook["command"];
+		return (
+			typeof command === "string" && command.trim().endsWith(` hook ${harness}`)
+		);
+	});
+}
+
+function readJsonConfig(file: string): JsonRecord {
+	if (!existsSync(file)) return {};
+	const text = readFileSync(file, "utf8");
+	if (text.trim().length === 0) return {};
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch (cause) {
+		throw new Error(
+			`${file} is not valid JSON. jact changed nothing. Repair the file, then run setup again.`,
+			{ cause },
+		);
+	}
+	if (!isRecord(parsed))
+		throw new Error(
+			`${file} does not hold a JSON object. jact changed nothing.`,
+		);
+	return parsed;
+}
+
+function eventGroups(config: JsonRecord, event: string): unknown[] {
+	const hooks = config["hooks"];
+	if (!isRecord(hooks)) return [];
+	const groups = hooks[event];
+	return Array.isArray(groups) ? groups : [];
+}
+
+function withGroups(
+	config: JsonRecord,
+	event: string,
+	groups: unknown[],
+): JsonRecord {
+	const hooks = isRecord(config["hooks"]) ? { ...config["hooks"] } : {};
+	if (groups.length > 0) hooks[event] = groups;
+	else delete hooks[event];
+	return { ...config, hooks };
+}
+
+function serialize(config: JsonRecord): string {
+	return `${JSON.stringify(config, null, 2)}\n`;
+}
+
+/** Extension source for pi and omp. It imports nothing from the harness, so one file serves both. */
+export function extensionSource(harness: Harness, command: string): string {
+	const commandLine = JSON.stringify(hookCommand(harness, command));
+	return `// Generated by \`jact setup ${harness}\`. Run that command again to update. Do not edit.
+// After a write, edit, or read of a Markdown file, this asks jact what the model should know.
+import { spawn } from "node:child_process";
+
+const COMMAND_LINE = ${commandLine};
+const TIMEOUT_MS = 30000;
+
+function askJact(payload: unknown, cwd: string): Promise<{ context?: string; failed?: boolean }> {
+	return new Promise((done) => {
+		const child = spawn(COMMAND_LINE, { cwd, shell: true, stdio: ["pipe", "pipe", "ignore"] });
+		const timer = setTimeout(() => child.kill(), TIMEOUT_MS);
+		let output = "";
+		child.stdout.on("data", (chunk) => {
+			output += String(chunk);
+		});
+		child.on("error", () => {
+			clearTimeout(timer);
+			done({});
+		});
+		child.on("close", () => {
+			clearTimeout(timer);
+			try {
+				done(output.trim() ? JSON.parse(output) : {});
+			} catch {
+				done({});
+			}
+		});
+		child.stdin.on("error", () => {});
+		child.stdin.end(JSON.stringify(payload));
+	});
+}
+
+export default function (pi: any) {
+	pi.on("tool_result", async (event: any, ctx: any) => {
+		if (event.isError) return undefined;
+		const answer = await askJact(
+			{
+				tool_name: event.toolName,
+				tool_input: event.input,
+				cwd: ctx.cwd,
+				session_id: ctx.sessionManager?.getSessionId?.(),
+			},
+			ctx.cwd,
+		);
+		if (!answer.context) return undefined;
+		return {
+			content: [...event.content, { type: "text", text: answer.context }],
+			...(answer.failed ? { isError: true } : {}),
+		};
+	});
+}
+`;
+}
+
+/**
+ * What setup would write: the file path and its full content.
+ * Contract: throws when the existing config file is not a valid JSON object. Writes nothing.
+ */
+export function plannedConfig(
+	harness: Harness,
+	options: SetupOptions,
+): { path: string; content: string; notes: string[] } {
+	const configTarget = target(harness, options);
+	if (configTarget.kind === "file")
+		return {
+			path: configTarget.file,
+			content: extensionSource(harness, options.command),
+			notes: configTarget.notes,
+		};
+	const config = readJsonConfig(configTarget.file);
+	const kept = eventGroups(config, configTarget.event).filter(
+		(group) => !isOwnGroup(group, harness),
+	);
+	const hook: JsonRecord = {
+		type: "command",
+		command: hookCommand(harness, options.command),
+	};
+	if (configTarget.named) hook["name"] = "jact";
+	const group = { matcher: configTarget.matcher, hooks: [hook] };
+	return {
+		path: configTarget.file,
+		content: serialize(
+			withGroups(config, configTarget.event, [...kept, group]),
+		),
+		notes: configTarget.notes,
+	};
+}
+
+/**
+ * Writes one config file, and its folder when missing.
+ * Contract: a failed write throws a message that names the next step. An agent
+ * sandbox often protects the harness's own config folder, as Codex does.
+ */
+function writeConfigFile(path: string, content: string): void {
+	try {
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, content);
+	} catch (cause) {
+		const reason = cause instanceof Error ? cause.message : String(cause);
+		throw new Error(
+			`Cannot write ${path} (${reason}). If an agent sandbox blocked the write, run this command in your own terminal.`,
+			{ cause },
+		);
+	}
+}
+
+/** True when the harness config already holds exactly what setup would write. */
+export function isInstalled(harness: Harness, options: SetupOptions): boolean {
+	const plan = plannedConfig(harness, options);
+	return (
+		existsSync(plan.path) && readFileSync(plan.path, "utf8") === plan.content
+	);
+}
+
+/**
+ * Writes the wiring.
+ * Contract: idempotent. A second run with the same options changes nothing.
+ * Contract: hook entries from other tools in the same file are kept.
+ * Contract: throws when the existing config file is not a valid JSON object, and leaves it unchanged.
+ */
+export function installHarness(
+	harness: Harness,
+	options: SetupOptions,
+): SetupOutcome {
+	const plan = plannedConfig(harness, options);
+	const existed = existsSync(plan.path);
+	if (existed && readFileSync(plan.path, "utf8") === plan.content)
+		return { path: plan.path, action: "unchanged", notes: plan.notes };
+	writeConfigFile(plan.path, plan.content);
+	return {
+		path: plan.path,
+		action: existed ? "updated" : "installed",
+		notes: plan.notes,
+	};
+}
+
+/**
+ * Removes the wiring.
+ * Contract: removes only what setup wrote. Other tools' hooks stay.
+ * Contract: throws when the existing config file is not a valid JSON object, and leaves it unchanged.
+ */
+export function removeHarness(
+	harness: Harness,
+	options: SetupOptions,
+): SetupOutcome {
+	const configTarget = target(harness, options);
+	if (!existsSync(configTarget.file))
+		return { path: configTarget.file, action: "absent", notes: [] };
+	if (configTarget.kind === "file") {
+		rmSync(configTarget.file);
+		return { path: configTarget.file, action: "removed", notes: [] };
+	}
+	const config = readJsonConfig(configTarget.file);
+	const groups = eventGroups(config, configTarget.event);
+	const kept = groups.filter((group) => !isOwnGroup(group, harness));
+	if (kept.length === groups.length)
+		return { path: configTarget.file, action: "absent", notes: [] };
+	writeConfigFile(
+		configTarget.file,
+		serialize(withGroups(config, configTarget.event, kept)),
+	);
+	return { path: configTarget.file, action: "removed", notes: [] };
+}
