@@ -20,7 +20,8 @@
 // to show how much one bug's bin drives the headline number.
 // Deterministic: Node builtins only, stable sort by value then id, fixed rounding.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 function parseArgs(argv) {
   const [file, ...rest] = argv;
@@ -121,11 +122,11 @@ function render({ rows, recall }, provisional) {
     `Value-weighted recall: ${money(recall.valueCaught)}/${money(recall.valueTotal)} = ${pct(recall.value)}`,
   ];
   if (recall.excluded.length) lines.push(`(excluding ${recall.excluded.join(", ")} from both)`);
-  if (provisional) lines.push("Prices, horizon, confidence map and thresholds are PROVISIONAL defaults.");
+  if (provisional) lines.push("Prices, horizon, confidence map, thresholds, delay rate, work items and fix estimates are PROVISIONAL.");
   return lines.join("\n");
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const opts = parseArgs(process.argv.slice(2));
   const data = JSON.parse(readFileSync(opts.file, "utf8"));
   const run = opts.run ? data.runs?.[opts.run] : undefined;
