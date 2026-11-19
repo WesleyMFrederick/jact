@@ -158,6 +158,39 @@ describe("parseHookPayload reads each harness's tool event", () => {
 		).toBeUndefined();
 	});
 
+	it("Antigravity CLI 1.5.12, as a live session sent it: write_file, edit_file and read_file carry Path", () => {
+		const live = (name: string, args: object) =>
+			antigravityEvent(
+				{
+					cwd: project,
+					hookEventName: "PostToolUse",
+					toolCall: { name, args, id: "call_1" },
+					stepIdx: 2,
+					error: "",
+				},
+				"c-live",
+			);
+		expect(
+			parseHookPayload(
+				live("write_file", { Content: "x\n", Overwrite: true, Path: note }),
+			),
+		).toEqual({
+			kind: "write",
+			paths: [note],
+			cwd: project,
+			sessionId: "c-live",
+		});
+		expect(
+			parseHookPayload(
+				live("edit_file", { Path: note, Replacement: "b", Target: "a" }),
+			),
+		).toMatchObject({ kind: "write", paths: [note] });
+		expect(parseHookPayload(live("read_file", { Path: note }))).toMatchObject({
+			kind: "read",
+			paths: [note],
+		});
+	});
+
 	it("pi and omp: write, edit and read carry tool_input.path, relative or @-prefixed", () => {
 		expect(
 			parseHookPayload(event("write", { path: "docs/note.md" }))?.paths,
@@ -363,10 +396,26 @@ describe("runHarnessHook for Antigravity CLI, whose tool hook cannot answer the 
 			antigravityHook("PreInvocation", antigravityModelCall("c-1")),
 		);
 		expect(delivered.injectSteps).toHaveLength(1);
-		expect(delivered.injectSteps[0].ephemeralMessage).toContain("missing.md");
+		expect(delivered.injectSteps[0].systemMessage.systemMessage).toContain(
+			"missing.md",
+		);
 		expect(antigravityHook("PreInvocation", antigravityModelCall("c-1"))).toBe(
 			"{}",
 		);
+	});
+
+	it("hands a result over as a nested system message, which agy 1.5.12 keeps in the conversation", () => {
+		// In live sessions the model lost an ephemeralMessage after one model call,
+		// and agy dropped a systemMessage that was plain text.
+		antigravityHook("PostToolUse", write("c-13"), broken);
+		const delivered = JSON.parse(
+			antigravityHook("PreInvocation", antigravityModelCall("c-13")),
+		);
+		expect(delivered).toEqual({
+			injectSteps: [
+				{ systemMessage: { systemMessage: expect.stringContaining("jact:") } },
+			],
+		});
 	});
 
 	it("hands over the sections that a read file links to", () => {
@@ -374,7 +423,7 @@ describe("runHarnessHook for Antigravity CLI, whose tool hook cannot answer the 
 		const delivered = JSON.parse(
 			antigravityHook("PreInvocation", antigravityModelCall("c-2")),
 		);
-		expect(delivered.injectSteps[0].ephemeralMessage).toContain(
+		expect(delivered.injectSteps[0].systemMessage.systemMessage).toContain(
 			"## Details\n\nThe answer.",
 		);
 	});
@@ -455,6 +504,38 @@ describe("runHarnessHook for Antigravity CLI, whose tool hook cannot answer the 
 		expect(
 			antigravityHook("PreInvocation", antigravityModelCall("c-9")),
 		).toContain("missing.md");
+	});
+
+	it("reads the event from hookEventName, which agy 1.5.12 sends, when none is passed", () => {
+		runHarnessHook("antigravity", write("c-10"), broken);
+		const named = (hookEventName: string) =>
+			antigravityEvent({ hookEventName, invocationNum: 1 }, "c-10");
+		expect(
+			runHarnessHook("antigravity", named("PreInvocation"), clean),
+		).toContain("missing.md");
+		expect(
+			JSON.parse(runHarnessHook("antigravity", named("Stop"), clean)),
+		).toEqual({ decision: "stop" });
+	});
+
+	it("an event name that is passed wins over hookEventName", () => {
+		antigravityHook("PostToolUse", write("c-11"), broken);
+		const stopNamedOtherwise = antigravityEvent(
+			{ hookEventName: "PreInvocation" },
+			"c-11",
+		);
+		expect(
+			JSON.parse(antigravityHook("Stop", stopNamedOtherwise)).decision,
+		).toBe("continue");
+	});
+
+	it("a second read of the same file in one step keeps the linked content", () => {
+		// jact extracts each linked section one time for a session, so the second read is empty.
+		antigravityHook("PostToolUse", read("c-12"), linked);
+		antigravityHook("PostToolUse", read("c-12"), clean);
+		expect(
+			antigravityHook("PreInvocation", antigravityModelCall("c-12")),
+		).toContain("The answer.");
 	});
 
 	it("leaves the other harnesses unchanged when an event name is passed", () => {

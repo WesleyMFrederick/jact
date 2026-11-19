@@ -1300,7 +1300,7 @@ program
 	)
 	.option(
 		"--event <name>",
-		"hook event, for a harness that does not name it in the input (antigravity)",
+		"hook event (antigravity). Default: hookEventName in the input, else PostToolUse",
 	)
 	.addHelpText(
 		"after",

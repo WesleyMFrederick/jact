@@ -67,16 +67,20 @@ const WRITE_TOOLS = new Set([
 	"multiedit",
 	"apply_patch",
 	"write_file",
+	"edit_file",
 	"replace",
 	"write_to_file",
 	"replace_file_content",
 	"multi_replace_file_content",
 ]);
 const READ_TOOLS = new Set(["read", "read_file", "view_file"]);
+// `Path` is what Antigravity CLI 1.5.12 sends. `TargetFile` and `AbsolutePath`
+// are the names in its documentation.
 const PATH_FIELDS = [
 	"file_path",
 	"path",
 	"absolute_path",
+	"Path",
 	"TargetFile",
 	"AbsolutePath",
 ];
@@ -391,9 +395,9 @@ function takeHeldResults(conversation: Conversation): HeldResult[] {
 
 /**
  * Antigravity CLI. Its PostToolUse hook must print `{}`, so the result waits in
- * a file. PreInvocation, which runs before a model call, hands it over. Stop is
- * the fallback: a broken-link report the model has not seen makes the agent
- * continue one time.
+ * a file. PreInvocation, which runs before a model call, hands it over as a
+ * system message that stays in the conversation. Stop is the fallback: a
+ * broken-link report the model has not seen makes the agent continue one time.
  * Contract: always returns JSON, and never throws.
  * Contract: each held result is handed over at most one time. A later result
  * for the same file replaces an earlier one, so a fixed file withdraws its report.
@@ -417,10 +421,13 @@ function runAntigravityHook(
 			request.kind === "write"
 				? validateWrites(request, run)
 				: extractReads(request, run);
-		holdResult(conversation, {
-			key: `${request.kind}:${request.paths.join("|")}`,
-			...result,
-		});
+		// An empty write result withdraws an earlier report: the file is fixed.
+		// An empty read result means only that jact already extracted the links.
+		if (request.kind === "write" || result.context.length > 0)
+			holdResult(conversation, {
+				key: `${request.kind}:${request.paths.join("|")}`,
+				...result,
+			});
 		logInvocation({
 			harness,
 			event,
@@ -454,16 +461,35 @@ function runAntigravityHook(
 		deliveredChars: text.length,
 	});
 	if (text.length === 0) return silentHookOutput(harness, event);
-	return eventName === "stop"
-		? JSON.stringify({ decision: "continue", reason: text })
-		: JSON.stringify({ injectSteps: [{ ephemeralMessage: text }] });
+	if (eventName === "stop")
+		return JSON.stringify({ decision: "continue", reason: text });
+	// Antigravity CLI 1.5.12 kept a nested systemMessage in the conversation. The
+	// model lost an ephemeralMessage after one model call, and a systemMessage
+	// that was plain text never reached the conversation.
+	return JSON.stringify({
+		injectSteps: [{ systemMessage: { systemMessage: text } }],
+	});
+}
+
+/**
+ * The event name in an Antigravity CLI hook input. Version 1.5.12 sends
+ * `hookEventName`; its documentation does not list the field.
+ * Contract: never throws. Input without the field returns undefined.
+ */
+function namedEvent(payloadText: string): string | undefined {
+	try {
+		const payload: unknown = JSON.parse(payloadText);
+		return isRecord(payload) ? firstText(payload["hookEventName"]) : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 /**
  * Handles one hook call. Returns the text to print, or an empty string.
  * Contract: input jact cannot use returns an empty string, never an error.
- * Contract: for Antigravity CLI the answer is always JSON. `event` names the
- * hook event, because Antigravity CLI does not put it in the input.
+ * Contract: for Antigravity CLI the answer is always JSON. The hook event is
+ * `event` when it is passed, else the input's `hookEventName`, else PostToolUse.
  */
 export function runHarnessHook(
 	harness: Harness,
@@ -472,7 +498,11 @@ export function runHarnessHook(
 	event?: string,
 ): string {
 	if (harness === "antigravity")
-		return runAntigravityHook(payloadText, run, event ?? "PostToolUse");
+		return runAntigravityHook(
+			payloadText,
+			run,
+			event ?? namedEvent(payloadText) ?? "PostToolUse",
+		);
 	const request = parseHookPayload(payloadText);
 	if (request === undefined) {
 		logInvocation({ harness, handled: false });

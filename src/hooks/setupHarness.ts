@@ -70,8 +70,10 @@ type JsonRecord = Record<string, unknown>;
 
 /** The key jact owns in a hooks file that is keyed by hook name. */
 const HOOK_NAME = "jact";
+// The first three names are what Antigravity CLI 1.5.12 sent in a live session.
+// The last four are the names in its documentation, which reached no hook there.
 const ANTIGRAVITY_FILE_TOOLS =
-	"write_to_file|replace_file_content|multi_replace_file_content|view_file";
+	"write_file|edit_file|read_file|write_to_file|replace_file_content|multi_replace_file_content|view_file";
 
 function isRecord(value: unknown): value is JsonRecord {
 	return typeof value === "object" && value !== null && !Array.isArray(value);

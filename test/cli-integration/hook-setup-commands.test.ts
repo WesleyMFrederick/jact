@@ -182,12 +182,15 @@ describe("jact hook, through the real CLI", () => {
 			JSON.stringify({
 				conversationId: "cli-agy",
 				workspacePaths: [project],
+				cwd: project,
 				...fields,
 			});
+		// The tool name and the Path field are what agy 1.5.12 sent in a live session.
 		const write = antigravityEvent({
+			hookEventName: "PostToolUse",
 			toolCall: {
-				name: "write_to_file",
-				args: { TargetFile: join(project, "docs", "broken.md") },
+				name: "write_file",
+				args: { Path: join(project, "docs", "broken.md") },
 			},
 			stepIdx: 2,
 			error: "",
@@ -201,9 +204,9 @@ describe("jact hook, through the real CLI", () => {
 		});
 		const next = hook("PreInvocation", antigravityEvent({ invocationNum: 1 }));
 		expect(next.exitCode).toBe(0);
-		expect(JSON.parse(next.stdout).injectSteps[0].ephemeralMessage).toContain(
-			"File not found: missing.md",
-		);
+		expect(
+			JSON.parse(next.stdout).injectSteps[0].systemMessage.systemMessage,
+		).toContain("File not found: missing.md");
 		expect(
 			hook("PreInvocation", antigravityEvent({ invocationNum: 2 })).stdout,
 		).toBe("{}\n");

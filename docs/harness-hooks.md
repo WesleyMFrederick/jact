@@ -14,7 +14,7 @@ jact setup <harness>
 |---|---|---|---|---|
 | Claude Code | `jact setup claude` | `.claude/settings.json` | `Write`, `Edit`, `MultiEdit`, `Read` | None |
 | Codex | `jact setup codex` | `.codex/hooks.json` | `apply_patch` | Run the command in your own terminal, not through Codex. Then start `codex`, run `/hooks`, trust the jact entry |
-| Antigravity CLI (`agy`) | `jact setup antigravity` | `.agents/hooks.json` | `write_to_file`, `replace_file_content`, `multi_replace_file_content`, `view_file` | Start `agy` and run `/hooks`. The list must show a hook named `jact`. |
+| Antigravity CLI (`agy`) | `jact setup antigravity` | `.agents/hooks.json` | `write_file`, `edit_file`, `read_file` | None in the tested runs. To confirm, start `agy` and run `/hooks`: the list must show a hook named `jact`. |
 | Gemini CLI | `jact setup gemini` | `.gemini/settings.json` | `write_file`, `replace`, `read_file` | Trust the folder when Gemini asks |
 | pi | `jact setup pi` | `.pi/extensions/jact.ts` | `write`, `edit`, `read` | Start `pi` and trust the project, or run `/trust` |
 | omp | `jact setup omp` | `.omp/extensions/jact.ts` | `write`, `edit`, `read` | None |
@@ -63,10 +63,14 @@ Antigravity CLI gives a tool hook no way to answer the model. So jact uses three
 | Hook | When Antigravity CLI runs it | What jact does |
 |---|---|---|
 | `PostToolUse` | After a file write or read | Runs the check. Holds the result in `.jact/hook-pending/` in the project. Prints `{}`. |
-| `PreInvocation` | Before a model call | Hands the held result to the model, one time. Prints `{}` when nothing is held. |
+| `PreInvocation` | Before a model call | Hands the held result to the model as a system message, one time. Prints `{}` when nothing is held. |
 | `Stop` | When the agent is about to stop | If a broken-link report is still held, makes the agent continue one time with that report. Otherwise lets it stop. |
 
 If the agent repairs the file before the report is handed over, jact withdraws the report.
+
+The system message stays in the conversation, so the model can still use the linked content many steps later. jact does not use Antigravity CLI's `ephemeralMessage`: in version 1.5.12 the model lost one after a single model call, and jact does not send the same linked content twice in one conversation.
+
+The write and read path passed in live Antigravity CLI 1.5.12 sessions with two Gemini models and one Claude model, with the sandbox on and off. Each time, the model's reply quoted the broken-link report and the linked content. The `Stop` fallback passed in a session that had no `PreInvocation` hook. When the model starts a write and a read in one step, the next `PreInvocation` call hands over both results in one message.
 
 ## Any other harness
 
@@ -92,11 +96,12 @@ A harness needs one thing: a point that runs code after a tool call. Then follow
 
 | Field | Values |
 |---|---|
-| `tool_name`, or `toolCall.name` | A write: `write`, `edit`, `multiedit`, `write_file`, `replace`, `apply_patch`, `write_to_file`, `replace_file_content`, `multi_replace_file_content`. A read: `read`, `read_file`, `view_file`. Letter case does not matter. Other names are ignored. |
-| `tool_input`, or `toolCall.args` | The file, in one of: `file_path`, `path`, `absolute_path`, `TargetFile`, `AbsolutePath`, a `paths` list, or patch text that has `*** Add File:`, `*** Update File:`, or `*** Move to:` lines |
+| `tool_name`, or `toolCall.name` | A write: `write`, `edit`, `multiedit`, `write_file`, `edit_file`, `replace`, `apply_patch`, `write_to_file`, `replace_file_content`, `multi_replace_file_content`. A read: `read`, `read_file`, `view_file`. Letter case does not matter. Other names are ignored. |
+| `tool_input`, or `toolCall.args` | The file, in one of: `file_path`, `path`, `absolute_path`, `Path`, `TargetFile`, `AbsolutePath`, a `paths` list, or patch text that has `*** Add File:`, `*** Update File:`, or `*** Move to:` lines |
 | `cwd`, or the first entry of `workspacePaths` | The project folder. Relative paths resolve from it. Default: the current folder. |
 | `session_id`, or `conversationId` | Optional. Lets the read hook add each linked section one time only. |
 | `error` | Read only beside `toolCall`. Text here means the tool call failed, and jact does nothing. |
+| `hookEventName` | Read only by `jact hook antigravity`, and only when `--event` is absent. |
 
 The harness name selects the output format:
 
@@ -105,9 +110,9 @@ The harness name selects the output format:
 | `pi`, `omp` | `{"context", "failed": true}` | `{"context", "failed": false}` |
 | `claude`, `codex` | `{"decision": "block", "reason"}` | `{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext"}}` |
 | `gemini` | `{"hookSpecificOutput": {"hookEventName": "AfterTool", "additionalContext"}}` | The same shape |
-| `antigravity` | `{}` now. Later `{"injectSteps": [{"ephemeralMessage"}]}` from `--event PreInvocation`, or `{"decision": "continue", "reason"}` from `--event Stop` | `{}` now. Later the same `injectSteps` shape from `--event PreInvocation` |
+| `antigravity` | `{}` now. Later `{"injectSteps": [{"systemMessage": {"systemMessage"}}]}` from `--event PreInvocation`, or `{"decision": "continue", "reason"}` from `--event Stop` | `{}` now. Later the same `injectSteps` shape from `--event PreInvocation` |
 
-`jact hook antigravity` takes `--event PostToolUse`, `--event PreInvocation`, or `--event Stop`, because Antigravity CLI does not name the event in the input. Use this name for another harness whose tool hook cannot answer the model.
+`jact hook antigravity` takes `--event PostToolUse`, `--event PreInvocation`, or `--event Stop`. Without `--event`, it reads `hookEventName` from the input. Antigravity CLI 1.5.12 sends that field, but Google's hook page does not list it, so `jact setup antigravity` writes `--event` in each command. Use this name for another harness whose tool hook cannot answer the model.
 
 A harness that accepts Claude Code hook settings can use `jact hook claude` without changes. A harness with no hook point can use the rule in [Rule for agents without hooks](#Rule%20for%20agents%20without%20hooks).
 
@@ -124,9 +129,12 @@ Before you read a long Markdown file, run `jact outline <file>`, then `jact extr
 
 - **Codex has no read hook.** Codex reads files through shell commands, so there is no read event. jact runs on writes only.
 - **Codex cannot wire itself.** The `workspace-write` sandbox keeps a project's `.codex/` folder read-only, so `jact setup codex` fails when Codex runs it. A person must run that one command.
-- **Trust steps are the harness's own.** Codex, Gemini CLI, and pi do not run a project's hooks until you trust them. Without a UI, the flags are `--dangerously-bypass-hook-trust` (Codex), `--skip-trust` (Gemini CLI), and `--approve` (pi).
-- **Antigravity CLI support has not run in a live session.** It is built from Google's hook documentation and checked with sample events. `agy` was not installed on the test machine. Two points need a live run to confirm: that the hook before a model call runs at each step and not one time for each request, and that the model reads the message jact hands over. To confirm on your machine, run `node scripts/hooks-e2e.mjs antigravity` in a clone of this repository. It prints which hook handed the report over. It passes only when the model's reply shows the broken-link report and the linked content.
+- **Trust steps are the harness's own.** Codex, Gemini CLI, and pi do not run a project's hooks until you trust them. Without a UI, the flags are `--dangerously-bypass-hook-trust` (Codex), `--skip-trust` (Gemini CLI), and `--approve` (pi). Antigravity CLI 1.5.12 ran a new project's hooks with no trust step in runs without a UI.
+- **Antigravity CLI's tool names are not the names in its documentation.** Version 1.5.12 sends `write_file`, `edit_file`, and `read_file`, with the file in `Path`. Google's hook page names `write_to_file`, `replace_file_content`, `multi_replace_file_content`, and `view_file`, which no tested session sent. jact matches both sets. If a later version renames the tools, the hook goes silent. To check on your machine, run `node scripts/hooks-e2e.mjs antigravity` in a clone of this repository. It passes only when the model's reply shows the broken-link report and the linked content.
+- **Two Antigravity CLI paths have not run in a live session.** The live runs used the project file, `.agents/hooks.json`, in sessions without a UI. The path that `--global` writes, `~/.gemini/config/hooks.json`, comes from Google's documentation. No interactive session ran, so a trust step there is possible.
 - **Antigravity CLI gets the report one step later**, and its `PreInvocation` hook adds about 0.09 seconds before each model call.
+- **Antigravity CLI's sandbox can hide jact from the agent.** With `--sandbox`, the agent's shell tool does not see files under `~/Documents`. The hooks still run. But an agent that you ask to set jact up fails on its first try when jact is installed from a folder there. Run `jact setup antigravity` in your own terminal in that case.
+- **The model still judges the text.** Antigravity CLI tells the model that a hook supplied the message. In the tests a Claude model used an ordinary fact from it, and would not repeat a "launch code" that arrived the same way.
 - **Gemini CLI serves fewer accounts.** Since 2026-06-18 it works only with a paid API key or an enterprise account. An update of Gemini CLI does not change that. Other Google accounts use Antigravity CLI.
 - **Cost.** One hook call takes about 0.35 seconds. See [Measured value](#Measured%20value).
 
@@ -140,7 +148,7 @@ Checked on 2026-11-19 with `scripts/hooks-e2e.mjs`. "Live" means a real model se
 | Codex | 0.160.0 | Pass | Pass: write caught | Blocked by Codex's sandbox. Codex gave the user the command to run, in 73 seconds. |
 | pi | 1.4.0 | Pass | Pass: write caught, read enriched | Pass in 14 seconds |
 | omp | 19.0.0 | Pass | Pass: write caught, read enriched | Pass in 90 seconds. omp also ran the check in a new session. |
-| Antigravity CLI | Not installed | Pass, with the event shapes in Google's documentation | Not run: `agy` was not on the test machine | Not run |
+| Antigravity CLI | 1.5.12 | Pass | Pass: write caught, read enriched, and the model's reply quoted both. Three models: Gemini 4 Neon, Gemini 3.8 Flash, Claude Sonnet 5.5. Also with `--sandbox`. | Pass in 31 seconds. With `--sandbox`: pass in 54 seconds, on the second try. |
 | Gemini CLI | 0.41.2 | Pass | Not run: Google moved this account type to Antigravity CLI, so the server refused the session. The event fields were checked against the CLI's own code. | Not run |
 
 For the last column, the agent had only `README.md` and this guide, and one request: "Set up jact for this harness. The instructions are in README.md." Pass means `jact setup <harness> --check` exited 0 afterward, on the first attempt.
@@ -157,8 +165,8 @@ Measured on this repository's own Markdown (36 files in `docs/` and `src/`) on 2
 | How fast is a link check? | **331 links in about 1 second**, with no model call |
 | Does it find real problems? | **3 broken links** in 3 committed files |
 | What does a hook cost? | About **0.35 seconds** for each write or read |
-| How fast does an agent find the setup command in the README? | **4 to 10 seconds**, correct each time: Claude Code 3.7, omp 4.6, pi 7.2, Codex 9.9 |
+| How fast does an agent find the setup command in the README? | **4 to 12 seconds**, correct each time: Claude Code 3.7, omp 4.6, pi 7.2, Codex 9.9, Antigravity CLI 10.7 to 11.5 (6.3 to 7.2 with its fast model) |
 
 Method for the first row: for each file of 4,000 characters or more that has two or more H2 sections, compare the file length with the length of `jact outline` output plus the file's median-length H2 section from `jact extract header`.
 
-Method for the last row: a real session in a folder that holds only `README.md` was asked for the command that sets up jact for Codex and the file it writes. The time is the whole run, startup included.
+Method for the last row: a real session in a folder that holds only `README.md` was asked for the command that sets up jact for Codex and the file it writes. The time is the whole run, startup included. Antigravity CLI needs 5.5 to 6.5 seconds for a prompt that reads no file, so its default model misses a 10-second target by 0.7 to 1.5 seconds.

@@ -217,12 +217,17 @@ describe("setup for Antigravity CLI, whose hooks file is keyed by hook name", ()
 		expect(jact.Stop[0].command).toBe("jact hook antigravity --event Stop");
 	});
 
-	it("matches the four Antigravity file tools and no other tool", () => {
+	it("matches the file tools agy 1.5.12 sends, the documented names, and no other tool", () => {
 		installHarness("antigravity", options);
 		const matcher = new RegExp(
 			`^(?:${readJson(file()).jact.PostToolUse[0].matcher})$`,
 		);
 		for (const tool of [
+			// Seen in a live agy 1.5.12 session.
+			"write_file",
+			"edit_file",
+			"read_file",
+			// Named in Google's hook documentation.
 			"write_to_file",
 			"replace_file_content",
 			"multi_replace_file_content",

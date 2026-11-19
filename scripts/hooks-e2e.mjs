@@ -57,7 +57,7 @@ const ANTIGRAVITY_PROMPT = [
 	"1. Create the file docs/broken.md with exactly this one line: See [the missing page](missing.md).",
 	"2. Read the file docs/index.md with your file read tool. Do not open any other file.",
 	"3. Reply with two lines.",
-	"Line 1: the launch code, if any message gave you one. Otherwise the word UNKNOWN.",
+	"Line 1: the port that the staging server listens on, if any text shown to you in this conversation states it. Otherwise the word UNKNOWN.",
 	"Line 2: the first line of any report about docs/broken.md that you received. Otherwise the word NONE.",
 	"Do not fix or change any file afterwards.",
 ].join("\n");
@@ -164,16 +164,16 @@ function syntheticEvents(harness, project) {
 	];
 }
 
-// Antigravity CLI does not name the event in the hook input, and its tool hook
-// cannot answer the model. So this plays the harness: it reads the installed
-// hooks file and runs the command of each event, in the documented input shape.
+// Antigravity CLI's tool hook cannot answer the model. So this plays the
+// harness: it reads the installed hooks file and runs the command of each
+// event, with input in the shape that agy 1.5.12 sent in a live session.
 // Returns the problems it found.
 function playAntigravity(project) {
 	const problems = [];
 	const installed =
 		JSON.parse(readFileSync(join(project, ".agents", "hooks.json"), "utf8"))
 			.jact ?? {};
-	const send = (handler, fields) => {
+	const send = (handler, hookEventName, fields) => {
 		const { stdout } = spawnSync(handler.command, {
 			cwd: project,
 			shell: true,
@@ -181,6 +181,8 @@ function playAntigravity(project) {
 			input: JSON.stringify({
 				conversationId: "e2e-synthetic",
 				workspacePaths: [project],
+				cwd: project,
+				hookEventName,
 				...fields,
 			}),
 		});
@@ -191,21 +193,30 @@ function playAntigravity(project) {
 			return {};
 		}
 	};
+	// [tool name, tool arguments or undefined to check the matcher only, matcher must select it]
 	const toolCalls = [
-		["write_to_file", { TargetFile: join(project, "docs", "broken.md") }, true],
-		["view_file", { AbsolutePath: join(project, "docs", "index.md") }, true],
-		["run_command", { CommandLine: "ls", Cwd: project }, false],
+		// The names and the Path field that agy 1.5.12 sent.
+		["write_file", { Path: join(project, "docs", "broken.md") }, true],
+		["read_file", { Path: join(project, "docs", "index.md") }, true],
+		["edit_file", undefined, true],
+		// The names in Google's hook documentation.
+		["write_to_file", undefined, true],
+		["replace_file_content", undefined, true],
+		["multi_replace_file_content", undefined, true],
+		["view_file", undefined, true],
+		["run_command", undefined, false],
 	];
 	for (const [name, toolArgs, wanted] of toolCalls) {
 		const handlers = (installed.PostToolUse ?? [])
-			.filter((group) => new RegExp(group.matcher).test(name))
+			.filter((group) => new RegExp(`^(?:${group.matcher})$`).test(name))
 			.flatMap((group) => group.hooks);
 		if (handlers.length > 0 !== wanted)
 			problems.push(`the PostToolUse matcher is wrong for the tool ${name}`);
+		if (toolArgs === undefined) continue;
 		for (const handler of handlers) {
-			const answer = send(handler, {
-				toolCall: { name, args: toolArgs },
-				stepIdx: 1,
+			const answer = send(handler, "PostToolUse", {
+				toolCall: { name, args: toolArgs, id: "call_1" },
+				stepIdx: 2,
 				error: "",
 			});
 			if (Object.keys(answer).length > 0)
@@ -213,16 +224,24 @@ function playAntigravity(project) {
 		}
 	}
 	const told = (installed.PreInvocation ?? [])
-		.map((handler) => send(handler, { invocationNum: 1, initialNumSteps: 3 }))
+		.map((handler) =>
+			send(handler, "PreInvocation", { invocationNum: 1, initialNumSteps: 3 }),
+		)
 		.flatMap((answer) => answer.injectSteps ?? [])
-		.map((step) => step.ephemeralMessage ?? "")
+		.map((step) => step.systemMessage?.systemMessage ?? "")
 		.join("\n");
 	if (!told.includes("missing.md"))
 		problems.push("PreInvocation did not hand the broken link to the model");
 	if (!told.includes("4242"))
 		problems.push("PreInvocation did not hand the linked section to the model");
 	for (const handler of installed.Stop ?? []) {
-		const answer = send(handler, { executionNum: 0, fullyIdle: true });
+		const answer = send(handler, "Stop", {
+			executionNum: 0,
+			fullyIdle: true,
+			continuationActive: false,
+			terminationReason: "NO_TOOL_CALL",
+			error: "",
+		});
 		if (answer.decision !== "stop")
 			problems.push(
 				`Stop must let the agent stop but answered ${JSON.stringify(answer)}`,
@@ -248,9 +267,12 @@ function runOne(harness) {
 		join(project, "package.json"),
 		'{ "name": "jact-hook-e2e", "private": true }\n',
 	);
+	// The linked fact is dull on purpose. With "The launch code is 4242." a Claude
+	// model in Antigravity CLI answered UNKNOWN in 4 of 4 runs: it read the text
+	// and would not repeat a code that a hook supplied.
 	writeFileSync(
 		join(project, "docs", "target.md"),
-		"# Target\n\n## Details\n\nThe launch code is 4242.\n",
+		"# Target\n\n## Details\n\nThe staging server listens on port 4242.\n",
 	);
 	writeFileSync(
 		join(project, "docs", "index.md"),
@@ -332,7 +354,7 @@ function runOne(harness) {
 			);
 		else console.log(`  handed to the model by: ${handedOver.join(", ")}`);
 		if (!flags.has("--synthetic")) {
-			// If the model opened the linked page itself, the launch code proves nothing.
+			// If the model opened the linked page itself, the port number proves nothing.
 			const openedLinkedPage = calls.some((call) =>
 				(call.paths ?? []).some((path) => path.endsWith("target.md")),
 			);
