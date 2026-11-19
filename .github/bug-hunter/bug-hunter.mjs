@@ -341,7 +341,7 @@ async function main() {
   const [agentId, environmentId, uploads] = await Promise.all([
     ensureAgent(),
     ensureEnvironment(),
-    Promise.all(slices.map((s) => client.beta.files.upload({ file: toFile(Buffer.from(s.text), `${s.id}.diff`, { type: "text/plain" }) }))),
+    Promise.all(slices.map(async (s) => client.beta.files.upload({ file: await toFile(Buffer.from(s.text), `${s.id}.diff`, { type: "text/plain" }) }))),
   ]);
 
   const session = await client.beta.sessions.create({
