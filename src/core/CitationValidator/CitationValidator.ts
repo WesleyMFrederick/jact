@@ -26,6 +26,11 @@ import type {
 	ParsedDocumentLike,
 } from "./AnchorMatcher.js";
 import { AnchorMatcher } from "./AnchorMatcher.js";
+import {
+	encodeAnchor,
+	findUnrenderableAnchorChars,
+	UNRENDERABLE_ANCHOR_ERROR,
+} from "./anchorEncoding.js";
 import type { FileCacheLike } from "./PathResolver.js";
 import { PathResolver } from "./PathResolver.js";
 
@@ -449,6 +454,8 @@ export class CitationValidator {
 					anchor.suggestion ?? null,
 				);
 			}
+			const unrenderable = this.checkAnchorRenders(citation);
+			if (unrenderable) return unrenderable;
 		}
 
 		if (outcome.warning) {
@@ -518,7 +525,41 @@ export class CitationValidator {
 			);
 		}
 
-		return this.createValidationResult(citation, "valid");
+		return (
+			this.checkAnchorRenders(citation) ??
+			this.createValidationResult(citation, "valid")
+		);
+	}
+
+	/**
+	 * A markdown link whose anchor has a raw space, `(`, or `)` does not render
+	 * on GitHub or in Obsidian, even when the heading exists (jact#125). Runs
+	 * under every preset. Wikilinks resolve raw anchors natively, and block
+	 * IDs (`^id`) cannot hold these characters, so both are skipped.
+	 */
+	private checkAnchorRenders(
+		citation: LinkObject,
+	): SingleCitationValidationResult | null {
+		const anchor = citation.target.anchor;
+		if (
+			citation.linkType !== "markdown" ||
+			citation.anchorType === "block" ||
+			anchor === null ||
+			anchor.startsWith("^")
+		) {
+			return null;
+		}
+		const chars = findUnrenderableAnchorChars(anchor);
+		if (chars.length === 0) return null;
+		const recommended = encodeAnchor(anchor);
+		return this.createValidationResult(
+			citation,
+			"error",
+			`${UNRENDERABLE_ANCHOR_ERROR} (${chars.join(", ")}): #${anchor}`,
+			`#${recommended}`,
+			null,
+			{ type: "anchor-conversion", original: anchor, recommended },
+		);
 	}
 
 	// ── Result builder ────────────────────────────────────────────────────────

@@ -22,11 +22,14 @@ const cliPath = path.resolve(testDir, "../../dist/cli.js");
 const configHome = path.resolve(testDir, "../fixtures/config-home-obsidian");
 const env = { ...process.env, XDG_CONFIG_HOME: configHome };
 
-/** Obsidian-style anchors that `--fix` rewrites by dropping the colon. */
+/**
+ * Obsidian-style anchors that `--fix` rewrites by dropping the colon. The fix
+ * writes the canonical anchor, which encodes a backtick as `%60` (jact#125).
+ */
 const brokenCitation = (token: string) =>
 	`[A](target.md#Cost%20${token}%20Q1:%20fit)`;
 const fixedCitation = (token: string) =>
-	`[A](target.md#Cost%20${token}%20Q1%20fit)`;
+	`[A](target.md#Cost%20${token.replace(/`/g, "%60")}%20Q1%20fit)`;
 const targetDoc = (token: string) =>
 	`# Target\n\n## Cost ${token} Q1: fit\n\nText.\n`;
 const sourceDoc = (token: string) =>

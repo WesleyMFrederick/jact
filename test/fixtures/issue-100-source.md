@@ -4,7 +4,7 @@ Test links for issue #100 false-positive patterns.
 
 ## Bug 1: Colon Normalization
 
-[Colon in heading - opsx continue](issue-100-colon-heading.md#TRACE%20LLM%20...%20(opsx%20continue))
+[Colon in heading - opsx continue](issue-100-colon-heading.md#TRACE%20LLM%20...%20%28opsx%20continue%29)
 
 ## Bug 2: Backslash-Encoded Bracket
 
@@ -12,4 +12,4 @@ Test links for issue #100 false-positive patterns.
 
 ## Issue 27: Backtick Anchor
 
-[**`hasAnchor(anchorId: string): boolean`**](issue-27-backtick-heading.md#%60hasAnchor(anchorId%20string)%20boolean%60)
+[**`hasAnchor(anchorId: string): boolean`**](issue-27-backtick-heading.md#%60hasAnchor%28anchorId%20string%29%20boolean%60)

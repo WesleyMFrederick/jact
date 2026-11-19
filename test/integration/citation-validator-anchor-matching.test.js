@@ -32,13 +32,19 @@ describe("CitationValidator Anchor Matching with Dual IDs", () => {
 		);
 	});
 
-	it("accepts the raw colon anchor when the dropped-chars rule is off (commonmark)", async () => {
+	it("does not apply the dropped-chars rule when it is off (commonmark); raw spaces still fail (jact#125)", async () => {
 		const { validateDocumentFile } = createCitationHarness();
 		const result = await validateDocumentFile(
 			join(fixturesDir, "anchor-matching-source.md"),
 		);
 		const linkObject = result.links.find((link) => link.fullMatch === RAW_COLON_LINK);
-		expect(linkObject.validation.status).toBe("valid");
+		expect(linkObject.validation.status).toBe("error");
+		expect(linkObject.validation.error).toBe(
+			"Anchor has characters a markdown link cannot contain (space): #Story 1.5: Implement Cache",
+		);
+		expect(linkObject.validation.anchorConversion.recommended).toBe(
+			"Story%201.5:%20Implement%20Cache",
+		);
 	});
 
 	it("should match anchor using URL-encoded ID format", async () => {
@@ -93,7 +99,7 @@ describe("CitationValidator Issue #100 - cleanMarkdownForComparison false positi
 		const linkObject = result.links.find(
 			(link) =>
 				link.fullMatch ===
-				"[Colon in heading - opsx continue](issue-100-colon-heading.md#TRACE%20LLM%20...%20(opsx%20continue))",
+				"[Colon in heading - opsx continue](issue-100-colon-heading.md#TRACE%20LLM%20...%20%28opsx%20continue%29)",
 		);
 		expect(linkObject).toBeDefined();
 		expect(linkObject.validation.status).toBe("valid");
@@ -112,7 +118,7 @@ describe("CitationValidator Issue #100 - cleanMarkdownForComparison false positi
 		const linkObject = result.links.find(
 			(link) =>
 				link.fullMatch ===
-				"[**`hasAnchor(anchorId: string): boolean`**](issue-27-backtick-heading.md#%60hasAnchor(anchorId%20string)%20boolean%60)",
+				"[**`hasAnchor(anchorId: string): boolean`**](issue-27-backtick-heading.md#%60hasAnchor%28anchorId%20string%29%20boolean%60)",
 		);
 		expect(linkObject).toBeDefined();
 		expect(linkObject.validation.status).toBe("valid");

@@ -5,8 +5,8 @@ How engineering skills should consume this repository's domain documentation.
 ## Before exploring, read these
 
 - ADRs relevant to the work under `docs/adrs/`
-- The [jact Living Specification](../spec/SPEC.md#jact Living Specification)
-- The [Domain Model core entities](../spec/004-domain-model.md#Core Entities)
+- The [jact Living Specification](../spec/SPEC.md#jact%20Living%20Specification)
+- The [Domain Model core entities](../spec/004-domain-model.md#Core%20Entities)
 
 ## File structure
 
@@ -21,7 +21,7 @@ How engineering skills should consume this repository's domain documentation.
 
 ## Use the domain model's vocabulary
 
-When the [Domain Model core entities](../spec/004-domain-model.md#Core Entities) define a term, use it consistently. If a needed concept is missing, reconsider the terminology or note the gap for domain modeling.
+When the [Domain Model core entities](../spec/004-domain-model.md#Core%20Entities) define a term, use it consistently. If a needed concept is missing, reconsider the terminology or note the gap for domain modeling.
 
 ## Flag ADR conflicts
 

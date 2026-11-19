@@ -47,7 +47,7 @@ These summaries show what core is, is not, and guarantees.
 
 - The **parser**: Markdown text to a typed parser output, through one micromark extension set
 - The **checker**: each parsed link to a valid, warning, or error result
-- The **rule layer** (`src/core/ValidationRules/`): preset registry, configuration and plugin loading, and post-link checks; contracts live in [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation configuration and presets)
+- The **rule layer** (`src/core/ValidationRules/`): preset registry, configuration and plugin loading, and post-link checks; contracts live in [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation%20configuration%20and%20presets)
 - The **extractor**: linked sections, blocks, and files to deduplicated content
 - The **editors**: `--fix` citation repair, `jact rename` move planning, and the vault link fixer (`src/core/VaultLink/`), the only code that changes user files. The fixer plans before writing and applies through the [note recovery contract](../../../../docs/spec/005-interfaces.md#Writing%20the%20note), rather than promising concurrent editors cannot change the note.
 

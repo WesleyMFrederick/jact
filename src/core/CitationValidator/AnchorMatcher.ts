@@ -19,6 +19,7 @@ import type {
 import type { AnchorConversion } from "../../types/validationTypes.js";
 import { normalizeAnchorText } from "../MarkdownParser/normalizeInlineText.js";
 import { ANCHOR_DROPPED_CHARS_RULE } from "../ValidationRules/rules/anchorDroppedChars.js";
+import { encodeAnchor } from "./anchorEncoding.js";
 
 /**
  * Minimal semantic-document interface used for anchor matching.
@@ -320,7 +321,10 @@ export class AnchorMatcher {
 		for (const position of positions) {
 			const anchorObj = availableAnchors[position];
 			if (anchorObj === undefined) continue;
-			const suggestion = encodeURIComponent(anchorObj.id).replace(/'/g, "%27");
+			const suggestion = encodeURIComponent(anchorObj.id)
+				.replace(/'/g, "%27")
+				.replace(/\(/g, "%28")
+				.replace(/\)/g, "%29");
 			if (suggestion !== usedAnchor) {
 				return suggestion;
 			}
@@ -361,10 +365,11 @@ export class AnchorMatcher {
 	}
 
 	/**
-	 * URL-encode header text for use as an anchor (spaces to %20, periods to %2E).
+	 * URL-encode header text for use as an anchor: the canonical encoding
+	 * (spaces, parens, backticks, bare `%`) plus periods to %2E.
 	 */
 	private urlEncodeAnchor(headerText: string): string {
-		return headerText.replace(/ /g, "%20").replace(/\./g, "%2E");
+		return encodeAnchor(headerText).replace(/\./g, "%2E");
 	}
 
 	/**
@@ -395,10 +400,7 @@ export class AnchorMatcher {
 
 		return {
 			dropped,
-			recommended: stripObsidianDroppedChars(header.anchor.id).replace(
-				/ /g,
-				"%20",
-			),
+			recommended: encodeAnchor(stripObsidianDroppedChars(header.anchor.id)),
 		};
 	}
 

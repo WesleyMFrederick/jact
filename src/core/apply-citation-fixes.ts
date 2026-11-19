@@ -20,6 +20,7 @@ import type {
 } from "../types/validationTypes.js";
 import { VALIDATION_DISABLED_REASON } from "../validate/validation-disable.js";
 import { OBSIDIAN_DROPPED_CHARS_ERROR } from "./CitationValidator/AnchorMatcher.js";
+import { UNRENDERABLE_ANCHOR_ERROR } from "./CitationValidator/anchorEncoding.js";
 import type { CitationValidator } from "./CitationValidator/CitationValidator.js";
 import { applyAnchorFix, applyPathConversion } from "./citationFixer.js";
 import { findPlainFilePaths, resolvePlainFilePath } from "./plain-file-paths.js";
@@ -40,6 +41,7 @@ export interface ApplyCitationFixesDeps {
 const isAnchorFixable = (link: EnrichedLinkObject): boolean =>
 	link.validation.status === "error" &&
 	(link.validation.error.includes(OBSIDIAN_DROPPED_CHARS_ERROR) ||
+		link.validation.error.startsWith(UNRENDERABLE_ANCHOR_ERROR) ||
 		(link.validation.suggestion !== undefined &&
 			(link.validation.suggestion.includes(
 				"Use raw header format for better Obsidian compatibility",

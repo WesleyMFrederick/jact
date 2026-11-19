@@ -11,7 +11,7 @@ Issues live as Markdown files in `.scratch/`. Persistent feature specs are canon
 - `/to-issues` slices a persistent plan, spec, or PRD into many small tracer-bullet issues; it never creates a 1:1 plan-to-issue mapping.
 - `.scratch/`-only issues and captured ideas live directly in `.scratch/` until promoted to a persistent feature artifact.
 - Triage state is recorded as a `Status:` line near the top.
-- Use the roles defined in [Triage Labels](triage-labels.md#Triage Labels).
+- Use the roles defined in [Triage Labels](triage-labels.md#Triage%20Labels).
 - Append conversation history under a `## Comments` heading.
 
 ## Publishing to the issue tracker
