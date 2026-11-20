@@ -382,6 +382,9 @@ function saveReport(pr, fields) {
 }
 
 async function main() {
+  if (!Object.hasOwn(SEVERITY_RANK, FAIL_ON)) {
+    throw new Error(`Invalid FAIL_ON ${JSON.stringify(FAIL_ON)}. Allowed values: ${Object.keys(SEVERITY_RANK).join(", ")} (case-sensitive).`);
+  }
   await refreshGithubIdToken();
   setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
   const { pr, files } = await loadTarget();
@@ -510,7 +513,7 @@ async function main() {
 
   await deleteUploads();
 
-  const threshold = SEVERITY_RANK[FAIL_ON] ?? SEVERITY_RANK.high;
+  const threshold = SEVERITY_RANK[FAIL_ON];
   const blocking = report.findings.filter((f) => (SEVERITY_RANK[f.severity] ?? 0) >= threshold);
   if (note) console.log(`::warning title=Bug Hunter did not finish::${note}`);
   // An unfinished review passes with its warning, even if it already confirmed something.

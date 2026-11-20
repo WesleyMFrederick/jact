@@ -42,6 +42,8 @@ Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to
 2. Create the trigger label: `gh label create bug-hunt -R WesleyMFrederick/jact --description "Run Bug Hunter on this PR"`.
 3. Optional: set repo variables to tune it: `BUG_HUNTER_BUDGET_CENTS` (default `1500`), `BUG_HUNTER_MODEL` (default `claude-opus-5-5`), and `BUG_HUNTER_FAIL_ON` (`high`, `medium`, `low`, or `none`; default `high`).
 
+`FAIL_ON` (set by `BUG_HUNTER_FAIL_ON` in CI) accepts only the case-sensitive values `high`, `medium`, `low`, and `none`. Any other value, including `Medium`, is a configuration error: the runner names the invalid value and allowed values, then exits 2 before making API calls. Unset or empty values still default to `high`.
+
 ## Where secrets live
 
 No secret is ever written to a `.env` file, the repo, or the agent's sandbox. The talk's rule (chapter "Credential vaults & locking down tools", 1:27:50) is that credentials must never touch the sandbox, because anything on the agent's disk can be talked out of it.
@@ -71,7 +73,7 @@ It does not run on every push, because each run spends API credit. Fork PRs are 
 | ---- | ----- | ------- |
 | 0 | pass | No confirmed finding at or above `FAIL_ON` severity. A budget stop or timeout also passes, but the review heading says "did not finish" and the job shows a warning. |
 | 1 | fail | A finished review has at least one confirmed finding at or above `FAIL_ON` severity. |
-| 2 | fail | The review itself broke: a failed login, an agent stopped by repeated API errors (`retries_exhausted`), or a report that breaks the JSON schema. |
+| 2 | fail | Invalid configuration, or the review itself broke: a failed login, an agent stopped by repeated API errors (`retries_exhausted`), or a report that breaks the JSON schema. |
 
 ## Cost
 
