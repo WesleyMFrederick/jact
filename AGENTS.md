@@ -1,3 +1,7 @@
+---
+created: 2026-07-01T10:34:58
+last_modified: 2026-11-19T16:15:54
+---
 # jact — Agent Operating Rules
 
 Canonical operating doc for agents working in the jact repo. Referenced by the squid `/plan` workflow and by any agent authoring plans, ADRs, or task files here.
@@ -37,6 +41,7 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 - **WHEN** a PR needs a fresh Bug Hunter review after new commits, **ALWAYS** remove and re-add the `bug-hunt` label (`gh pr edit <N> --remove-label bug-hunt` then `--add-label bug-hunt`); **NEVER** expect a push to trigger it, **BECAUSE** each run spends up to its session budget ($15 by default), so it runs only on PR open, ready-for-review, and that label. See [Bug Hunter · When it runs](.github/bug-hunter/README.md#When%20it%20runs).
 - **WHEN** you need to know why a past Bug Hunter run found or missed a bug, **ALWAYS** read its session record from the Anthropic Console through the SDK and the local `ant` login, **NEVER** infer it from the GitHub job log alone, **BECAUSE** the log shows only counts while the session keeps every agent's suspects and verdicts. See [Bug Hunter · Inspect a past run](.github/bug-hunter/README.md#Inspect%20a%20past%20run).
+- **WHEN** you need Bug Hunter evaluation data (answer keys, run traces, committee verdicts, the scorer), **ALWAYS** read and write it under `design-docs/features/bug-hunter-rice/eval/`, **NEVER** commit it to this repo, **BECAUSE** jact is public and that folder is in a private docs repo; keeping the key out of jact also keeps it out of what Bug Hunter reads. Start at [Answer-key committee: protocol](design-docs/features/bug-hunter-rice/eval/pr130/committee/PROTOCOL.md#Answer-key%20committee%20protocol).
 
 ## Delta design research
 
