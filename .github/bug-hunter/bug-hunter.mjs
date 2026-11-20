@@ -16,7 +16,11 @@
 // in CI the Workload Identity Federation vars (no stored key); locally ANTHROPIC_API_KEY.
 // Optional: REPO_TOKEN (repo mount, private repos only; never set by default), BUG_HUNTER_MODEL,
 // BUDGET_CENTS (default 1500 = $15.00), FAIL_ON (high|medium|low|none, default high),
-// TIMEOUT_MINUTES (default 50), DRY_RUN=1 (print the review instead of posting it).
+// TIMEOUT_MINUTES (default 50), DRY_RUN=1 (print the review instead of posting it),
+// PLAN_ONLY=1 (print the slices and manifest, then stop before any Anthropic call; costs $0),
+// REPORT_FILE (write the report, session id, cost and model as JSON to this path).
+// Exam mode: BASE_SHA and HEAD_SHA instead of PR_NUMBER review a fixed commit range and never
+// post (see target.mjs).
 //
 // Exit codes: 0 no blocking findings, 1 blocking findings, 2 the review itself failed.
 
@@ -25,6 +29,7 @@ import { readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic, { toFile } from "@anthropic-ai/sdk";
+import { compareToPr, reviewTarget, sessionPrefix } from "./target.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const env = (name, fallback) => {
@@ -34,7 +39,8 @@ const env = (name, fallback) => {
 };
 
 const REPO = env("GITHUB_REPOSITORY");
-const PR_NUMBER = Number(env("PR_NUMBER"));
+const TARGET = reviewTarget(process.env);
+const PR_NUMBER = TARGET.exam ? undefined : Number(env("PR_NUMBER"));
 const GITHUB_TOKEN = env("GITHUB_TOKEN");
 // The agent's sandbox gets no GitHub credential by default: a public repo clones without one.
 // Set REPO_TOKEN (a read-only, single-repo token) only for a private repo.
@@ -43,7 +49,9 @@ const MODEL = process.env.BUG_HUNTER_MODEL || "claude-opus-5-5";
 const BUDGET_CENTS = String(Number(process.env.BUDGET_CENTS || 1500));
 const FAIL_ON = process.env.FAIL_ON || "high";
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MINUTES || 50) * 60_000;
-const DRY_RUN = process.env.DRY_RUN === "1";
+const DRY_RUN = TARGET.exam || process.env.DRY_RUN === "1";
+const PLAN_ONLY = process.env.PLAN_ONLY === "1";
+const REPORT_FILE = process.env.REPORT_FILE || undefined;
 const MOUNT_PATH = "/workspace/repo";
 const SLICE_DIR = "/workspace/slices";
 const POLL_MS = 15_000;
@@ -97,6 +105,17 @@ async function gh(path, { method = "GET", body, accept = "application/vnd.github
     throw err;
   }
   return res.json();
+}
+
+// The pull request and its files, or in exam mode the frozen range shaped like one.
+async function loadTarget() {
+  if (TARGET.exam) return compareToPr(await gh(`/repos/${REPO}/compare/${TARGET.base}...${TARGET.head}`), TARGET);
+  const pr = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
+  const files = await prFiles();
+  // The PR object and its file list come from two calls; a push between them would mix two heads.
+  const recheck = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
+  if (recheck.head.sha !== pr.head.sha) throw new Error(`PR head moved from ${pr.head.sha} to ${recheck.head.sha} during setup; the newer push's run reviews it.`);
+  return { pr, files };
 }
 
 async function prFiles() {
@@ -203,10 +222,10 @@ async function ensureEnvironment() {
 
 function manifest(pr, slices, skipped) {
   return [
-    `Review pull request #${PR_NUMBER} in ${REPO}: "${pr.title}".`,
-    `Repository: ${MOUNT_PATH}, checked out at the PR head commit ${pr.head.sha} (base ${pr.base.ref} at ${pr.base.sha}).`,
+    TARGET.exam ? `Review the changes in ${REPO} from ${pr.base.sha} to ${pr.head.sha}.` : `Review pull request #${PR_NUMBER} in ${REPO}: "${pr.title}".`,
+    `Repository: ${MOUNT_PATH}, checked out at the ${TARGET.exam ? "head" : "PR head"} commit ${pr.head.sha} (base ${pr.base.ref} at ${pr.base.sha}).`,
     "",
-    "PR description:",
+    TARGET.exam ? "Change description:" : "PR description:",
     (pr.body || "(none)").slice(0, 4000),
     "",
     "Slices (each is a unified diff file already in the sandbox):",
@@ -292,7 +311,7 @@ async function stopSession(sessionId, { quick = false } = {}) {
 // A cancelled or crashed earlier run can leave its session alive and spending.
 // Stop any live Bug Hunter session for this PR before starting a new one.
 async function stopStaleSessions() {
-  const prefix = `Bug Hunter ${REPO}#${PR_NUMBER} `;
+  const prefix = sessionPrefix(REPO, TARGET, PR_NUMBER);
   let checked = 0;
   for await (const s of client.beta.sessions.list()) {
     if (++checked > 200) break;
@@ -381,13 +400,13 @@ let liveSession; // the session to stop if this process is cancelled or crashes
 async function main() {
   await refreshGithubIdToken();
   setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
-  const pr = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
-  const files = await prFiles();
-  // The PR object and its file list come from two calls; a push between them would mix two heads.
-  const recheck = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
-  if (recheck.head.sha !== pr.head.sha) throw new Error(`PR head moved from ${pr.head.sha} to ${recheck.head.sha} during setup; the newer push's run reviews it.`);
+  const { pr, files } = await loadTarget();
   const { slices, skipped } = planSlices(files);
   console.log(`Slices: ${slices.map((s) => `${s.id}=${s.lines} lines/${s.files.length} files`).join(", ") || "none"}; skipped ${skipped.length} files.`);
+  if (PLAN_ONLY) {
+    console.log(`PLAN_ONLY: no session started.\n\n${manifest(pr, slices, skipped)}`);
+    return;
+  }
   if (!slices.length) {
     await postReview(pr, files, { summary: "Nothing to review: this PR changes only lockfiles, build output, planning docs, or removed or binary files.", findings: [] }, { finished: true });
     return;
@@ -403,7 +422,7 @@ async function main() {
   const session = await client.beta.sessions.create({
     agent: agentId,
     environment_id: environmentId,
-    title: `Bug Hunter ${REPO}#${PR_NUMBER} @ ${pr.head.sha.slice(0, 7)}`,
+    title: `${sessionPrefix(REPO, TARGET, PR_NUMBER)}@ ${pr.head.sha.slice(0, 7)}`,
     budget: { type: "limit", max_list_cost: { amount: BUDGET_CENTS, currency: "USD" } },
     resources: [
       {
@@ -475,6 +494,10 @@ async function main() {
     report = { summary: "No report: the review did not finish, so this PR has not been checked.", findings: [] };
   }
   await postReview(pr, files, report, { sessionId: session.id, note, finished, cost });
+  if (REPORT_FILE) {
+    writeFileSync(REPORT_FILE, `${JSON.stringify({ repo: REPO, pr: PR_NUMBER ?? null, base: pr.base.sha, head: pr.head.sha, session: session.id, agent: agentId, model: MODEL, finished, note, cost_usd: cost.total === undefined ? null : Number(cost.total) / 100, report }, null, 2)}\n`);
+    console.log(`Report written to ${REPORT_FILE}.`);
+  }
   await Promise.all(uploads.map((u) => client.beta.files.delete(u.id).catch(() => {})));
 
   const threshold = SEVERITY_RANK[FAIL_ON] ?? SEVERITY_RANK.high;
