@@ -29,6 +29,7 @@ import { readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic, { toFile } from "@anthropic-ai/sdk";
+import { assess } from "./progress.mjs";
 import { compareToPr, reviewTarget, sessionPrefix } from "./target.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -55,6 +56,10 @@ const REPORT_FILE = process.env.REPORT_FILE || undefined;
 const MOUNT_PATH = "/workspace/repo";
 const SLICE_DIR = "/workspace/slices";
 const POLL_MS = 15_000;
+// After the last workflow run ends, the lead normally reports within seconds. Silence this long
+// means it froze (exam 1, sesn_0169BWdXnQa1HrxFhqPuvxR1), so the runner interrupts it once.
+const STALL_MS = 3 * 60_000;
+const REPORT_NOW = "Your workflow run has finished. Write the final report now from the findings a prover confirmed, in the required JSON format.";
 // At this share of the budget, the runner asks the agent to stop its runs and report,
 // so the final report is never the request that runs out of money.
 const WRAP_UP_AT = 0.75;
@@ -242,27 +247,6 @@ async function listEvents(sessionId) {
   return events;
 }
 
-// Done when every run seen has ended, and after that the session idled with end_turn.
-// https://platform.claude.com/docs/en/managed-agents/workflow-runs#know-when-the-work-is-done
-function assess(events) {
-  const open = new Set();
-  let lastRunEnd = -1;
-  let lastIdle;
-  let lastUserMessage = -1;
-  events.forEach((e, i) => {
-    if (e.type === "user.message") lastUserMessage = i;
-    if (e.type === "workflow_run.created") open.add(e.workflow_run_id);
-    if (e.type === "workflow_run.status_ended") { open.delete(e.workflow_run_id); lastRunEnd = i; }
-    if (e.type === "session.status_idle") lastIdle = { index: i, reason: e.stop_reason?.type };
-  });
-  // A message sent after the last idle (such as the wrap-up request) starts a new turn.
-  if (!lastIdle || lastUserMessage > lastIdle.index) return { state: "working" };
-  if (lastIdle.reason === "budget_reached") return { state: "budget" };
-  if (lastIdle.reason === "requires_action") return { state: "blocked" };
-  if (lastIdle.reason === "end_turn" && open.size === 0 && lastIdle.index > lastRunEnd) return { state: "done" };
-  return { state: "working", reason: lastIdle.reason };
-}
-
 function finalText(events) {
   const messages = events.filter((e) => e.type === "agent.message" && !e.session_thread_id);
   const last = messages.at(-1) ?? events.filter((e) => e.type === "agent.message").at(-1);
@@ -436,12 +420,14 @@ async function main() {
     ],
   });
   liveSession = session.id;
-  console.log(`Session ${session.id} started for ${REPO}#${PR_NUMBER} (budget ${dollars(BUDGET_CENTS)}).`);
+  console.log(`Session ${session.id} started: ${sessionPrefix(REPO, TARGET, PR_NUMBER).trim()} (budget ${dollars(BUDGET_CENTS)}).`);
   await say(session.id, manifest(pr, slices, skipped));
 
   const deadline = Date.now() + TIMEOUT_MS;
   const wrapUpCents = Number(BUDGET_CENTS) * WRAP_UP_AT;
   let askedToWrapUp = false;
+  let interrupted = false;
+  let reminded = false;
   let verdict = { state: "working" };
   let events = [];
   let seen = 0;
@@ -455,7 +441,7 @@ async function main() {
       console.log(`  spent ${dollars(spent)}: asking the agent to stop its runs and report.`);
       await say(session.id, "The budget is nearly spent. Stop your workflow runs now, start no new agents, and write the final report from the findings that a prover has already confirmed. List everything unfinished in not_covered.").catch((err) => console.log(`  wrap-up message failed: ${err.message}`));
     }
-    if (current.status !== "idle") continue;
+    if (current.status !== "idle" && current.status !== "running") continue;
     events = await listEvents(session.id);
     const fresh = events.slice(seen);
     seen = events.length;
@@ -464,8 +450,24 @@ async function main() {
       if (e.type === "workflow_run.created") console.log(`  run started: ${e.name} (${(e.phases || []).map((p) => p.name).join(" -> ")})`);
       if (e.type === "workflow_run.status_ended") console.log(`  run ended: ${JSON.stringify(e.result)}`);
     }
-    verdict = assess(events);
-    if (verdict.state !== "working") break;
+    verdict = assess(events, { stallMs: STALL_MS });
+    if (current.status === "running") {
+      // An interrupt ends the frozen turn; the idle that follows has no report, which the
+      // no_report branch below answers with one reminder.
+      if (verdict.state === "stalled" && !interrupted) {
+        interrupted = true;
+        console.log(`  the lead has been silent ${STALL_MS / 60000} minutes since the workflow ended: interrupting it.`);
+        await client.beta.sessions.events.send(session.id, { events: [{ type: "user.interrupt" }] }).catch((err) => console.log(`  interrupt failed: ${err.message}`));
+      }
+      continue;
+    }
+    if (verdict.state === "no_report" && !reminded) {
+      reminded = true;
+      console.log("  idle without a report: asking the lead to write it.");
+      await say(session.id, REPORT_NOW).catch((err) => console.log(`  reminder failed: ${err.message}`));
+      continue;
+    }
+    if (verdict.state !== "working" && verdict.state !== "stalled") break;
   }
 
   if (verdict.state === "working" && verdict.reason === "retries_exhausted") {
@@ -473,7 +475,8 @@ async function main() {
     throw new Error(`Session ${session.id} stopped with retries_exhausted. Last errors: ${errors.join(" | ") || "none logged"}`);
   }
   let note = "";
-  if (verdict.state === "working") note = `Timed out after ${TIMEOUT_MS / 60000} minutes before the review finished.`;
+  if (verdict.state === "working" || verdict.state === "stalled") note = `Timed out after ${TIMEOUT_MS / 60000} minutes before the review finished.`;
+  if (verdict.state === "no_report") note = "The workflow finished, but the agent wrote no report, even after one reminder.";
   if (verdict.state === "budget") note = `Stopped at the ${dollars(BUDGET_CENTS)} session budget before the review finished.`;
   if (verdict.state === "blocked") throw new Error(`Session ${session.id} is waiting on a tool confirmation; check the agent's permission policy.`);
   const finished = verdict.state === "done";
