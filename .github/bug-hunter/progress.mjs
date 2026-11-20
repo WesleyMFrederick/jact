@@ -34,6 +34,8 @@ export function assess(events, { now = Date.now(), stallMs = 3 * 60_000 } = {}) 
   }
   if (lastIdle.reason === "budget_reached") return { state: "budget" };
   if (lastIdle.reason === "requires_action") return { state: "blocked" };
+  // The docs leave a refusal for the caller to handle; waiting cannot change it.
+  if (lastIdle.reason === "refusal") return { state: "refused" };
   if (lastIdle.reason === "end_turn" && runsDone && lastIdle.index > lastRunEnd) return { state: reported ? "done" : "no_report" };
   // The lead may end its turn while a run is still open; the run's end should wake it. If it stays
   // silent for stallMs after that, it is idle with no report (seen in Bug Hunter's PR #135 review).

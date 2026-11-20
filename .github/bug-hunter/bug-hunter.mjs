@@ -366,6 +366,13 @@ async function postReview(pr, files, report, { sessionId, note, finished, cost }
 // ---------- Main ----------
 
 let liveSession; // the session to stop if this process is cancelled or crashes
+// Files API uploads outlive their session, so every exit path deletes the ones that succeeded,
+// including uploads that finished before another setup step failed.
+const uploadedIds = [];
+async function deleteUploads() {
+  const ids = uploadedIds.splice(0);
+  await Promise.all(ids.map((id) => client.beta.files.delete(id).catch(() => {})));
+}
 
 // REPORT_FILE gets one JSON record per run, including runs that end before a session starts.
 function saveReport(pr, fields) {
@@ -395,7 +402,11 @@ async function main() {
   const [agentId, environmentId, uploads] = await Promise.all([
     ensureAgent(),
     ensureEnvironment(),
-    Promise.all(slices.map(async (s) => client.beta.files.upload({ file: await toFile(Buffer.from(s.text), `${s.id}.diff`, { type: "text/plain" }) }))),
+    Promise.all(slices.map(async (s) => {
+      const u = await client.beta.files.upload({ file: await toFile(Buffer.from(s.text), `${s.id}.diff`, { type: "text/plain" }) });
+      uploadedIds.push(u.id);
+      return u;
+    })),
   ]);
 
   const session = await client.beta.sessions.create({
@@ -473,6 +484,7 @@ async function main() {
   if (verdict.state === "working" || verdict.state === "stalled") note = `Timed out after ${TIMEOUT_MS / 60000} minutes before the review finished.`;
   if (verdict.state === "no_report") note = "The workflow finished, but the agent wrote no report, even after one reminder.";
   if (verdict.state === "budget") note = `Stopped at the ${dollars(BUDGET_CENTS)} session budget before the review finished.`;
+  if (verdict.state === "refused") throw new Error(`Session ${session.id} stopped with a refusal, so this PR has not been checked.`);
   if (verdict.state === "blocked") throw new Error(`Session ${session.id} is waiting on a tool confirmation; check the agent's permission policy.`);
   const finished = verdict.state === "done";
   // Archive in every case: a finished session has nothing left to do, and an unfinished one
@@ -480,6 +492,8 @@ async function main() {
   if (!finished) await stopSession(session.id);
   else await client.beta.sessions.archive(session.id).catch((err) => console.log(`  could not archive ${session.id}: ${err.message}`));
   liveSession = undefined;
+  // A report can land between the last poll and the stop, so read the events once more.
+  if (!finished) events = await listEvents(session.id).catch(() => events);
 
   const cost = await costReport(session.id).catch((err) => ({ table: `Cost unavailable: ${err.message}` }));
   console.log(`\nCost:\n${cost.table}\n`);
@@ -494,7 +508,7 @@ async function main() {
   await postReview(pr, files, report, { sessionId: session.id, note, finished, cost });
   saveReport(pr, { session: session.id, agent: agentId, finished, note, cost_usd: cost.total === undefined ? null : Number(cost.total) / 100, report });
 
-  await Promise.all(uploads.map((u) => client.beta.files.delete(u.id).catch(() => {})));
+  await deleteUploads();
 
   const threshold = SEVERITY_RANK[FAIL_ON] ?? SEVERITY_RANK.high;
   const blocking = report.findings.filter((f) => (SEVERITY_RANK[f.severity] ?? 0) >= threshold);
@@ -513,6 +527,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
       console.log(`${signal}: stopping session ${liveSession}.`);
       await stopSession(liveSession, { quick: true });
     }
+    await deleteUploads();
     process.exit(2);
   });
 }
@@ -521,5 +536,6 @@ main().catch(async (err) => {
   console.error(`::error title=Bug Hunter failed::${err.message.split("\n")[0]}`);
   console.error(err);
   if (liveSession) await stopSession(liveSession);
+  await deleteUploads();
   process.exit(2);
 });

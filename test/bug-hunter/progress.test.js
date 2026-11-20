@@ -38,6 +38,11 @@ const idledEarly = [
 ];
 
 describe("assess", () => {
+	it("reports a refusal at once instead of polling until the deadline", () => {
+		const refused = [...run3.slice(0, 1), ev("session.status_idle", "01:26:40", { stop_reason: { type: "refusal" } })];
+		expect(assess(refused, opts("01:26:50")).state).toBe("refused");
+	});
+
 	it("asks for the report when the lead idled before the run ended and never woke", () => {
 		expect(assess(idledEarly, opts("02:00:00")).state).toBe("no_report");
 	});

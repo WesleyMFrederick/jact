@@ -16,14 +16,14 @@ The slide's rule is "no agent reviews its own finding". Every step after the fir
 4. **Prove.** A fresh prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap.
 5. **Report.** Only confirmed findings come back.
 
-Steps 2 to 5 live in `system-prompt.md`. The agent runs them as a Managed Agents **dynamic workflow**: a small program that runs many agents in phases, which the server runs in the background. The lead agent only gets a short manifest (title, description, slice paths), never the full diff, and is told to start the workflow before reading anything.
+Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to%20work). The agent runs them as a Managed Agents **dynamic workflow**: a small program that runs many agents in phases, which the server runs in the background. The lead agent only gets a short manifest (title, description, slice paths), never the full diff, and is told to start the workflow before reading anything.
 
 `bug-hunter.mjs` handles the plumbing:
 
 - It finds or creates the agent and its cloud environment. Each name carries a hash of its config, so editing `system-prompt.md` creates a new agent instead of changing the old one.
 - It starts a session with the repo mounted at the PR head commit, the slice files beside it, and a cost cap.
 - It polls until every workflow run has ended and the session is idle with `end_turn`. That is the documented definition of done. At 75% of the budget it tells the agent to stop its runs and report what is already confirmed.
-- If the CI job is cancelled or crashes, it stops and archives the session so nothing keeps spending.
+- If the CI job is cancelled or crashes, it stops and archives the session so nothing keeps spending. A job killed with no signal (SIGKILL, a lost runner) runs no cleanup: that session spends until its budget cap, or until the next Bug Hunter run for the same PR stops it.
 - It posts one PR review. Findings on changed lines become inline comments, and the rest go in the review body. It prints a cost table (per agent role and model) in the job log and the job summary.
 
 ## Setup
@@ -31,7 +31,8 @@ Steps 2 to 5 live in `system-prompt.md`. The agent runs them as a Managed Agents
 1. Connect GitHub Actions to Anthropic with [Workload Identity Federation](https://platform.claude.com/docs/en/manage-claude/wif-providers/github-actions.md). No API key is created or stored. Each run, GitHub signs a short-lived token that says "this is a `pull_request` run of WesleyMFrederick/jact", and Anthropic trades it for a 10-minute access token.
    1. In the Claude Console, go to **Settings → Workload identity → Connect workload** and select **GitHub Actions**.
    2. Use these values: issuer `https://token.actions.githubusercontent.com` (discovery), audience `https://api.anthropic.com`, subject prefix `repo:WesleyMFrederick/jact:pull_request`, claim `repository_owner` = `WesleyMFrederick`, scope `workspace:developer`, lifetime `600`.
-   3. Copy the four IDs the wizard shows into repo variables. They are identifiers, not secrets:
+   3. The rule trusts every `pull_request` job in this repo, not only Bug Hunter's: anyone who can push a branch here can add a workflow that gets a token. A claim on the workflow file does not close this, because a PR can edit that file too. Keep push access to people you would trust with the Anthropic workspace.
+   4. Copy the four IDs the wizard shows into repo variables. They are identifiers, not secrets:
       ```bash
       gh variable set ANTHROPIC_FEDERATION_RULE_ID -R WesleyMFrederick/jact --body fdrl_...
       gh variable set ANTHROPIC_SERVICE_ACCOUNT_ID -R WesleyMFrederick/jact --body svac_...
