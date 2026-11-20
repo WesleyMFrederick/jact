@@ -229,6 +229,14 @@ The tracked, canonical design documentation is the [jact Living Specification](d
 
 **When modifying components**: update the living specification and the affected module spec in the same PR. The old component guides (local-only `design-docs/component-guides/`, banner-marked deprecated 2026-07-01) are not a source of truth.
 
+### Documentation audit checklist
+
+When asked to audit or correct documentation, read the [documentation audit prompt](docs/agents/documentation-audit-prompt.md#Documentation%20audit%20prompt).
+
+- [ ] Check claims against code, tests, or public records. Flag anything you cannot verify.
+- [ ] Recheck links without local-only files. If asked to fix findings, correct the maintained docs and verify the fixes.
+- [ ] Report what you reviewed, what you checked, and what remains uncertain.
+
 ## Path Resolution Strategy
 
 For a standard Markdown link, the tool tries these path resolution strategies (in order):
