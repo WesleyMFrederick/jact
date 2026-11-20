@@ -1,3 +1,7 @@
+---
+created: 2026-11-19T11:50:56
+last_modified: 2026-11-19T17:21:49
+---
 # Bug Hunter
 
 Bug Hunter is a multi-agent PR review that runs on Claude Managed Agents and posts its confirmed findings as a PR review. It follows the "Bug hunter" flow from the AI Engineer NYC 2026 workshop *Why One AI Agent Isn't Enough (And How to Run 1,000)* by CJ Avilla and Harrison Stall (chapter at 1:04:45).
@@ -80,7 +84,21 @@ ant auth login   # or any credential the SDK resolves; never write a key to a .e
 GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=WesleyMFrederick/jact PR_NUMBER=128 DRY_RUN=1 node bug-hunter.mjs
 ```
 
-`DRY_RUN=1` prints the review instead of posting it.
+`DRY_RUN=1` prints the review instead of posting it. `PLAN_ONLY=1` prints the slices and the agent's first message, then stops before any Anthropic call, so it costs nothing.
+
+### Exam mode: replay a fixed commit range
+
+To score a newer Bug Hunter against an answer key written for an old snapshot, give the range instead of a pull request number. Both values must be full 40-character SHAs:
+
+```bash
+GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=WesleyMFrederick/jact \
+  BASE_SHA=<base sha> HEAD_SHA=<head sha> REPORT_FILE=/path/outside/the/repo/report.json \
+  node bug-hunter.mjs
+```
+
+Exam mode never posts a review. It describes the change with the commit subjects inside the range, so no later commit or pull request text reaches the agent. Each exam's session title carries its own prefix and a run label (`RUN_LABEL`, default a timestamp), so exams and CI runs never stop each other, and several exams on one snapshot can run at once. GitHub's compare API returns at most 300 files, and exam mode refuses a larger range. `REPORT_FILE` saves the report, session id, agent, model and cost as JSON; keep it outside this repo.
+
+The sandbox still holds the repository's git history. Before scoring an exam run, scan its session events for commits made after `HEAD_SHA`; a hit means the run saw the future and its score does not count.
 
 ## Inspect a past run
 

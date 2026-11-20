@@ -16,7 +16,11 @@
 // in CI the Workload Identity Federation vars (no stored key); locally ANTHROPIC_API_KEY.
 // Optional: REPO_TOKEN (repo mount, private repos only; never set by default), BUG_HUNTER_MODEL,
 // BUDGET_CENTS (default 1500 = $15.00), FAIL_ON (high|medium|low|none, default high),
-// TIMEOUT_MINUTES (default 50), DRY_RUN=1 (print the review instead of posting it).
+// TIMEOUT_MINUTES (default 50), DRY_RUN=1 (print the review instead of posting it),
+// PLAN_ONLY=1 (print the slices and manifest, then stop before any Anthropic call; costs $0),
+// REPORT_FILE (write the report, session id, cost and model as JSON to this path).
+// Exam mode: BASE_SHA and HEAD_SHA instead of PR_NUMBER review a fixed commit range and never
+// post (see target.mjs).
 //
 // Exit codes: 0 no blocking findings, 1 blocking findings, 2 the review itself failed.
 
@@ -25,7 +29,9 @@ import { readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic, { toFile } from "@anthropic-ai/sdk";
+import { assess } from "./progress.mjs";
 import { parseReport } from "./report.mjs";
+import { compareToPr, reviewTarget, sessionPrefix } from "./target.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const env = (name, fallback) => {
@@ -35,7 +41,8 @@ const env = (name, fallback) => {
 };
 
 const REPO = env("GITHUB_REPOSITORY");
-const PR_NUMBER = Number(env("PR_NUMBER"));
+const TARGET = reviewTarget(process.env);
+const PR_NUMBER = TARGET.exam ? undefined : Number(env("PR_NUMBER"));
 const GITHUB_TOKEN = env("GITHUB_TOKEN");
 // The agent's sandbox gets no GitHub credential by default: a public repo clones without one.
 // Set REPO_TOKEN (a read-only, single-repo token) only for a private repo.
@@ -44,10 +51,16 @@ const MODEL = process.env.BUG_HUNTER_MODEL || "claude-opus-5-5";
 const BUDGET_CENTS = String(Number(process.env.BUDGET_CENTS || 1500));
 const FAIL_ON = process.env.FAIL_ON || "high";
 const TIMEOUT_MS = Number(process.env.TIMEOUT_MINUTES || 50) * 60_000;
-const DRY_RUN = process.env.DRY_RUN === "1";
+const DRY_RUN = TARGET.exam || process.env.DRY_RUN === "1";
+const PLAN_ONLY = process.env.PLAN_ONLY === "1";
+const REPORT_FILE = process.env.REPORT_FILE || undefined;
 const MOUNT_PATH = "/workspace/repo";
 const SLICE_DIR = "/workspace/slices";
 const POLL_MS = 15_000;
+// After the last workflow run ends, the lead normally reports within seconds. Silence this long
+// means it froze (exam 1, sesn_0169BWdXnQa1HrxFhqPuvxR1), so the runner interrupts it once.
+const STALL_MS = 3 * 60_000;
+const REPORT_NOW = "Your workflow run has finished. Write the final report now from the findings a prover confirmed, in the required JSON format.";
 // At this share of the budget, the runner asks the agent to stop its runs and report,
 // so the final report is never the request that runs out of money.
 const WRAP_UP_AT = 0.75;
@@ -98,6 +111,17 @@ async function gh(path, { method = "GET", body, accept = "application/vnd.github
     throw err;
   }
   return res.json();
+}
+
+// The pull request and its files, or in exam mode the frozen range shaped like one.
+async function loadTarget() {
+  if (TARGET.exam) return compareToPr(await gh(`/repos/${REPO}/compare/${TARGET.base}...${TARGET.head}`), TARGET);
+  const pr = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
+  const files = await prFiles();
+  // The PR object and its file list come from two calls; a push between them would mix two heads.
+  const recheck = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
+  if (recheck.head.sha !== pr.head.sha) throw new Error(`PR head moved from ${pr.head.sha} to ${recheck.head.sha} during setup; the newer push's run reviews it.`);
+  return { pr, files };
 }
 
 async function prFiles() {
@@ -204,10 +228,10 @@ async function ensureEnvironment() {
 
 function manifest(pr, slices, skipped) {
   return [
-    `Review pull request #${PR_NUMBER} in ${REPO}: "${pr.title}".`,
-    `Repository: ${MOUNT_PATH}, checked out at the PR head commit ${pr.head.sha} (base ${pr.base.ref} at ${pr.base.sha}).`,
+    TARGET.exam ? `Review the changes in ${REPO} from ${pr.base.sha} to ${pr.head.sha}.` : `Review pull request #${PR_NUMBER} in ${REPO}: "${pr.title}".`,
+    `Repository: ${MOUNT_PATH}, checked out at the ${TARGET.exam ? "head" : "PR head"} commit ${pr.head.sha} (base ${pr.base.ref} at ${pr.base.sha}).`,
     "",
-    "PR description:",
+    TARGET.exam ? "Change description:" : "PR description:",
     (pr.body || "(none)").slice(0, 4000),
     "",
     "Slices (each is a unified diff file already in the sandbox):",
@@ -222,27 +246,6 @@ async function listEvents(sessionId) {
   const events = [];
   for await (const event of client.beta.sessions.events.list(sessionId)) events.push(event);
   return events;
-}
-
-// Done when every run seen has ended, and after that the session idled with end_turn.
-// https://platform.claude.com/docs/en/managed-agents/workflow-runs#know-when-the-work-is-done
-function assess(events) {
-  const open = new Set();
-  let lastRunEnd = -1;
-  let lastIdle;
-  let lastUserMessage = -1;
-  events.forEach((e, i) => {
-    if (e.type === "user.message") lastUserMessage = i;
-    if (e.type === "workflow_run.created") open.add(e.workflow_run_id);
-    if (e.type === "workflow_run.status_ended") { open.delete(e.workflow_run_id); lastRunEnd = i; }
-    if (e.type === "session.status_idle") lastIdle = { index: i, reason: e.stop_reason?.type };
-  });
-  // A message sent after the last idle (such as the wrap-up request) starts a new turn.
-  if (!lastIdle || lastUserMessage > lastIdle.index) return { state: "working" };
-  if (lastIdle.reason === "budget_reached") return { state: "budget" };
-  if (lastIdle.reason === "requires_action") return { state: "blocked" };
-  if (lastIdle.reason === "end_turn" && open.size === 0 && lastIdle.index > lastRunEnd) return { state: "done" };
-  return { state: "working", reason: lastIdle.reason };
 }
 
 function finalText(events) {
@@ -278,7 +281,7 @@ async function stopSession(sessionId, { quick = false } = {}) {
 // A cancelled or crashed earlier run can leave its session alive and spending.
 // Stop any live Bug Hunter session for this PR before starting a new one.
 async function stopStaleSessions() {
-  const prefix = `Bug Hunter ${REPO}#${PR_NUMBER} `;
+  const prefix = sessionPrefix(REPO, TARGET, PR_NUMBER);
   let checked = 0;
   for await (const s of client.beta.sessions.list()) {
     if (++checked > 200) break;
@@ -367,13 +370,13 @@ let liveSession; // the session to stop if this process is cancelled or crashes
 async function main() {
   await refreshGithubIdToken();
   setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
-  const pr = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
-  const files = await prFiles();
-  // The PR object and its file list come from two calls; a push between them would mix two heads.
-  const recheck = await gh(`/repos/${REPO}/pulls/${PR_NUMBER}`);
-  if (recheck.head.sha !== pr.head.sha) throw new Error(`PR head moved from ${pr.head.sha} to ${recheck.head.sha} during setup; the newer push's run reviews it.`);
+  const { pr, files } = await loadTarget();
   const { slices, skipped } = planSlices(files);
   console.log(`Slices: ${slices.map((s) => `${s.id}=${s.lines} lines/${s.files.length} files`).join(", ") || "none"}; skipped ${skipped.length} files.`);
+  if (PLAN_ONLY) {
+    console.log(`PLAN_ONLY: no session started.\n\n${manifest(pr, slices, skipped)}`);
+    return;
+  }
   if (!slices.length) {
     await postReview(pr, files, { summary: "Nothing to review: this PR changes only lockfiles, build output, planning docs, or removed or binary files.", findings: [] }, { finished: true });
     return;
@@ -389,7 +392,7 @@ async function main() {
   const session = await client.beta.sessions.create({
     agent: agentId,
     environment_id: environmentId,
-    title: `Bug Hunter ${REPO}#${PR_NUMBER} @ ${pr.head.sha.slice(0, 7)}`,
+    title: `${sessionPrefix(REPO, TARGET, PR_NUMBER)}@ ${pr.head.sha.slice(0, 7)}`,
     budget: { type: "limit", max_list_cost: { amount: BUDGET_CENTS, currency: "USD" } },
     resources: [
       {
@@ -403,12 +406,14 @@ async function main() {
     ],
   });
   liveSession = session.id;
-  console.log(`Session ${session.id} started for ${REPO}#${PR_NUMBER} (budget ${dollars(BUDGET_CENTS)}).`);
+  console.log(`Session ${session.id} started: ${sessionPrefix(REPO, TARGET, PR_NUMBER).trim()} (budget ${dollars(BUDGET_CENTS)}).`);
   await say(session.id, manifest(pr, slices, skipped));
 
   const deadline = Date.now() + TIMEOUT_MS;
   const wrapUpCents = Number(BUDGET_CENTS) * WRAP_UP_AT;
   let askedToWrapUp = false;
+  let interrupted = false;
+  let reminded = false;
   let verdict = { state: "working" };
   let events = [];
   let seen = 0;
@@ -422,7 +427,7 @@ async function main() {
       console.log(`  spent ${dollars(spent)}: asking the agent to stop its runs and report.`);
       await say(session.id, "The budget is nearly spent. Stop your workflow runs now, start no new agents, and write the final report from the findings that a prover has already confirmed. List everything unfinished in not_covered.").catch((err) => console.log(`  wrap-up message failed: ${err.message}`));
     }
-    if (current.status !== "idle") continue;
+    if (current.status !== "idle" && current.status !== "running") continue;
     events = await listEvents(session.id);
     const fresh = events.slice(seen);
     seen = events.length;
@@ -431,8 +436,24 @@ async function main() {
       if (e.type === "workflow_run.created") console.log(`  run started: ${e.name} (${(e.phases || []).map((p) => p.name).join(" -> ")})`);
       if (e.type === "workflow_run.status_ended") console.log(`  run ended: ${JSON.stringify(e.result)}`);
     }
-    verdict = assess(events);
-    if (verdict.state !== "working") break;
+    verdict = assess(events, { stallMs: STALL_MS });
+    if (current.status === "running") {
+      // An interrupt ends the frozen turn; the idle that follows has no report, which the
+      // no_report branch below answers with one reminder.
+      if (verdict.state === "stalled" && !interrupted) {
+        interrupted = true;
+        console.log(`  the lead has been silent ${STALL_MS / 60000} minutes since the workflow ended: interrupting it.`);
+        await client.beta.sessions.events.send(session.id, { events: [{ type: "user.interrupt" }] }).catch((err) => console.log(`  interrupt failed: ${err.message}`));
+      }
+      continue;
+    }
+    if (verdict.state === "no_report" && !reminded) {
+      reminded = true;
+      console.log("  idle without a report: asking the lead to write it.");
+      await say(session.id, REPORT_NOW).catch((err) => console.log(`  reminder failed: ${err.message}`));
+      continue;
+    }
+    if (verdict.state !== "working" && verdict.state !== "stalled") break;
   }
 
   if (verdict.state === "working" && verdict.reason === "retries_exhausted") {
@@ -440,7 +461,8 @@ async function main() {
     throw new Error(`Session ${session.id} stopped with retries_exhausted. Last errors: ${errors.join(" | ") || "none logged"}`);
   }
   let note = "";
-  if (verdict.state === "working") note = `Timed out after ${TIMEOUT_MS / 60000} minutes before the review finished.`;
+  if (verdict.state === "working" || verdict.state === "stalled") note = `Timed out after ${TIMEOUT_MS / 60000} minutes before the review finished.`;
+  if (verdict.state === "no_report") note = "The workflow finished, but the agent wrote no report, even after one reminder.";
   if (verdict.state === "budget") note = `Stopped at the ${dollars(BUDGET_CENTS)} session budget before the review finished.`;
   if (verdict.state === "blocked") throw new Error(`Session ${session.id} is waiting on a tool confirmation; check the agent's permission policy.`);
   const finished = verdict.state === "done";
@@ -461,6 +483,10 @@ async function main() {
     report = { summary: "No report: the review did not finish, so this PR has not been checked.", findings: [] };
   }
   await postReview(pr, files, report, { sessionId: session.id, note, finished, cost });
+  if (REPORT_FILE) {
+    writeFileSync(REPORT_FILE, `${JSON.stringify({ repo: REPO, pr: PR_NUMBER ?? null, base: pr.base.sha, head: pr.head.sha, session: session.id, agent: agentId, model: MODEL, finished, note, cost_usd: cost.total === undefined ? null : Number(cost.total) / 100, report }, null, 2)}\n`);
+    console.log(`Report written to ${REPORT_FILE}.`);
+  }
   await Promise.all(uploads.map((u) => client.beta.files.delete(u.id).catch(() => {})));
 
   const threshold = SEVERITY_RANK[FAIL_ON] ?? SEVERITY_RANK.high;
