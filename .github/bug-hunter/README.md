@@ -13,7 +13,7 @@ The slide's rule is "no agent reviews its own finding". Every step after the fir
 1. **Split.** `bug-hunter.mjs` cuts the PR into at most 6 slices of whole files, about 400 changed lines each, in plain code. It skips lockfiles, `dist/`, snapshots, and planning docs (`docs/`, `design-docs/`, `.scratch/`). It uploads each slice as a diff file into the agent's sandbox. A PR with nothing left to review gets a short "nothing to review" comment and no session.
 2. **Read.** One agent per slice reads its diff and the code around it, and lists at most 5 suspected bugs.
 3. **Pick.** Plain code merges the suspects, drops duplicates, and keeps the top 8.
-4. **Prove.** A fresh prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap.
+4. **Prove.** A fresh prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap. From the repo root, it runs `npm ci --ignore-scripts && npm run build` before `npx vitest run <file>`: install scripts stay disabled, and the explicit build produces the untracked `dist/` needed by native CLI execution.
 5. **Report.** Only confirmed findings come back.
 
 Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to%20work). The agent runs them as a Managed Agents **dynamic workflow**: a small program that runs many agents in phases, which the server runs in the background. The lead agent only gets a short manifest (title, description, slice paths), never the full diff, and is told to start the workflow before reading anything.

@@ -10,7 +10,7 @@ Run these phases in order. **No agent reviews its own finding.**
 
 1. **Read.** One agent per slice. It reads its slice file, then reads the code that the changed lines call or are called by in the mounted repo, only as far as it needs to judge the change. It returns at most 5 suspected defects as JSON: file, line on the new side of the diff, claim, reason, and a severity guess. An empty list is a good answer.
 2. **Pick.** Plain code, not a model. Merge the suspects, drop duplicates (same file, lines within 3 of each other, same claim), rank by severity guess, and keep at most 8.
-3. **Prove.** One fresh prover agent per candidate. The prover gets only the claim, the file, and the line, not the reader's reasoning. It tries to confirm the claim against the code: trace the call path, and where it is cheap, write and run a small test or script (for this repo, `npm ci --ignore-scripts` then `npx vitest run <file>`). It returns `confirmed` or `rejected` with evidence. Keep a finding only if its prover confirmed it.
+3. **Prove.** One fresh prover agent per candidate. The prover gets only the claim, the file, and the line, not the reader's reasoning. It tries to confirm the claim against the code: trace the call path, and where it is cheap, write and run a small test or script (for this repo, run `npm ci --ignore-scripts && npm run build` from the repo root to produce `dist/`, then `npx vitest run <file>`). It returns `confirmed` or `rejected` with evidence. Keep a finding only if its prover confirmed it.
 4. **Report.** Return the confirmed findings.
 
 If an agent fails, record its slice or candidate id as not covered and keep going. If the user tells you to stop, stop your runs and report what a prover has already confirmed.
