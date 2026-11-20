@@ -6,7 +6,8 @@
 //
 // Two failures seen in exam 1 (sesn_0169BWdXnQa1HrxFhqPuvxR1) get their own states:
 // - stalled: the last run ended, the lead never woke, and no event arrived for stallMs.
-// - no_report: the session idled after the last run without a lead message (an interrupt does this).
+// - no_report: the session idled after the last run without a lead message (an interrupt does this),
+//   or idled before the last run ended and stayed silent for stallMs after it.
 // The runner answers each once: an interrupt for stalled, a "write the report" message for no_report.
 export function assess(events, { now = Date.now(), stallMs = 3 * 60_000 } = {}) {
   const open = new Set();
@@ -34,5 +35,8 @@ export function assess(events, { now = Date.now(), stallMs = 3 * 60_000 } = {}) 
   if (lastIdle.reason === "budget_reached") return { state: "budget" };
   if (lastIdle.reason === "requires_action") return { state: "blocked" };
   if (lastIdle.reason === "end_turn" && runsDone && lastIdle.index > lastRunEnd) return { state: reported ? "done" : "no_report" };
+  // The lead may end its turn while a run is still open; the run's end should wake it. If it stays
+  // silent for stallMs after that, it is idle with no report (seen in Bug Hunter's PR #135 review).
+  if (lastIdle.reason === "end_turn" && runsDone && lastRunEnd > lastIdle.index && !reported && now - lastEventAt >= stallMs) return { state: "no_report" };
   return { state: "working", reason: lastIdle.reason };
 }

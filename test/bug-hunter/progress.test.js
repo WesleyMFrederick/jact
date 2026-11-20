@@ -27,7 +27,30 @@ const interrupted = [
 	ev("session.status_idle", "01:37:41", { stop_reason: { type: "end_turn" } }),
 ];
 
+// Shape from Bug Hunter's review of PR #135: the lead ends its turn while the run is still open,
+// then never wakes after the run ends.
+const idledEarly = [
+	ev("user.message", "01:00:00"),
+	ev("workflow_run.created", "01:00:01", { workflow_run_id: "w" }),
+	ev("agent.message", "01:00:02"),
+	ev("session.status_idle", "01:00:03", { stop_reason: { type: "end_turn" } }),
+	ev("workflow_run.status_ended", "01:00:10", { workflow_run_id: "w" }),
+];
+
 describe("assess", () => {
+	it("asks for the report when the lead idled before the run ended and never woke", () => {
+		expect(assess(idledEarly, opts("02:00:00")).state).toBe("no_report");
+	});
+
+	it("gives a lead that idled early time to wake after the run ends", () => {
+		expect(assess(idledEarly, opts("01:01:00")).state).toBe("working");
+	});
+
+	it("is done when a lead that idled early wakes and reports", () => {
+		const woke = [...idledEarly, ev("agent.message", "01:00:30"), ev("session.status_idle", "01:00:31", { stop_reason: { type: "end_turn" } })];
+		expect(assess(woke, opts("01:00:40")).state).toBe("done");
+	});
+
 	it("is done when the lead reports after the workflow ends", () => {
 		expect(assess(run3, opts("01:29:30")).state).toBe("done");
 	});

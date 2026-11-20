@@ -367,6 +367,13 @@ async function postReview(pr, files, report, { sessionId, note, finished, cost }
 
 let liveSession; // the session to stop if this process is cancelled or crashes
 
+// REPORT_FILE gets one JSON record per run, including runs that end before a session starts.
+function saveReport(pr, fields) {
+  if (!REPORT_FILE) return;
+  writeFileSync(REPORT_FILE, `${JSON.stringify({ repo: REPO, pr: PR_NUMBER ?? null, base: pr.base.sha, head: pr.head.sha, model: MODEL, ...fields }, null, 2)}\n`);
+  console.log(`Report written to ${REPORT_FILE}.`);
+}
+
 async function main() {
   await refreshGithubIdToken();
   setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
@@ -378,7 +385,9 @@ async function main() {
     return;
   }
   if (!slices.length) {
-    await postReview(pr, files, { summary: "Nothing to review: this PR changes only lockfiles, build output, planning docs, or removed or binary files.", findings: [] }, { finished: true });
+    const report = { summary: "Nothing to review: this PR changes only lockfiles, build output, planning docs, or removed or binary files.", findings: [] };
+    await postReview(pr, files, report, { finished: true });
+    saveReport(pr, { session: null, agent: null, finished: true, note: "No session: every changed file is skipped.", cost_usd: 0, report });
     return;
   }
 
@@ -483,10 +492,8 @@ async function main() {
     report = { summary: "No report: the review did not finish, so this PR has not been checked.", findings: [] };
   }
   await postReview(pr, files, report, { sessionId: session.id, note, finished, cost });
-  if (REPORT_FILE) {
-    writeFileSync(REPORT_FILE, `${JSON.stringify({ repo: REPO, pr: PR_NUMBER ?? null, base: pr.base.sha, head: pr.head.sha, session: session.id, agent: agentId, model: MODEL, finished, note, cost_usd: cost.total === undefined ? null : Number(cost.total) / 100, report }, null, 2)}\n`);
-    console.log(`Report written to ${REPORT_FILE}.`);
-  }
+  saveReport(pr, { session: session.id, agent: agentId, finished, note, cost_usd: cost.total === undefined ? null : Number(cost.total) / 100, report });
+
   await Promise.all(uploads.map((u) => client.beta.files.delete(u.id).catch(() => {})));
 
   const threshold = SEVERITY_RANK[FAIL_ON] ?? SEVERITY_RANK.high;
