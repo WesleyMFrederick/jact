@@ -38,6 +38,12 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 - **WHEN** browser rendering, DOM inspection, screengrabs, or other headless browser work is required, **ALWAYS** use `ws-chromium` as the pointer to Chromium under `~/Applications`; **NEVER** infer Chromium is unavailable from a failed `open`, PATH lookup, or system Chrome launch, **BECAUSE** the pointer resolves the canonical browser source without copying launch details that drift or become stale.
 
+## Bug Hunter PR review
+
+- **WHEN** a PR needs a fresh Bug Hunter review after new commits, **ALWAYS** remove and re-add the `bug-hunt` label on a PR that is ready for review (on a draft the label does nothing; marking it ready starts a run) (`gh pr edit <N> --remove-label bug-hunt` then `--add-label bug-hunt`); **NEVER** expect a push to trigger it, **BECAUSE** each run spends up to its session budget ($15 by default), so it runs only on PR open, ready-for-review, and that label. See [Bug Hunter · When it runs](.github/bug-hunter/README.md#When%20it%20runs).
+- **WHEN** you need to know why a past Bug Hunter run found or missed a bug, **ALWAYS** read its session record from the Anthropic Console through the SDK and the local `ant` login, **NEVER** infer it from the GitHub job log alone, **BECAUSE** the log shows only counts while the session keeps every agent's suspects and verdicts. See [Bug Hunter · Inspect a past run](.github/bug-hunter/README.md#Inspect%20a%20past%20run).
+- **WHEN** you need Bug Hunter evaluation data (answer keys, run traces, committee verdicts, the scorer, measures and sensors), **ALWAYS** read and write it under `design-docs/features/20261119T132629-bug-hunter-rice/eval/` (local-only; start with `PROTOCOL.md` under `eval/pr130/committee/`). The one exception is `measures.md`, which sits in the feature folder beside `eval/`, **NEVER** commit it to this repo, **BECAUSE** jact is public and that folder lives in a private docs repo; keeping the key out of jact also keeps it out of what Bug Hunter reads.
+
 ## Delta design research
 
 - **WHEN** proposing a delta or delta hypothesis, **ALWAYS** research how established expert repositories, tools, or domain authorities already solve the same problem before choosing names or interfaces, and cite the evidence that affects the proposal, **BECAUSE** observed conventions prevent local invention and make the change predictable.
