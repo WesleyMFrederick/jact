@@ -3,8 +3,9 @@
 // Exam mode replays an old snapshot so a newer Bug Hunter can be scored against an answer key
 // written for that snapshot. Set BASE_SHA and HEAD_SHA (full 40-character SHAs; names follow
 // tj-actions/changed-files `base_sha`/`sha` and the pull_request payload's base.sha/head.sha).
-// Exam mode never posts: there is no pull request to post to, and a posted review would leak
-// the result into the repo the next exam mounts.
+// RUN_LABEL names one exam (letters, digits, - and _; default: a timestamp) so parallel exams on
+// the same snapshot get distinct session titles. Exam mode never posts: there is no pull request
+// to post to, and a posted review would leak the result into the repo the next exam mounts.
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
@@ -15,7 +16,9 @@ export function reviewTarget(env) {
   if (!FULL_SHA.test(base ?? "") || !FULL_SHA.test(head ?? "")) {
     throw new Error("Exam mode needs both BASE_SHA and HEAD_SHA as full 40-character commit SHAs.");
   }
-  return { exam: true, base, head };
+  const label = env.RUN_LABEL || Date.now().toString(36);
+  if (!/^[A-Za-z0-9_-]+$/.test(label)) throw new Error("RUN_LABEL may contain only letters, digits, - and _.");
+  return { exam: true, base, head, label };
 }
 
 // The GitHub compare API returns at most 300 files and gives no way to page past them.
@@ -42,7 +45,8 @@ export function compareToPr(compare, { base, head }) {
 }
 
 // Session titles carry this prefix; the stale-session sweep only stops sessions with the same
-// prefix, so an exam and a CI run on the same pull request never stop each other.
+// prefix, so an exam and a CI run on the same pull request never stop each other, and the label
+// (always set, trailing space included) keeps two exams from matching each other.
 export function sessionPrefix(repo, target, prNumber) {
-  return target.exam ? `Bug Hunter exam ${repo}@${target.base.slice(0, 7)}..${target.head.slice(0, 7)} ` : `Bug Hunter ${repo}#${prNumber} `;
+  return target.exam ? `Bug Hunter exam ${repo}@${target.base.slice(0, 7)}..${target.head.slice(0, 7)} #${target.label} ` : `Bug Hunter ${repo}#${prNumber} `;
 }

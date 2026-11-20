@@ -9,8 +9,16 @@ describe("reviewTarget", () => {
 		expect(reviewTarget({ PR_NUMBER: "130" })).toEqual({ exam: false });
 	});
 
-	it("enters exam mode with two full SHAs", () => {
-		expect(reviewTarget({ BASE_SHA: BASE, HEAD_SHA: HEAD })).toEqual({ exam: true, base: BASE, head: HEAD });
+	it("enters exam mode with two full SHAs and a run label", () => {
+		expect(reviewTarget({ BASE_SHA: BASE, HEAD_SHA: HEAD, RUN_LABEL: "exam3" })).toEqual({ exam: true, base: BASE, head: HEAD, label: "exam3" });
+	});
+
+	it("gives every exam a label even when none is set", () => {
+		expect(reviewTarget({ BASE_SHA: BASE, HEAD_SHA: HEAD }).label).toMatch(/^[a-z0-9]+$/);
+	});
+
+	it("rejects a label with spaces or symbols, since it goes in the session title", () => {
+		expect(() => reviewTarget({ BASE_SHA: BASE, HEAD_SHA: HEAD, RUN_LABEL: "a b" })).toThrow(/RUN_LABEL/);
 	});
 
 	it.each([
@@ -48,10 +56,17 @@ describe("compareToPr", () => {
 });
 
 describe("sessionPrefix", () => {
+	it("lets parallel exams on one snapshot leave each other alone", () => {
+		const a = sessionPrefix("o/r", { exam: true, base: BASE, head: HEAD, label: "exam3" });
+		const b = sessionPrefix("o/r", { exam: true, base: BASE, head: HEAD, label: "exam30" });
+		expect(a).toBe("Bug Hunter exam o/r@0e4b880..9f336d6 #exam3 ");
+		expect(a.startsWith(b) || b.startsWith(a)).toBe(false);
+	});
+
 	it("keeps exam sessions and pull request sessions apart", () => {
-		const exam = sessionPrefix("o/r", { exam: true, base: BASE, head: HEAD });
+		const exam = sessionPrefix("o/r", { exam: true, base: BASE, head: HEAD, label: "x" });
 		const pr = sessionPrefix("o/r", { exam: false }, 130);
-		expect(exam).toBe("Bug Hunter exam o/r@0e4b880..9f336d6 ");
+		expect(exam).toBe("Bug Hunter exam o/r@0e4b880..9f336d6 #x ");
 		expect(pr).toBe("Bug Hunter o/r#130 ");
 		expect(exam.startsWith(pr) || pr.startsWith(exam)).toBe(false);
 	});

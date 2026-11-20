@@ -96,7 +96,7 @@ GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=WesleyMFrederick/jact \
   node bug-hunter.mjs
 ```
 
-Exam mode never posts a review. It describes the change with the commit subjects inside the range, so no later commit or pull request text reaches the agent. Its sessions carry their own title prefix, so an exam and a CI run on the same pull request never stop each other. GitHub's compare API returns at most 300 files, and exam mode refuses a larger range. `REPORT_FILE` saves the report, session id, agent, model and cost as JSON; keep it outside this repo.
+Exam mode never posts a review. It describes the change with the commit subjects inside the range, so no later commit or pull request text reaches the agent. Each exam's session title carries its own prefix and a run label (`RUN_LABEL`, default a timestamp), so exams and CI runs never stop each other, and several exams on one snapshot can run at once. GitHub's compare API returns at most 300 files, and exam mode refuses a larger range. `REPORT_FILE` saves the report, session id, agent, model and cost as JSON; keep it outside this repo.
 
 The sandbox still holds the repository's git history. Before scoring an exam run, scan its session events for commits made after `HEAD_SHA`; a hit means the run saw the future and its score does not count.
 
