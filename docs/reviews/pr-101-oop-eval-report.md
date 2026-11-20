@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # PR 101 — Object-Oriented Architecture Evaluation
 
 ## Evaluation Metadata
@@ -38,7 +42,7 @@
 ## Recommendations
 
 1. Add the symlink guard from Critical Issue 1 and correct the `MovePlan.moved` comment (`:108`) to match. ([Backup Creation](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^backup-creation), [JSDoc/TSDoc on Public APIs](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^jsdoc-tsdoc-on-public-apis))
-2. Update [005 · Interfaces](../spec/005-interfaces.md#`jact%20rename%20<source...>%20<destination>`) line 126 (existing paths are literal) and line 154 (recovery is attempted step by step; recovery errors report retained backups) to match README line 172 and [Rename Workflow](../spec/006-behavior.md#Rename%20Workflow%20%28%60jact%20rename%60%29) on `dd23741`.
+2. Update [005 · Interfaces](../spec/005-interfaces.md#`jact%20rename%20<source...>%20<destination>`) line 126 (existing paths are literal) and line 154 (recovery is attempted step by step; recovery errors report retained backups) to match README line 172 and [Rename Workflow](../spec/006-behavior.md#Rename%20Workflow%20%28%60jact%20rename%60%29) on `dd23741`. Line numbers are for `dd23741`, not the current file.
 3. Move wiki-embed recognition into the parser boundary so the rename service consumes tokens, not decoded text. ([Replaceable Parts via Interfaces](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^replaceable-parts-via-interfaces), [ADR-0003 — Flavor Extension Collection](../adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection))
 4. Add docblocks to `RenameMarkdownFilesDeps` and `RenameFileChange`, and a short file-level purpose header for agents. ([Selective Documentation](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^selective-documentation), [Contextual Comments](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/object-oriented/ARCHITECTURE-PRINCIPLES.md#^contextual-comments))
 5. Optional, maintainability only: when the module next changes, split it by responsibility (see Architectural Rework below). Do not add a file-system abstraction only for elegance; the existing `--import` fault test already covers rollback without one.
@@ -47,6 +51,8 @@
 
 - [ ] Ready to proceed
 - [X] Requires revision — Critical Issue 1 remains open on current published `dd23741`. The escaped-prose false refusal and the 005 contract drift are medium and should be fixed in the same pass.
+
+**Point-in-time verdict.** This verdict records the 2026-10-06 review of `7d627ae` and `dd23741`; it is not current status. Critical Issue 1 was resolved before merge: [`5975560`](https://github.com/WesleyMFrederick/jact/commit/5975560a004b97e2cbb869ab982350b585fb8b3b) rejects symlinks inside source folders ([PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6010268465)), and PR #101 merged at that head. The escaped-prose false refusal and the 005 contract alignment were addressed after merge in [PR #103](https://github.com/WesleyMFrederick/jact/pull/103).
 
 ## Prioritized Findings
 
@@ -87,3 +93,5 @@ During this review the PR head advanced from `7d627ae` to `dd23741` ("Address PR
 - Confirmed correct: a real incoming `![[notes/p.png]]` embed refuses the move; a reference-style image definition is rewritten.
 
 Line references above are from the `7d627ae` snapshot. They match `dd23741` for all code before `rename-markdown-file.ts:695`. The `commitPlan` region shifted (`dd23741:697-815`).
+
+Evidence availability: the parent-observed probes and test runs above come from a private session that is not published. The public record of the same `dd23741` state is the [PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6009994670) (literal-path and rollback fixes, symlink defect reproduced, 16 rename tests passing).

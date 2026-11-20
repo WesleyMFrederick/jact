@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # PR 101 TypeScript Principles Evaluation
 
 ## Evaluation Metadata
@@ -26,7 +30,7 @@
 
 | Category | Status | Details |
 |---|---|---|
-| [TypeScript Coding Style](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/typescript/typescript-principles.md#TypeScript%20Coding%20Style) | ✅ | `.js` import suffixes, `import type` for `Root`, `FileCache`, `ParsedFileCache`, `LinkObject` (`rename-markdown-file.ts:16-26`); static imports only (`jact-cli.ts:12` adds `isDynamicPattern` statically); no `any`; `const` by default with `let` only for try/catch assignment (`:151`, `:516`). Minor: the `/\.md$/i` literal repeats at `:157`, `:362`, `:405`, `:559` with no named constant. The pi-specific tsgo and Biome-gate bullets do not apply to jact. |
+| [TypeScript Coding Style](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/typescript/typescript-principles.md#TypeScript%20Coding%20Style) | ✅ | `.js` import suffixes, `import type` for `Root`, `FileCache`, `ParsedFileCache`, `LinkObject` (`rename-markdown-file.ts:16-26`); static imports only (`jact-cli.ts:12` adds `isDynamicPattern` statically); no `any`; `const` by default, with `let` only for reassigned bindings: try/catch assignment (`:151`, `:516`) and loop or accumulator variables (`:174`, `:236-237`, `:294`, `:373`). Minor: the `/\.md$/i` literal repeats at `:157`, `:362`, `:405`, `:559` with no named constant. The pi-specific tsgo and Biome-gate bullets do not apply to jact. |
 | [Architecture Patterns](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/typescript/typescript-principles.md#Architecture%20Patterns) | ❌ | Good: planning (`planMoves`, `planFiles`) is separated from side effects (`commitPlan`). Violation: `brokenEmbeds` (`:542-549`) re-tokenizes Markdown source with a regex over decoded `text` node values. The repo pattern is ADR-0003 rule 1: a construct in Markdown source gets a tokenizer extension. Parent-observed: escaped prose `\!\[\[notes/p.png\]\]` makes a folder move fail with the image-embed refusal (exit 1). `RenameMove` uses a `kind` literal, but `movedFiles` is not tied to the `directory` variant (`:51-57`). |
 | [File Organization](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/typescript/typescript-principles.md#File%20Organization) | ❌ | Kebab-case is kept, but the self-contained name drifted: `rename-markdown-file.ts` now exports `renameMarkdownFiles`, `RenameRequest`, and directory moves. The module (843 lines) holds four cohesive concerns: move planning, link rewriting, embed safety, and commit/rollback. The principle allows one file when concerns are cohesive, so a split is optional. No `test/core/` mirror; coverage is CLI integration only (pre-existing pattern). |
 | [Interface Design](https://github.com/WesleyMFrederick/0-documents/blob/main/markdown-documents/architecture-principles/typescript/typescript-principles.md#Interface%20Design) | ❌ | The README and spec contract promised all-or-nothing apply and literal source paths; the published code broke both (Already Mitigated 1–2). `RenameMarkdownFilesResult.source`/`destination` are linked optionals ("present only for a single-file request", `:59-66`) instead of a union, so `cli.ts:407` must check both fields and `cli.ts:416` tests `movedFiles === undefined` instead of narrowing on `kind`. `export interface` for object shapes follows the principle. |
@@ -50,6 +54,8 @@
 
 - [ ] Ready to proceed
 - [X] Requires revision — Critical 1 is open on published `7d627ae` and on `dd23741`. The two other published P1 defects are fixed in `dd23741` but not in the published commit under review.
+
+**Point-in-time verdict.** This verdict records the 2026-10-06 review of `7d627ae` and `dd23741`; it is not current status. Critical 1 was resolved before merge: [`5975560`](https://github.com/WesleyMFrederick/jact/commit/5975560a004b97e2cbb869ab982350b585fb8b3b) rejects symlinks inside source folders ([PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6010268465)), and PR #101 merged at that head. The escaped-prose false refusal was fixed after merge in [PR #103](https://github.com/WesleyMFrederick/jact/pull/103).
 
 ## Prioritized Findings
 
@@ -96,3 +102,5 @@ The PR moved forward during this review. The current published head is `dd23741`
 Verdict for the current PR `dd23741`: requires revision, because Critical 1 is still open.
 
 Parent revalidation against the `dd23741` build: `npm run build` passes and the rename suite passes 16/16. In the CLI probes, the bracket-path source moves only the literal file. The symlink to a file outside the scope still creates a regular `archive/secret.md` and exits 0. Escaped prose still gets a false refusal (exit 1). A real wiki embed is still refused correctly. The reference-style image definition is rewritten correctly.
+
+Evidence availability: the parent-observed probes and test runs above come from a private session that is not published. The public record of the same `dd23741` state is the [PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6009994670) (literal-path and rollback fixes, symlink defect reproduced, 16 rename tests passing).
