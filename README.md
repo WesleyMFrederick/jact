@@ -310,7 +310,7 @@ Prints the parsed Markdown tree, detected links, headings, and anchors as JSON.
 
 **Heading anchors use the exact heading text.** Write `#Getting%20Started` (or `#Getting Started` inside wiki links), not the lowercase slug `#getting-started`. jact reports slugs as errors and suggests the exact form; `--fix` rewrites them. This matches how Obsidian resolves links.
 
-With the `obsidian` preset (see [Validation presets](#Validation presets)), jact also reports heading links that contain characters Obsidian removes from links, such as `:`, and suggests the corrected anchor.
+With the `obsidian` preset (see [Validation presets](#Validation%20presets)), jact also reports heading links that contain characters Obsidian removes from links, such as `:`, and suggests the corrected anchor.
 
 ## How links are resolved
 

@@ -267,10 +267,10 @@ The tool supports multiple path resolution strategies (in order):
 3. Add factory method if new component created
 4. Wire through CLI orchestrator
 5. Add tests in `test/` mirroring source structure
-6. Update the [jact Living Specification](docs/spec/SPEC.md#jact Living Specification) (component guides in `design-docs/component-guides/` are deprecated)
+6. Update the [jact Living Specification](docs/spec/SPEC.md#jact%20Living%20Specification) (component guides in `design-docs/component-guides/` are deprecated)
 
 ### When Fixing Bugs:
-1. Check the [jact Living Specification](docs/spec/SPEC.md#jact Living Specification) for expected behavior
+1. Check the [jact Living Specification](docs/spec/SPEC.md#jact%20Living%20Specification) for expected behavior
 2. Write failing test first (TDD approach)
 3. Fix implementation
 4. Verify all tests pass

@@ -82,3 +82,5 @@ test/
 ├── scratch/           # Proofs of concept and benchmarks
 └── *.test.{js,ts}     # Older top-level suites
 ```
+
+Regression test files follow the [Naming Convention](regressions/README.md#Naming%20Convention).
