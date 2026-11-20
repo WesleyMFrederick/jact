@@ -25,6 +25,7 @@ import { readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Anthropic, { toFile } from "@anthropic-ai/sdk";
+import { parseReport } from "./report.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const env = (name, fallback) => {
@@ -248,21 +249,6 @@ function finalText(events) {
   const messages = events.filter((e) => e.type === "agent.message" && !e.session_thread_id);
   const last = messages.at(-1) ?? events.filter((e) => e.type === "agent.message").at(-1);
   return (last?.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-}
-
-function parseReport(text) {
-  const blocks = [...text.matchAll(/```json\s*\n([\s\S]*?)```/g)];
-  if (!blocks.length) throw new Error(`Agent's final message has no json block:\n${text.slice(-2000)}`);
-  const report = JSON.parse(blocks.at(-1)[1]);
-  // A report that breaks the schema is a failed review, not a clean one.
-  if (!report || !Array.isArray(report.findings)) throw new Error("Agent's report has no findings array.");
-  for (const f of report.findings) {
-    if (!["high", "medium", "low"].includes(f?.severity) || typeof f.file !== "string" || typeof f.title !== "string" || !Number.isInteger(Number(f.line))) {
-      throw new Error(`Agent's report has an invalid finding: ${JSON.stringify(f).slice(0, 300)}`);
-    }
-  }
-  if (report.not_covered !== undefined && !Array.isArray(report.not_covered)) throw new Error("Agent's report has a non-array not_covered.");
-  return report;
 }
 
 const say = (sessionId, text) =>
