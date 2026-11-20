@@ -6,7 +6,7 @@ verified_by: agent
 
 **Status:** done
 
-Architecture Decision Records reconstructed from commit history, in-repo design docs, and source comments. Each cites its evidence.
+Architecture Decision Records reconstructed from commit history, design docs, and source comments. Each cites its evidence. Paths under `design-docs/` are local-only: `.gitignore` excludes that folder, so a clone does not contain those files; tracked source paths and commit links are the public evidence.
 
 ## ADR-0001 — DI-via-factory pattern
 
@@ -32,7 +32,7 @@ Architecture Decision Records reconstructed from commit history, in-repo design 
 
 **Consequences:** 783 tests passing at merge time, build clean. Heading line numbers now come from `node.position` on the tree, not a regex re-find — a `HeadingObject.position?: Position` field was added specifically to carry this (see [004-domain-model.md](../spec/004-domain-model.md#HeadingObject)). `extractCaretLinks`/`extractCiteLinks` (the old regex functions) no longer exist in `src/`.
 
-**Known residual debt (documented, not yet migrated):** the follow-on regex census (`design-docs/features/20260701T161127-markdown-flavor-extension-collection/regex-extraction-census.md`) found two remaining "migrate" verdicts — `AnchorMatcher.cleanMarkdownForComparison` (re-parses already-tokenized text with regex) and `citationFixer`'s citation-string re-parse — plus two "thread-field" verdicts (`determineAnchorType`'s `^[a-zA-Z0-9-_]+$` classification and `CARET_SYNTAX_REGEX`/`EMPHASIS_MARKED_REGEX` in `CitationValidator.ts`) where a tokenizer already knows the answer but a downstream regex re-derives it instead of reading a threaded field.
+**Known residual debt (documented, not yet migrated):** the follow-on regex census (local-only, not tracked: `design-docs/features/20260701T161127-markdown-flavor-extension-collection/regex-extraction-census.md`) found two remaining "migrate" verdicts — `AnchorMatcher.cleanMarkdownForComparison` (re-parses already-tokenized text with regex) and `citationFixer`'s citation-string re-parse — plus two "thread-field" verdicts (`determineAnchorType`'s `^[a-zA-Z0-9-_]+$` classification and `CARET_SYNTAX_REGEX`/`EMPHASIS_MARKED_REGEX` in `CitationValidator.ts`) where a tokenizer already knows the answer but a downstream regex re-derives it instead of reading a threaded field.
 
 ---
 
@@ -40,7 +40,7 @@ Architecture Decision Records reconstructed from commit history, in-repo design 
 
 **Decision:** Group every micromark/mdast extension by *markdown flavor* (`commonmark`, `obsidian`) in one registry (`src/core/MarkdownParser/extensions/flavors.ts`), each flavor a self-contained group of tokenizer triples (syntax + fromMarkdown). `assemble.ts` composes `allFlavors` into what `MarkdownParser` consumes; adding a construct means adding one group to the registry, nothing else.
 
-**Context:** Full design in `design-docs/features/20260701T161127-markdown-flavor-extension-collection/markdown-flavor-extension-collection-design.md`. Decision rule for regex vs. tokenizer, established by the same design: (1) a construct that lives in markdown source always gets a tokenizer extension — regex can't handle code-span/nesting/escaping context correctly; (2) a regular-language token in a *non-markdown* string (URL fragment, path, filename) stays regex — running document grammar over a fragment mis-parses it; (3) a downstream regex re-classifying what a tokenizer already knew should thread a structured field through the token instead of either extreme.
+**Context:** Full design (local-only, not tracked): `design-docs/features/20260701T161127-markdown-flavor-extension-collection/markdown-flavor-extension-collection-design.md`. Decision rule for regex vs. tokenizer, established by the same design: (1) a construct that lives in markdown source always gets a tokenizer extension — regex can't handle code-span/nesting/escaping context correctly; (2) a regular-language token in a *non-markdown* string (URL fragment, path, filename) stays regex — running document grammar over a fragment mis-parses it; (3) a downstream regex re-classifying what a tokenizer already knew should thread a structured field through the token instead of either extreme.
 
 **Alternatives considered:** a stock wiki-link parsing package was tried and rejected for not matching Obsidian's actual syntax variations, which is why jact wrote its own `wikilink`/`obsidianLink` extensions rather than adopting a third-party one.
 
@@ -50,7 +50,7 @@ Architecture Decision Records reconstructed from commit history, in-repo design 
 - An `anchorFlavorPolicy: "obsidian" | "github"` knob for `AnchorMatcher` — GFM-style slugs and Obsidian's kebab-reduction currently conflict, and today's behavior hardcodes the Obsidian stance. Deferred because it's a separate reviewable change to the validator surface.
 - Threading an `anchorKind` field onto `wikilink`/`citation`/`obsidianLink` nodes so `determineAnchorType` and the caret/emphasis regexes in `CitationValidator` become field reads instead of re-classification. Deferred — touches node shape across 3 extensions plus validator paths; no current bug traces to it, so it stayed a documented smell rather than urgent work.
 
-A fuller inventory of remaining architecture-principle gaps in this area (naming, boundary violations flagged during the design pass) is tracked in `design-docs/features/20260701T161127-markdown-flavor-extension-collection/architecture-principles-findings.md`.
+A fuller inventory of remaining architecture-principle gaps in this area (naming, boundary violations flagged during the design pass) is tracked locally (not in Git) in `design-docs/features/20260701T161127-markdown-flavor-extension-collection/architecture-principles-findings.md`.
 
 ---
 
@@ -68,7 +68,7 @@ A fuller inventory of remaining architecture-principle gaps in this area (naming
 
 **Decision:** `jact validate` gained multi-path/glob/`--changed`/`--json` support as a pure orchestration layer over the existing single-file `CitationValidator` — no validation logic was forked or duplicated.
 
-Full context, alternatives, and diagram: `design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md`. Key sub-decisions (D1-D6):
+Full context, alternatives, and diagram (local-only, not tracked): `design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md`. The public contract is [Validate Workflow (batch)](../spec/006-behavior.md#Validate%20Workflow%20%28batch%29). Key sub-decisions (D1-D6):
 
 | # | Decision |
 |---|---|
@@ -83,7 +83,15 @@ Full context, alternatives, and diagram: `design-docs/features/20260701T041917-b
 
 ---
 
-## ADR-0006 — Validation rule presets and plugins
+## ADR-0006 — Exact heading-level filtering and source lines
+
+**Decision:** `jact outline` gains `--exact-heading-level HN` and `--line-number`/`-n` while keeping the positional level as an inclusive ceiling. The full record, with its own status and evidence, is [ADR-0006 — Exact heading-level filtering and source lines](adr-0006-exact-heading-level-and-source-lines.md#ADR-0006%20—%20Exact%20heading-level%20filtering%20and%20source%20lines).
+
+---
+
+## ADR-0007 — Validation rule presets and plugins
+
+**Numbering note:** This decision was first recorded as a second ADR-0006 in [`e1edef7`](https://github.com/WesleyMFrederick/jact/commit/e1edef7707491f1e94720081fdf78fc70b22c1e6), after the outline decision had taken that number in [`58b4889`](https://github.com/WesleyMFrederick/jact/commit/58b48898d89753097917b51553e3486fca12c612). It is renumbered ADR-0007; the outline decision keeps ADR-0006.
 
 **Decision:** Separate renderer-specific validity checks into named presets with per-rule `"off"` or `"error"` overrides and dynamically imported ESM plugins. Resolve the user configuration first, then the nearest project configuration for each checked file. The public configuration and plugin contracts live in [Validation configuration and presets](../spec/005-interfaces.md#Validation configuration and presets).
 
@@ -99,10 +107,10 @@ Full context, alternatives, and diagram: `design-docs/features/20260701T041917-b
 
 ## Known Tech Debt
 
-Two existing findings docs already catalogue open gaps against architecture principles and against the ADR-0002 migration's own stated scope. This spec surfaces them rather than duplicating them — read the source docs for detail:
+Two existing findings docs already catalogue open gaps against architecture principles and against the ADR-0002 migration's own stated scope. Both are local-only (not tracked in Git). This spec surfaces them rather than duplicating them — read the source docs for detail where available:
 
-- `design-docs/features/20260701T161127-markdown-flavor-extension-collection/architecture-principles-findings.md` — naming and boundary-violation findings from the Flavor Extension Collection design pass.
-- `design-docs/features/20260701T161127-markdown-flavor-extension-collection/regex-extraction-census.md` — the residual regex sites called out in ADR-0002 above (`AnchorMatcher.cleanMarkdownForComparison`, `citationFixer`'s citation-string re-parse, and the two thread-field candidates in `determineAnchorType`/`CitationValidator`).
+- `design-docs/features/20260701T161127-markdown-flavor-extension-collection/architecture-principles-findings.md` (local-only) — naming and boundary-violation findings from the Flavor Extension Collection design pass.
+- `design-docs/features/20260701T161127-markdown-flavor-extension-collection/regex-extraction-census.md` (local-only) — the residual regex sites called out in ADR-0002 above (`AnchorMatcher.cleanMarkdownForComparison`, `citationFixer`'s citation-string re-parse, and the two thread-field candidates in `determineAnchorType`/`CitationValidator`).
 
 Neither is fixed by this spec-writing pass — they're pre-existing, already-documented debt, listed here so a future contributor doesn't have to rediscover them.
 
@@ -110,7 +118,7 @@ Neither is fixed by this spec-writing pass — they're pre-existing, already-doc
 
 ## Superseded Documentation
 
-The living specification in `docs/spec/` and ADRs in `docs/adrs/` replace `design-docs/component-guides/` (deprecated 2026-07-01). The most consequential drifts found between the old guides and current code:
+The living specification in `docs/spec/` and ADRs in `docs/adrs/` replace the local-only `design-docs/component-guides/` (deprecated 2026-07-01, not tracked in Git). The most consequential drifts found between the old guides and current code:
 
 1. **Parser engine**: the old MarkdownParser guide describes `marked.js`; current code has zero `marked` imports and parses exclusively via micromark/mdast (ADR-0002 above). jact's own `CLAUDE.md` architecture section repeated this same stale claim until the 2026-07-01 merge `b53295b` corrected it to micromark.
 2. **CLI split**: the old CLI guides describe a single orchestrator class; current code is deliberately split into `src/cli.ts` (Commander registration, issue #29) and `src/jact-cli.ts` (`JactCli`, orchestration) — see [002-architecture.md](../spec/002-architecture.md#CLI%20Orchestrator%20%60src/cli.ts%60%20+%20%60src/jact-cli.ts%60).
@@ -122,5 +130,6 @@ The living specification in `docs/spec/` and ADRs in `docs/adrs/` replace `desig
 
 | Version | Date | Changes |
 |---|---|---|
-| 1.0.0-draft | 2026-10-09 | Added ADR-0006 for renderer validation presets, per-rule overrides, plugins, configuration layering, and the opt-in dropped-character check |
+| 1.0.0-draft | 2026-11-19 | Renumbered the validation preset decision to ADR-0007, indexed the outline decision as ADR-0006, and labeled local-only design paths |
+| 1.0.0-draft | 2026-10-09 | Added the validation preset decision (then numbered ADR-0006, now ADR-0007) for renderer validation presets, per-rule overrides, plugins, configuration layering, and the opt-in dropped-character check |
 | 1.0.0-draft | 2026-07-01 | Initial ADR set, reconstructed from git history and in-repo design docs |

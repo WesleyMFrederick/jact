@@ -38,7 +38,10 @@ Five conventions decide how a new test is written.
 
 - **Test first for features.** A feature folder under `design-docs/features/` maps each requirement scenario to a test before the code exists.
 - **Characterization snapshots guard migrations.** Before an internal rewrite, a snapshot pins the old output, so the rewrite proves the same behavior. Example: [ADR-0002 — Regex → mdast-token migration (WMF-35)](../adrs/003-adrs.md#ADR-0002%20—%20Regex%20→%20mdast-token%20migration%20%28WMF-35%29).
-- **Injected seams, not module mocks.** Git calls and file-system reads come in as injected functions or objects, and tests pass a stub. One exception: the `jact vault-link` tests partly mock `node:fs` to force `linkSync` failures during the note rewrite; their `renameSync` override simulates an editor save and then performs the real rename, so no rename-failure path is covered.
+- **Prefer injected seams to module mocks.** Where a component accepts a Git runner, file-system function, or dependency object, a test passes a stub through that parameter. Injection changes only the component under test. A module mock or spy instead patches a shared Node built-in for the test file, and three suites do this:
+  - `test/core/vaultLink.test.ts` mocks `node:fs` with `vi.mock`. Its `renameSync` and `linkSync` overrides simulate editor saves and then call the real function; one `linkSync` override throws to force an installation failure. No test forces a `renameSync` failure.
+  - `test/unit/file-cache.test.ts` spies on `fs.statSync` and `fs.readdirSync` to simulate entries that cannot be read.
+  - `test/cli-integration/rename-command.test.ts` spies on `path.relative` and `path.isAbsolute` to emulate Windows path containment while file I/O stays real.
 - **Factory overrides for fakes.** The component factory accepts dependency overrides, so a test injects a fake without a production class. Why: [ADR-0001 — DI-via-factory pattern](../adrs/003-adrs.md#ADR-0001%20—%20DI-via-factory%20pattern).
 - **Type-contract tests are a suite.** Type tests assert public shapes directly and catch a signature change that a behavior test misses.
 
@@ -60,3 +63,4 @@ Each row records one version of this section.
 |---------|------|---------|
 | 1.0.0-draft | 2026-07-01 | Initial testing doc, grounded in `test/` directory layout and `test/README.md` |
 | 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
+| 1.1.1 | 2026-11-19 | Clarification: listed the `node:fs` and `node:path` mocks and spies in three suites, replacing a single-exception claim, and separated module mocking from injection; no new guarantee |

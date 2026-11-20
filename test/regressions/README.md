@@ -29,5 +29,5 @@ When a bug is fixed, the reproducer becomes a permanent test here. The issue num
 
 ## Source
 
-Testing Principles §Test Organization and Sprawl Prevention — `^test-regression-filename-convention`
-Testing Principles §Test Scope and Targets — `^test-regressions-promoted`
+- Naming convention: [007 · Directory Layout (`test/`)](../../docs/spec/007-testing.md#Directory%20Layout%20%28%60test/%60%29) records the `<issue-number>-<short-slug>.test.ts` rule for this folder.
+- The other rules (one issue per file, fails before the fix) come from the maintainer's Testing Principles (§Test Organization and Sprawl Prevention `^test-regression-filename-convention`; §Test Scope and Targets `^test-regressions-promoted`). That document lives in a private principles repository, so it cannot be followed from a clone. Tracked example of the rules in practice: `test/regressions/37-enrichLinkObject-immutability.test.ts`, which covers [issue #37](https://github.com/WesleyMFrederick/jact/issues/37).

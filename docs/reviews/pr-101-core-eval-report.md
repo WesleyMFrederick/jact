@@ -58,6 +58,8 @@ verified_by: agent
 - [ ] Ready to proceed
 - [X] Requires revision. At `7d627ae`, three high findings existed. At current `dd23741`, the symlink scope breach is still open; the escaped-prose false refusal is a medium parser-boundary finding.
 
+**Point-in-time verdict.** This verdict records the 2026-10-06 review of `7d627ae` and `dd23741`; it is not current status. The symlink scope breach was resolved before merge: [`5975560`](https://github.com/WesleyMFrederick/jact/commit/5975560a004b97e2cbb869ab982350b585fb8b3b) rejects symlinks inside source folders ([PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6010268465)), and PR #101 merged at that head. The escaped-prose false refusal was fixed after merge in [PR #103](https://github.com/WesleyMFrederick/jact/pull/103).
+
 ## Prioritized Findings
 
 ### Fix Now
@@ -91,6 +93,8 @@ Parent-observed results on `dd23741`: `npm run build` passes; the rename suite p
 | Escaped prose triggers false embed refusal | Open (P2) | **Open (Medium)** | Probe still exits `1`. Regex still at `dd23741` line 543. |
 | Normal incoming wiki embed refusal | Works | Works | Probe rejects the unsafe move. |
 | Reference-style image definition | Works | Works | Definition is rewritten. |
+
+Evidence availability: the parent-observed probes and test runs above come from a private session that is not published. The public record of the same `dd23741` state is the [PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6009994670) (literal-path and rollback fixes, symlink defect reproduced, 16 rename tests passing).
 
 ## Document Hygiene
 

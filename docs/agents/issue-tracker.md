@@ -4,7 +4,7 @@ verified_by: agent
 ---
 # Issue tracker: Local Markdown
 
-Issues live as Markdown files in `.scratch/`. Persistent feature specs are canonical under `design-docs/features/` and exposed to the issue tracker through symlinks.
+Issues live as Markdown files in `.scratch/`. Persistent feature specs are canonical under `design-docs/features/` and exposed to the issue tracker through symlinks. Both folders are local-only: `.gitignore` excludes `/.scratch` and `design-docs`, so a clone does not contain them. Tracked documents cite them as backtick paths labeled local-only, never as Markdown links.
 
 ## Conventions
 
@@ -14,8 +14,9 @@ Issues live as Markdown files in `.scratch/`. Persistent feature specs are canon
 - Issue filenames use `<NN>-<slug>.md`, numbered from `01`.
 - `/to-issues` slices a persistent plan, spec, or PRD into many small tracer-bullet issues; it never creates a 1:1 plan-to-issue mapping.
 - `.scratch/`-only issues and captured ideas live directly in `.scratch/` until promoted to a persistent feature artifact.
-- Triage state is recorded as a `Status:` line near the top.
-- Use the roles defined in [Triage Labels](triage-labels.md#Triage Labels).
+- Record state as one `Status:` line near the top. Its value moves through one lifecycle:
+  - **Triage:** one of the local statuses in [Triage Labels](triage-labels.md#Triage Labels) (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, or `wontfix`).
+  - **Work:** `claimed` when an agent or human starts a `ready-for-agent` or `ready-for-human` issue, then `resolved` when it is done (see [Wayfinding operations](#Wayfinding%20operations)).
 - Append conversation history under a `## Comments` heading.
 
 ## Publishing to the issue tracker
@@ -41,7 +42,7 @@ Read the referenced issue file. The user will normally provide its path or numbe
 - Map: `.scratch/{YYYYMMDDTHHMMSS}-{module}-{slug}/map.md`
 - Child ticket: `.scratch/{YYYYMMDDTHHMMSS}-{module}-{slug}/issues/<NN>-<slug>.md`
 - Type: `research`, `prototype`, `grilling`, or `task`
-- Status: `claimed` or `resolved`
+- Status: `claimed` or `resolved` once work starts; before that, a triage status (see [Conventions](#Conventions))
 - Blocking: record issue numbers in a `Blocked by:` line
 - Claim: set `Status: claimed` before beginning work
 - Resolve: append an `## Answer`, set `Status: resolved`, and update the map

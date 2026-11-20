@@ -37,5 +37,5 @@ Callers rely on these six guarantees.
 2. **Exit code, not exit.** Actions set the process exit code and return, so piped standard output drains before the process ends.
 3. **Usage checks first.** Flag-conflict and argument checks in `validate` and `vault-link` run before any read or write.
 4. **One component graph per run.** One orchestrator shares one file index and one parsed-document cache across its components.
-5. **Help matches contract.** Each command help page ends with an `Exit Codes` block that matches the repository contract for that command.
+5. **Help matches contract.** Each leaf command help page ends with an `Exit Codes` block that matches the repository contract for that command. The `extract` parent command only groups its subcommands and has no such block.
 6. **Safe printed commands.** Retry commands and hints quote document text, as in [Terminal Output Safety](../../../../docs/spec/005-interfaces.md#Terminal%20Output%20Safety).

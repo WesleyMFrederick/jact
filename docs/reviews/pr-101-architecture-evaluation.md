@@ -8,6 +8,10 @@ verified_by: agent
 
 **Requires revision at published head `dd23741109c1f01a2c22de7dcd56d5317be998a6`.** A folder move can materialize content from outside the declared scope through a symlink. Escaped prose can also incorrectly block a valid move. Both were reproduced against the current published build, despite all 16 rename integration tests passing.
 
+**Point-in-time verdict, not current status.** The verdict above records the 2026-10-06 review of `dd23741`. Both defects were resolved afterwards: [`5975560`](https://github.com/WesleyMFrederick/jact/commit/5975560a004b97e2cbb869ab982350b585fb8b3b) rejects symlinks inside source folders before PR #101 merged at that head ([PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6010268465)), and [PR #103](https://github.com/WesleyMFrederick/jact/pull/103) replaced the escaped-prose scan with parser-owned embed recognition. For the later state, read [Follow-up Publication — 2026-10-06](#Follow-up%20Publication%20—%202026-10-06) and [Latest-main Integration](#Latest-main%20Integration).
+
+**Evidence availability.** Probe results, test runs, review findings and usage measurements in this report come from private session archives under `.scratch/`, which Git ignores; those pointers are labelled private local evidence and cannot be followed from a clone. Public evidence is limited to the two PR #101 replies ([`dd23741` fixes](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6009994670), [`5975560` symlink refusal](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6010268465)), [PR #103](https://github.com/WesleyMFrederick/jact/pull/103), and the commits named below.
+
 This is a report-only evaluation against the explicitly requested Core, Object-Oriented, TypeScript, and Testing principles. No implementation files were changed by this evaluation.
 
 ## Principle Reports
@@ -228,7 +232,7 @@ Parent-observed characterization of the current branch parser, before any parser
 | Fenced code containing an embed | Code node, no wikilink |
 | Ordinary `[[notes/p.png]]` | Wikilink node and ordinary link output |
 
-Evidence: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c533655ac11a.jsonl:L480`; its producing probe is at `L478`.
+Private local evidence (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c533655ac11a.jsonl:L480`; its producing probe is at `L478`.
 
 **Recommendation, not yet approved:** use a dedicated Obsidian embed construct starting at `!`, then expose the smallest typed embed result to rename. The current `[` wikilink tokenizer never emits a node for the real embed, so annotating only existing wikilink nodes cannot classify that input. Reusing it would require changing the surrounding image-tokenization interaction; a dedicated construct keeps ordinary wikilink recognition separate.
 
@@ -256,7 +260,7 @@ Parent verification:
 - Actual built-CLI smoke passed for an unchanged directory preview, exact new nested destination, incoming/outgoing link rewrites, and a reported relocated backup retaining original content. The throwaway harness initially failed; normalizing its temporary root with `realpathSync` made the same scenario pass without a production change. Temporary trees were removed.
 - Parent inspected the first-wave and safety-test diffs. No formal final review is claimed.
 
-Checkpoint evidence archive: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.bcb61e92c7de.jsonl`. Observed result lines: build `L520`, concurrent runs `L525`, literal/reference-image smoke `L534`, full suite `L633`, directory/backup smoke `L644`, safety-test commit `L661`. Each result's producing command is recoverable with `transcript-reader --dir <archive> --lines <line> --all --cite`.
+Checkpoint evidence archive (private local, untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.bcb61e92c7de.jsonl`. Observed result lines: build `L520`, concurrent runs `L525`, literal/reference-image smoke `L534`, full suite `L633`, directory/backup smoke `L644`, safety-test commit `L661`. Each result's producing command is recoverable with `transcript-reader --dir <archive> --lines <line> --all --cite`.
 
 ### Explicit Codex Worker Measurements
 
@@ -316,7 +320,7 @@ The previously presented approval gate still stands. The proposed dedicated `!` 
 
 **Status:** implemented, verified, and saved locally. The user selected the dedicated raw-`!` recognition rule; this supersedes the earlier unapproved checkpoint.[^embed-approval] No push, merge, global-settings change, or excluded phase 5/6 work is authorized.
 
-**Checkout:** `/Users/wesleyfrederick/.paseo/worktrees/3bzq2cjn/jact-bulk-rename`, branch `feat/bulk-rename`. Commands and root-relative evidence paths below use this checkout.
+**Checkout:** a local Paseo worktree of branch `feat/bulk-rename` (workstation path omitted). Commands and root-relative evidence paths below are relative to that checkout's root.
 
 The canonical contracts are the [parser component specification](../spec/002-architecture.md#MarkdownParser%20(%60src/core/MarkdownParser/%60)), [typed embed references](../spec/004-domain-model.md#EmbedReference), and [rename behavior](../spec/006-behavior.md#Rename%20Workflow%20(%60jact%20rename%60)). Rename planning now consumes parser-owned references rather than scanning decoded text. `micromark-core-commonmark` is declared directly for the image-recognition helpers.
 
@@ -381,26 +385,26 @@ The tracked commit hook intentionally skipped refreshing the global CLI outside 
 
 ### Final Evidence Receipts
 
-These are immutable local transcript snapshots. Each pointer names the result or report, not merely the producing call. Full output is available with `transcript-reader --dir <archive> --lines <line> --all`, or raw JSON with its `L3` mode.
+These are private local transcript snapshots under the untracked `.scratch/` folder; they are not published and cannot be followed from a clone. Each pointer names the result or report, not merely the producing call. Full output is available locally with `transcript-reader --dir <archive> --lines <line> --all`, or raw JSON with its `L3` mode.
 
-[^embed-approval]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L810`
-[^embed-parser-tests]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1170`
-[^embed-rename-tests]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1171`
-[^embed-checks]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1315`
-[^embed-runtime]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1318`
-[^embed-tokenizer-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1314`
-[^embed-full-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1241`
-[^embed-lint-lines]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1071`
-[^embed-lint-equality]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1277`
-[^embed-reuse]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-647Z_01a111bb-727f-7000-9563-0a6fa837bb02.42a48729c023.jsonl:L210`
-[^embed-quality]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-629Z_01a111bb-726d-7000-a98d-6b61f4009b6c.e7f8dc814bdd.jsonl:L167`
-[^embed-efficiency]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-636Z_01a111bb-7274-7000-9d90-e3f74d492011.2c21f4e8587e.jsonl:L153`
-[^embed-test-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L931`
-[^embed-implementation-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1235`
-[^embed-reuse-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1242`
-[^embed-quality-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1243`
-[^embed-parser-commit]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1336`
-[^embed-regression-commit]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1343`
+[^embed-approval]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L810`
+[^embed-parser-tests]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1170`
+[^embed-rename-tests]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1171`
+[^embed-checks]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1315`
+[^embed-runtime]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1318`
+[^embed-tokenizer-lint]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1314`
+[^embed-full-lint]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1241`
+[^embed-lint-lines]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1071`
+[^embed-lint-equality]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1277`
+[^embed-reuse]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-647Z_01a111bb-727f-7000-9563-0a6fa837bb02.42a48729c023.jsonl:L210`
+[^embed-quality]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-629Z_01a111bb-726d-7000-a98d-6b61f4009b6c.e7f8dc814bdd.jsonl:L167`
+[^embed-efficiency]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T15-00-59-636Z_01a111bb-7274-7000-9d90-e3f74d492011.2c21f4e8587e.jsonl:L153`
+[^embed-test-usage]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L931`
+[^embed-implementation-usage]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1235`
+[^embed-reuse-usage]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1242`
+[^embed-quality-usage]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1243`
+[^embed-parser-commit]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1336`
+[^embed-regression-commit]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.b3fb93b01ab1.jsonl:L1343`
 
 
 ## Follow-up Publication — 2026-10-06
@@ -453,19 +457,19 @@ Native usage includes both assistant-message usage and top-level `model_usage` r
 | Final run total | Mixed | unknown (parent still active) | unknown (parent still active) | unknown (no answer key) | unknown (parent still active) |
 | Comparison baseline / variant | unknown (not run) | unknown (not run) | unknown (not run) | unknown (no answer key) | unknown (not run) |
 
-[^followup-red]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L1903`
-[^followup-checks]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2019`
-[^followup-runtime]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2035`
-[^followup-ast]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2039`
-[^followup-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2044`
-[^followup-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2091`
+[^followup-red]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L1903`
+[^followup-checks]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2019`
+[^followup-runtime]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2035`
+[^followup-ast]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2039`
+[^followup-lint]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2044`
+[^followup-usage]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.da3229ea3371.jsonl:L2091`
 
 
 ### Latest-main Integration
 
 Main advanced to `3cdda5652df56d67d707ecfa8a3d02cc211322e0` (merged PR 102) before push. The six conflicting files were resolved without discarding main's landed regular-file moves, exact plain-path rewrites, or physical-scope and Windows safeguards. Destination rules and public CLI JSON shape remain main's contracts. The earlier verification and usage tables are historical snapshots, not the final integrated result.
 
-- Final integrated build and type-check passed. **133 test files passed; 1065 tests passed and 1 was skipped**.[^integrated-checks]
+- Final integrated build and type-check passed. **133 test files passed; 1065 tests passed and 1 was skipped**.[^integrated-checks] [PR #103](https://github.com/WesleyMFrederick/jact/pull/103) publicly reports the same totals.
 - The actual shared-parser CLI smoke and all **24 full-AST compatibility comparisons** passed again on the integrated source.[^integrated-runtime]
 - An additional runtime smoke proved arbitrary JSON moves and exact code-path rewrites, read-only preview, active cross-formatted embed refusal before writes or backups, and untouched CommonMark caption text.[^integrated-main-smoke]
 - Inert code examples remain non-embeds, while their exact file paths follow main's plain-reference policy. The retained integration tests now assert those rewrites; escaped-prose examples retain their bytes. No rename-only scanner exception remains.
@@ -487,9 +491,9 @@ The two additional Codex workers below are included in the integrated native rec
 | Final run total | Mixed | unknown (parent active) | unknown (parent active) | unknown (no answer key) | unknown (parent active) |
 | Comparison baseline / variant | unknown (not run) | unknown (not run) | unknown (not run) | unknown (no answer key) | unknown (not run) |
 
-[^integrated-checks]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2213`
-[^integrated-runtime]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2222`
-[^integrated-main-smoke]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2225`
-[^integrated-lint]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2220`
-[^integrated-usage]: Source: `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2246`
+[^integrated-checks]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2213`
+[^integrated-runtime]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2222`
+[^integrated-main-smoke]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2225`
+[^integrated-lint]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2220`
+[^integrated-usage]: Private local source (untracked, not published): `.scratch/20261006T081324-rename-pr101/sessions/2026-10-06T08-05-29-874Z_01a1103f-0c92-7000-a2c6-799786c2acb0.c21f17270377.jsonl:L2246`
 

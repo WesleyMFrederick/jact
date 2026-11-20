@@ -55,6 +55,8 @@ verified_by: agent
 - [ ] Ready to proceed
 - [X] Requires revision — Critical 1 is open on published `7d627ae` and on `dd23741`. The two other published P1 defects are fixed in `dd23741` but not in the published commit under review.
 
+**Point-in-time verdict.** This verdict records the 2026-10-06 review of `7d627ae` and `dd23741`; it is not current status. Critical 1 was resolved before merge: [`5975560`](https://github.com/WesleyMFrederick/jact/commit/5975560a004b97e2cbb869ab982350b585fb8b3b) rejects symlinks inside source folders ([PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6010268465)), and PR #101 merged at that head. The escaped-prose false refusal was fixed after merge in [PR #103](https://github.com/WesleyMFrederick/jact/pull/103).
+
 ## Prioritized Findings
 
 ### Fix Now
@@ -100,3 +102,5 @@ The PR moved forward during this review. The current published head is `dd23741`
 Verdict for the current PR `dd23741`: requires revision, because Critical 1 is still open.
 
 Parent revalidation against the `dd23741` build: `npm run build` passes and the rename suite passes 16/16. In the CLI probes, the bracket-path source moves only the literal file. The symlink to a file outside the scope still creates a regular `archive/secret.md` and exits 0. Escaped prose still gets a false refusal (exit 1). A real wiki embed is still refused correctly. The reference-style image definition is rewritten correctly.
+
+Evidence availability: the parent-observed probes and test runs above come from a private session that is not published. The public record of the same `dd23741` state is the [PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6009994670) (literal-path and rollback fixes, symlink defect reproduced, 16 rename tests passing).

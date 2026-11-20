@@ -52,6 +52,8 @@ verified_by: agent
 - [ ] Ready to proceed
 - [X] Requires revision — Critical Issue 1 remains open on current published `dd23741`. The escaped-prose false refusal and the 005 contract drift are medium and should be fixed in the same pass.
 
+**Point-in-time verdict.** This verdict records the 2026-10-06 review of `7d627ae` and `dd23741`; it is not current status. Critical Issue 1 was resolved before merge: [`5975560`](https://github.com/WesleyMFrederick/jact/commit/5975560a004b97e2cbb869ab982350b585fb8b3b) rejects symlinks inside source folders ([PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6010268465)), and PR #101 merged at that head. The escaped-prose false refusal and the 005 contract alignment were addressed after merge in [PR #103](https://github.com/WesleyMFrederick/jact/pull/103).
+
 ## Prioritized Findings
 
 ### Fix Now
@@ -91,3 +93,5 @@ During this review the PR head advanced from `7d627ae` to `dd23741` ("Address PR
 - Confirmed correct: a real incoming `![[notes/p.png]]` embed refuses the move; a reference-style image definition is rewritten.
 
 Line references above are from the `7d627ae` snapshot. They match `dd23741` for all code before `rename-markdown-file.ts:695`. The `commitPlan` region shifted (`dd23741:697-815`).
+
+Evidence availability: the parent-observed probes and test runs above come from a private session that is not published. The public record of the same `dd23741` state is the [PR #101 reply](https://github.com/WesleyMFrederick/jact/pull/101#issuecomment-6009994670) (literal-path and rollback fixes, symlink defect reproduced, 16 rename tests passing).

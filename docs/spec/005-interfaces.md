@@ -425,7 +425,7 @@ Every command uses three exit codes, and hooks depend on them.
 | `1` | Content failure: errors found, no eligible links, header or target file not found by extraction, outline selector unresolved, or rename plan refused |
 | `2` | System or usage error: missing file, permission denied, parse error, missing source position, bad flag combination, an unknown command or option, a missing required argument, a value outside its choices, an invalid argument value, a glob that matched nothing when nothing else was selected, or not a git repository |
 
-The three-code contract is a recorded decision: D4 in [Decision](../../design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md#Decision).
+The three-code contract is recorded in D4 of [ADR-0005](../adrs/003-adrs.md#ADR-0005%20—%20Batch%20validate%20globs,%20%60--changed%60,%20%60--json%60).
 
 Command-specific exceptions:
 

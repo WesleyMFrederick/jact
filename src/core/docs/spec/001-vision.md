@@ -18,7 +18,7 @@ Core gives each command the same parser, the same link checks, and the same safe
 
 1. **One parse model** — validation, extraction, fix, and rename read the same syntax tree
 2. **One link verdict** — every link gets a valid, warning, or error result from one checker
-3. **Safe edits** — the three write paths refuse unsafe targets and write nothing on a partial failure
+3. **Safe edits** — the three write paths refuse unsafe targets before writing; `--fix` and rename write all planned edits or none, and the vault link fixer follows the [note recovery contract](../../../../docs/spec/005-interfaces.md#Writing%20the%20note)
 
 ### What `src/core` Is Not
 
@@ -44,9 +44,9 @@ Three principles decide where new core code goes.
 **Implications:**
 - The rule and its extension registry: [ADR-0003 — Flavor Extension Collection](../../../../docs/adrs/003-adrs.md#ADR-0003%20—%20Flavor%20Extension%20Collection)
 
-### 3. Writes Are Opt-In and All-or-Nothing
+### 3. Writes Are Opt-In and Guarded
 
-**Principle:** Only the fix, rename, and vault link paths write user files, and each writes all planned edits or none.
+**Principle:** Only the fix, rename, and vault link paths write user files. Fix and rename write all planned edits or none. The vault link fixer refuses a note that changed before it moved the note aside; a later change can leave the displaced note in a recovery file, as [Writing the note](../../../../docs/spec/005-interfaces.md#Writing%20the%20note) states.
 
 **Implications:**
 - The repository read-only rule: [3. Read-Only by Default](../../../../docs/spec/001-vision.md#3.%20Read-Only%20by%20Default)
@@ -63,6 +63,7 @@ Core guarantees one verdict per link, bounded reads, and safe writes.
 | **Bounded extraction reads** | Extraction reads a linked target only inside the permitted directories | `test/integration/extract-read-boundary.test.ts` |
 | **Safe fix writes** | `--fix` refuses symbolic links, out-of-scope files, and changed citations | `test/cli-integration/validate-fix-write-safety.test.ts` |
 | **Rename is one batch** | `jact rename` refuses an unsafe plan before it writes, and rolls back a failed apply | `test/cli-integration/rename-command.test.ts` |
+| **Recoverable vault link writes** | A note change detected during the rewrite refuses it, removes the symlinks the run created, and keeps the displaced note in a recovery file | `test/core/vaultLink.test.ts` ("keeps an editor's recreated note instead of installing over it") |
 | **Excludes-only backlink screen** | The backlink filter only removes parse candidates | `test/core/LinkedHeaderContext/backlink-candidate-filter.test.ts` |
 
 ## Target Users
@@ -85,3 +86,4 @@ Each row records one version of this vision.
 | 1.0.0 | Initial vision for `src/core` |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
 | 1.2.0 | 2026-11-19: The vault link fixer counts as a third write path; `src/cli.ts` is a direct core caller |
+| 1.3.0 | 2026-11-19: Correction plus new guarantee row: the vault link fixer follows the note recovery contract rather than all-or-nothing writes (principle 3 renamed); the added recoverable-write guarantee documents existing behavior and names its enforcing test |

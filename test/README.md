@@ -15,7 +15,14 @@ Vitest runs TypeScript directly, so most tests import from `src/` (TypeScript so
 import { createMarkdownParser } from "../../src/factories/componentFactory.js";
 ```
 
-**Build before CLI tests**: CLI integration tests run the compiled `dist/cli.js` in a child process, and a few older unit tests still import from `dist/`. Run `npm run build` first when `dist/` is stale, or those tests exercise old code.
+**Build before `dist/` consumers**: many suites run the compiled `dist/cli.js` in a child process or import compiled modules from `dist/`, so a stale build makes them exercise old code. Run `npm run build` first. The consumers are spread across folders:
+
+- `test/cli-integration/`: every suite runs `dist/cli.js`; `validate-fix-write-safety.test.ts` also imports `dist/jact-cli.js` and `dist/core/ValidationRules/loadConfig.js`.
+- `test/integration/`: eight suites run `dist/cli.js`, for example `cli-help.test.ts`.
+- `test/validate/validate-integration.test.ts` runs `dist/cli.js`.
+- `test/core/citation-fixer.test.ts` imports `dist/core/citationFixer.js`.
+- `test/unit/`: the `jact-cli*.test.*` suites import `dist/jact-cli.js`, and `jact-validate-stdin.test.ts` runs `dist/cli.js`.
+- Older top-level suites such as `cli-warning-output.test.js` and `enhanced-citations.test.js` run `dist/cli.js`.
 
 ## Path Resolution
 

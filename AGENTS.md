@@ -25,10 +25,11 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 - `.scratch/{YYYYMMDDTHHMMSS}-{module}-{slug}/` is the issue-tracker workspace (naming per [Issue tracker: Local Markdown](docs/agents/issue-tracker.md#Issue%20tracker%20Local%20Markdown)). Files meant to persist (PRDs, specs) have their **canonical version in `design-docs/features/<feature>/`** and are **symlinked into `.scratch/`** — never copied.
 - **WHEN** a file needs to exist in both `.scratch/` and `design-docs/features/`, **ALWAYS** write the canonical version to `design-docs/features/<feature>/` and `ln -s` into `.scratch/`, **NEVER** `cp`, **BECAUSE** copying creates two files with one truth — they inevitably diverge, and downstream consumers silently read the stale copy while the canonical version moves ahead.
 - `.scratch/`-only files (ad-hoc issues, captured ideas not yet promoted to a feature) live directly in `.scratch/` — no symlink needed until they graduate to `design-docs/features/`.
+- **Local-only paths:** `.gitignore` excludes both `/.scratch` and `design-docs`, so a clone does not contain them. **WHEN** a tracked document cites one of these paths, **ALWAYS** prefer tracked files or public PR/commit evidence, and otherwise write the path in backticks labeled local-only, **NEVER** as a Markdown link, **BECAUSE** a link that resolves only on one machine passes local validation but cannot be followed from GitHub or a fresh clone.
 
 ## Markdown links — surgical, to canonical source (like imports)
 - **WHEN** writing any markdown document (plans, ADRs, specs, task files, design docs) that references another document, **ALWAYS** use a surgical markdown link to the exact header/anchor of the canonical source — treat it like an `import` statement in code — **NEVER** a prose mention, a bare filename, or a paraphrase, **BECAUSE** linking to the exact section of the canonical source prevents document drift: the reader (human or LLM) resolves current truth on click instead of trusting a copy that silently goes stale.
-- **Example:** a plan referencing an ADR links to the ADR file **and** its exact header — `[ADR-0001 · Decision](spec/003-adrs.md#Decision)`, never "see ADR-0001".
+- **Example:** a plan referencing an ADR links to the ADR file **and** its exact header — `[ADR-0001 — DI-via-factory pattern](docs/adrs/003-adrs.md#ADR-0001%20—%20DI-via-factory%20pattern)`, never "see ADR-0001".
 - **WHEN** linking to a section, **ALWAYS** use the header's **exact text** as the anchor (run `jact outline <file> H6` first to copy it verbatim), **BECAUSE** jact validates anchors and matches verbatim, not kebab-case.
 - **WHEN** a fact already lives in a canonical doc, **ALWAYS** link to it rather than restating it, **BECAUSE** one source of truth + surgical links = no divergent copies to reconcile.
 - **WHEN** the link target is a NON-markdown file (`.ts`, `.js`, `.json`, config, any non-`.md`), **NEVER** use a markdown link — write it as a bare backtick path, optionally `path:line` (e.g. `` `src/cli.ts:105` ``), **BECAUSE** jact extracts only markdown: a link to code can't be surgically extracted. Markdown links are for `.md` targets only.
@@ -65,7 +66,7 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 npm install
 npm run build
 
-# Run this branch's CLI; tracked hooks maintain global jact from canonical main
+# Run this branch's CLI; when Git uses the tracked .githooks, they maintain global jact from canonical main
 node ./dist/cli.js --help
 
 # Run tests
@@ -85,7 +86,7 @@ npm run jact:validate path/to/file.md -- --format json
 # Validate with line filtering
 npm run jact:validate path/to/file.md -- --lines 150-160
 
-# In-repo: scope auto-inferred from cwd (.git or package.json walk-up)
+# In-repo: scope auto-inferred (nearest .git, .obsidian, or package.json up from cwd, then up from the target file)
 npm run jact:validate path/to/file.md
 
 # Cross-project / explicit override only:
@@ -106,7 +107,7 @@ npm run jact:base-paths path/to/file.md
 # Extract content from links
 npm run jact:extract path/to/file.md
 
-# Global CLI usage (always canonical main's build; use `node ./dist/cli.js` for this branch)
+# Global CLI usage (canonical main's build when Git uses the tracked .githooks; use `node ./dist/cli.js` for this branch)
 # In-repo: scope auto-inferred from cwd
 jact validate path/to/file.md --lines 157
 
@@ -224,27 +225,20 @@ test/
 - **CLI Orchestrator**: Command routing, output formatting
 
 ## Design Documentation
-The project includes extensive architecture documentation:
+The tracked, canonical design documentation is the [jact Living Specification](docs/spec/SPEC.md#jact%20Living%20Specification). Its [Spec Sections](docs/spec/SPEC.md#Spec%20Sections) table lists every repository section, including [003. ADRs](docs/adrs/003-adrs.md#003.%20ADRs), and maps each source folder to its module spec under `src/*/docs/spec/`.
 
-- **ARCHITECTURE-Citation-Manager.md**: C4 model diagrams and system context
-- **component-guides/**: Implementation guides for each component
-  - CLI Orchestrator Implementation Guide
-  - CitationValidator Implementation Guide
-  - ContentExtractor Component Guide
-  - MarkdownParser Component Guide
-  - ParsedDocument Implementation Guide
-  - ParsedFileCache Implementation Guide
-
-**When modifying components**: Consult the [jact Living Specification](docs/spec/SPEC.md#jact Living Specification) — `design-docs/component-guides/` is deprecated (banner-marked 2026-07-01).
+**When modifying components**: update the living specification and the affected module spec in the same PR. The old component guides (local-only `design-docs/component-guides/`, banner-marked deprecated 2026-07-01) are not a source of truth.
 
 ## Path Resolution Strategy
 
-The tool supports multiple path resolution strategies (in order):
+For a standard Markdown link, the tool tries these path resolution strategies (in order):
 0. Home-directory expansion for `~/` paths
 1. Standard relative path from source location
 2. Obsidian absolute path format (`0_SoftwareDevelopment/...`)
 3. Symlink-aware resolution (resolves symlinks and retries)
 4. Cache fallback (filename matching in `--scope` folder)
+
+Wiki links use the file the parser already resolved, or fail with `Wiki page not found` listing the paths tried. Canonical order: [Path Resolution Strategy Order (cross-document links)](docs/spec/006-behavior.md#Path%20Resolution%20Strategy%20Order%20%28cross-document%20links%29).
 
 ## Citation Patterns Supported
 
@@ -319,8 +313,8 @@ Start at L0 across a directory, zoom to L2 on the one map that matters. Config: 
 
 ### Ground rules
 
-- `jact` CLI reads **markdown only** — never point it at `.ts`/`.json` (silently returns garbage).
-- After changing `src/**/*.ts`, Vitest needs no build. For an end-to-end check of *this* branch, run `npm run build` and invoke `node ./dist/cli.js`—never the global `jact`. Tracked Git hooks synchronize dependencies, rebuild, and relink the global command after changes land on canonical `main`. `npm run global:link` exists only as agent/system recovery and refuses to run outside canonical main.
+- `jact` **parses Markdown only** — never point `outline`, `extract`, `validate`, or `ast` at `.ts`/`.json` (silently returns garbage). `jact rename` is the exception: it can move non-Markdown files and update Markdown links to them.
+- After changing `src/**/*.ts`, Vitest needs no build. For an end-to-end check of *this* branch, run `npm run build` and invoke `node ./dist/cli.js`—never the global `jact`. When Git's `core.hooksPath` points at the tracked `.githooks` (Paseo worktree setup does this; a plain clone must set it), those hooks synchronize dependencies, rebuild, and relink the global command after changes land on canonical `main` — see [npm global link](docs/spec/010-integrations.md#npm%20global%20link). `npm run global:link` exists only as agent/system recovery and refuses to run outside canonical main.
 
 ## Agent skills
 
