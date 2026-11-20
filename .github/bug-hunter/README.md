@@ -26,7 +26,7 @@ Steps 2 to 5 live in `system-prompt.md`. The agent runs them as a Managed Agents
 
 1. Connect GitHub Actions to Anthropic with [Workload Identity Federation](https://platform.claude.com/docs/en/manage-claude/wif-providers/github-actions.md). No API key is created or stored. Each run, GitHub signs a short-lived token that says "this is a `pull_request` run of WesleyMFrederick/jact", and Anthropic trades it for a 10-minute access token.
    1. In the Claude Console, go to **Settings → Workload identity → Connect workload** and select **GitHub Actions**.
-   2. Use these values: issuer `https://token.actions.githubusercontent.com` (discovery), audience `https://api.anthropic.com`, subject prefix `repo:WesleyMFrederick/jact:`, claim `repository_owner` = `WesleyMFrederick`, scope `workspace:developer`, lifetime `600`.
+   2. Use these values: issuer `https://token.actions.githubusercontent.com` (discovery), audience `https://api.anthropic.com`, subject prefix `repo:WesleyMFrederick/jact:pull_request`, claim `repository_owner` = `WesleyMFrederick`, scope `workspace:developer`, lifetime `600`.
    3. Copy the four IDs the wizard shows into repo variables. They are identifiers, not secrets:
       ```bash
       gh variable set ANTHROPIC_FEDERATION_RULE_ID -R WesleyMFrederick/jact --body fdrl_...
@@ -43,7 +43,7 @@ No secret is ever written to a `.env` file, the repo, or the agent's sandbox. Th
 
 | Secret | Stored in | Who can read it |
 | ------ | --------- | --------------- |
-| Anthropic access | Nowhere. GitHub's OIDC token is exchanged per run for a 10-minute Anthropic token | Only the CI step that calls the API. The agent never sees it. The federation rule accepts only tokens from this repo. |
+| Anthropic access | Nowhere. GitHub's OIDC token is exchanged per run for a 10-minute Anthropic token | Only the CI step that calls the API. The agent never sees it. The federation rule accepts only `pull_request` runs of this repo, so other workflows here (such as the npm release job) cannot get a token. |
 | `GITHUB_TOKEN` | Issued by GitHub per job, expires when the job ends | Only the CI step, to read the PR and post the review. It is not passed to the agent. |
 | Repo access for the agent | None | jact is public, so the sandbox clones it without a token. |
 
