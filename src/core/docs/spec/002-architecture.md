@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 002. Architecture
 
 **Status:** done
@@ -6,7 +10,7 @@ This section maps the `src/core` components, the one job each owns, and the boun
 
 ## System Overview
 
-Core is a set of components that callers outside core build and connect. Reads flow from the parser to the checker to the extractor. Only the citation fixer and the rename planner write user files.
+Core is a set of components that callers outside core build and connect. Reads flow from the parser to the checker to the extractor. Only the citation fixer, the rename planner, and the vault link fixer write user files.
 
 ```
 caller (src/jact-cli.ts, src/validate/, src/cli.ts)
@@ -20,6 +24,7 @@ caller (src/jact-cli.ts, src/validate/, src/cli.ts)
   │
   └─ write ──► citation fixer ──► plain path scanner
                rename planner ──► plain path scanner, fresh parser for verification
+               vault link fixer ──► note recovery primitives (src/cli.ts calls it directly)
 ```
 
 ---
@@ -56,6 +61,16 @@ The extractor reads the content that eligible links point at and removes duplica
 - **One block reason.** Every blocked read reports the same reason text, so output stays consistent.
 
 Boundary: the extractor receives links that the checker already checked; it has no checker dependency.
+
+### `ValidationRules/` — rule layer
+
+The rule layer loads rule settings and runs the enabled rules after link checks. Contract: [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation%20configuration%20and%20presets).
+
+- **Settings before checks.** `loadConfig.ts` layers the personal config under the nearest project config into a per-file rule set and throws on a bad file, unknown rule, or bad plugin. Only the personal config may list plugins; `loadPlugins.ts` loads them.
+- **Findings are errors.** `runRules.ts` adds each rule finding, with its rule ID, to the result and counts it as an error; `withRuleId` builds the `[rule-id]` suffix that the report formatters print.
+- **Two callers.** The validation workflow and the citation fixer run the rules; the fixer also applies rule edits.
+
+Boundary: rules read the parser output and checked links, and the Obsidian rules inspect vault folders and symlinks; rules never write files.
 
 ### `LinkedHeaderContext/` — linked-context query
 
@@ -127,13 +142,14 @@ The result helpers count link statuses and classify a link as `wiki`, `caret`, o
 
 Core imports types, shared utilities, and injected services, never the CLI layer or formatters. `apply-citation-fixes.ts`, `rename-markdown-file.ts`, and `VaultLink/vaultLink.ts` apply changes to user files; `replaceFile.ts` owns note replacement primitives.
 
-Three imports cross the layer line:
+Four imports cross the layer line:
 
 | Importer | Imports | Why |
 |---|---|---|
 | `MarkdownParser/mdastAdapter.ts` | `src/validate/validation-disable.ts` | Detects the disable comment |
 | `apply-citation-fixes.ts` | `src/validate/validation-disable.ts` | Reports the skip reason |
 | `rename-markdown-file.ts` | `src/factories/componentFactory.ts` | Builds a fresh parser to verify an apply |
+| `ValidationRules/rules/` (three Obsidian vault rules) | `src/shellArgument.ts` | Quotes paths in the suggested `jact vault-link` command |
 
 `apply-citation-fixes.ts` also prints scan counts to standard output when `--scope` is set.
 
@@ -149,3 +165,4 @@ Each row records one version of this architecture section.
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
 | 1.2.0 | 2026-10-14: Added recoverable note application ownership and corrected the user-file writer boundary |
 | 1.3.0 | 2026-10-23: Rename resolves and preserves directory references without changing the citation fixer's file-only contract |
+| 1.4.0 | 2026-11-19: Added the vault link fixer to the write paths and the rule layer to the components; listed the shell-quoting import |

@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 002. Architecture
 
 **Status:** done
@@ -6,11 +10,14 @@ This section maps the six files in `src/validate/`, the guarantees each holds, a
 
 ## System Overview
 
-The validate module is an orchestration layer over the shared link checker. Single-file and `--stdin` runs call the workflow through the CLI orchestrator in `src/jact-cli.ts`. Batch runs select files first, then call the same workflow once per file.
+The validate module is an orchestration layer over the shared link checker. Single-file and `--stdin` runs call the workflow through the CLI orchestrator in `src/jact-cli.ts`. After `--fix`, `src/cli.ts` runs a fresh workflow on the file to pick the exit code. Batch runs select files first, then call the same workflow once per file.
 
 ```
 single file / --stdin:
   src/jact-cli.ts ──► workflow ──► outcome ──► src/jact-cli.ts renders report
+
+--fix recheck:
+  src/cli.ts ──► fresh workflow ──► outcome ──► exit code from remaining errors
 
 batch:
   src/cli.ts ──► file-set selection ──► sorted .md list
@@ -128,3 +135,4 @@ Each row records one version of this architecture section.
 | 1.0.0 | First module architecture |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
 | 1.2.0 | 2026-10-09: Added post-link rule checks, per-file configuration, and findings filtering |
+| 1.2.1 | 2026-11-19: Named the `--fix` recheck entry point in `src/cli.ts` |

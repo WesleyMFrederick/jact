@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 002. Architecture
 
 **Status:** done
@@ -51,15 +55,23 @@ Boundary: argument parsing and exit codes live in `src/cli.ts` and `src/jact-cli
 
 ### `fileCacheTypes.ts` — file resolution results
 
-This file declares the success and failure results of a file-cache lookup. Fields: [FileCache Types](../../../../docs/spec/004-domain-model.md#FileCache%20Types%20%28%60src/types/fileCacheTypes.ts%60%29).
+This file declares the success and failure results of a file-cache lookup, the lookup options, and the scope scan statistics. Fields: [FileCache Types](../../../../docs/spec/004-domain-model.md#FileCache%20Types%20%28%60src/types/fileCacheTypes.ts%60%29).
 
 - **Discriminated result.** One flag separates success from failure; only a failure carries a reason and diagnostics.
 
 Boundary: candidate ranking and display limits live in `src/FileCache.ts` and the output formatter.
 
+### `validationRuleTypes.ts` — validation rule contracts
+
+This file declares the rule, plugin, finding, fix edit, rule set, and per-file rule set resolver shapes. Configuration contract: [Validation configuration and presets](../../../../docs/spec/005-interfaces.md#Validation%20configuration%20and%20presets).
+
+- **Plugin surface.** A plugin module supplies rules in this shape, so a field change is a plugin contract change.
+
+Boundary: preset registration, config loading, and rule execution live in `src/core/ValidationRules/`.
+
 ### `componentInterfaces.ts` — dependency-injection import point
 
-This file re-exports the narrow dependency-injection interfaces that callers and the factory accept in place of concrete classes. Each interface is defined next to the core component that consumes it.
+This file re-exports the narrow dependency-injection interfaces that callers and the factory accept in place of concrete classes. Each interface is defined next to the core component that consumes it. It also re-exports the citation target resolution shapes from `validationTypes.ts`.
 
 - **No definitions.** The file holds only `export type` lines; it adds no members.
 - **Test doubles fit.** A plain object that satisfies an interface passes into the factory without a production class import. `test/unit/factories/component-factory-interfaces.test.ts` enforces this.
@@ -92,3 +104,4 @@ Each row records one version of this architecture document.
 |---------|---------|
 | 1.0.0 | Initial architecture for `src/types` |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
+| 1.2.0 | 2026-11-19: Added `validationRuleTypes.ts`; listed the full contents of `fileCacheTypes.ts` and `componentInterfaces.ts` |

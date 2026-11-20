@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 002. Architecture
 
 **Status:** done
@@ -65,13 +69,13 @@ Boundary: the factory wires components; it holds no parse, check, or extraction 
 
 ### `src/factories/LinkObjectFactory.ts` — synthetic link factory
 
-The synthetic link factory builds one link object from the `extract header` or `extract file` arguments, so the checker treats it like a parsed link.
+The synthetic link factory builds one link object from the `extract header` or `extract file` arguments, so extraction reports it like a parsed link.
 
 - **Header link.** An empty target path or heading text is refused; the link anchors to the heading.
 - **File link.** The link has no anchor, so extraction takes the whole file.
 - **Command-line origin.** The link's source is the working folder at line 0, column 0, with no extraction marker.
 
-Boundary: the factory only builds the object. The checker validates it, and only the orchestrator calls the factory.
+Boundary: the factory only builds the object, and only the orchestrator calls it. The checker validates the file link. For a header link, the orchestrator resolves the heading itself and marks the link valid in the extraction report.
 
 ---
 
@@ -81,3 +85,4 @@ Boundary: the factory only builds the object. The checker validates it, and only
 |---|---|
 | 1.0.0 | 2026-10-11: Initial architecture for the CLI layer |
 | 1.1.0 | 2026-10-14: Replaced the unchanged-note claim with core-owned recoverable application and CLI-owned recovery reporting |
+| 1.1.1 | 2026-11-19: The checker validates only the synthetic file link; the orchestrator resolves header links itself |

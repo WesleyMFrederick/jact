@@ -1,6 +1,10 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # `src/core` Living Specification
 
-**Version:** 2.1.0
+**Version:** 2.1.1
 **Status:** done
 
 `src/core` is the domain layer of jact: it parses Markdown, checks links, extracts linked content, and plans or applies file edits. It has no command registration, no output formatting, and no exit codes. Those belong to the command-line interface (CLI) layer in the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -78,3 +82,4 @@ Each row records one version of this module spec.
 | 1.4.1 | 2026-10-14: Vault link fixer preserves whitespace in Git checkout paths, including a trailing newline, by removing only Git's line-output separator |
 | 2.0.0 | 2026-10-14: Replaced the unchanged-note overwrite claim with recoverable displacement and exclusive installation; persistent recovery retains late editor saves, including writes through old descriptors |
 | 2.1.0 | 2026-10-23: Rename resolves existing directory references with and without trailing slashes and preserves their targets across moves |
+| 2.1.1 | 2026-11-19: Vision and architecture name the vault link fixer as a write path and the rule layer as a component, matching this quick reference |
