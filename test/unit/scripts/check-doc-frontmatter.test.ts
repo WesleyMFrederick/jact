@@ -40,6 +40,28 @@ describe("check-doc-frontmatter", () => {
 		expect(stderr).toContain("docs/a.md: remove created, last_modified");
 	});
 
+	it("given this checkout, when checked, then all tracked documentation is clean", () => {
+		const result = runCheck(dirname(dirname(SCRIPT)));
+		expect(result.stderr).toBe("");
+		expect(result.status).toBe(0);
+	});
+
+	it.each([
+		["a leading BOM", "\uFEFF---\ncreated: x\n---\n"],
+		["a padded opening fence", "--- \t\ncreated: x\n---\n"],
+		["a padded closing fence", "---\ncreated: x\n--- \t\n"],
+	])("given %s, when checked, then header timestamps are rejected", (_name, content) => {
+		const dir = makeRepo({ "a.md": content });
+		const { status, stderr } = runCheck(dir);
+		expect(status).toBe(1);
+		expect(stderr).toContain("a.md: remove created");
+	});
+
+	it("given a padded closing fence, when checked, then body keys stay exempt", () => {
+		const dir = makeRepo({ "a.md": "---\nverified_by: agent\n--- \t\ncreated: prose\n---\n" });
+		expect(runCheck(dir).status).toBe(0);
+	});
+
 	it("given only verification keys, when checked, then it passes", () => {
 		const dir = makeRepo({ "a.md": "---\nlast_verified: 2026-11-19\nverified_by: agent\n---\n# A\n" });
 		expect(runCheck(dir).status).toBe(0);

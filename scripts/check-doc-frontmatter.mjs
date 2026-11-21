@@ -17,9 +17,9 @@ const SKIPPED_PREFIXES = ["test/fixtures/"];
 
 /** Returns the banned keys found in the file's leading YAML header, in header order. */
 export function findStampKeys(content) {
-	const lines = content.split(/\r?\n/);
-	if (lines[0] !== "---") return [];
-	const end = lines.indexOf("---", 1);
+	const lines = content.replace(/^\uFEFF/, "").split(/\r?\n/);
+	if (lines[0]?.trimEnd() !== "---") return [];
+	const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === "---");
 	if (end === -1) return [];
 	return lines
 		.slice(1, end)

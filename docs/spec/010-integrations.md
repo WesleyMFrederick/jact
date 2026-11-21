@@ -6,7 +6,7 @@ verified_by: agent
 
 **Status:** done
 
-jact connects to four outside systems: editor hooks, AI agent sessions, the npm global link, and the npm release workflow. Each section states the contract that system relies on.
+jact connects to editor hooks, AI agent sessions, npm distribution, and development tooling. Each section states the contract that system relies on.
 
 ## Claude Code hook (primary integration)
 
@@ -48,3 +48,10 @@ Only the `.github/workflows/release.yml` workflow publishes the package. Contrac
 ## AppMap (runtime traces, dev-time)
 
 `npx appmap-node npx vitest run <test>` captures call traces to `tmp/appmap/` (gitignored); read with `appmap-read --zoom L0|L1|L2`. Config: `appmap.yml`.
+
+## Documentation hygiene in CI
+
+`node scripts/check-doc-frontmatter.mjs` checks tracked `.md` files, except `test/fixtures/`, for the editor timestamp keys `created` and `last_modified` in their leading YAML header. It exits 1 and names offending files and keys; clean documentation exits 0. Verification keys `last_verified` and `verified_by`, and timestamp-like text in the body, are allowed.
+
+Header fences may have trailing spaces or tabs, and the opening fence may follow a leading byte-order mark. These variations do not bypass the check or extend it into the body.
+

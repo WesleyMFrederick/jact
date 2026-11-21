@@ -43,7 +43,7 @@ This specification is the **canonical source of truth** for how jact is designed
 | 007 | [Testing](007-testing.md#007.%20Testing) | done | Test layout, conventions, TDD approach |
 | 008 | [Capabilities](008-capabilities.md#008.%20Capabilities) | done | Feature matrix of shipped capabilities |
 | 009 | [Actors](009-actors.md#009.%20Actors) | done | Human / LLM agent / hook / CI consumers and their constraints |
-| 010 | [Integrations](010-integrations.md#010.%20Integrations) | done | Hook contract, agent workflows, npm global link, npm release, AppMap |
+| 010 | [Integrations](010-integrations.md#010.%20Integrations) | done | Hook contract, agent workflows, npm global link, npm release, AppMap, documentation hygiene in CI |
 
 **Sections deliberately omitted** (vs the 22-section headroom template — mirror the format, not the section count): compliance, deployment, disaster-recovery, governance, observability, operations, policies, security, data, diagrams, quality, migration. A local single-user CLI has no meaningful content for them today — an empty scaffold would read as coverage and hide what's actually unspecified. Add any of these the day jact grows the corresponding surface (e.g. observability if telemetry lands).
 
