@@ -15,6 +15,7 @@ const fakeSdk = `
   const none = async function* () {};
   let uploads = 0;
   let sent = [];
+  let archiving = false;
   let releaseHelper;
   const helperReleased = new Promise((resolve) => { releaseHelper = resolve; });
   let releaseSlice;
@@ -70,7 +71,17 @@ const fakeSdk = `
           return { id: process.env.TEST_SESSION_ID };
         },
         retrieve: async () => ({ status: 'idle', usage: { list_cost: { amount: '12' } } }),
-        archive: async (id) => record({ op: 'archive', id }),
+        archive: async (id) => {
+          record({ op: 'archive', id });
+          if (process.env.TEST_CANCEL_AT === 'archive') {
+            if (archiving) throw new Error('archive already pending');
+            archiving = true;
+            process.emit('SIGINT');
+            process.emit('SIGTERM');
+            await new Promise(setImmediate);
+          }
+          record({ op: 'archived', id });
+        },
         threads: { list: none },
         events: {
           send: async (id, body) => {
@@ -102,7 +113,7 @@ const preload = `
   import { register } from 'node:module';
   register(${JSON.stringify(`data:text/javascript,${encodeURIComponent(sdkLoader)}`)});
   const realSetTimeout = globalThis.setTimeout;
-  globalThis.setTimeout = (fn, _ms, ...args) => realSetTimeout(fn, 0, ...args);
+  globalThis.setTimeout = (fn, ms, ...args) => realSetTimeout(fn, ms === 15_000 ? 0 : ms, ...args);
   globalThis.fetch = async (url, init) => {
     if (init?.method && init.method !== 'GET') throw new Error('unexpected GitHub write ' + url);
     return { ok: true, json: async () => String(url).includes('/files?') ? [
@@ -203,6 +214,17 @@ describe("Bug Hunter build helper upload", () => {
     expect(calls.filter((c) => c.op === "delete").map((c) => c.id).sort()).toEqual(ids);
     expect(calls.filter((c) => c.op === "deleted").map((c) => c.id).sort()).toEqual(ids);
     expect(calls.some((c) => c.op === "create")).toBe(false);
+  });
+
+  it("shares normal archival with cancellation and confirms it before deleting uploads", () => {
+    const { result, calls } = review("sesn_cancel_archive", { TEST_CANCEL_AT: "archive" });
+    expect(result.status, result.stderr).toBe(2);
+    expect(calls.filter((c) => c.op === "archive")).toEqual([{ op: "archive", id: "sesn_cancel_archive" }]);
+    const confirmed = calls.findIndex((c) => c.op === "archived");
+    expect(confirmed).toBeGreaterThanOrEqual(0);
+    for (const c of calls.filter((c) => c.op === "upload")) {
+      expect(calls.findIndex((d) => d.op === "deleted" && d.id === c.id)).toBeGreaterThan(confirmed);
+    }
   });
 
   it("quotes a session id that is not shell-safe", () => {

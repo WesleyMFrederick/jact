@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const helper = fileURLToPath(new URL("../../.github/bug-hunter/ensure-jact-build.mjs", import.meta.url));
+// Helpers still running, mapped to the promise that settles once they and their fake npm closed stdio.
+const live = new Map();
 let root;
 let repo;
 let head;
@@ -17,23 +19,102 @@ function git(...args) {
   }).trim();
 }
 
-function run(overrides = {}, extraArgs = [], onMessage = () => {}) {
-  return new Promise((resolve, reject) => {
+function stop(child) {
+  // Each helper leads its own process group, so this also reaches the fake npm it spawned,
+  // even after the helper itself has died.
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch (error) {
+    if (error.code !== "ESRCH") throw error;
+  }
+}
+
+function run(overrides = {}, extraArgs = [], onMessage = () => {}, processMs = 4000) {
+  let child;
+  const closed = new Promise((resolve, reject) => {
     const preload = overrides.BUILD_TEST_BARRIER ? ["--import", join(root, "lock-probe.mjs")] : [];
-    const child = spawn(process.execPath, [...preload, helper, "--repo", repo, "--head", head, "--session", "test-session", ...extraArgs], {
-      env: { ...env, ...overrides }, stdio: ["ignore", "pipe", "pipe", "ipc"],
+    child = spawn(process.execPath, [...preload, helper, "--repo", repo, "--head", head, "--session", "test-session", ...extraArgs], {
+      env: { ...env, ...overrides }, stdio: ["ignore", "pipe", "pipe", "ipc"], detached: true,
     });
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    let timedOut = false;
+    let installReady = false;
+    // A hung helper and its fake npm are killed here, so the hang fails an assertion
+    // instead of waiting for Vitest's timeout.
+    const timer = setTimeout(() => {
+      timedOut = true;
+      stop(child);
+    }, processMs);
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+      if (!installReady && stdout.includes("BUILD_TEST_INSTALL_READY\n")) {
+        installReady = true;
+        onMessage({ event: "install-ready", pid: child.pid });
+      }
+    });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
     child.on("error", reject);
     child.on("message", onMessage);
-    child.on("close", async (code) => {
+    // The fake npm inherits the helper's stdout and stderr, so "close" also means it has exited.
+    child.on("close", async (code, signal) => {
+      clearTimeout(timer);
+      live.delete(child);
       const cli = await readFile(join(repo, "dist", "cli.js"), "utf8").catch(() => null);
-      resolve({ code, stdout, stderr, cli });
+      resolve({ pid: child.pid, code, signal, timedOut, stdout, stderr, cli });
     });
   });
+  live.set(child, closed);
+  return closed;
+}
+
+// The barrier gets its own window to gather five waiters. Each waiter's lock deadline covers that
+// whole window plus the released install and build; each helper process, with its fake npm, is
+// killed shortly after that deadline, and the test's own timeout comes after that.
+function budgets(barrierMs, buildMs = 5000) {
+  const lockMs = barrierMs + buildMs;
+  const processMs = lockMs + 2000;
+  return { barrierMs, lockMs, processMs, testMs: processMs + 2000 };
+}
+
+// Six callers share one held install gate. `barrier` resolves with the lock owner's pid once the
+// other five report waiting on its lock: at once, or with `late`, only when the barrier window ends.
+function contend({ barrierMs, lockMs, processMs }, { late = false } = {}) {
+  const gate = join(root, "release-build");
+  const waiting = new Set();
+  let owner;
+  let installReady = false;
+  let settle;
+  const barrier = new Promise((resolve, reject) => {
+    settle = (final) => {
+      if (waiting.size === 5 && owner && installReady) resolve(owner);
+      else if (final) reject(new Error(`Owner install and five waiters did not reach the barrier within ${barrierMs} ms`));
+    };
+  });
+  const timer = setTimeout(() => settle(true), barrierMs);
+  const calls = Array.from({ length: 6 }, () => run(
+    { BUILD_TEST_BARRIER: gate, BUILD_TEST_BARRIER_MS: String(lockMs) },
+    ["--lock-timeout-ms", String(lockMs)],
+    (message) => {
+      if (message.event === "lock-owner") owner = message.pid;
+      if (message.event === "install-ready") installReady = true;
+      if (message.event === "lock-wait") waiting.add(message.pid);
+      if (!late) settle(false);
+    },
+    processMs,
+  ));
+  return { calls, barrier: barrier.finally(() => clearTimeout(timer)), release: () => writeFile(gate, "release") };
+}
+
+async function expectOneBuild(results) {
+  for (const result of results) {
+    expect(result.code, result.stderr).toBe(0);
+    expect(["built", "reused"]).toContain(callLog(result).outcome);
+    expect(result.cli).toBe("built for test\n");
+  }
+  expect(await commands()).toEqual(["ci --ignore-scripts", "run build"]);
+  expect(await readFile(join(repo, "dist", "cli.js"), "utf8")).toBe("built for test\n");
+  expect(results.map(callLog).filter((entry) => entry.outcome === "built")).toHaveLength(1);
 }
 
 async function commands() {
@@ -63,7 +144,26 @@ import { join } from 'node:path';
 const args = process.argv.slice(2).join(' ');
 appendFileSync(process.env.BUILD_TEST_LOG, args + '\\n');
 if (args === 'ci --ignore-scripts' && process.env.BUILD_TEST_BARRIER) {
+  // Held only until the gate opens, its own bound passes, or its helper dies and orphans it.
+  const parent = process.ppid;
+  const deadline = Date.now() + Number(process.env.BUILD_TEST_BARRIER_MS);
+  console.log('BUILD_TEST_INSTALL_READY');
   while (!existsSync(process.env.BUILD_TEST_BARRIER)) {
+    // Check the recorded helper PID, not a potentially reparented PID.
+    let parentAlive = true;
+    try { process.kill(parent, 0); }
+    catch (error) {
+      if (error.code !== 'ESRCH') throw error;
+      parentAlive = false;
+    }
+    if (!parentAlive) {
+      appendFileSync(process.env.BUILD_TEST_LOG, 'orphaned\\n');
+      process.exit(75);
+    }
+    if (Date.now() >= deadline) {
+      appendFileSync(process.env.BUILD_TEST_LOG, 'barrier timeout\\n');
+      process.exit(75);
+    }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
@@ -83,11 +183,13 @@ import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 const mkdir = fs.mkdirSync;
 fs.mkdirSync = (...args) => {
-  try { return mkdir(...args); }
-  catch (error) {
-    if (String(args[0]).endsWith('/bug-hunter-build.lock') && error.code === 'EEXIST') {
-      process.send?.({ event: 'lock-wait', pid: process.pid });
-    }
+  const lock = String(args[0]).endsWith('/bug-hunter-build.lock');
+  try {
+    const made = mkdir(...args);
+    if (lock) process.send?.({ event: 'lock-owner', pid: process.pid });
+    return made;
+  } catch (error) {
+    if (lock && error.code === 'EEXIST') process.send?.({ event: 'lock-wait', pid: process.pid });
     throw error;
   }
 };
@@ -96,35 +198,47 @@ syncBuiltinESMExports();
 });
 
 afterEach(async () => {
+  // Kill whatever a failed or timed-out test left running, fake npm included, before removing its files.
+  const running = [...live];
+  for (const [child] of running) stop(child);
+  await Promise.allSettled(running.map(([, closed]) => closed));
   await rm(root, { recursive: true, force: true });
 });
 
 describe("shared prover build guard", () => {
   it("lets six simultaneous callers use CLI output after exactly one install and build", async () => {
-    const gate = join(root, "release-build");
-    const waiting = new Set();
-    let release;
-    const blocked = new Promise((resolve) => { release = resolve; });
-    const timer = setTimeout(() => release(new Error("Five callers did not reach the held lock")), 5000);
-    // Bound each waiter too: a dead lock owner must fail here, not at Vitest's timeout.
-    const calls = Array.from({ length: 6 }, () => run({ BUILD_TEST_BARRIER: gate }, ["--lock-timeout-ms", "5000"], (message) => {
-      if (message.event === "lock-wait") waiting.add(message.pid);
-      if (waiting.size === 5) release();
-    }));
-    const barrierError = await blocked;
-    clearTimeout(timer);
-    await writeFile(gate, "release");
-    const results = await Promise.all(calls);
-    expect(barrierError).toBeUndefined();
+    const contest = contend(budgets(5000));
+    await contest.barrier;
+    await contest.release();
+    await expectOneBuild(await Promise.all(contest.calls));
+  }, budgets(5000).testMs);
+
+  it("still builds once when the held install is released at the very end of the barrier window", async () => {
+    // The barrier resolves from its own timer, after all five wait, so the release is as late as is valid.
+    const contest = contend(budgets(3000), { late: true });
+    await contest.barrier;
+    await contest.release();
+    await expectOneBuild(await Promise.all(contest.calls));
+  }, budgets(3000).testMs);
+
+  it("fails each waiter on its own lock bound, leaving no process behind, when the lock owner dies", async () => {
+    const contest = contend(budgets(3000, 1000));
+    const owner = await contest.barrier;
+    // Kill the owner alone, as a crash would: its orphaned fake npm must still exit.
+    process.kill(owner, "SIGKILL");
+    const results = await Promise.all(contest.calls);
     for (const result of results) {
-      expect(result.code, result.stderr).toBe(0);
-      expect(["built", "reused"]).toContain(callLog(result).outcome);
-      expect(result.cli).toBe("built for test\n");
+      expect(result.timedOut, result.stderr).toBe(false);
+      if (result.pid === owner) {
+        expect(result.signal).toBe("SIGKILL");
+        continue;
+      }
+      expect(result.code, result.stderr).toBe(124);
+      expect(callLog(result).outcome).toBe("timeout");
     }
-    expect(await commands()).toEqual(["ci --ignore-scripts", "run build"]);
-    expect(await readFile(join(repo, "dist", "cli.js"), "utf8")).toBe("built for test\n");
-    expect(results.map(callLog).filter((entry) => entry.outcome === "built")).toHaveLength(1);
-  }, 15_000);
+    expect(await commands()).toEqual(["ci --ignore-scripts", "orphaned"]);
+    expect(live.size).toBe(0);
+  }, budgets(3000, 1000).testMs);
 
   it("does not trust a preexisting dist directory, and reuses only a successful guarded build", async () => {
     await mkdir(join(repo, "dist"));

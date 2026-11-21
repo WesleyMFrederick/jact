@@ -27,7 +27,7 @@
 //
 // Exit codes: 0 no blocking findings, 1 blocking findings, 2 the review itself failed.
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +35,7 @@ import Anthropic, { toFile } from "@anthropic-ai/sdk";
 import { assess } from "./progress.mjs";
 import { parseReport } from "./report.mjs";
 import { compareToPr, reviewTarget, sessionPrefix } from "./target.mjs";
+import { createSessionLifecycle } from "./session-lifecycle.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const env = (name, fallback) => {
@@ -278,9 +279,7 @@ const say = (sessionId, text) =>
 // Best effort: ask the agent to end its runs, stop its turn, and archive the session so
 // nothing keeps spending after the CI job is gone. Archiving can also end open runs.
 // https://platform.claude.com/docs/en/managed-agents/workflow-runs#interrupt-a-session-with-runs-open
-// `quick` skips the wait, for the cancel path: GitHub kills the process about 10 seconds
-// after it signals, and the next run's stopStaleSessions() catches anything left over.
-async function stopSession(sessionId, { quick = false } = {}) {
+async function stopSession(sessionId) {
   const { status } = await client.beta.sessions.retrieve(sessionId).catch(() => ({}));
   if (status === "running" || status === "rescheduling") {
     // Only a working session gets the stop message: on an idle one it would start a new turn.
@@ -288,7 +287,7 @@ async function stopSession(sessionId, { quick = false } = {}) {
     await client.beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
   }
   // A running session can't be archived; give the interrupt up to 30 seconds to land.
-  for (let i = 0; i < (quick ? 0 : 6); i++) {
+  for (let i = 0; i < 6; i++) {
     const { status } = await client.beta.sessions.retrieve(sessionId).catch(() => ({}));
     if (status !== "running" && status !== "rescheduling") break;
     await new Promise((r) => setTimeout(r, 5_000));
@@ -383,44 +382,9 @@ async function postReview(pr, files, report, { sessionId, note, finished, cost }
 
 // ---------- Main ----------
 
-let liveSession; // the session to stop if this process is cancelled or crashes
-let stopping = false;
-let pendingSession;
-let shutdownPromise;
-let uploadCleanup;
-// Files API uploads outlive their session, so every exit path deletes the ones that succeeded,
-// including uploads still in flight when another setup step fails.
-const uploadedIds = [];
-const pendingUploads = [];
-function upload(bytes, name, type) {
-  const pending = (async () => {
-    const u = await client.beta.files.upload({ file: await toFile(bytes, name, { type }) });
-    uploadedIds.push(u.id);
-    return u;
-  })();
-  pendingUploads.push(pending);
-  return pending;
-}
-function deleteUploads() {
-  return uploadCleanup ??= (async () => {
-    await Promise.allSettled(pendingUploads);
-    const ids = uploadedIds.splice(0);
-    await Promise.all(ids.map((id) => client.beta.files.delete(id).catch(() => {})));
-  })();
-}
-
-function shutdown({ quick = false } = {}) {
-  stopping = true;
-  return shutdownPromise ??= (async () => {
-    // Creation may finish after a signal, before main can publish the session id.
-    // Wait for that continuation before checking liveSession or deleting its files.
-    await pendingSession?.catch(() => {});
-    if (liveSession) {
-      await stopSession(liveSession, { quick });
-      liveSession = undefined;
-    }
-    await deleteUploads();
-  })();
+const lifecycle = createSessionLifecycle(client);
+async function upload(bytes, name, type) {
+  return lifecycle.upload(await toFile(bytes, name, { type }));
 }
 
 // REPORT_FILE gets one JSON record per run, including runs that end before a session starts.
@@ -437,7 +401,7 @@ async function main() {
   await refreshGithubIdToken();
   setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
   const { pr, files } = await loadTarget();
-  if (stopping) return;
+  if (lifecycle.mode !== "none") return;
   const { slices, skipped } = planSlices(files);
   console.log(`Slices: ${slices.map((s) => `${s.id}=${s.lines} lines/${s.files.length} files`).join(", ") || "none"}; skipped ${skipped.length} files.`);
   if (PLAN_ONLY) {
@@ -454,19 +418,19 @@ async function main() {
   // Read before any Anthropic call, so a missing helper stops the run with nothing to clean up.
   const helperBytes = readFileSync(BUILD_HELPER);
   await stopStaleSessions();
-  if (stopping) return;
+  if (lifecycle.mode !== "none") return;
   const [agentId, environmentId, helper, uploads] = await Promise.all([
     ensureAgent(),
     ensureEnvironment(),
     upload(helperBytes, "ensure-jact-build.mjs", "text/javascript"),
     Promise.all(slices.map((s) => upload(Buffer.from(s.text), `${s.id}.diff`, "text/plain"))),
   ]);
-  if (stopping) return;
+  if (lifecycle.mode !== "none") return;
 
-  pendingSession = client.beta.sessions.create({
+  const session = await lifecycle.createSession({
     agent: agentId,
     environment_id: environmentId,
-    title: `${sessionPrefix(REPO, TARGET, PR_NUMBER)}@ ${pr.head.sha.slice(0, 7)}`,
+    title: `${sessionPrefix(REPO, TARGET, PR_NUMBER)}@ ${pr.head.sha.slice(0, 7)} (${randomUUID()})`,
     budget: { type: "limit", max_list_cost: { amount: BUDGET_CENTS, currency: "USD" } },
     resources: [
       {
@@ -480,13 +444,10 @@ async function main() {
       ...uploads.map((u, i) => ({ type: "file", file_id: u.id, mount_path: `${SLICE_DIR}/${slices[i].id}.diff` })),
     ],
   });
-  const session = await pendingSession;
-  liveSession = session.id;
-  pendingSession = undefined;
-  if (stopping) return;
+  if (lifecycle.mode !== "none") return;
   console.log(`Session ${session.id} started: ${sessionPrefix(REPO, TARGET, PR_NUMBER).trim()} (budget ${dollars(BUDGET_CENTS)}).`);
   await say(session.id, manifest(pr, slices, skipped, session.id));
-  if (stopping) return;
+  if (lifecycle.mode !== "none") return;
 
   const deadline = Date.now() + TIMEOUT_MS;
   const wrapUpCents = Number(BUDGET_CENTS) * WRAP_UP_AT;
@@ -496,10 +457,10 @@ async function main() {
   let verdict = { state: "working" };
   let events = [];
   let seen = 0;
-  while (!stopping && Date.now() < deadline) {
+  while (lifecycle.mode === "none" && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_MS));
     const current = await client.beta.sessions.retrieve(session.id);
-    if (stopping) return;
+    if (lifecycle.mode !== "none") return;
     if (current.status === "terminated") throw new Error(`Session ${session.id} terminated.`);
     const spent = Number(current.usage?.list_cost?.amount ?? 0);
     if (!askedToWrapUp && spent >= wrapUpCents && current.status === "running") {
@@ -509,7 +470,7 @@ async function main() {
     }
     if (current.status !== "idle" && current.status !== "running") continue;
     events = await listEvents(session.id);
-    if (stopping) return;
+    if (lifecycle.mode !== "none") return;
     const fresh = events.slice(seen);
     seen = events.length;
     for (const e of fresh) {
@@ -536,7 +497,7 @@ async function main() {
     }
     if (verdict.state !== "working" && verdict.state !== "stalled") break;
   }
-  if (stopping) return;
+  if (lifecycle.mode !== "none") return;
 
   if (verdict.state === "working" && verdict.reason === "retries_exhausted") {
     const errors = events.filter((e) => e.type === "session.error").map((e) => JSON.stringify(e.error ?? e)).slice(-3);
@@ -549,15 +510,15 @@ async function main() {
   if (verdict.state === "refused") throw new Error(`Session ${session.id} stopped with a refusal, so this PR has not been checked.`);
   if (verdict.state === "blocked") throw new Error(`Session ${session.id} is waiting on a tool confirmation; check the agent's permission policy.`);
   const finished = verdict.state === "done";
-  // Archive in every case: a finished session has nothing left to do, and an unfinished one
-  // must not keep spending after this job ends.
-  if (!finished) await stopSession(session.id);
-  else await client.beta.sessions.archive(session.id).catch((err) => console.log(`  could not archive ${session.id}: ${err.message}`));
-  liveSession = undefined;
+  // Completion, errors, and signals all await this one resource owner.
+  const cleanup = await lifecycle.requestShutdown("graceful");
+  if (!cleanup.ok) throw new Error("Session cleanup was not confirmed; see the shutdown errors.");
+  if (lifecycle.mode === "fast") return;
   // A report can land between the last poll and the stop, so read the events once more.
   if (!finished) events = await listEvents(session.id).catch(() => events);
 
   const cost = await costReport(session.id).catch((err) => ({ table: `Cost unavailable: ${err.message}` }));
+  if (lifecycle.mode === "fast") return;
   console.log(`\nCost:\n${cost.table}\n`);
 
   let report;
@@ -569,8 +530,6 @@ async function main() {
   }
   await postReview(pr, files, report, { sessionId: session.id, note, finished, cost });
   saveReport(pr, { session: session.id, agent: agentId, finished, note, cost_usd: cost.total === undefined ? null : Number(cost.total) / 100, report });
-
-  await deleteUploads();
 
   const threshold = SEVERITY_RANK[FAIL_ON];
   const blocking = report.findings.filter((f) => (SEVERITY_RANK[f.severity] ?? 0) >= threshold);
@@ -585,15 +544,18 @@ async function main() {
 // GitHub sends SIGINT, then SIGTERM, when a newer run cancels this one.
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, async () => {
-    if (liveSession) console.log(`${signal}: stopping session ${liveSession}.`);
-    await shutdown({ quick: true });
+    console.log(`${signal}: requesting fast shutdown.`);
+    await lifecycle.requestShutdown("fast");
     process.exit(2);
   });
 }
 
-main().catch(async (err) => {
+main().then(async () => {
+  const cleanup = await lifecycle.requestShutdown("graceful");
+  if (!cleanup.ok) process.exit(2);
+}).catch(async (err) => {
   console.error(`::error title=Bug Hunter failed::${err.message.split("\n")[0]}`);
   console.error(err);
-  await shutdown();
+  await lifecycle.requestShutdown("graceful");
   process.exit(2);
 });

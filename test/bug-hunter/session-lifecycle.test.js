@@ -1,0 +1,409 @@
+import { describe, expect, it } from "vitest";
+import { createSessionLifecycle } from "../../.github/bug-hunter/session-lifecycle.mjs";
+
+// The lifecycle owns every cleanup the runner does on its way out: finishing or failing
+// (graceful) and GitHub's cancel signals (fast). These tests drive it through a fake SDK with
+// real promises and short deadlines; no paid service is called. Signal and error labels map
+// to the requestShutdown mode the runner passes; the real-runner tests cover the handlers.
+
+const TITLE = "Bug Hunter test/repo#1 @ 0123456";
+// The matrix releases each pending call about 10 ms after the second trigger, well inside
+// these deadlines, so every service answer arrives in time and cleanup should succeed.
+const MATRIX = { gracefulMs: 1_500, fastMs: 400, requestMs: 250, pollMs: 50 };
+const SHORT = { gracefulMs: 500, fastMs: 120, requestMs: 30, pollMs: 100 };
+const RANK = { none: 0, graceful: 1, fast: 2 };
+const FIRST = { finish: "graceful", "setup-error": "graceful", "poll-error": "graceful", SIGINT: "fast", SIGTERM: "fast" };
+const SECOND = { SIGINT: "fast", SIGTERM: "fast", error: "graceful", finish: "graceful" };
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// A service that never answers, even after the request is aborted.
+const never = () => new Promise(() => {});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+// Rejects with a clear message well before Vitest's own timeout.
+async function within(promise, ms, label) {
+  let timer;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} did not settle within ${ms} ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, guard]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function until(check, label, ms = 2_000) {
+  const end = Date.now() + ms;
+  while (!check()) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${label}`);
+    await sleep(2);
+  }
+}
+
+// Fake Anthropic client with the SDK's argument order: create/upload/list take options second;
+// retrieve/archive/delete/events.send take them third. SDK calls are recorded with `sdk: true`;
+// "uploaded", "created", "archived" and "deleted" mark the moment the service answered.
+function fakeClient({ upload, create, archive, remove, interruptStops = true, listTail = false } = {}) {
+  const calls = [];
+  const server = new Map();
+  let uploads = 0;
+  const sdk = (op, id, options, extra = {}) => calls.push({ op, id, options, sdk: true, ...extra });
+  const mark = (op, id) => calls.push({ op, id });
+  const addSession = (session) => {
+    const stored = { status: "idle", archived_at: null, ...session };
+    server.set(stored.id, stored);
+    return stored;
+  };
+  const files = {
+    async upload(params, options) {
+      const id = `file_${++uploads}`;
+      sdk("upload", id, options, { name: params?.file?.name });
+      await upload?.(id, params);
+      mark("uploaded", id);
+      return { id, filename: params?.file?.name };
+    },
+    async delete(id, _params, options) {
+      sdk("delete", id, options);
+      await remove?.(id);
+      mark("deleted", id);
+      return { id, type: "file_deleted" };
+    },
+  };
+  const sessions = {
+    async create(params, options) {
+      sdk("create", params?.title, options);
+      const spec = await create?.(params, addSession);
+      const session = addSession({ id: "sesn_1", title: params.title, ...spec });
+      mark("created", session.id);
+      return { ...session };
+    },
+    async retrieve(id, _params, options) {
+      sdk("retrieve", id, options);
+      const session = server.get(id);
+      if (!session) throw Object.assign(new Error(`no session ${id}`), { status: 404 });
+      return { ...session };
+    },
+    async archive(id, _params, options) {
+      sdk("archive", id, options);
+      await archive?.(id);
+      const session = server.get(id);
+      if (session) Object.assign(session, { status: "idle", archived_at: new Date().toISOString() });
+      mark("archived", id);
+      return { ...session };
+    },
+    // Newest first, like the service. With listTail the list never ends: lookup must be bounded.
+    list(_params, options) {
+      sdk("list", undefined, options);
+      const snapshot = [...server.values()].reverse().map((s) => ({ ...s }));
+      async function* items() {
+        yield* snapshot;
+        for (let i = 0; listTail; i++) {
+          if (options?.signal?.aborted) throw options.signal.reason ?? new Error("aborted");
+          await new Promise(setImmediate);
+          yield { id: `sesn_unrelated_${i}`, title: `Unrelated ${i}`, status: "running", archived_at: null };
+        }
+      }
+      const iterator = items();
+      return { data: snapshot, [Symbol.asyncIterator]: () => iterator };
+    },
+    events: {
+      async send(id, params, options) {
+        const types = (params?.events ?? []).map((e) => e.type);
+        sdk("send", id, options, { events: types });
+        if (interruptStops && types.includes("user.interrupt")) {
+          const session = server.get(id);
+          if (session) session.status = "idle";
+        }
+        return {};
+      },
+    },
+  };
+  const ops = (op) => calls.filter((c) => c.op === op);
+  return {
+    client: { beta: { files, sessions }, files, sessions },
+    calls,
+    addSession,
+    ops,
+    ids: (op) => ops(op).map((c) => c.id),
+    index: (op, id) => calls.findIndex((c) => c.op === op && c.id === id),
+  };
+}
+
+function logger() {
+  const lines = [];
+  return { lines, log: (...args) => lines.push(args.map((a) => (a instanceof Error ? a.message : String(a))).join(" ")) };
+}
+
+const params = () => ({ title: TITLE, agent: "agent_test", environment_id: "env_test", resources: [] });
+const uploadTwo = (life) => Promise.all([life.upload({ name: "helper.mjs" }), life.upload({ name: "s1.diff" })]);
+
+function expectBoundedRequests(calls) {
+  for (const c of calls.filter((call) => call.sdk)) {
+    const label = `${c.op} ${c.id ?? ""}`;
+    expect(c.options?.signal, `${label} has an AbortSignal`).toBeInstanceOf(AbortSignal);
+    expect(c.options.maxRetries, `${label} does not retry`).toBe(0);
+    expect(c.options.timeout, `${label} has a timeout`).toBeGreaterThan(0);
+  }
+}
+
+// Each moment leaves one call pending (or a session running) when the first trigger arrives.
+const MOMENTS = {
+  "pending upload": {
+    fake: (gate) => ({ upload: (id) => (id === "file_2" ? gate.promise : undefined) }),
+    async reach(life, fake) {
+      await life.upload({ name: "helper.mjs" });
+      life.upload({ name: "s1.diff" }).catch(() => {});
+      await until(() => fake.ops("upload").length === 2, "the second upload to start");
+    },
+    // No session exists yet, so there is nothing to archive.
+    archived: [],
+  },
+  "pending create": {
+    fake: (gate) => ({
+      create: async () => {
+        await gate.promise;
+        return { id: "sesn_late" };
+      },
+    }),
+    async reach(life, fake) {
+      await uploadTwo(life);
+      life.createSession(params()).catch(() => {});
+      await until(() => fake.ops("create").length === 1, "creation to start");
+    },
+    archived: ["sesn_late"],
+  },
+  "running session": {
+    fake: () => ({ create: async () => ({ id: "sesn_run", status: "running" }) }),
+    async reach(life) {
+      await uploadTwo(life);
+      await life.createSession(params());
+    },
+    archived: ["sesn_run"],
+  },
+  "pending archive": {
+    fake: (gate) => ({ create: async () => ({ id: "sesn_arch" }), archive: () => gate.promise }),
+    async reach(life) {
+      await uploadTwo(life);
+      await life.createSession(params());
+    },
+    afterFirst: (fake) => until(() => fake.ops("archive").length === 1, "the archive request"),
+    archived: ["sesn_arch"],
+  },
+};
+
+const rows = Object.keys(FIRST).flatMap((first) =>
+  Object.keys(MOMENTS).flatMap((moment) => Object.keys(SECOND).map((second) => ({ first, moment, second }))),
+);
+
+describe("Bug Hunter session lifecycle", () => {
+  it.each(rows)("$first during $moment, then $second", async ({ first, moment, second }) => {
+    const gate = deferred();
+    const m = MOMENTS[moment];
+    const fake = fakeClient(m.fake(gate));
+    const { log } = logger();
+    const life = createSessionLifecycle(fake.client, { ...MATRIX, log });
+    await m.reach(life, fake);
+    const started = { upload: fake.ops("upload").length, create: fake.ops("create").length };
+    expect(life.mode).toBe("none");
+
+    const stopping = life.requestShutdown(FIRST[first]);
+    let resolvedAt;
+    stopping.then(
+      () => {
+        resolvedAt = fake.calls.length;
+      },
+      () => {},
+    );
+    expect(life.mode).toBe(FIRST[first]);
+    await m.afterFirst?.(fake);
+
+    expect(life.requestShutdown(SECOND[second])).toBe(stopping);
+    const mode = RANK[SECOND[second]] > RANK[FIRST[first]] ? SECOND[second] : FIRST[first];
+    expect(life.mode).toBe(mode);
+
+    // New work while stopping is refused without reaching the service.
+    await within(expect(life.upload({ name: "late.diff" })).rejects.toThrow(), 1_000, "a refused upload");
+    await within(expect(life.createSession(params())).rejects.toThrow(), 1_000, "a refused creation");
+
+    await sleep(10);
+    gate.resolve();
+    const result = await within(stopping, (mode === "fast" ? MATRIX.fastMs : MATRIX.gracefulMs) + 250, "shutdown");
+
+    expect(result).toMatchObject({ ok: true });
+    expect(life.mode).toBe(mode);
+    expect(fake.ops("upload")).toHaveLength(started.upload);
+    expect(fake.ops("create")).toHaveLength(started.create);
+
+    // Each known resource is cleaned up exactly once, before shutdown resolves.
+    expect(fake.ids("archive")).toEqual(m.archived);
+    const uploaded = fake.ids("uploaded").sort();
+    expect(uploaded).toEqual(["file_1", "file_2"]);
+    expect(fake.ids("delete").sort()).toEqual(uploaded);
+    expect(fake.ids("deleted").sort()).toEqual(uploaded);
+    for (const id of uploaded) expect(fake.index("deleted", id)).toBeLessThan(resolvedAt);
+    for (const id of m.archived) {
+      // The archive answered, so deletion waits for that answer.
+      const archived = fake.index("archived", id);
+      expect(archived).toBeGreaterThanOrEqual(0);
+      expect(archived).toBeLessThan(resolvedAt);
+      for (const fileId of uploaded) expect(fake.index("delete", fileId)).toBeGreaterThan(archived);
+    }
+    expectBoundedRequests(fake.calls);
+
+    // A trigger after cleanup still gets the same promise and starts nothing new.
+    const callCount = fake.calls.length;
+    expect(life.requestShutdown("fast")).toBe(stopping);
+    expect(life.requestShutdown("graceful")).toBe(stopping);
+    await sleep(20);
+    expect(fake.calls.slice(callCount).filter((c) => c.sdk)).toEqual([]);
+  });
+
+  it("wakes a graceful stop that is waiting on a running session when a signal escalates it", async () => {
+    const fake = fakeClient({ create: async () => ({ id: "sesn_busy", status: "running" }), interruptStops: false });
+    const { log } = logger();
+    // Graceful would wait ten seconds; after escalation allow only the fast budget plus scheduler slack.
+    const life = createSessionLifecycle(fake.client, { gracefulMs: 10_000, fastMs: 120, requestMs: 30, pollMs: 5_000, log });
+    await uploadTwo(life);
+    await life.createSession(params());
+
+    const stopping = life.requestShutdown("graceful"); // poll error
+    await until(() => fake.ops("retrieve").length + fake.ops("send").length > 0, "the graceful stop to check the session");
+    await sleep(50);
+    expect(fake.ops("archive"), "graceful stop is still waiting for the session to stop running").toHaveLength(0);
+
+    expect(life.requestShutdown("fast")).toBe(stopping); // SIGTERM
+    expect(life.mode).toBe("fast");
+    await within(stopping, SHORT.fastMs + 250, "shutdown after fast escalation");
+
+    expect(life.mode).toBe("fast");
+    expect(fake.ids("archive")).toEqual(["sesn_busy"]);
+    expect(fake.ids("delete").sort()).toEqual(["file_1", "file_2"]);
+    expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+    expectBoundedRequests(fake.calls);
+  });
+
+  it.each(["graceful", "fast"])(
+    "%s stop of a creation that never answers finds the session by its exact title and archives it",
+    async (mode) => {
+      const fake = fakeClient({
+        listTail: true,
+        // The service made the session but its answer never arrives, even after abort.
+        create: (p, addSession) => {
+          addSession({ id: "sesn_ghost", title: p.title, status: "running" });
+          return never();
+        },
+      });
+      fake.addSession({ id: "sesn_other_pr", title: "Bug Hunter test/repo#2 @ abcdef0", status: "running" });
+      fake.addSession({ id: "sesn_longer_title", title: `${TITLE} (retry)`, status: "running" });
+      const { lines, log } = logger();
+      const life = createSessionLifecycle(fake.client, { ...SHORT, log });
+      await life.upload({ name: "s1.diff" });
+      const settled = life.createSession(params()).then(
+        () => "resolved",
+        () => "rejected",
+      );
+      await until(() => fake.ops("create").length === 1, "creation to start");
+
+      const result = await within(life.requestShutdown(mode), (mode === "fast" ? SHORT.fastMs : SHORT.gracefulMs) + 250, "shutdown with a stalled creation");
+      await within(settled, 1_000, "the stalled createSession call");
+
+      expect(result).toMatchObject({ ok: false });
+      expect(lines.length, "a timed-out creation is logged").toBeGreaterThan(0);
+      expect(fake.ops("list").length).toBeGreaterThan(0);
+      expect(fake.ids("archive")).toEqual(["sesn_ghost"]);
+      expect(fake.ids("delete")).toEqual(["file_1"]);
+      expect(fake.ids("deleted")).toEqual(["file_1"]);
+      expect(fake.ops("create")).toHaveLength(1);
+      expectBoundedRequests(fake.calls);
+    },
+  );
+
+  it.each(["graceful", "fast"])(
+    "%s stop of a creation that never answers and never appears in the list still ends and deletes uploads",
+    async (mode) => {
+      const fake = fakeClient({ listTail: true, create: () => never() });
+      const { lines, log } = logger();
+      const life = createSessionLifecycle(fake.client, { ...SHORT, log });
+      await life.upload({ name: "s1.diff" });
+      life.createSession(params()).catch(() => {});
+      await until(() => fake.ops("create").length === 1, "creation to start");
+
+      const result = await within(life.requestShutdown(mode), (mode === "fast" ? SHORT.fastMs : SHORT.gracefulMs) + 250, "shutdown with a stalled creation");
+
+      expect(result).toMatchObject({ ok: false });
+      expect(lines.length).toBeGreaterThan(0);
+      expect(fake.ids("archive")).toEqual([]);
+      expect(fake.ids("deleted")).toEqual(["file_1"]);
+      expectBoundedRequests(fake.calls);
+    },
+  );
+
+  it.each([
+    ["never answer", { archive: () => never(), remove: (id) => (id === "file_1" ? never() : undefined) }],
+    [
+      "fail",
+      {
+        archive: async () => {
+          throw new Error("archive refused");
+        },
+        remove: async (id) => {
+          if (id === "file_1") throw new Error("delete refused");
+        },
+      },
+    ],
+  ])("finishes every cleanup step loudly when the archive and one delete %s", async (_label, behavior) => {
+    const fake = fakeClient({ create: async () => ({ id: "sesn_stuck" }), ...behavior });
+    const { lines, log } = logger();
+    const life = createSessionLifecycle(fake.client, { ...SHORT, log });
+    await uploadTwo(life);
+    await life.createSession(params());
+
+    const stopping = life.requestShutdown("graceful");
+    await until(() => fake.ops("archive").length === 1, "the archive request");
+    expect(life.requestShutdown("fast")).toBe(stopping);
+    const result = await within(stopping, SHORT.fastMs + 250, "shutdown with stalled cleanup");
+
+    expect(result).toMatchObject({ ok: false });
+    expect(fake.ids("archive")).toEqual(["sesn_stuck"]);
+    expect(fake.ids("delete").sort()).toEqual(["file_1", "file_2"]);
+    expect(fake.ids("deleted")).toEqual(["file_2"]);
+    expect(lines.some((line) => line.includes("sesn_stuck")), lines.join("\n")).toBe(true);
+    expect(lines.some((line) => line.includes("file_1")), lines.join("\n")).toBe(true);
+    expectBoundedRequests(fake.calls);
+
+    await sleep(20);
+    expect(fake.ops("archive")).toHaveLength(1);
+    expect(fake.ops("delete")).toHaveLength(2);
+  });
+
+  it("only escalates its mode and refuses new uploads and sessions once shutdown is requested", async () => {
+    const fake = fakeClient();
+    const life = createSessionLifecycle(fake.client, SHORT);
+    expect(life.mode).toBe("none");
+
+    const stopping = life.requestShutdown("graceful");
+    expect(life.mode).toBe("graceful");
+    expect(life.requestShutdown("fast")).toBe(stopping);
+    expect(life.mode).toBe("fast");
+    expect(life.requestShutdown("graceful")).toBe(stopping);
+    expect(life.mode).toBe("fast");
+
+    await within(expect(life.upload({ name: "s1.diff" })).rejects.toThrow(), 1_000, "a refused upload");
+    await within(expect(life.createSession(params())).rejects.toThrow(), 1_000, "a refused creation");
+    const result = await within(stopping, SHORT.fastMs + 250, "shutdown with nothing to clean");
+
+    expect(result).toMatchObject({ ok: true });
+    expect(life.mode).toBe("fast");
+    await within(expect(life.upload({ name: "s2.diff" })).rejects.toThrow(), 1_000, "a refused upload");
+    await within(expect(life.createSession(params())).rejects.toThrow(), 1_000, "a refused creation");
+    expect(fake.calls.filter((c) => c.sdk)).toEqual([]);
+  });
+});
