@@ -161,6 +161,48 @@ describe("setup is safe to run on a config other tools also use", () => {
 		},
 	);
 
+	it.each(["claude", "codex", "gemini"] as const)(
+		"%s: never claims another program's hook subcommand",
+		(harness) => {
+			const event = harness === "gemini" ? "AfterTool" : "PostToolUse";
+			const foreign = { matcher: ".*", hooks: [{ type: "command", command: `other-linter hook ${harness}` }] };
+			const file = seed(harness, JSON.stringify({ hooks: { [event]: [foreign] } }));
+			expect(isInstalled(harness, options)).toBe(false);
+			expect(removeHarness(harness, options).action).toBe("absent");
+			installHarness(harness, options);
+			expect(readJson(file).hooks[event][0]).toEqual(foreign);
+			removeHarness(harness, options);
+			expect(readJson(file).hooks[event]).toEqual([foreign]);
+		},
+	);
+
+	it.each([[], "bad", 42, null].map((value) => [value]))("refuses a malformed hooks value: %j", (hooks) => {
+		const before = JSON.stringify({ model: "keep", hooks });
+		const file = seed("claude", before);
+		expect(() => installHarness("claude", options)).toThrow(/hooks/);
+		expect(() => removeHarness("claude", options)).toThrow(/hooks/);
+		expect(readFileSync(file, "utf8")).toBe(before);
+	});
+
+	it.each([{}, "bad", 42, null].map((value) => [value]))("refuses malformed event groups: %j", (groups) => {
+		const before = JSON.stringify({ hooks: { PostToolUse: groups } });
+		const file = seed("codex", before);
+		expect(() => installHarness("codex", options)).toThrow(/PostToolUse/);
+		expect(() => removeHarness("codex", options)).toThrow(/PostToolUse/);
+		expect(readFileSync(file, "utf8")).toBe(before);
+	});
+
+	it.each(["pi", "omp"] as const)("%s: never removes or overwrites an unmanaged extension", (harness) => {
+		const file = plannedConfig(harness, options).path;
+		mkdirSync(join(file, ".."), { recursive: true });
+		const foreign = "export default function customExtension() {}\n";
+		writeFileSync(file, foreign);
+		expect(isInstalled(harness, options)).toBe(false);
+		expect(removeHarness(harness, options).action).toBe("absent");
+		expect(() => installHarness(harness, options)).toThrow(/extension/);
+		expect(readFileSync(file, "utf8")).toBe(foreign);
+	});
+
 	it("a second run changes nothing", () => {
 		seed("codex", JSON.stringify(otherTool));
 		installHarness("codex", options);
@@ -179,7 +221,7 @@ describe("setup is safe to run on a config other tools also use", () => {
 			.PostToolUse;
 		expect(groups).toHaveLength(1);
 		expect(groups[0].hooks[0].command).toBe(
-			"node /opt/jact/dist/cli.js hook claude",
+			"node /opt/jact/dist/cli.js hook claude # jact",
 		);
 	});
 
@@ -352,6 +394,13 @@ describe("--check and --print", () => {
 		},
 	);
 
+
+	it.each(HARNESSES)("%s: recognizes and removes its custom command without repeating it", (harness) => {
+		installHarness(harness, { ...options, command: "'/opt/custom tool/bin/runner'" });
+		expect(isInstalled(harness, options)).toBe(true);
+		expect(removeHarness(harness, options).action).toBe("removed");
+		expect(isInstalled(harness, options)).toBe(false);
+	});
 	it("plannedConfig returns the file content without writing it", () => {
 		const plan = plannedConfig("claude", options);
 		expect(JSON.parse(plan.content).hooks.PostToolUse).toHaveLength(1);

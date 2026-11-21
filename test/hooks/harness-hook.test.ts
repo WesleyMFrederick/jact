@@ -1,19 +1,30 @@
 import {
+	appendFileSync,
+	closeSync,
+	openSync,
 	mkdirSync,
 	mkdtempSync,
 	realpathSync,
+	renameSync,
 	rmSync,
+	writeSync,
 	writeFileSync,
 } from "node:fs";
+import type * as NodeFs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
 	type JactRunner,
 	MAX_READ_CONTEXT_CHARS,
 	parseHookPayload,
 	runHarnessHook,
 } from "../../src/hooks/harnessHook.js";
+
+vi.mock("node:fs", async (importOriginal) => {
+	const fs = await importOriginal<typeof NodeFs>();
+	return { ...fs, appendFileSync: vi.fn(fs.appendFileSync), renameSync: vi.fn(fs.renameSync) };
+});
 
 let project: string;
 let note: string;
@@ -434,6 +445,57 @@ describe("runHarnessHook for Antigravity CLI, whose tool hook cannot answer the 
 		expect(antigravityHook("PreInvocation", antigravityModelCall("c-3"))).toBe(
 			"{}",
 		);
+	});
+
+	it("withdraws each file of a multi-file patch when fixed separately", () => {
+		const id = "multi-file-fix";
+		antigravityHook("PostToolUse", antigravityTool("apply_patch", { paths: [note, other] }, id), broken);
+		antigravityHook("PostToolUse", write(id), clean);
+		const remaining = JSON.parse(antigravityHook("Stop", antigravityStop(id)));
+		expect(remaining.reason).not.toContain(`in ${note}\n`);
+		expect(remaining.reason).toContain(`in ${other}\n`);
+		antigravityHook("PostToolUse", antigravityTool("apply_patch", { paths: [note, other] }, id), broken);
+		antigravityHook("PostToolUse", write(id), clean);
+		antigravityHook("PostToolUse", antigravityTool("edit_file", { Path: other }, id), clean);
+		expect(JSON.parse(antigravityHook("Stop", antigravityStop(id)))).toEqual({ decision: "stop" });
+	});
+
+	it.each([2, null])("does not withdraw a report after inconclusive validation (%s)", (status) => {
+		const id = `inconclusive-${status}`;
+		antigravityHook("PostToolUse", write(id), broken);
+		antigravityHook("PostToolUse", write(id), () => ({ status, stdout: "" }));
+		expect(antigravityHook("Stop", antigravityStop(id))).toContain("missing.md");
+	});
+
+	it("cannot lose a writer's entry when a consumer drains during its write", async () => {
+		const fs = await vi.importActual<typeof NodeFs>("node:fs");
+		const id = "overlapping-writer";
+		antigravityHook("PostToolUse", write(id), broken);
+		const received: string[] = [];
+		vi.mocked(appendFileSync).mockImplementationOnce((file, data) => {
+			// Reproduce opening the append handle before a consumer renames and reads it.
+			const descriptor = openSync(file, "a");
+			received.push(antigravityHook("PreInvocation", antigravityModelCall(id)));
+			try {
+				writeSync(descriptor, String(data));
+			} finally {
+				closeSync(descriptor);
+			}
+		});
+		vi.mocked(renameSync).mockImplementationOnce((from, to) => {
+			// New storage publishes a closed temporary file after the concurrent drain.
+			received.push(antigravityHook("PreInvocation", antigravityModelCall(id)));
+			fs.renameSync(from, to);
+		});
+		try {
+			antigravityHook("PostToolUse", antigravityTool("edit_file", { Path: other }, id), broken);
+			received.push(antigravityHook("PreInvocation", antigravityModelCall(id)));
+			expect(received.join("\n")).toContain(`in ${note}\\n`);
+			expect(received.join("\n")).toContain(`in ${other}\\n`);
+		} finally {
+			vi.mocked(appendFileSync).mockReset().mockImplementation(fs.appendFileSync);
+			vi.mocked(renameSync).mockReset().mockImplementation(fs.renameSync);
+		}
 	});
 
 	it("keeps the report of each conversation apart", () => {

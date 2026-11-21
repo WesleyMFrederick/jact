@@ -15,16 +15,19 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
 	appendFileSync,
 	existsSync,
 	mkdirSync,
 	readFileSync,
+	readdirSync,
 	renameSync,
 	rmSync,
+	writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 
 export const HARNESSES = [
 	"claude",
@@ -190,19 +193,21 @@ export function parseHookPayload(payloadText: string): HookRequest | undefined {
 	};
 }
 
+function writeReport(file: string, result: JactRun): string {
+	// Exit 1 means broken links. Exit 2 is a system error the model cannot fix.
+	if (result.status !== 1) return "";
+	return [
+		`jact: broken Markdown links in ${file}`,
+		result.stdout.trim(),
+		`Fix these links, then check again: jact validate "${file}"`,
+	].join("\n");
+}
+
 function validateWrites(request: HookRequest, run: JactRunner): HookResult {
 	const reports: string[] = [];
 	for (const file of request.paths) {
-		const result = run(["validate", file], request.cwd);
-		// Exit 1 means broken links. Exit 2 is a system error the model cannot fix.
-		if (result.status !== 1) continue;
-		reports.push(
-			[
-				`jact: broken Markdown links in ${file}`,
-				result.stdout.trim(),
-				`Fix these links, then check again: jact validate "${file}"`,
-			].join("\n"),
-		);
+		const report = writeReport(file, run(["validate", file], request.cwd));
+		if (report.length > 0) reports.push(report);
 	}
 	return { context: reports.join("\n\n"), failed: reports.length > 0 };
 }
@@ -342,47 +347,50 @@ function conversationOf(payloadText: string): Conversation | undefined {
 	};
 }
 
-function heldFile(conversation: Conversation): string {
+function heldFolder(conversation: Conversation): string {
 	const name = conversation.id.replace(/[^A-Za-z0-9_-]/g, "_");
-	return join(conversation.folder, HELD_DIR, `${name}.jsonl`);
+	return join(conversation.folder, HELD_DIR, name);
 }
 
 function holdResult(conversation: Conversation, held: HeldResult): void {
 	try {
-		const file = heldFile(conversation);
-		// An empty result only matters when it withdraws an earlier one.
-		if (held.context.length === 0 && !existsSync(file)) return;
-		mkdirSync(dirname(file), { recursive: true });
-		appendFileSync(file, `${JSON.stringify(held)}\n`);
+		const folder = heldFolder(conversation);
+		mkdirSync(folder, { recursive: true });
+		const name = `${process.hrtime.bigint().toString().padStart(24, "0")}-${randomUUID()}`;
+		const temporary = join(folder, `${name}.tmp`);
+		writeFileSync(temporary, JSON.stringify(held), { flag: "wx" });
+		// Publish only complete records. A consumer never renames a writer's open file.
+		renameSync(temporary, join(folder, `${name}.json`));
 	} catch {
 		// A result that cannot be stored is dropped. The harness keeps working.
 	}
 }
 
-/** Returns the held results and removes them, so each one reaches the model one time. */
+/** Claims complete entries individually; concurrent writers publish for this or the next call. */
 function takeHeldResults(conversation: Conversation): HeldResult[] {
-	const file = heldFile(conversation);
-	const taken = `${file}.${process.pid}.taken`;
-	let text: string;
+	const folder = heldFolder(conversation);
+	let names: string[];
 	try {
-		// Rename first: a tool hook that runs at the same moment starts a new file.
-		renameSync(file, taken);
-		text = readFileSync(taken, "utf8");
+		names = readdirSync(folder).filter((name) => name.endsWith(".json")).sort();
 	} catch {
 		return [];
 	}
-	try {
-		rmSync(taken, { force: true });
-	} catch {
-		// A leftover file is harmless: no later call reads it.
-	}
 	const latest = new Map<string, HeldResult>();
-	for (const line of text.split("\n")) {
+	for (const name of names) {
+		const taken = join(folder, `${name}.${randomUUID()}.taken`);
 		let entry: unknown;
 		try {
-			entry = JSON.parse(line);
+			// Another consumer can win this entry, but it can never be delivered twice.
+			renameSync(join(folder, name), taken);
+			entry = JSON.parse(readFileSync(taken, "utf8"));
 		} catch {
 			continue;
+		} finally {
+			try {
+				rmSync(taken, { force: true });
+			} catch {
+				// A leftover claimed file is not read by later calls.
+			}
 		}
 		if (!isRecord(entry)) continue;
 		const { key, context, failed } = entry;
@@ -417,25 +425,33 @@ function runAntigravityHook(
 			logInvocation({ harness, event, handled: false });
 			return ANTIGRAVITY_NOTHING;
 		}
-		const result =
-			request.kind === "write"
-				? validateWrites(request, run)
-				: extractReads(request, run);
-		// An empty write result withdraws an earlier report: the file is fixed.
-		// An empty read result means only that jact already extracted the links.
-		if (request.kind === "write" || result.context.length > 0)
-			holdResult(conversation, {
-				key: `${request.kind}:${request.paths.join("|")}`,
-				...result,
-			});
+		let failed = false;
+		let contextChars = 0;
+		if (request.kind === "write") {
+			for (const path of request.paths) {
+				const validation = run(["validate", path], request.cwd);
+				// Only a completed validation can replace an earlier report.
+				if (validation.status !== 0 && validation.status !== 1) continue;
+				const context = writeReport(path, validation);
+				failed ||= validation.status === 1;
+				contextChars += context.length;
+				holdResult(conversation, { key: `write:${path}`, context, failed: validation.status === 1 });
+			}
+		} else {
+			const result = extractReads(request, run);
+			contextChars = result.context.length;
+			// An empty read means only that jact already extracted the links.
+			if (result.context.length > 0)
+				holdResult(conversation, { key: `read:${request.paths.join("|")}`, ...result });
+		}
 		logInvocation({
 			harness,
 			event,
 			handled: true,
 			kind: request.kind,
 			paths: request.paths,
-			failed: result.failed,
-			contextChars: result.context.length,
+			failed,
+			contextChars,
 		});
 		return ANTIGRAVITY_NOTHING;
 	}

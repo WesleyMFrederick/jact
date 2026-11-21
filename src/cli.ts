@@ -1295,6 +1295,9 @@ Exit Codes:
 
 program
 	.command("hook")
+	// Argument and option errors must be as harmless as runtime hook failures.
+	.configureOutput({ writeErr: () => {} })
+	.exitOverride(() => process.exit(0))
 	.description(
 		"Run as a harness hook: read one tool event as JSON on stdin and print what the harness should tell the model",
 	)

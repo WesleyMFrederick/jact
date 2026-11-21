@@ -183,10 +183,13 @@ function antigravityHooks(command: string): JsonRecord {
 function isOwnHook(hook: unknown, harness: Harness, event?: string): boolean {
 	if (!isRecord(hook)) return false;
 	const command = hook["command"];
-	return (
-		typeof command === "string" &&
-		command.trim().endsWith(` hook ${harness}${event ? ` --event ${event}` : ""}`)
-	);
+	if (typeof command !== "string") return false;
+	const suffix = ` hook ${harness}${event ? ` --event ${event}` : ""}`;
+	const text = command.trim();
+	// Custom commands carry a shell comment: a matching subcommand alone
+	// cannot distinguish jact from another program with its own hook command.
+	return text === `jact${suffix}` || text.endsWith(`${suffix} # jact`) ||
+		(harness === "antigravity" && text.endsWith(suffix));
 }
 
 function withoutOwnHooks(groups: unknown[], harness: Harness): unknown[] {
@@ -246,9 +249,14 @@ function readJsonConfig(file: string): JsonRecord {
 
 function eventGroups(config: JsonRecord, event: string): unknown[] {
 	const hooks = config["hooks"];
-	if (!isRecord(hooks)) return [];
+	if (hooks === undefined) return [];
+	if (!isRecord(hooks))
+		throw new Error("hooks must be a JSON object. jact changed nothing.");
 	const groups = hooks[event];
-	return Array.isArray(groups) ? groups : [];
+	if (groups === undefined) return [];
+	if (!Array.isArray(groups))
+		throw new Error(`hooks.${event} must be an array. jact changed nothing.`);
+	return groups;
 }
 
 function withGroups(
@@ -323,6 +331,20 @@ export default function (pi: any) {
 `;
 }
 
+/** Recognizes the complete generated extension, with any configured command. */
+function isOwnExtension(source: string, harness: Harness): boolean {
+	const encoded = source.match(/^const COMMAND_LINE = (".*");$/m)?.[1];
+	if (encoded === undefined) return false;
+	try {
+		const line: unknown = JSON.parse(encoded);
+		const suffix = ` hook ${harness}`;
+		return typeof line === "string" && line.endsWith(suffix) &&
+			source === extensionSource(harness, line.slice(0, -suffix.length));
+	} catch {
+		return false;
+	}
+}
+
 /**
  * What setup would write: the file path and its full content.
  * Contract: throws when the existing config file is not a valid JSON object. Writes nothing.
@@ -332,12 +354,16 @@ export function plannedConfig(
 	options: SetupOptions,
 ): { path: string; content: string; notes: string[] } {
 	const configTarget = target(harness, options);
-	if (configTarget.kind === "file")
+	if (configTarget.kind === "file") {
+		if (existsSync(configTarget.file) &&
+			!isOwnExtension(readFileSync(configTarget.file, "utf8"), harness))
+			throw new Error(`Refusing to replace an unmanaged extension: ${configTarget.file}. jact changed nothing.`);
 		return {
 			path: configTarget.file,
 			content: extensionSource(harness, options.command),
 			notes: configTarget.notes,
 		};
+	}
 	const config = readJsonConfig(configTarget.file);
 	if (configTarget.kind === "named") {
 		const { [HOOK_NAME]: _replaced, ...others } = config;
@@ -353,7 +379,7 @@ export function plannedConfig(
 	const kept = withoutOwnHooks(eventGroups(config, configTarget.event), harness);
 	const hook: JsonRecord = {
 		type: "command",
-		command: hookCommand(harness, options.command),
+		command: `${hookCommand(harness, options.command)}${options.command === "jact" ? "" : " # jact"}`,
 	};
 	if (configTarget.named) hook["name"] = "jact";
 	const group = { matcher: configTarget.matcher, hooks: [hook] };
@@ -389,10 +415,7 @@ export function isInstalled(harness: Harness, options: SetupOptions): boolean {
 	const configTarget = target(harness, options);
 	if (!existsSync(configTarget.file)) return false;
 	if (configTarget.kind === "file")
-		return (
-			readFileSync(configTarget.file, "utf8") ===
-			extensionSource(harness, options.command)
-		);
+		return isOwnExtension(readFileSync(configTarget.file, "utf8"), harness);
 	const config = readJsonConfig(configTarget.file);
 	if (configTarget.kind === "json")
 		return hasWiring(
@@ -460,6 +483,8 @@ export function removeHarness(
 	if (!existsSync(configTarget.file))
 		return { path: configTarget.file, action: "absent", notes: [] };
 	if (configTarget.kind === "file") {
+		if (!isOwnExtension(readFileSync(configTarget.file, "utf8"), harness))
+			return { path: configTarget.file, action: "absent", notes: [] };
 		rmSync(configTarget.file);
 		return { path: configTarget.file, action: "removed", notes: [] };
 	}

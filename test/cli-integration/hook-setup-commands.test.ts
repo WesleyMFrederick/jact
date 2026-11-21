@@ -54,6 +54,18 @@ afterEach(() => {
 	rmSync(project, { recursive: true, force: true });
 });
 
+describe("hook argument errors never interrupt a harness", () => {
+	it.each([["hook"], ["hook", "bogus"], ["hook", "claude", "--bogus"], ["hook", "antigravity", "--event"]])(
+		"quietly accepts malformed invocation %j",
+		(...args) => {
+			const result = run(args);
+			expect(result.exitCode).toBe(0);
+			expect(result.stdout).toBe("");
+			expect(result.stderr).toBe("");
+		},
+	);
+});
+
 describe("jact setup", () => {
 	it("installs, reports unchanged on a second run, and --check agrees", () => {
 		expect(run(["setup", "claude", "--check"]).exitCode).toBe(1);
