@@ -203,6 +203,21 @@ describe("setup is safe to run on a config other tools also use", () => {
 		expect(readFileSync(file, "utf8")).toBe(foreign);
 	});
 
+	it.each(["pi", "omp"] as const)("%s: updates and removes an older generated extension", (harness) => {
+		const { path } = installHarness(harness, options);
+		const older = readFileSync(path, "utf8").replace(
+			'child.stdin.end(JSON.stringify(payload));',
+			'child.stdin.end(JSON.stringify(payload), "utf8");',
+		);
+		writeFileSync(path, older);
+		expect(isInstalled(harness, options)).toBe(false);
+		expect(installHarness(harness, options).action).toBe("updated");
+		expect(isInstalled(harness, options)).toBe(true);
+		writeFileSync(path, older);
+		expect(removeHarness(harness, options).action).toBe("removed");
+		expect(existsSync(path)).toBe(false);
+	});
+
 	it("a second run changes nothing", () => {
 		seed("codex", JSON.stringify(otherTool));
 		installHarness("codex", options);

@@ -248,6 +248,8 @@ function extractReads(request: HookRequest, run: JactRunner): HookResult {
 			`jact: sections that ${file} links to\n\n${sections.join("\n\n---\n\n")}`,
 		);
 	}
+	// Deliberately once per session and cut at 20,000 characters; the rest is manual.
+	// See docs/harness-hooks.md#What%20the%20model%20sees.
 	let context = parts.join("\n\n");
 	if (context.length > MAX_READ_CONTEXT_CHARS)
 		context = `${context.slice(0, MAX_READ_CONTEXT_CHARS)}\n\n[jact: linked content cut at ${MAX_READ_CONTEXT_CHARS} characters. Run jact extract links for the rest.]`;
@@ -356,7 +358,7 @@ function holdResult(conversation: Conversation, held: HeldResult): void {
 	try {
 		const folder = heldFolder(conversation);
 		mkdirSync(folder, { recursive: true });
-		const name = `${process.hrtime.bigint().toString().padStart(24, "0")}-${randomUUID()}`;
+		const name = `${held.key.startsWith("write:") ? "write" : "read"}-${process.hrtime.bigint().toString().padStart(24, "0")}-${randomUUID()}`;
 		const temporary = join(folder, `${name}.tmp`);
 		writeFileSync(temporary, JSON.stringify(held), { flag: "wx" });
 		// Publish only complete records. A consumer never renames a writer's open file.
@@ -367,11 +369,12 @@ function holdResult(conversation: Conversation, held: HeldResult): void {
 }
 
 /** Claims complete entries individually; concurrent writers publish for this or the next call. */
-function takeHeldResults(conversation: Conversation): HeldResult[] {
+function takeHeldResults(conversation: Conversation, writesOnly = false): HeldResult[] {
 	const folder = heldFolder(conversation);
 	let names: string[];
 	try {
-		names = readdirSync(folder).filter((name) => name.endsWith(".json")).sort();
+		names = readdirSync(folder).filter((name) => name.endsWith(".json") &&
+			(!writesOnly || name.startsWith("write-"))).sort();
 	} catch {
 		return [];
 	}
@@ -461,7 +464,7 @@ function runAntigravityHook(
 		return ANTIGRAVITY_NOTHING;
 	}
 
-	const held = conversation === undefined ? [] : takeHeldResults(conversation);
+	const held = conversation === undefined ? [] : takeHeldResults(conversation, eventName === "stop");
 	const reports = held.filter((result) => result.failed);
 	// At Stop the turn is over: only a broken-link report is worth one more step.
 	const delivered =
@@ -492,7 +495,7 @@ function runAntigravityHook(
  * `hookEventName`; its documentation does not list the field.
  * Contract: never throws. Input without the field returns undefined.
  */
-function namedEvent(payloadText: string): string | undefined {
+export function namedEvent(payloadText: string): string | undefined {
 	try {
 		const payload: unknown = JSON.parse(payloadText);
 		return isRecord(payload) ? firstText(payload["hookEventName"]) : undefined;

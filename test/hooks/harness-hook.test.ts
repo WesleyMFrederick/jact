@@ -527,9 +527,22 @@ describe("runHarnessHook for Antigravity CLI, whose tool hook cannot answer the 
 				decision: "stop",
 			},
 		);
-		expect(antigravityHook("PreInvocation", antigravityModelCall("c-6"))).toBe(
-			"{}",
+		expect(antigravityHook("PreInvocation", antigravityModelCall("c-6"))).toContain(
+			"The answer.",
 		);
+		expect(antigravityHook("PreInvocation", antigravityModelCall("c-6"))).toBe("{}");
+	});
+
+	it("Stop delivers a report without discarding held linked sections", () => {
+		const id = "stop-with-read-and-write";
+		antigravityHook("PostToolUse", read(id), linked);
+		antigravityHook("PostToolUse", write(id), broken);
+		const stopped = JSON.parse(antigravityHook("Stop", antigravityStop(id)));
+		expect(stopped).toMatchObject({ decision: "continue", reason: expect.stringContaining("missing.md") });
+		expect(stopped.reason).not.toContain("The answer.");
+		const next = antigravityHook("PreInvocation", antigravityModelCall(id));
+		expect(next).toContain("The answer.");
+		expect(next).not.toContain("missing.md");
 	});
 
 	it("skips a tool call that Antigravity reports as failed", () => {

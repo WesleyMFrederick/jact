@@ -128,6 +128,25 @@ describe("jact setup", () => {
 		).toContain('"node /opt/jact/dist/cli.js hook pi"');
 	});
 
+	it.each([
+		["pi", false], ["pi", true], ["omp", false], ["omp", true],
+	] as const)("%s --check reports an unmanaged extension as not installed (global=%s)", (harness, global) => {
+		const home = join(project, "home");
+		const file = global
+			? join(home, `.${harness}`, "agent", "extensions", "jact.ts")
+			: join(project, `.${harness}`, "extensions", "jact.ts");
+		mkdirSync(dirname(file), { recursive: true });
+		const source = "export default function customExtension() {}\n";
+		writeFileSync(file, source);
+		const result = spawnSync(process.execPath, [cliPath, "setup", harness, "--check", ...(global ? ["--global"] : [])], {
+			cwd: project, encoding: "utf8", env: { ...process.env, HOME: home },
+		});
+		expect(result.status).toBe(1);
+		expect(result.stdout).toContain(`${harness}: not installed (${file})`);
+		expect(result.stderr).toBe("");
+		expect(readFileSync(file, "utf8")).toBe(source);
+	});
+
 	it("exits 2 and changes nothing when the harness config is not valid JSON", () => {
 		mkdirSync(join(project, ".codex"));
 		const file = join(project, ".codex", "hooks.json");
@@ -200,6 +219,23 @@ process.exit(result.status ?? 2);
 		expect(result.status, result.stdout + result.stderr).toBe(1);
 		expect(result.stdout).toContain("FAIL");
 	});
+
+	it.each([1, 2, 7])("synthetic Antigravity fails when a hook prints JSON but exits %s", (status) => {
+		const scripts = join(project, "scripts");
+		symlinkSync(join(here, "..", "..", "node_modules"), join(project, "node_modules"), "dir");
+		mkdirSync(scripts);
+		mkdirSync(join(project, "dist"));
+		writeFileSync(join(scripts, "hooks-e2e.mjs"), readFileSync(scriptPath("hooks-e2e.mjs")));
+		writeFileSync(join(project, "dist", "cli.js"), `
+const { spawnSync } = require("node:child_process");
+const args = process.argv.slice(2);
+const result = spawnSync(process.execPath, [${JSON.stringify(cliPath)}, ...args], { stdio: "inherit" });
+process.exit(args[0] === "hook" ? ${status} : (result.status ?? 2));
+`);
+		const result = spawnSync(process.execPath, [join(scripts, "hooks-e2e.mjs"), "antigravity", "--synthetic"], { encoding: "utf8" });
+		expect(result.status, result.stdout + result.stderr).toBe(1);
+		expect(result.stdout).toContain("installed command failed");
+	});
 });
 
 describe("jact hook, through the real CLI", () => {
@@ -257,6 +293,31 @@ describe("jact hook, through the real CLI", () => {
 			});
 	});
 
+
+	it.each([[], ["--event", "PreInvocation"]])("uses the payload event for a runtime failure unless overridden: %j", (...options) => {
+		const argv = [process.execPath, cliPath, "hook", "antigravity", ...options];
+		// Load the CLI after patching stdin; a static import would run it before the failure is armed.
+		const bootstrap = `
+			import fs from "node:fs";
+			import { syncBuiltinESMExports } from "node:module";
+			const read = fs.readFileSync;
+			fs.readFileSync = (file, ...args) => {
+				const result = read(file, ...args);
+				if (file === 0) process.cwd = () => { throw new Error("cwd unavailable"); };
+				return result;
+			};
+			syncBuiltinESMExports();
+			process.execArgv = [];
+			process.argv = ${JSON.stringify(argv)};
+			await import(${JSON.stringify(cliPath)});
+		`;
+		const result = spawnSync(process.execPath, ["--input-type=module", "-e", bootstrap], {
+			cwd: project, encoding: "utf8", input: '{"hookEventName":"Stop"}',
+		});
+		expect(result.stderr).toBe("");
+		expect(result.status).toBe(0);
+		expect(JSON.parse(result.stdout)).toEqual(options.length === 0 ? { decision: "stop" } : {});
+	});
 	it("Antigravity CLI: the write hook answers {}, and the next model call gets the report", () => {
 		const antigravityEvent = (fields: object) =>
 			JSON.stringify({

@@ -175,7 +175,7 @@ function playAntigravity(project) {
 		JSON.parse(readFileSync(join(project, ".agents", "hooks.json"), "utf8"))
 			.jact ?? {};
 	const send = (handler, hookEventName, fields) => {
-		const { stdout } = spawnSync(handler.command, {
+		const result = spawnSync(handler.command, {
 			cwd: project,
 			shell: true,
 			encoding: "utf8",
@@ -187,6 +187,9 @@ function playAntigravity(project) {
 				...fields,
 			}),
 		});
+		if (result.error || result.status !== 0)
+			problems.push(`installed command failed: ${result.error?.message ?? result.stderr}`);
+		const { stdout } = result;
 		try {
 			return JSON.parse(stdout);
 		} catch {

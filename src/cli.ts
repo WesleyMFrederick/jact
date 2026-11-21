@@ -42,10 +42,12 @@ import {
 import {
 	HARNESSES,
 	type Harness,
+	namedEvent,
 	runHarnessHook,
 	silentHookOutput,
 } from "./hooks/harnessHook.js";
 import {
+	harnessConfigPath,
 	installHarness,
 	isInstalled,
 	plannedConfig,
@@ -1266,7 +1268,7 @@ Exit Codes:
 			if (options.check) {
 				const installed = isInstalled(harness, setup);
 				console.log(
-					`${harness}: ${installed ? "installed" : "not installed"} (${plannedConfig(harness, setup).path})`,
+					`${harness}: ${installed ? "installed" : "not installed"} (${harnessConfigPath(harness, setup)})`,
 				);
 				process.exitCode = installed ? 0 : 1;
 				return;
@@ -1336,16 +1338,19 @@ Exit Codes:
 	)
 	.action((harness: Harness, options: { event?: string }) => {
 		let output: string;
+		let event = options.event;
 		try {
+			const payload = readFileSync(0, "utf8");
+			event ??= namedEvent(payload);
 			output = runHarnessHook(
 				harness,
-				readFileSync(0, "utf8"),
+				payload,
 				undefined,
-				options.event,
+				event,
 			);
 		} catch {
 			// A hook that fails says nothing, so the harness keeps working.
-			output = silentHookOutput(harness, options.event);
+			output = silentHookOutput(harness, event);
 		}
 		if (output.length > 0) process.stdout.write(`${output}\n`);
 		process.exitCode = 0;

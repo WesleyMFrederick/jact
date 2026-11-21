@@ -31,7 +31,7 @@ Options, the same for each harness:
 | `--remove` | Remove only jact's hook, including from shared groups. Cannot be combined with `--print` or `--check`. |
 | `--command <command>` | The command the harness runs to start jact. Default: `jact`. Use a full path when the harness does not see your `PATH`. |
 
-Setup is safe to run again. It keeps other tools' hooks and unmanaged extension files, replaces its own wiring instead of adding a second entry, and refuses invalid JSON or wrongly typed hook containers. Custom Claude, Codex, and Gemini hook commands carry a `# jact` shell comment so setup can recognize them without mistaking another program's `hook` subcommand for jact.
+Setup is safe to run again. It keeps other tools' hooks and unmanaged extension files, replaces its own wiring instead of adding a second entry, and refuses invalid JSON or wrongly typed hook containers. Generated pi and omp extensions carry an ownership header so setup can update or remove an older version. Custom Claude, Codex, and Gemini hook commands carry a `# jact` shell comment so setup can recognize them without mistaking another program's `hook` subcommand for jact.
 
 **If you are an agent and setup prints `Cannot write`:** your sandbox protects the harness's own config folder. Do not look for another route. Give the user the same command to run in a terminal. Codex does this for `.codex/`.
 
@@ -54,6 +54,8 @@ In a clone of this repository, `node scripts/hooks-e2e.mjs <harness>` runs steps
 | Read of a `.md` file | `jact extract links <file> --session <id>` | The sections that file links to, one time for each session, cut at 20,000 characters |
 | Any other tool, or a file that is not `.md` | Nothing | Nothing |
 
+Linked content is deliberately delivered once per session and cut at 20,000 characters. A later read does not resend the cut part; run `jact extract links <file>` without `--session` to get the rest.
+
 A hook call always exits 0, including malformed command arguments. If jact fails, the hook prints nothing and the harness continues. The read hook stores its session cache in `.jact/` in the project; add that folder to `.gitignore`.
 
 ### Antigravity CLI: the model sees it one step later
@@ -66,7 +68,7 @@ Antigravity CLI gives a tool hook no way to answer the model. So jact uses three
 | `PreInvocation` | Before a model call | Hands the held result to the model as a system message, one time. Prints `{}` when nothing is held. |
 | `Stop` | When the agent is about to stop | If a broken-link report is still held, makes the agent continue one time with that report. Otherwise lets it stop. |
 
-If the agent repairs files before a report is handed over, successful validation withdraws each file's report independently, including files originally changed together. Inconclusive validation keeps the earlier report. Held entries are published as separate complete files so overlapping writers and consumers cannot lose an append.
+If the agent repairs files before a report is handed over, successful validation withdraws each file's report independently, including files originally changed together. Inconclusive validation keeps the earlier report. Held entries are published as separate complete files so overlapping writers and consumers cannot lose an append. `Stop` consumes only write reports; linked sections remain held for the next `PreInvocation`.
 
 The system message stays in the conversation, so the model can still use the linked content many steps later. jact does not use Antigravity CLI's `ephemeralMessage`: in version 1.5.12 the model lost one after a single model call, and jact does not send the same linked content twice in one conversation.
 
