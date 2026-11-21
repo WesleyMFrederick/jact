@@ -139,19 +139,17 @@ export function createSessionLifecycle(client, {
     // archive half for more polling/retries, but must retain the deletion half.
     let retrying = false;
     const reserveMs = () => deletionReserveMs() * (retrying ? 1 : 2);
-    let stopRequested = false;
-    const stopRuns = async () => {
-      stopRequested = true;
-      await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
-        events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
-      }, options), 5, deletionReserveMs);
-    };
     if (running()) {
+      // A message to an idle session starts a new turn. Only ask a known working lead,
+      // before interrupting it; an unknown status still requires the interrupt.
+      if (current) {
+        await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
+          events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
+        }, options), 5, deletionReserveMs);
+      }
       await attempt(`interrupt ${id}`, (options) => client.beta.sessions.events.send(id, {
         events: [{ type: "user.interrupt" }],
       }, options), 4, deletionReserveMs);
-      // Interrupt ends a turn, not its workflows. Ask afterward so this request can take effect.
-      await stopRuns();
     }
     for (;;) {
       while (running() && deadline - Date.now() > reserveMs()) {
@@ -176,8 +174,6 @@ export function createSessionLifecycle(client, {
         failure(`archive ${id}`, rejection);
         return;
       }
-      // Even an idle session can have paused workflows that prevent archival.
-      if (!stopRequested) await stopRuns();
       await pause(reserveMs());
       current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, deletionReserveMs);
     }

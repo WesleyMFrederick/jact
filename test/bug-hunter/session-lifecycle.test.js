@@ -271,6 +271,34 @@ describe("Bug Hunter session lifecycle", () => {
     expect(fake.calls.slice(callCount).filter((c) => c.sdk)).toEqual([]);
   });
 
+  it.each(["running", "idle"])("does not start a new lead turn while shutting down a %s session", async (status) => {
+    let newTurns = 0;
+    let archives = 0;
+    const fake = fakeClient({
+      create: async () => ({ status }),
+      requireIdle: true,
+      send: (_id, types, session) => {
+        if (types.includes("user.message") && session.status === "idle") {
+          newTurns++;
+          session.status = "running";
+        }
+      },
+      archive: () => {
+        if (++archives === 1) throw Object.assign(new Error("busy"), { status: 409 });
+      },
+    });
+    const { log } = logger();
+    const life = createSessionLifecycle(fake.client, { ...SHORT, pollMs: 5, log });
+    await life.createSession(params());
+    const result = await life.requestShutdown("fast");
+    expect(newTurns).toBe(0);
+    expect(result).toEqual({ ok: true });
+    expect(fake.ids("archived")).toEqual(["sesn_1"]);
+    expect(fake.ops("send").map((call) => call.events)).toEqual(
+      status === "running" ? [["user.message"], ["user.interrupt"]] : [],
+    );
+  });
+
   it("waits for a delayed interrupt to make the session idle before fast archival", async () => {
     const fake = fakeClient({
       create: async () => ({ status: "running" }),
@@ -402,11 +430,11 @@ describe("Bug Hunter session lifecycle", () => {
     }
   });
 
-  it.each(["running", "idle"])("stops open workflows in a %s session and retries confirmed archive rejection", async (status) => {
+  it("stops open workflows in a running session and retries confirmed archive rejection", async () => {
     let open = true;
     let attempts = 0;
     const fake = fakeClient({
-      create: async () => ({ status }),
+      create: async () => ({ status: "running" }),
       requireIdle: true,
       send: (_id, types) => {
         if (types.includes("user.message")) setTimeout(() => { open = false; }, 50);
