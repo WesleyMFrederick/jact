@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 005. Interfaces
 
 **Status:** done
@@ -292,7 +296,7 @@ jact outline <file> [level] [options]
 
 Exact-level output hides every other level and does not mark filtered children as collapsed. Line numbers sit in a right-aligned six-character field followed by two spaces. A visible heading with no parser source position fails the command.
 
-After the tree, jact prints next-step commands: expand collapsed branches, filter one level with line numbers, extract a section, and open `jact outline -h`. With a session ID, jact shows them once per session and file. The reminder set has a revision, so new guidance shows once after an upgrade.
+After the tree, jact prints next-step commands: expand collapsed branches, filter one level with line numbers, extract a section, and open `jact outline -h`. With a session ID, jact shows them once per session, file, and file content. The reminder set has a revision, so new guidance shows once after an upgrade.
 
 **Exit codes:** `0` outline printed, including a file with no headings; `1` heading selector missing, ambiguous, or unsupported; `2` file lookup, scope, permission, parse, or source-position error.
 
@@ -343,7 +347,7 @@ jact extract header <target-file> <header-name> [options]
 |---|---|---|
 | `--scope <folder>` | smart default | Folder for filename matches |
 | `--allow-read <dir>` | - | As in [`jact extract links <source-file>`](#`jact extract links <source-file>`); without it, jact does not read linked targets outside scope |
-| `--within <parent>` | - | Resolve the header only among children of one unique parent |
+| `--within <parent>` | - | Resolve the header only among descendants of one unique parent |
 | `--extract-linked-content [depth]` | off; depth `1` | Also extract linked content to `depth` (whole number ≥ 1), plus backlinks to the header in scope |
 | `--max-chars <n>` | `28000` | With `--extract-linked-content`: above this size, print a content map |
 | `-v, --verbose` | `false` | Add `outgoingLinksReport` and `stats` |
@@ -421,7 +425,7 @@ Every command uses three exit codes, and hooks depend on them.
 | `1` | Content failure: errors found, no eligible links, header or target file not found by extraction, outline selector unresolved, or rename plan refused |
 | `2` | System or usage error: missing file, permission denied, parse error, missing source position, bad flag combination, an unknown command or option, a missing required argument, a value outside its choices, an invalid argument value, a glob that matched nothing when nothing else was selected, or not a git repository |
 
-The three-code contract is a recorded decision: D4 in [Decision](../../design-docs/features/20260701T041917-batch-validate/spec/003-adrs.md#Decision).
+The three-code contract is recorded in D4 of [ADR-0005](../adrs/003-adrs.md#ADR-0005%20—%20Batch%20validate%20globs,%20%60--changed%60,%20%60--json%60).
 
 Command-specific exceptions:
 

@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 001. Vision
 
 **Status:** done
@@ -10,7 +14,7 @@ The validate module is the one workflow behind `jact validate`. It takes one Mar
 
 The module selects files, checks links, and reports one result per file. An unreadable or unparsable file stops the batch.
 
-1. **Single-input workflow** — scope, parse, opt-out check, link check, and line filter for one file or for `--stdin` content
+1. **Single-input workflow** — scope, parse, opt-out check, link check, enabled rule checks, and line filter for one file or for `--stdin` content
 2. **File-set selection** — globs, explicit paths, and git-changed Markdown resolved into one sorted, deduplicated list
 3. **Batch run** — one file at a time through the same single-input workflow, totaled into a batch summary
 4. **Batch reports** — a human view and a JSON Lines (JSONL) view of the same summary
@@ -77,9 +81,10 @@ Two caller groups use the module.
 
 ## Version History
 
-The vision is at version 1.1.0.
+The vision is at version 1.1.1.
 
 | Version | Changes |
 |---------|---------|
 | 1.0.0 | First module vision |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
+| 1.1.1 | 2026-11-19: The single-input workflow lists its rule checks |

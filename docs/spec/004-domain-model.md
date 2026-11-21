@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 004. Domain Model
 
 **Status:** done
@@ -26,6 +30,7 @@ A link object is one parsed reference to an anchor or another file. The `extract
 - `fullMatch` — the source text of the link
 - `line` (1-based), `column` (0-based)
 - `extractionMarker` — the following `%%…%%` marker (`fullMatch`, `innerText`), or `null`
+- `markdownForm` — `"definition"` when the link is a reference definition (`[label]: dest`); absent otherwise
 - `validation` — added by validation (see below)
 
 ---
@@ -88,7 +93,7 @@ The `status` field selects the variant:
 | Status | Fields |
 |---|---|
 | `valid` | none |
-| `error` | `error` (message), optional `suggestion`, `pathConversion`, `anchorConversion` |
+| `error` | `error` (message), optional `suggestion`, `pathConversion`, `anchorConversion`, `ruleId` (the enabled validation rule that reported the error) |
 | `warning` | `message`, optional `suggestion`, `pathConversion`, `anchorConversion` |
 
 A path conversion or anchor conversion carries the fix that `--fix` applies: `type` (`"path-conversion"` or `"anchor-conversion"`), `original`, and `recommended`.
@@ -181,6 +186,7 @@ ProcessedLinkEntry 1───1 EnrichedLinkObject (sourceLink)
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.0.0-draft | 2026-11-19 | Clarification: listed the existing `markdownForm` link field and optional error `ruleId`; no shape change |
 | 1.0.0-draft | 2026-10-15 | Include existing reference-style link uses in the documented parser output fields |
 | 1.0.0-draft | 2026-10-07 | Aligned to code; removed internal code names to reduce drift |
 | 1.0.0-draft | 2026-10-06 | Added typed inline-image and wiki-embed references to the required parser output contract |
