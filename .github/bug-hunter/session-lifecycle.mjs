@@ -87,14 +87,17 @@ export function createSessionLifecycle(client, {
     changed.add(arm);
     arm();
     try {
-      if (end <= Date.now()) {
-        expire();
-        return await timeout;
-      }
       return await Promise.race([
-        Promise.resolve().then(() => work({
-          signal: controller.signal, timeout: Math.max(1, Math.ceil(end - Date.now())), maxRetries: 0,
-        })),
+        Promise.resolve().then(() => {
+          // Other queued work can delay this callback beyond the cutoff armed above.
+          if (end <= Date.now()) {
+            expire();
+            return timeout;
+          }
+          return work({
+            signal: controller.signal, timeout: Math.max(1, Math.ceil(end - Date.now())), maxRetries: 0,
+          });
+        }),
         timeout,
       ]);
     } catch (error) {

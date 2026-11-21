@@ -332,6 +332,29 @@ describe("Bug Hunter session lifecycle", () => {
     }
   });
 
+  it("sends no expired cleanup request when another microtask delays SDK invocation past 2s", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const fake = fakeClient();
+      const { lines, log } = logger();
+      const life = createSessionLifecycle(fake.client, { log });
+      await uploadTwo(life);
+      await life.createSession(params());
+      const stopping = life.requestShutdown("fast");
+      // Shutdown checks the status request, then this queued work runs before its SDK callback.
+      await Promise.resolve().then(() => { vi.setSystemTime(2_100); });
+      expect(await stopping).toEqual({ ok: false });
+      for (const op of ["retrieve", "send", "archive", "delete"]) {
+        expect(fake.ops(op), `${op} must not start after its cutoff`).toHaveLength(0);
+      }
+      expect(lines.join("\n")).toContain("deadline expired");
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it.each(["archive", "poll"])("preserves 250ms for two 225ms deletes when the retry %s stalls at 1.6s", async (stage) => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
