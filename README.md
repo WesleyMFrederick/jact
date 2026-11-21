@@ -373,6 +373,8 @@ npm link             # optional: put this checkout's `jact` on your PATH
 
 The source is TypeScript in `src/`; tests are in `test/`.
 
+Vitest excludes `.claude/` and `.scratch/` from test discovery so shared configuration and scratch folders can hold other checkouts without running their tests. Its default exclusions for `node_modules/` and `.git/` remain in place.
+
 Design documentation:
 
 - [jact Living Specification](docs/spec/SPEC.md#jact%20Living%20Specification) — what jact does and why.
