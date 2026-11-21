@@ -102,13 +102,11 @@ async function main() {
       await setTimeout(Math.min(100, Math.max(1, deadline - Date.now())));
       continue;
     }
-    try {
-      return build(identity, lock, resultPath);
-    } finally {
-      // Only the process that created this directory may release it. A crashed
-      // owner leaves it intact: waiters time out rather than risk a second clean.
-      rmdirSync(lock);
-    }
+    // Release only after build() publishes and consumes its result. An exception
+    // leaves the lock intact, so another caller cannot repeat a destructive build.
+    const exitCode = build(identity, lock, resultPath);
+    rmdirSync(lock);
+    return exitCode;
   }
 }
 

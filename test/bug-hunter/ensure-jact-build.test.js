@@ -17,16 +17,18 @@ function git(...args) {
   }).trim();
 }
 
-function run(overrides = {}, extraArgs = []) {
+function run(overrides = {}, extraArgs = [], onMessage = () => {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [helper, "--repo", repo, "--head", head, "--session", "test-session", ...extraArgs], {
-      env: { ...env, ...overrides },
+    const preload = overrides.BUILD_TEST_BARRIER ? ["--import", join(root, "lock-probe.mjs")] : [];
+    const child = spawn(process.execPath, [...preload, helper, "--repo", repo, "--head", head, "--session", "test-session", ...extraArgs], {
+      env: { ...env, ...overrides }, stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
     child.on("error", reject);
+    child.on("message", onMessage);
     child.on("close", async (code) => {
       const cli = await readFile(join(repo, "dist", "cli.js"), "utf8").catch(() => null);
       resolve({ code, stdout, stderr, cli });
@@ -56,21 +58,41 @@ beforeEach(async () => {
   git("-c", "user.name=Build Guard Test", "-c", "user.email=build-guard@example.invalid", "commit", "--quiet", "--allow-empty", "-m", "fixture");
   head = git("rev-parse", "HEAD");
   await writeFile(join(bin, "npm"), `#!/usr/bin/env node
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 const args = process.argv.slice(2).join(' ');
 appendFileSync(process.env.BUILD_TEST_LOG, args + '\\n');
-await new Promise((resolve) => setTimeout(resolve, 100));
+if (args === 'ci --ignore-scripts' && process.env.BUILD_TEST_BARRIER) {
+  while (!existsSync(process.env.BUILD_TEST_BARRIER)) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 if (args === process.env.BUILD_TEST_FAIL) process.exit(23);
 if (args === 'run build') {
   mkdirSync('dist', { recursive: true });
-  writeFileSync(join('dist', 'cli.js'), 'built for test\\n');
+  if (process.env.BUILD_TEST_BAD_OUTPUT) symlinkSync('cli.js', join('dist', 'cli.js'));
+  else writeFileSync(join('dist', 'cli.js'), 'built for test\\n');
 }
 `, { mode: 0o755 });
   // .mjs is not needed for npm's extensionless executable when its enclosing
   // package declares ESM; keep the fixture independent of Node's syntax detection.
   await writeFile(join(root, "package.json"), '{"type":"module"}\n');
   env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, BUILD_TEST_LOG: join(root, "npm-calls") };
+  await writeFile(join(root, "lock-probe.mjs"), `
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+const mkdir = fs.mkdirSync;
+fs.mkdirSync = (...args) => {
+  try { return mkdir(...args); }
+  catch (error) {
+    if (String(args[0]).endsWith('/bug-hunter-build.lock') && error.code === 'EEXIST') {
+      process.send?.({ event: 'lock-wait', pid: process.pid });
+    }
+    throw error;
+  }
+};
+syncBuiltinESMExports();
+`);
 });
 
 afterEach(async () => {
@@ -79,7 +101,20 @@ afterEach(async () => {
 
 describe("shared prover build guard", () => {
   it("lets six simultaneous callers use CLI output after exactly one install and build", async () => {
-    const results = await Promise.all(Array.from({ length: 6 }, () => run()));
+    const gate = join(root, "release-build");
+    const waiting = new Set();
+    let release;
+    const blocked = new Promise((resolve) => { release = resolve; });
+    const timer = setTimeout(() => release(new Error("Five callers did not reach the held lock")), 5000);
+    const calls = Array.from({ length: 6 }, () => run({ BUILD_TEST_BARRIER: gate }, [], (message) => {
+      if (message.event === "lock-wait") waiting.add(message.pid);
+      if (waiting.size === 5) release();
+    }));
+    const barrierError = await blocked;
+    clearTimeout(timer);
+    await writeFile(gate, "release");
+    const results = await Promise.all(calls);
+    expect(barrierError).toBeUndefined();
     for (const result of results) {
       expect(result.code, result.stderr).toBe(0);
       expect(["built", "reused"]).toContain(callLog(result).outcome);
@@ -88,7 +123,7 @@ describe("shared prover build guard", () => {
     expect(await commands()).toEqual(["ci --ignore-scripts", "run build"]);
     expect(await readFile(join(repo, "dist", "cli.js"), "utf8")).toBe("built for test\n");
     expect(results.map(callLog).filter((entry) => entry.outcome === "built")).toHaveLength(1);
-  });
+  }, 15_000);
 
   it("does not trust a preexisting dist directory, and reuses only a successful guarded build", async () => {
     await mkdir(join(repo, "dist"));
@@ -110,6 +145,16 @@ describe("shared prover build guard", () => {
     expect(subsequent.code).toBe(23);
     expect(callLog(subsequent).outcome).toBe("failed");
     expect(await commands()).toEqual(stage === "run build" ? ["ci --ignore-scripts", "run build"] : ["ci --ignore-scripts"]);
+  });
+
+  it("keeps the lock after an output-check exception so later callers cannot rebuild", async () => {
+    const failed = await run({ BUILD_TEST_BAD_OUTPUT: "1" });
+    expect(failed.code, failed.stderr).toBe(1);
+    expect(failed.stderr).toMatch(/ELOOP/);
+    const subsequent = await run({}, ["--lock-timeout-ms", "100"]);
+    expect(await commands()).toEqual(["ci --ignore-scripts", "run build"]);
+    expect(subsequent.code, subsequent.stderr).toBe(124);
+    expect(callLog(subsequent).outcome).toBe("timeout");
   });
 
   it("times out loudly on a stale lock without installing or deleting the lock", async () => {

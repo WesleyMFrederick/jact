@@ -15,18 +15,35 @@ const fakeSdk = `
   const none = async function* () {};
   let uploads = 0;
   let sent = [];
+  let releaseHelper;
+  const helperReleased = new Promise((resolve) => { releaseHelper = resolve; });
+  let releaseSlice;
+  const sliceUploaded = new Promise((resolve) => { releaseSlice = resolve; });
   export const toFile = async (value, name, options) => ({ name, type: options?.type, base64: Buffer.from(value).toString('base64') });
   export default class Anthropic {
     beta = {
       agents: { list: none, create: async () => ({ id: 'agent_test' }) },
-      environments: { list: none, create: async () => ({ id: 'env_test' }) },
+      environments: { list: none, create: async () => {
+        if (process.env.TEST_SETUP_FAILURE) {
+          await sliceUploaded;
+          // Let setup reject and cleanup start before the helper finishes.
+          setImmediate(releaseHelper);
+          throw new Error('environment creation failed');
+        }
+        return { id: 'env_test' };
+      } },
       files: {
         upload: async ({ file }) => {
           const id = 'file_' + ++uploads;
+          if (process.env.TEST_SETUP_FAILURE && file.name === 'ensure-jact-build.mjs') await helperReleased;
           record({ op: 'upload', id, ...file });
+          if (file.name !== 'ensure-jact-build.mjs') releaseSlice();
           return { id };
         },
-        delete: async (id) => record({ op: 'delete', id }),
+        delete: async (id) => {
+          record({ op: 'delete', id });
+          if (process.env.TEST_SETUP_FAILURE) await helperReleased;
+        },
       },
       sessions: {
         list: none,
@@ -78,7 +95,7 @@ const preload = `
   };
 `;
 
-function review(sessionId) {
+function review(sessionId, overrides = {}) {
   const result = spawnSync(process.execPath, ["--import", `data:text/javascript,${encodeURIComponent(preload)}`, runner], {
     env: {
       GITHUB_REPOSITORY: "test/repo",
@@ -87,6 +104,7 @@ function review(sessionId) {
       DRY_RUN: "1",
       TEST_SESSION_ID: sessionId,
       TEST_FINAL_TEXT: ['Nothing confirmed.', '```json', '{"summary": "No bugs.", "findings": []}', '```'].join("\n"),
+      ...overrides,
     },
     encoding: "utf8",
     timeout: 20_000,
@@ -122,6 +140,18 @@ describe("Bug Hunter build helper upload", () => {
     expect(deleted.map((d) => d.id).sort()).toEqual(uploads.map((u) => u.id).sort());
     expect(archived).toBeGreaterThanOrEqual(0);
     for (const d of deleted) expect(d.i).toBeGreaterThan(archived);
+  });
+
+  it("deletes a helper upload that finishes after environment creation fails", () => {
+    const { result, calls } = review("sesn_setup_failure", { TEST_SETUP_FAILURE: "1" });
+    expect(result.status, result.stderr).toBe(2);
+    expect(result.stderr).toContain("environment creation failed");
+    const uploads = calls.filter((c) => c.op === "upload");
+    expect(uploads.map((u) => u.name).sort()).toEqual(["ensure-jact-build.mjs", "s1.diff"]);
+    expect(calls.filter((c) => c.op === "delete").map((c) => c.id).sort()).toEqual(
+      uploads.map((u) => u.id).sort(),
+    );
+    expect(calls.some((c) => c.op === "create")).toBe(false);
   });
 
   it("quotes a session id that is not shell-safe", () => {

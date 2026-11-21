@@ -385,14 +385,20 @@ async function postReview(pr, files, report, { sessionId, note, finished, cost }
 
 let liveSession; // the session to stop if this process is cancelled or crashes
 // Files API uploads outlive their session, so every exit path deletes the ones that succeeded,
-// including uploads that finished before another setup step failed.
+// including uploads still in flight when another setup step fails.
 const uploadedIds = [];
-async function upload(bytes, name, type) {
-  const u = await client.beta.files.upload({ file: await toFile(bytes, name, { type }) });
-  uploadedIds.push(u.id);
-  return u;
+const pendingUploads = [];
+function upload(bytes, name, type) {
+  const pending = (async () => {
+    const u = await client.beta.files.upload({ file: await toFile(bytes, name, { type }) });
+    uploadedIds.push(u.id);
+    return u;
+  })();
+  pendingUploads.push(pending);
+  return pending;
 }
 async function deleteUploads() {
+  await Promise.allSettled(pendingUploads);
   const ids = uploadedIds.splice(0);
   await Promise.all(ids.map((id) => client.beta.files.delete(id).catch(() => {})));
 }
