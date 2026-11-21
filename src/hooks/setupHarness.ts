@@ -180,15 +180,46 @@ function antigravityHooks(command: string): JsonRecord {
 	};
 }
 
-function isOwnGroup(group: unknown, harness: Harness): boolean {
-	if (!isRecord(group)) return false;
-	const hooks = group["hooks"];
-	if (!Array.isArray(hooks)) return false;
-	return hooks.some((hook) => {
-		if (!isRecord(hook)) return false;
-		const command = hook["command"];
+function isOwnHook(hook: unknown, harness: Harness, event?: string): boolean {
+	if (!isRecord(hook)) return false;
+	const command = hook["command"];
+	return (
+		typeof command === "string" &&
+		command.trim().endsWith(` hook ${harness}${event ? ` --event ${event}` : ""}`)
+	);
+}
+
+function withoutOwnHooks(groups: unknown[], harness: Harness): unknown[] {
+	return groups.flatMap((group) => {
+		if (!isRecord(group) || !Array.isArray(group["hooks"])) return [group];
+		const hooks = group["hooks"].filter((hook) => !isOwnHook(hook, harness));
+		if (hooks.length === group["hooks"].length) return [group];
+		return hooks.length > 0 ? [{ ...group, hooks }] : [];
+	});
+}
+
+function hasWiring(
+	groups: unknown[],
+	matcher: string,
+	harness: Harness,
+	event?: string,
+): boolean {
+	return groups.some((group) => {
+		if (!isRecord(group) || typeof group["matcher"] !== "string") return false;
+		try {
+			const pattern = new RegExp(`^(?:${group["matcher"]})$`);
+			if (!matcher.split("|").every((tool) => pattern.test(tool))) return false;
+		} catch {
+			return false;
+		}
 		return (
-			typeof command === "string" && command.trim().endsWith(` hook ${harness}`)
+			Array.isArray(group["hooks"]) &&
+			group["hooks"].some(
+				(hook) =>
+					isRecord(hook) &&
+					hook["type"] === "command" &&
+					isOwnHook(hook, harness, event),
+			)
 		);
 	});
 }
@@ -319,9 +350,7 @@ export function plannedConfig(
 			notes: configTarget.notes,
 		};
 	}
-	const kept = eventGroups(config, configTarget.event).filter(
-		(group) => !isOwnGroup(group, harness),
-	);
+	const kept = withoutOwnHooks(eventGroups(config, configTarget.event), harness);
 	const hook: JsonRecord = {
 		type: "command",
 		command: hookCommand(harness, options.command),
@@ -355,11 +384,44 @@ function writeConfigFile(path: string, content: string): void {
 	}
 }
 
-/** True when the harness config already holds exactly what setup would write. */
+/** True when the expected events and matchers hold jact's wiring, regardless of JSON formatting. */
 export function isInstalled(harness: Harness, options: SetupOptions): boolean {
-	const plan = plannedConfig(harness, options);
+	const configTarget = target(harness, options);
+	if (!existsSync(configTarget.file)) return false;
+	if (configTarget.kind === "file")
+		return (
+			readFileSync(configTarget.file, "utf8") ===
+			extensionSource(harness, options.command)
+		);
+	const config = readJsonConfig(configTarget.file);
+	if (configTarget.kind === "json")
+		return hasWiring(
+			eventGroups(config, configTarget.event),
+			configTarget.matcher,
+			harness,
+		);
+	const named = config[HOOK_NAME];
+	if (!isRecord(named)) return false;
 	return (
-		existsSync(plan.path) && readFileSync(plan.path, "utf8") === plan.content
+		Array.isArray(named["PostToolUse"]) &&
+		hasWiring(
+			named["PostToolUse"],
+			ANTIGRAVITY_FILE_TOOLS,
+			harness,
+			"PostToolUse",
+		) &&
+		["PreInvocation", "Stop"].every((event) => {
+			const handlers = named[event];
+			return (
+				Array.isArray(handlers) &&
+				handlers.some(
+					(hook) =>
+						isRecord(hook) &&
+						hook["type"] === "command" &&
+						isOwnHook(hook, harness, event),
+				)
+			);
+		})
 	);
 }
 
@@ -410,8 +472,11 @@ export function removeHarness(
 		return { path: configTarget.file, action: "removed", notes: [] };
 	}
 	const groups = eventGroups(config, configTarget.event);
-	const kept = groups.filter((group) => !isOwnGroup(group, harness));
-	if (kept.length === groups.length)
+	const kept = withoutOwnHooks(groups, harness);
+	if (
+		kept.length === groups.length &&
+		kept.every((group, index) => group === groups[index])
+	)
 		return { path: configTarget.file, action: "absent", notes: [] };
 	writeConfigFile(
 		configTarget.file,

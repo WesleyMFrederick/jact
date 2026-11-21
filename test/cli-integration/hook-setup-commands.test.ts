@@ -6,6 +6,7 @@ import {
 	readFileSync,
 	realpathSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -83,6 +84,16 @@ describe("jact setup", () => {
 		);
 		expect(existsSync(join(project, ".gemini"))).toBe(false);
 	});
+	it.each(["--print", "--check"])("rejects --remove with %s without changing the config", (flag) => {
+		run(["setup", "claude"]);
+		const path = join(project, ".claude", "settings.json");
+		const before = readFileSync(path, "utf8");
+		const result = run(["setup", "claude", "--remove", flag]);
+		expect(result.exitCode).toBe(2);
+		expect(result.stderr).toContain("cannot be combined");
+		expect(readFileSync(path, "utf8")).toBe(before);
+	});
+
 
 	it("antigravity: writes .agents/hooks.json and --check agrees", () => {
 		expect(run(["setup", "antigravity", "--check"]).exitCode).toBe(1);
@@ -119,6 +130,63 @@ describe("jact setup", () => {
 		const result = run(["setup", "emacs"]);
 		expect(result.exitCode).toBe(2);
 		expect(result.stderr).toContain("Allowed choices are");
+	});
+});
+
+describe("harness development scripts", () => {
+	const scriptPath = (name: string) => join(here, "..", "..", "scripts", name);
+
+	it("reports reading and hook measurements as unavailable when no file qualifies", () => {
+		const empty = join(project, "empty");
+		mkdirSync(empty);
+		for (const folder of [join(project, "docs"), empty]) {
+			const result = spawnSync(process.execPath, [scriptPath("measure-agent-value.mjs"), folder], { encoding: "utf8" });
+			expect(result.status).toBe(0);
+			const output = JSON.parse(result.stdout);
+			expect(output.reading.filesMeasured).toBe(0);
+			expect(output.reading.message).toContain("No files qualify");
+			expect(output.reading).not.toHaveProperty("medianSavingPercent");
+			if (folder === empty) {
+				expect(output.hook.calls).toBe(0);
+				expect(output.hook.message).toContain("No Markdown files");
+				expect(output.hook).not.toHaveProperty("medianMs");
+			}
+		}
+	});
+
+	it.each([
+		["claude", "matcher"], ["codex", "matcher"], ["gemini", "matcher"],
+		["claude", "command"], ["codex", "command"], ["gemini", "command"],
+		["pi", "extension"], ["omp", "extension"],
+	])("synthetic %s fails when the installed %s is broken", (harness, damage) => {
+		const scripts = join(project, "scripts");
+		symlinkSync(join(here, "..", "..", "node_modules"), join(project, "node_modules"), "dir");
+		mkdirSync(scripts);
+		mkdirSync(join(project, "dist"));
+		writeFileSync(join(scripts, "hooks-e2e.mjs"), readFileSync(scriptPath("hooks-e2e.mjs")));
+		// Damage the installation after --check, before the synthetic player loads it.
+		writeFileSync(join(project, "dist", "cli.js"), `
+const { spawnSync } = require("node:child_process");
+const { readFileSync, writeFileSync, rmSync } = require("node:fs");
+const args = process.argv.slice(2);
+const result = spawnSync(process.execPath, [${JSON.stringify(cliPath)}, ...args], { stdio: "inherit" });
+if (args.includes("--check")) {
+	const harness = ${JSON.stringify(harness)};
+	if (${JSON.stringify(damage)} === "extension") rmSync("." + harness, { recursive: true });
+	else {
+		const path = harness === "codex" ? ".codex/hooks.json" : "." + harness + "/settings.json";
+		const config = JSON.parse(readFileSync(path, "utf8"));
+		const group = config.hooks[harness === "gemini" ? "AfterTool" : "PostToolUse"][0];
+		if (${JSON.stringify(damage)} === "matcher") group.matcher = "NoSuchTool";
+		else group.hooks[0].command = "true";
+		writeFileSync(path, JSON.stringify(config));
+	}
+}
+process.exit(result.status ?? 2);
+`);
+		const result = spawnSync(process.execPath, [join(scripts, "hooks-e2e.mjs"), harness, "--synthetic"], { encoding: "utf8" });
+		expect(result.status, result.stdout + result.stderr).toBe(1);
+		expect(result.stdout).toContain("FAIL");
 	});
 });
 

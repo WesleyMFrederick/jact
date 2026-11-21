@@ -27,8 +27,8 @@ Options, the same for each harness:
 |---|---|
 | `--global` | Write the user-level file instead, so each project gets the hook: `~/.claude/settings.json`, `~/.codex/hooks.json`, `~/.gemini/config/hooks.json` (Antigravity CLI), `~/.gemini/settings.json` (Gemini CLI), `~/.pi/agent/extensions/jact.ts`, `~/.omp/agent/extensions/jact.ts` |
 | `--print` | Print the file that setup would write. Write nothing. |
-| `--check` | Exit 0 when the wiring is installed, 1 when it is not |
-| `--remove` | Remove only the entry that jact wrote |
+| `--check` | Exit 0 when the wiring is installed, 1 when it is not. JSON formatting and unrelated hooks do not affect the result. |
+| `--remove` | Remove only jact's hook, including from shared groups. Cannot be combined with `--print` or `--check`. |
 | `--command <command>` | The command the harness runs to start jact. Default: `jact`. Use a full path when the harness does not see your `PATH`. |
 
 Setup is safe to run again. It keeps hook entries from other tools, it replaces its own entry instead of adding a second, and it refuses a config file that is not valid JSON.
@@ -43,7 +43,7 @@ Setup is safe to run again. It keeps hook entries from other tools, it replaces 
 
 To see each hook call, set `JACT_HOOK_LOG=<file>` in the environment of the harness. jact appends one JSON line for each call.
 
-In a clone of this repository, `node scripts/hooks-e2e.mjs <harness>` runs steps 1 to 3 in a throwaway project with a real harness session. Add `--synthetic` to skip the model call.
+In a clone of this repository, `node scripts/hooks-e2e.mjs <harness>` runs steps 1 to 3 in a throwaway project with a real harness session. Add `--synthetic` to skip the model call while still loading the installed event matchers, commands, or extension.
 
 ## What the model sees
 
@@ -168,5 +168,7 @@ Measured on this repository's own Markdown (36 files in `docs/` and `src/`) on 2
 | How fast does an agent find the setup command in the README? | **4 to 12 seconds**, correct each time: Claude Code 3.7, omp 4.6, pi 7.2, Codex 9.9, Antigravity CLI 10.7 to 11.5 (6.3 to 7.2 with its fast model) |
 
 Method for the first row: for each file of 4,000 characters or more that has two or more H2 sections, compare the file length with the length of `jact outline` output plus the file's median-length H2 section from `jact extract header`.
+
+When no files qualify for the reading measurement, the script prints an explanatory message instead of saving percentages. When no Markdown files are found, it also reports that hook timing is unavailable.
 
 Method for the last row: a real session in a folder that holds only `README.md` was asked for the command that sets up jact for Codex and the file it writes. The time is the whole run, startup included. Antigravity CLI needs 5.5 to 6.5 seconds for a prompt that reads no file, so its default model misses a 10-second target by 0.7 to 1.5 seconds.

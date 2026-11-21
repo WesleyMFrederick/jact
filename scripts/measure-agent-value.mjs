@@ -103,15 +103,24 @@ console.log(
 			reading: {
 				filesScanned: files.length,
 				filesMeasured: rows.length,
-				medianWholeFileChars: median(rows.map((row) => row.whole)),
-				medianOutlinePlusSectionChars: median(rows.map((row) => row.cost)),
-				medianSavingPercent: percent(median(savings)),
-				smallestSavingPercent: percent(Math.min(...savings)),
-				largestSavingPercent: percent(Math.max(...savings)),
-				allFilesTogetherSavingPercent: percent(1 - sum("cost") / sum("whole")),
+				...(rows.length === 0
+					? { message: "No files qualify: reading measurements require 4,000+ characters and at least two H2 sections." }
+					: {
+						medianWholeFileChars: median(rows.map((row) => row.whole)),
+						medianOutlinePlusSectionChars: median(rows.map((row) => row.cost)),
+						medianSavingPercent: percent(median(savings)),
+						smallestSavingPercent: percent(Math.min(...savings)),
+						largestSavingPercent: percent(Math.max(...savings)),
+						allFilesTogetherSavingPercent: percent(1 - sum("cost") / sum("whole")),
+					}),
 			},
 			writing: { ...summary, seconds: Number(validateSeconds.toFixed(2)) },
-			hook: { calls: hookMs.length, medianMs: Math.round(median(hookMs)) },
+			hook: {
+				calls: hookMs.length,
+				...(hookMs.length === 0
+					? { message: "No Markdown files: hook timing is unavailable." }
+					: { medianMs: Math.round(median(hookMs)) }),
+			},
 		},
 		null,
 		1,

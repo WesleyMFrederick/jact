@@ -15,7 +15,9 @@ jact connects to four outside systems: agent harness hooks, AI agent sessions, t
 - Input: the tool event as JSON on standard input. A Markdown write runs `jact validate`; a Markdown read runs `jact extract links`.
 - Output: text for the model in that harness's format, or nothing. The exit code is always 0.
 - Antigravity CLI: its tool hook cannot answer the model. That hook holds the result in `.jact/hook-pending/` and prints `{}`. The hook that runs before the next model call hands the result over.
-- Setup keeps other tools' hooks and refuses a config file that is not valid JSON.
+- Setup and removal keep other tools' hooks, including hooks in the same matcher group, and refuse a config file that is not valid JSON.
+- `setup --check` checks JSON wiring rather than formatting or unrelated hook order; it recognizes custom commands without repeating `--command`. `--remove` cannot be combined with `--print` or `--check`.
+- Synthetic checks in `scripts/hooks-e2e.mjs` load the installed matchers and commands or extension. Measurements in `scripts/measure-agent-value.mjs` explicitly report when no files qualify rather than emitting invalid statistics.
 - Machine data: a caller that acts on a fix reads `pathConversion` and `anchorConversion` from `jact validate --format json`. It never parses the human `suggestion` text, which can change.
 
 ## Agent workflows (orient-before-extract)

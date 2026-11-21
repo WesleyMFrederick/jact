@@ -1251,6 +1251,11 @@ Exit Codes:
 `,
 	)
 	.action((harness: Harness, options: CliSetupOptions) => {
+		if (options.remove && (options.print || options.check)) {
+			console.error("ERROR: --remove cannot be combined with --print or --check");
+			process.exitCode = 2;
+			return;
+		}
 		const setup: SetupOptions = {
 			global: options.global,
 			command: options.command,

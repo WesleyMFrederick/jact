@@ -32,6 +32,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
 const HARNESSES = ["claude", "codex", "antigravity", "gemini", "pi", "omp"];
 // Codex reads files through shell commands, so it has no read event to hook.
@@ -250,7 +251,56 @@ function playAntigravity(project) {
 	return problems;
 }
 
-function runOne(harness) {
+async function playInstalled(harness, project) {
+	const problems = [];
+	try {
+		const events = syntheticEvents(harness, project);
+		if (harness === "pi" || harness === "omp") {
+			const source = readFileSync(join(project, `.${harness}`, "extensions", "jact.ts"), "utf8");
+			const { outputText } = ts.transpileModule(source, {
+				compilerOptions: { module: ts.ModuleKind.ESNext },
+			});
+			const extension = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
+			const handlers = new Map();
+			extension.default({ on: (event, handler) => handlers.set(event, handler) });
+			const handler = handlers.get("tool_result");
+			if (!handler) return ["the installed extension did not register tool_result"];
+			for (const event of events)
+				await handler(
+					{ toolName: event.tool_name, input: event.tool_input, content: [], isError: false },
+					{ cwd: project, sessionManager: { getSessionId: () => event.session_id } },
+				);
+		} else {
+			const path = harness === "codex"
+				? join(project, ".codex", "hooks.json")
+				: join(project, `.${harness}`, "settings.json");
+			const installed = JSON.parse(readFileSync(path, "utf8"));
+			const eventName = harness === "gemini" ? "AfterTool" : "PostToolUse";
+			for (const event of events) {
+				const handlers = (installed.hooks?.[eventName] ?? [])
+					.filter((group) => new RegExp(`^(?:${group.matcher})$`).test(event.tool_name))
+					.flatMap((group) => group.hooks ?? []);
+				if (handlers.length === 0)
+					problems.push(`the installed ${eventName} matcher did not select ${event.tool_name}`);
+				for (const handler of handlers) {
+					const result = spawnSync(handler.command, {
+						cwd: project,
+						shell: true,
+						input: JSON.stringify({ ...event, hook_event_name: eventName }),
+						encoding: "utf8",
+					});
+					if (result.error || result.status !== 0)
+						problems.push(`installed command failed: ${result.error?.message ?? result.stderr}`);
+				}
+			}
+		}
+	} catch (error) {
+		problems.push(`could not load installed wiring: ${error.message}`);
+	}
+	return problems;
+}
+
+async function runOne(harness) {
 	const project = realpathSync(
 		mkdtempSync(join(tmpdir(), `jact-hook-e2e-${harness}-`)),
 	);
@@ -294,14 +344,7 @@ function runOne(harness) {
 			"See [the missing page](missing.md).\n",
 		);
 		if (harness === "antigravity") problems.push(...playAntigravity(project));
-		else
-			for (const event of syntheticEvents(harness, project))
-				spawnSync(`${command} hook ${harness}`, {
-					cwd: project,
-					shell: true,
-					input: JSON.stringify(event),
-					encoding: "utf8",
-				});
+		else problems.push(...await playInstalled(harness, project));
 	} else {
 		// JACT_E2E_ARGS adds harness flags, for example: JACT_E2E_ARGS="--model <id>"
 		const extra = (process.env.JACT_E2E_ARGS ?? "").split(" ").filter(Boolean);
@@ -400,16 +443,17 @@ function runOne(harness) {
 	};
 }
 
-const results = targets.map((harness) => {
+const results = [];
+for (const harness of targets) {
 	console.log(
 		`▶ ${harness} (${flags.has("--synthetic") ? "synthetic" : "live"})`,
 	);
-	const result = runOne(harness);
+	const result = await runOne(harness);
 	console.log(
 		`  ${result.pass ? "PASS" : "FAIL"}  write: ${result.write}  read: ${result.read}  hook calls: ${result.hookCalls}  ${result.seconds}s`,
 	);
 	for (const problem of result.problems) console.log(`  - ${problem}`);
-	return result;
-});
+	results.push(result);
+}
 
 process.exit(results.every((result) => result.pass) ? 0 : 1);

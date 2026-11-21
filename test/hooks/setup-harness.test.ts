@@ -139,6 +139,28 @@ describe("setup is safe to run on a config other tools also use", () => {
 		);
 	});
 
+	it.each(["claude", "codex", "gemini"] as const)(
+		"%s: install and removal preserve other hooks inside a shared group",
+		(harness) => {
+			const event = harness === "gemini" ? "AfterTool" : "PostToolUse";
+			const other = { type: "command", command: "prettier --write", timeout: 20 };
+			const group = {
+				matcher: "Write|Edit",
+				description: "shared group",
+				hooks: [other, { type: "command", command: `jact hook ${harness}` }],
+			};
+			const file = seed(harness, JSON.stringify({ hooks: { [event]: [group] } }));
+			installHarness(harness, options);
+			expect(readJson(file).hooks[event][0]).toEqual({ ...group, hooks: [other] });
+			expect(removeHarness(harness, options).action).toBe("removed");
+			expect(readJson(file).hooks[event]).toEqual([{ ...group, hooks: [other] }]);
+			expect(removeHarness(harness, options).action).toBe("absent");
+			writeFileSync(file, JSON.stringify({ hooks: { [event]: [group] } }));
+			removeHarness(harness, options);
+			expect(readJson(file).hooks[event]).toEqual([{ ...group, hooks: [other] }]);
+		},
+	);
+
 	it("a second run changes nothing", () => {
 		seed("codex", JSON.stringify(otherTool));
 		installHarness("codex", options);
@@ -308,6 +330,24 @@ describe("--check and --print", () => {
 			installHarness(harness, options);
 			expect(isInstalled(harness, options)).toBe(true);
 			removeHarness(harness, options);
+			expect(isInstalled(harness, options)).toBe(false);
+		},
+	);
+
+	it.each(["claude", "codex", "gemini", "antigravity"] as const)(
+		"%s: recognizes reformatted wiring with a custom command and later unrelated hooks",
+		(harness) => {
+			const { path } = installHarness(harness, { ...options, command: "node /opt/jact/cli.js" });
+			const config = readJson(path);
+			if (harness !== "antigravity") {
+				const event = harness === "gemini" ? "AfterTool" : "PostToolUse";
+				config.hooks[event].push({ matcher: "Other", hooks: [{ command: "other" }] });
+			}
+			writeFileSync(path, JSON.stringify(config, null, "\t"));
+			expect(isInstalled(harness, options)).toBe(true);
+			if (harness === "antigravity") delete config.jact.PreInvocation;
+			else config.hooks[harness === "gemini" ? "AfterTool" : "PostToolUse"][0].matcher = "NoSuchTool";
+			writeFileSync(path, JSON.stringify(config));
 			expect(isInstalled(harness, options)).toBe(false);
 		},
 	);
