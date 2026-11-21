@@ -3,10 +3,13 @@
 //
 // 1. Splits the PR into slices here, in plain code, and uploads each slice as a diff file.
 //    Lockfiles, build output and planning docs are skipped. No reviewable change, no session.
+//    It also uploads ensure-jact-build.mjs, the one command provers run to install and build
+//    jact once per session. The runner itself never runs it and never builds the PR.
 // 2. Finds or creates the agent and its cloud environment. Both names carry a hash of
 //    their config, so a config change makes new ones.
-// 3. Starts a session with the repo mounted at the PR head, the slice files mounted beside
-//    it, and a short manifest as the first message. The agent runs a dynamic workflow:
+// 3. Starts a session with the repo mounted at the PR head, the slice files and the build helper
+//    mounted beside it, and a short manifest, with the exact helper command, as the first message.
+//    The agent runs a dynamic workflow:
 //    read each slice -> pick candidates -> prove each candidate -> report.
 // 4. Polls until every workflow run has ended and the session idles with end_turn.
 //    At 75% of the budget it asks the agent to stop its runs and report.
@@ -24,7 +27,7 @@
 //
 // Exit codes: 0 no blocking findings, 1 blocking findings, 2 the review itself failed.
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, appendFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,6 +35,7 @@ import Anthropic, { toFile } from "@anthropic-ai/sdk";
 import { assess } from "./progress.mjs";
 import { parseReport } from "./report.mjs";
 import { compareToPr, reviewTarget, sessionPrefix } from "./target.mjs";
+import { createSessionLifecycle } from "./session-lifecycle.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const env = (name, fallback) => {
@@ -57,6 +61,11 @@ const REPORT_FILE = process.env.REPORT_FILE || undefined;
 const MOUNT_PATH = "/workspace/repo";
 const SLICE_DIR = "/workspace/slices";
 const POLL_MS = 15_000;
+// A file resource's mount_path is rooted under the session's uploads directory, so this mounts
+// the helper at BUILD_HELPER_PATH. https://platform.claude.com/docs/en/managed-agents/files#file-paths
+const BUILD_HELPER = new URL("./ensure-jact-build.mjs", import.meta.url);
+const BUILD_HELPER_MOUNT = "/ensure-jact-build.mjs";
+const BUILD_HELPER_PATH = "/mnt/session/uploads/ensure-jact-build.mjs";
 // After the last workflow run ends, the lead normally reports within seconds. Silence this long
 // means it froze (exam 1, sesn_0169BWdXnQa1HrxFhqPuvxR1), so the runner interrupts it once.
 const STALL_MS = 3 * 60_000;
@@ -226,10 +235,20 @@ async function ensureEnvironment() {
 
 // ---------- Session ----------
 
-function manifest(pr, slices, skipped) {
+// Leaves plain words as they are and single-quotes anything else, so the command is safe to paste.
+const shellArg = (value) => (/^[\w@%+=:,./-]+$/.test(value) ? value : `'${String(value).replaceAll("'", "'\\''")}'`);
+
+// The one setup command provers run before any test; see system-prompt.md.
+const buildCommand = (head, sessionId) =>
+  ["node", BUILD_HELPER_PATH, "--repo", MOUNT_PATH, "--head", head, "--session", sessionId].map(shellArg).join(" ");
+
+function manifest(pr, slices, skipped, sessionId) {
   return [
     TARGET.exam ? `Review the changes in ${REPO} from ${pr.base.sha} to ${pr.head.sha}.` : `Review pull request #${PR_NUMBER} in ${REPO}: "${pr.title}".`,
     `Repository: ${MOUNT_PATH}, checked out at the ${TARGET.exam ? "head" : "PR head"} commit ${pr.head.sha} (base ${pr.base.ref} at ${pr.base.sha}).`,
+    "",
+    "Build setup command (give it to every prover, copied exactly):",
+    buildCommand(pr.head.sha, sessionId),
     "",
     TARGET.exam ? "Change description:" : "PR description:",
     (pr.body || "(none)").slice(0, 4000),
@@ -260,9 +279,7 @@ const say = (sessionId, text) =>
 // Best effort: ask the agent to end its runs, stop its turn, and archive the session so
 // nothing keeps spending after the CI job is gone. Archiving can also end open runs.
 // https://platform.claude.com/docs/en/managed-agents/workflow-runs#interrupt-a-session-with-runs-open
-// `quick` skips the wait, for the cancel path: GitHub kills the process about 10 seconds
-// after it signals, and the next run's stopStaleSessions() catches anything left over.
-async function stopSession(sessionId, { quick = false } = {}) {
+async function stopSession(sessionId) {
   const { status } = await client.beta.sessions.retrieve(sessionId).catch(() => ({}));
   if (status === "running" || status === "rescheduling") {
     // Only a working session gets the stop message: on an idle one it would start a new turn.
@@ -270,7 +287,7 @@ async function stopSession(sessionId, { quick = false } = {}) {
     await client.beta.sessions.events.send(sessionId, { events: [{ type: "user.interrupt" }] }).catch(() => {});
   }
   // A running session can't be archived; give the interrupt up to 30 seconds to land.
-  for (let i = 0; i < (quick ? 0 : 6); i++) {
+  for (let i = 0; i < 6; i++) {
     const { status } = await client.beta.sessions.retrieve(sessionId).catch(() => ({}));
     if (status !== "running" && status !== "rescheduling") break;
     await new Promise((r) => setTimeout(r, 5_000));
@@ -365,13 +382,9 @@ async function postReview(pr, files, report, { sessionId, note, finished, cost }
 
 // ---------- Main ----------
 
-let liveSession; // the session to stop if this process is cancelled or crashes
-// Files API uploads outlive their session, so every exit path deletes the ones that succeeded,
-// including uploads that finished before another setup step failed.
-const uploadedIds = [];
-async function deleteUploads() {
-  const ids = uploadedIds.splice(0);
-  await Promise.all(ids.map((id) => client.beta.files.delete(id).catch(() => {})));
+const lifecycle = createSessionLifecycle(client);
+async function upload(bytes, name, type) {
+  return lifecycle.upload(await toFile(bytes, name, { type }));
 }
 
 // REPORT_FILE gets one JSON record per run, including runs that end before a session starts.
@@ -388,10 +401,11 @@ async function main() {
   await refreshGithubIdToken();
   setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
   const { pr, files } = await loadTarget();
+  if (lifecycle.mode !== "none") return;
   const { slices, skipped } = planSlices(files);
   console.log(`Slices: ${slices.map((s) => `${s.id}=${s.lines} lines/${s.files.length} files`).join(", ") || "none"}; skipped ${skipped.length} files.`);
   if (PLAN_ONLY) {
-    console.log(`PLAN_ONLY: no session started.\n\n${manifest(pr, slices, skipped)}`);
+    console.log(`PLAN_ONLY: no session started.\n\n${manifest(pr, slices, skipped, "<session id>")}`);
     return;
   }
   if (!slices.length) {
@@ -401,21 +415,22 @@ async function main() {
     return;
   }
 
+  // Read before any Anthropic call, so a missing helper stops the run with nothing to clean up.
+  const helperBytes = readFileSync(BUILD_HELPER);
   await stopStaleSessions();
-  const [agentId, environmentId, uploads] = await Promise.all([
+  if (lifecycle.mode !== "none") return;
+  const [agentId, environmentId, helper, uploads] = await Promise.all([
     ensureAgent(),
     ensureEnvironment(),
-    Promise.all(slices.map(async (s) => {
-      const u = await client.beta.files.upload({ file: await toFile(Buffer.from(s.text), `${s.id}.diff`, { type: "text/plain" }) });
-      uploadedIds.push(u.id);
-      return u;
-    })),
+    upload(helperBytes, "ensure-jact-build.mjs", "text/javascript"),
+    Promise.all(slices.map((s) => upload(Buffer.from(s.text), `${s.id}.diff`, "text/plain"))),
   ]);
+  if (lifecycle.mode !== "none") return;
 
-  const session = await client.beta.sessions.create({
+  const session = await lifecycle.createSession({
     agent: agentId,
     environment_id: environmentId,
-    title: `${sessionPrefix(REPO, TARGET, PR_NUMBER)}@ ${pr.head.sha.slice(0, 7)}`,
+    title: `${sessionPrefix(REPO, TARGET, PR_NUMBER)}@ ${pr.head.sha.slice(0, 7)} (${randomUUID()})`,
     budget: { type: "limit", max_list_cost: { amount: BUDGET_CENTS, currency: "USD" } },
     resources: [
       {
@@ -425,12 +440,14 @@ async function main() {
         ...(REPO_TOKEN ? { authorization_token: REPO_TOKEN } : {}),
         checkout: { type: "commit", sha: pr.head.sha },
       },
+      { type: "file", file_id: helper.id, mount_path: BUILD_HELPER_MOUNT },
       ...uploads.map((u, i) => ({ type: "file", file_id: u.id, mount_path: `${SLICE_DIR}/${slices[i].id}.diff` })),
     ],
   });
-  liveSession = session.id;
+  if (lifecycle.mode !== "none") return;
   console.log(`Session ${session.id} started: ${sessionPrefix(REPO, TARGET, PR_NUMBER).trim()} (budget ${dollars(BUDGET_CENTS)}).`);
-  await say(session.id, manifest(pr, slices, skipped));
+  await say(session.id, manifest(pr, slices, skipped, session.id));
+  if (lifecycle.mode !== "none") return;
 
   const deadline = Date.now() + TIMEOUT_MS;
   const wrapUpCents = Number(BUDGET_CENTS) * WRAP_UP_AT;
@@ -440,9 +457,10 @@ async function main() {
   let verdict = { state: "working" };
   let events = [];
   let seen = 0;
-  while (Date.now() < deadline) {
+  while (lifecycle.mode === "none" && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_MS));
     const current = await client.beta.sessions.retrieve(session.id);
+    if (lifecycle.mode !== "none") return;
     if (current.status === "terminated") throw new Error(`Session ${session.id} terminated.`);
     const spent = Number(current.usage?.list_cost?.amount ?? 0);
     if (!askedToWrapUp && spent >= wrapUpCents && current.status === "running") {
@@ -452,6 +470,7 @@ async function main() {
     }
     if (current.status !== "idle" && current.status !== "running") continue;
     events = await listEvents(session.id);
+    if (lifecycle.mode !== "none") return;
     const fresh = events.slice(seen);
     seen = events.length;
     for (const e of fresh) {
@@ -478,6 +497,7 @@ async function main() {
     }
     if (verdict.state !== "working" && verdict.state !== "stalled") break;
   }
+  if (lifecycle.mode !== "none") return;
 
   if (verdict.state === "working" && verdict.reason === "retries_exhausted") {
     const errors = events.filter((e) => e.type === "session.error").map((e) => JSON.stringify(e.error ?? e)).slice(-3);
@@ -490,15 +510,15 @@ async function main() {
   if (verdict.state === "refused") throw new Error(`Session ${session.id} stopped with a refusal, so this PR has not been checked.`);
   if (verdict.state === "blocked") throw new Error(`Session ${session.id} is waiting on a tool confirmation; check the agent's permission policy.`);
   const finished = verdict.state === "done";
-  // Archive in every case: a finished session has nothing left to do, and an unfinished one
-  // must not keep spending after this job ends.
-  if (!finished) await stopSession(session.id);
-  else await client.beta.sessions.archive(session.id).catch((err) => console.log(`  could not archive ${session.id}: ${err.message}`));
-  liveSession = undefined;
+  // Completion, errors, and signals all await this one resource owner.
+  const cleanup = await lifecycle.requestShutdown("graceful");
+  if (!cleanup.ok) throw new Error("Session cleanup was not confirmed; see the shutdown errors.");
+  if (lifecycle.mode === "fast") return;
   // A report can land between the last poll and the stop, so read the events once more.
   if (!finished) events = await listEvents(session.id).catch(() => events);
 
   const cost = await costReport(session.id).catch((err) => ({ table: `Cost unavailable: ${err.message}` }));
+  if (lifecycle.mode === "fast") return;
   console.log(`\nCost:\n${cost.table}\n`);
 
   let report;
@@ -510,8 +530,6 @@ async function main() {
   }
   await postReview(pr, files, report, { sessionId: session.id, note, finished, cost });
   saveReport(pr, { session: session.id, agent: agentId, finished, note, cost_usd: cost.total === undefined ? null : Number(cost.total) / 100, report });
-
-  await deleteUploads();
 
   const threshold = SEVERITY_RANK[FAIL_ON];
   const blocking = report.findings.filter((f) => (SEVERITY_RANK[f.severity] ?? 0) >= threshold);
@@ -526,19 +544,18 @@ async function main() {
 // GitHub sends SIGINT, then SIGTERM, when a newer run cancels this one.
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, async () => {
-    if (liveSession) {
-      console.log(`${signal}: stopping session ${liveSession}.`);
-      await stopSession(liveSession, { quick: true });
-    }
-    await deleteUploads();
+    console.log(`${signal}: requesting fast shutdown.`);
+    await lifecycle.requestShutdown("fast");
     process.exit(2);
   });
 }
 
-main().catch(async (err) => {
+main().then(async () => {
+  const cleanup = await lifecycle.requestShutdown("graceful");
+  if (!cleanup.ok) process.exit(2);
+}).catch(async (err) => {
   console.error(`::error title=Bug Hunter failed::${err.message.split("\n")[0]}`);
   console.error(err);
-  if (liveSession) await stopSession(liveSession);
-  await deleteUploads();
+  await lifecycle.requestShutdown("graceful");
   process.exit(2);
 });
