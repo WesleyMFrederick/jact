@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # Domain Docs
 
 How engineering skills should consume this repository's domain documentation.

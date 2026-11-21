@@ -1,0 +1,73 @@
+name: Bug Hunter
+
+# Multi-agent PR review on Claude Managed Agents. See .github/bug-hunter/README.md.
+# Runs once when a PR opens or leaves draft, and again whenever the `bug-hunt`
+# label is added. It does not run on every push, because each run spends API
+# credit (capped per run by BUDGET_CENTS). There is no manual trigger: the
+# Anthropic federation rule accepts only `pull_request` runs.
+on:
+  pull_request:
+    types: [opened, ready_for_review, labeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+  # Lets the job request GitHub's OIDC token, which Anthropic exchanges for a
+  # 10-minute access token (Workload Identity Federation). No API key is stored.
+  id-token: write
+
+jobs:
+  hunt:
+    # Same-repo PRs only: fork PRs get no secrets. Skip drafts, and skip label
+    # events for any label other than `bug-hunt`.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft &&
+      (github.event.action != 'labeled' || github.event.label.name == 'bug-hunt')
+    runs-on: ubuntu-latest
+    # Job-level, not workflow-level: a skipped event (an unrelated label) never joins
+    # the group, so it cannot cancel a review that is already running.
+    concurrency:
+      group: bug-hunter-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/bug-hunter
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install the Anthropic SDK without install scripts
+        working-directory: .github/bug-hunter
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Fetch GitHub OIDC token for Anthropic
+        env:
+          TOKEN_FILE: ${{ runner.temp }}/gha-jwt
+        run: |
+          curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.anthropic.com" \
+            | jq -r .value > "$TOKEN_FILE"
+
+      - name: Run Bug Hunter
+        working-directory: .github/bug-hunter
+        env:
+          # Federation IDs are identifiers, not secrets. Set them as repo variables
+          # from the Console's Workload identity page. See README "Setup".
+          ANTHROPIC_IDENTITY_TOKEN_FILE: ${{ runner.temp }}/gha-jwt
+          ANTHROPIC_FEDERATION_RULE_ID: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
+          ANTHROPIC_ORGANIZATION_ID: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
+          ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
+          ANTHROPIC_WORKSPACE_ID: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BUDGET_CENTS: ${{ vars.BUG_HUNTER_BUDGET_CENTS || '1500' }}
+          BUG_HUNTER_MODEL: ${{ vars.BUG_HUNTER_MODEL || 'claude-opus-5-5' }}
+          FAIL_ON: ${{ vars.BUG_HUNTER_FAIL_ON || 'high' }}
+        # exec: node replaces bash, so it receives GitHub's cancel signal directly.
+        run: exec node bug-hunter.mjs

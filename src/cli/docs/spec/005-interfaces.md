@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 005. Interfaces
 
 **Status:** done
@@ -16,7 +20,7 @@ Each row names the contract section and the files that act on one command. `src/
 | `vault-link` | [`jact vault-link <note> [target]`](../../../../docs/spec/005-interfaces.md#%60jact%20vault-link%20%3Cnote%3E%20target%20%60) | `src/cli.ts`, with the core vault link fixer | `src/cli.ts` |
 | `outline` | [`jact outline <file> [level]`](../../../../docs/spec/005-interfaces.md#%60jact%20outline%20%3Cfile%3E%20level%20%60) | `src/jact-cli.ts` | `src/cli.ts` |
 | `ast` | [`jact ast <file>`](../../../../docs/spec/005-interfaces.md#%60jact%20ast%20%3Cfile%3E%60) | `src/jact-cli.ts` | `src/cli.ts` |
-| `extract links` | [`jact extract links <source-file>`](../../../../docs/spec/005-interfaces.md#%60jact%20extract%20links%20%3Csource-file%3E%60) | `src/jact-cli.ts` | `src/jact-cli.ts`; `src/cli.ts` for a `--session` cache hit |
+| `extract links` | [`jact extract links <source-file>`](../../../../docs/spec/005-interfaces.md#%60jact%20extract%20links%20%3Csource-file%3E%60) | `src/jact-cli.ts` | `src/jact-cli.ts`; `src/cli.ts` for a `--session` cache hit or an unexpected error |
 | `extract header` | [`jact extract header <target-file> <header-name>`](../../../../docs/spec/005-interfaces.md#%60jact%20extract%20header%20%3Ctarget-file%3E%20%3Cheader-name%3E%60) | `src/jact-cli.ts`, with a synthetic header link | Both files |
 | `extract file` | [`jact extract file <target-file>`](../../../../docs/spec/005-interfaces.md#%60jact%20extract%20file%20%3Ctarget-file%3E%60) | `src/jact-cli.ts`, with a synthetic file link | Both files |
 
@@ -39,14 +43,14 @@ A PR that changes a flag, default, or exit path updates the help text, the repos
 
 ### Extra Help Blocks
 
-Some commands add blocks between the examples and the exit codes.
+Some commands add blocks besides the examples and exit codes; a block may sit before or after the examples.
 
 | Command | Extra blocks |
 |---|---|
-| `validate` | Default output, batch mode, and rule presets |
+| `validate` | Default output and batch mode before the examples; `--stdin`, `--fix`, and rules and presets after them |
 | `rename` | Safety |
 | `vault-link` | Behavior |
-| `outline` | Default heading ceiling |
+| `outline` | Default heading ceiling, before the examples |
 | `ast` | Output fields: every top-level JSON key |
 
 ---
@@ -67,7 +71,7 @@ Two features keep files under `.jact/claude-cache` in the working folder.
 
 | Feature | Key | Effect |
 |---|---|---|
-| `extract links --session <id>` | Session ID and source file | A hit skips extraction and exits `0` |
+| `extract links --session <id>` | Session ID and a hash of the source file's content | A hit skips extraction and exits `0`; an edited source misses |
 | `outline` next-step reminders | Session ID and target file | Reminders show once; `--cache-reset` shows them again |
 
 The outline session ID comes from the environment, as in [Environment Variables](../../../../docs/spec/005-interfaces.md#Environment%20Variables).
@@ -84,5 +88,6 @@ The outline session ID comes from the environment, as in [Environment Variables]
 
 | Version | Changes |
 |---|---|
+| 1.1.1 | 2026-11-19: Extra help blocks list their real position and `validate`'s `--stdin` and `--fix` blocks; the extract session key hashes source content |
 | 1.1.0 | 2026-10-15: Parser rejections exit `2`; command lists show each command's own usage; `ast` lists all output fields and exit codes; `validate` declares format choices and reuses the shared scope description |
 | 1.0.0 | 2026-10-11: Initial command-to-code map and help-text contract |

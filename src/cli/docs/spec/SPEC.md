@@ -1,6 +1,10 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # `src/cli` Living Specification
 
-**Version:** 1.3.0
+**Version:** 1.3.2
 **Status:** done
 
 The command-line interface (CLI) layer turns a `jact` command line into calls on the domain components, then prints the result and sets the exit code. It spans `src/cli.ts`, `src/jact-cli.ts`, and `src/factories/`. Command contracts live in the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -85,3 +89,5 @@ Each row records one version of this module spec.
 | 1.1.0 | 2026-10-11: `vault-link --all` no longer writes the note itself; the core vault link fixer applies the plan |
 | 1.2.0 | 2026-10-14: `vault-link --all` reports the retained recovery file returned by core; command help discloses manual recovery cleanup and the brief missing-note interval |
 | 1.3.0 | 2026-10-15: Align help pages with command contracts and classify parser rejections and conflicting extraction scope as usage errors |
+| 1.3.1 | 2026-11-19: Header extraction resolves its heading in the orchestrator; help-block positions and the extract session key match the code |
+| 1.3.2 | 2026-11-19: Clarification: the help exit-code guarantee covers leaf commands; the `extract` parent page never had an `Exit Codes` block, so no behavior changed |
