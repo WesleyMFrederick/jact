@@ -138,15 +138,9 @@ export function createSessionLifecycle(client, {
     // Initially reserve archive and deletion time. A confirmed rejection can borrow the
     // archive half for more polling/retries, but must retain the deletion half.
     let retrying = false;
+    let stopRequested = false;
     const reserveMs = () => deletionReserveMs() * (retrying ? 1 : 2);
     if (running()) {
-      // A message to an idle session starts a new turn. Only ask a known working lead,
-      // before interrupting it; an unknown status still requires the interrupt.
-      if (current) {
-        await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
-          events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
-        }, options), 5, deletionReserveMs);
-      }
       await attempt(`interrupt ${id}`, (options) => client.beta.sessions.events.send(id, {
         events: [{ type: "user.interrupt" }],
       }, options), 4, deletionReserveMs);
@@ -170,9 +164,17 @@ export function createSessionLifecycle(client, {
       }, 2, deletionReserveMs, { required: true });
       if (archived !== false) return;
       retrying = true;
-      if (deadline - Date.now() <= reserveMs()) {
+      if (stopRequested || deadline - Date.now() <= reserveMs()) {
         failure(`archive ${id}`, rejection);
         return;
+      }
+      if (rejection.error?.error?.details?.error_code === "workflow_run_open") {
+        // Only a confirmed open workflow justifies waking the lead. Give it one turn
+        // to stop its runs, then retry archival once without restarting the deadline.
+        stopRequested = true;
+        await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
+          events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
+        }, options), 5, deletionReserveMs);
       }
       await pause(reserveMs());
       current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, deletionReserveMs);

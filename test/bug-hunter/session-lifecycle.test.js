@@ -271,14 +271,14 @@ describe("Bug Hunter session lifecycle", () => {
     expect(fake.calls.slice(callCount).filter((c) => c.sdk)).toEqual([]);
   });
 
-  it.each(["running", "idle"])("does not start a new lead turn while shutting down a %s session", async (status) => {
+  it.each(["running", "idle"])("does not start an idle lead while the overall session is %s", async (status) => {
     let newTurns = 0;
     let archives = 0;
     const fake = fakeClient({
       create: async () => ({ status }),
       requireIdle: true,
       send: (_id, types, session) => {
-        if (types.includes("user.message") && session.status === "idle") {
+        if (types.includes("user.message")) {
           newTurns++;
           session.status = "running";
         }
@@ -295,8 +295,53 @@ describe("Bug Hunter session lifecycle", () => {
     expect(result).toEqual({ ok: true });
     expect(fake.ids("archived")).toEqual(["sesn_1"]);
     expect(fake.ops("send").map((call) => call.events)).toEqual(
-      status === "running" ? [["user.message"], ["user.interrupt"]] : [],
+      status === "running" ? [["user.interrupt"]] : [],
     );
+  });
+
+  it.each(["stops", "stays open"])("uses one stop fallback and one archive retry when a workflow %s", async (outcome) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      let stopMessages = 0;
+      let archives = 0;
+      const fake = fakeClient({
+        send: (_id, types, session) => {
+          if (types.includes("user.message")) {
+            stopMessages++;
+            session.status = "running";
+            setTimeout(() => { session.status = "idle"; }, 25);
+          }
+        },
+        archive: () => {
+          if (++archives === 1 || !stopMessages || outcome === "stays open") {
+            throw Object.assign(new Error("open workflow"), {
+              status: 400, error: { error: { details: { error_code: "workflow_run_open" } } },
+            });
+          }
+        },
+        requireIdle: true,
+      });
+      const { log } = logger();
+      const life = createSessionLifecycle(fake.client, { ...SHORT, pollMs: 10, log });
+      await uploadTwo(life);
+      await life.createSession(params());
+      const stopping = life.requestShutdown("graceful");
+      await vi.advanceTimersByTimeAsync(SHORT.gracefulMs);
+      expect(await stopping).toEqual({ ok: outcome === "stops" });
+      expect(stopMessages).toBe(1);
+      expect(archives).toBe(2);
+      const sends = fake.ops("send");
+      expect(sends.map((call) => call.events)).toEqual([["user.message"]]);
+      expect(fake.index("send", "sesn_1")).toBeGreaterThan(fake.index("archive", "sesn_1"));
+      expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+      await vi.advanceTimersByTimeAsync(SHORT.gracefulMs);
+      expect(archives).toBe(2);
+      expect(stopMessages).toBe(1);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it.each(["upload", "create"])("waits for a 1.5s in-flight %s during graceful cleanup", async (stage) => {
@@ -517,13 +562,16 @@ describe("Bug Hunter session lifecycle", () => {
     const fake = fakeClient({
       create: async () => ({ status: "running" }),
       requireIdle: true,
-      send: (_id, types) => {
-        if (types.includes("user.message")) setTimeout(() => { open = false; }, 50);
+      send: (_id, types, session) => {
+        if (types.includes("user.message")) {
+          session.status = "running";
+          setTimeout(() => { open = false; session.status = "idle"; }, 50);
+        }
       },
       archive: () => {
         if (++attempts === 1 || open) {
           throw Object.assign(new Error("workflow_run_open"), {
-            status: 400, error: { details: { error_code: "workflow_run_open" } },
+            status: 400, error: { error: { details: { error_code: "workflow_run_open" } } },
           });
         }
       },
@@ -536,7 +584,7 @@ describe("Bug Hunter session lifecycle", () => {
     expect(life.requestShutdown("fast")).toBe(stopping);
     expect(await within(stopping, 650, "workflow shutdown")).toEqual({ ok: true });
     expect(fake.ops("send").some((call) => call.events.includes("user.message"))).toBe(true);
-    expect(attempts).toBeGreaterThan(1);
+    expect(attempts).toBe(2);
     expect(open).toBe(false);
     expect(fake.ids("archived")).toEqual(["sesn_1"]);
     expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);

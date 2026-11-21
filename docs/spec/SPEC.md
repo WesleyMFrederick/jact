@@ -87,6 +87,6 @@ This specification is the **canonical source of truth** for how jact is designed
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.1.0 | 2026-11-21 | Corrected CI review cleanup; operational guarantees live in [Bug Hunter — How it works](../../.github/bug-hunter/README.md#How%20it%20works) |
+| 1.1.0 | 2026-11-21 | Corrected CI review cleanup, including archive-confirmed workflow stopping; operational guarantees live in [Bug Hunter — How it works](../../.github/bug-hunter/README.md#How%20it%20works) |
 | 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift; added the contracts-not-code rule and module spec pointers |
 | 1.0.0-draft | 2026-07-01 | Initial living spec, replacing `design-docs/component-guides/` |
