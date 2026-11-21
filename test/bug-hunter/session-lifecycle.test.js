@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createSessionLifecycle } from "../../.github/bug-hunter/session-lifecycle.mjs";
 
 // The lifecycle owns every cleanup the runner does on its way out: finishing or failing
@@ -288,6 +288,48 @@ describe("Bug Hunter session lifecycle", () => {
     expect(fake.ids("archived")).toEqual(["sesn_1"]);
     expect(fake.ids("archive")).toEqual(["sesn_1"]);
     expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+  });
+
+  it("retries the 1.5s busy archive when the interrupt takes effect at 1.6s within the 2s fast budget", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const fake = fakeClient({
+        create: async () => ({ status: "running" }),
+        interruptStops: false,
+        requireIdle: true,
+        send: (_id, types, session) => {
+          if (types.includes("user.interrupt")) setTimeout(() => { session.status = "idle"; }, 1_600);
+        },
+      });
+      const { lines, log } = logger();
+      const life = createSessionLifecycle(fake.client, { log });
+      await uploadTwo(life);
+      await life.createSession(params());
+      let result;
+      const stopping = life.requestShutdown("fast");
+      const settled = stopping.then((value) => { result = value; });
+      await vi.advanceTimersByTimeAsync(1_499);
+      expect(fake.ops("archive")).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fake.ops("archive")).toHaveLength(1); // Confirmed HTTP 400 while still running.
+      expect(result, "the remaining half-second still permits recovery").toBeUndefined();
+      expect(fake.ops("delete")).toHaveLength(0);
+      expect(life.requestShutdown("fast")).toBe(stopping);
+      await vi.advanceTimersByTimeAsync(100);
+      await settled;
+      expect(result).toEqual({ ok: true });
+      expect(Date.now()).toBe(1_600);
+      expect(fake.ids("archive")).toEqual(["sesn_1", "sesn_1"]);
+      expect(fake.ids("archived")).toEqual(["sesn_1"]);
+      expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+      expect(lines).toEqual([]);
+      await vi.advanceTimersByTimeAsync(400);
+      expect(fake.ops("archive")).toHaveLength(2);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it.each(["running", "idle"])("stops open workflows in a %s session and retries confirmed archive rejection", async (status) => {

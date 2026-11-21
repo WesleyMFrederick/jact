@@ -124,8 +124,10 @@ export function createSessionLifecycle(client, {
     let current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 5);
     // A failed lookup is not evidence that the session stopped.
     const running = () => !current || current.status === "running" || current.status === "rescheduling";
-    // Keep a tail for archive and deletion, scaled to the signal's shorter total budget.
-    const reserveMs = () => Math.min(2 * requestMs, (mode === "fast" ? fastMs : gracefulMs) / 4);
+    // Initially reserve archive and deletion time. A confirmed rejection can borrow the
+    // archive half for more polling/retries, but must retain the deletion half.
+    let retrying = false;
+    const reserveMs = () => Math.min(2 * requestMs, (mode === "fast" ? fastMs : gracefulMs) / 4) / (retrying ? 2 : 1);
     let stopRequested = false;
     const stopRuns = async () => {
       stopRequested = true;
@@ -145,7 +147,6 @@ export function createSessionLifecycle(client, {
         await pause(reserveMs());
         current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3);
       }
-      if (running()) failure(`wait for idle ${id}`, new Error("deadline reached; attempting final archive"));
       let rejection;
       const archived = await attempt(`archive ${id}`, async (options) => {
         try {
@@ -159,6 +160,7 @@ export function createSessionLifecycle(client, {
         }
       }, 2);
       if (archived !== false) return;
+      retrying = true;
       if (deadline - Date.now() <= reserveMs()) {
         failure(`archive ${id}`, rejection);
         return;
