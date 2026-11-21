@@ -46,14 +46,6 @@ jobs:
         working-directory: .github/bug-hunter
         run: npm ci --ignore-scripts --no-audit --no-fund
 
-      - name: Fetch GitHub OIDC token for Anthropic
-        env:
-          TOKEN_FILE: ${{ runner.temp }}/gha-jwt
-        run: |
-          curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.anthropic.com" \
-            | jq -r .value > "$TOKEN_FILE"
-
       - name: Run Bug Hunter
         working-directory: .github/bug-hunter
         env:
