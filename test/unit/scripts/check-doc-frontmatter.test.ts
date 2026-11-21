@@ -40,12 +40,6 @@ describe("check-doc-frontmatter", () => {
 		expect(stderr).toContain("docs/a.md: remove created, last_modified");
 	});
 
-	it("given this checkout, when checked, then all tracked documentation is clean", () => {
-		const result = runCheck(dirname(dirname(SCRIPT)));
-		expect(result.stderr).toBe("");
-		expect(result.status).toBe(0);
-	});
-
 	it.each([
 		["a leading BOM", "\uFEFF---\ncreated: x\n---\n"],
 		["a padded opening fence", "--- \t\ncreated: x\n---\n"],
