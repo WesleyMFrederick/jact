@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -19,6 +22,7 @@ const preload = `
   register(${JSON.stringify(`data:text/javascript,${encodeURIComponent(sdkLoader)}`)});
   globalThis.fetch = async (url) => {
     console.error('TEST_GITHUB_REQUEST');
+    if (String(url).includes('test-oidc')) return { ok: false, status: 503 };
     return { ok: true, json: async () => String(url).includes('/files?') ? [] : {
       title: 'Config check', body: '', head: { sha: 'abc' }, base: { ref: 'main' },
     } };
@@ -38,6 +42,37 @@ function run(failOn) {
   });
 }
 
+function runCi(failOn) {
+  const temp = mkdtempSync(join(tmpdir(), "bug-hunter-ci-"));
+  try {
+    // Run the workflow's shell commands, excluding dependency installation. Actions
+    // supply the runtime/SDK; this fixture supplies Node and the same SDK stub above.
+    const workflow = readFileSync(new URL("../../.github/workflows/bug-hunter.yml", import.meta.url), "utf8");
+    const commands = [...workflow.matchAll(/^        run: (?:\|\n((?:          .*\n)+)|(.+))/gm)]
+      .map((match) => match[1]?.replace(/^          /gm, "") ?? match[2])
+      .filter((command) => !command.startsWith("npm ci"));
+    symlinkSync(process.execPath, join(temp, "node"));
+    writeFileSync(join(temp, "curl"), "#!/bin/sh\necho TEST_GITHUB_REQUEST >&2\nexit 1\n", { mode: 0o755 });
+    writeFileSync(join(temp, "jq"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    return spawnSync("/bin/bash", ["-e", "-o", "pipefail", "-c", commands.join("\n")], {
+      cwd: dirname(runner),
+      env: {
+        PATH: temp,
+        NODE_OPTIONS: `--import=data:text/javascript,${encodeURIComponent(preload)}`,
+        GITHUB_REPOSITORY: "test/repo", PR_NUMBER: "1", GITHUB_TOKEN: "test-only",
+        FAIL_ON: failOn, PLAN_ONLY: "1",
+        ACTIONS_ID_TOKEN_REQUEST_URL: "https://test-oidc.invalid?request=1",
+        ACTIONS_ID_TOKEN_REQUEST_TOKEN: "test-only",
+        ANTHROPIC_IDENTITY_TOKEN_FILE: join(temp, "gha-jwt"),
+        TOKEN_FILE: join(temp, "gha-jwt"),
+      },
+      encoding: "utf8", timeout: 10_000,
+    });
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+}
+
 describe("FAIL_ON configuration", () => {
   it.each(["Medium", "hgih", "toString", "__proto__"])("rejects %s with exit 2 before any API request", (value) => {
     const result = run(value);
@@ -51,5 +86,19 @@ describe("FAIL_ON configuration", () => {
     const result = run(value);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("PLAN_ONLY: no session started.");
+  });
+
+  it("reports invalid CI configuration even when the identity-token service fails", () => {
+    const result = runCi("Medium");
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('Invalid FAIL_ON "Medium"');
+    expect(result.stderr).not.toContain("TEST_GITHUB_REQUEST");
+  });
+
+  it("still requests a CI identity token after accepting the configuration", () => {
+    const result = runCi("high");
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain("GitHub OIDC token request -> 503");
+    expect(result.stderr).toContain("TEST_GITHUB_REQUEST");
   });
 });

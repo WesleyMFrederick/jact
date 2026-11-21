@@ -44,6 +44,8 @@ Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to
 
 `FAIL_ON` (set by `BUG_HUNTER_FAIL_ON` in CI) accepts only the case-sensitive values `high`, `medium`, `low`, and `none`. Any other value, including `Medium`, is a configuration error: the runner names the invalid value and allowed values, then exits 2 before making API calls. Unset or empty values still default to `high`.
 
+In CI, the runner validates `FAIL_ON` before requesting the initial GitHub identity token, then refreshes that token during the run. The workflow does not fetch a token separately, so a token-service failure cannot hide an invalid threshold.
+
 ## Where secrets live
 
 No secret is ever written to a `.env` file, the repo, or the agent's sandbox. The talk's rule (chapter "Credential vaults & locking down tools", 1:27:50) is that credentials must never touch the sandbox, because anything on the agent's disk can be talked out of it.
