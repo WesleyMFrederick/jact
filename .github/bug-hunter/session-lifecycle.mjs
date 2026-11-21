@@ -1,6 +1,6 @@
 // Own one run's resources and its only shutdown. A signal shortens, never restarts, cleanup.
 export function createSessionLifecycle(client, {
-  gracefulMs = 30_000, fastMs = 2_000, requestMs = 1_000, pollMs = 5_000,
+  gracefulMs = 30_000, fastMs = 2_000, requestMs = 10_000, pollMs = 5_000,
   log = console.error,
 } = {}) {
   const uploads = new Set();

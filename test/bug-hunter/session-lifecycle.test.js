@@ -328,6 +328,36 @@ describe("Bug Hunter session lifecycle", () => {
     }
   });
 
+  it("confirms graceful cleanup when each service request takes 1.5s", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const fake = fakeClient({
+        create: async () => ({ status: "running" }),
+        retrieve: () => sleep(1_500),
+        send: () => sleep(1_500),
+        archive: () => sleep(1_500),
+        remove: () => sleep(1_500),
+        requireIdle: true,
+      });
+      const { lines, log } = logger();
+      const life = createSessionLifecycle(fake.client, { log });
+      await uploadTwo(life);
+      await life.createSession(params());
+      const stopping = life.requestShutdown("graceful");
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(await stopping).toEqual({ ok: true });
+      expect(fake.ids("archived")).toEqual(["sesn_1"]);
+      expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+      const cleanupCalls = fake.calls.filter((call) => call.sdk && call.op !== "upload" && call.op !== "create");
+      expect(cleanupCalls.every((call) => !call.options.signal.aborted)).toBe(true);
+      expect(lines).toEqual([]);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it("waits for a delayed interrupt to make the session idle before fast archival", async () => {
     const fake = fakeClient({
       create: async () => ({ status: "running" }),
