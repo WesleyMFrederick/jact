@@ -16,9 +16,9 @@ export function createSessionLifecycle(client, {
   let archivePromise;
   let failed = false;
 
-  function failure(label, error) {
-    failed = true;
-    log(`::error title=Bug Hunter shutdown::${label}: ${error.message ?? error}`);
+  function failure(label, error, required = true) {
+    if (required) failed = true;
+    log(`::${required ? "error" : "warning"} title=Bug Hunter shutdown::${label}: ${error.message ?? error}`);
   }
 
   function startResource(work, remember) {
@@ -64,7 +64,7 @@ export function createSessionLifecycle(client, {
 
   // Reserve a share for later stages so a stalled request cannot consume the archive/delete window.
   // Each local deadline also moves earlier when graceful shutdown escalates to fast.
-  async function attempt(label, work, reserve = 1, retainMs, { maxMs = requestMs } = {}) {
+  async function attempt(label, work, reserve = 1, retainMs, { maxMs = requestMs, required = false } = {}) {
     const controller = new AbortController();
     let end = Date.now() + maxMs;
     let timer;
@@ -101,7 +101,7 @@ export function createSessionLifecycle(client, {
         timeout,
       ]);
     } catch (error) {
-      failure(label, error);
+      failure(label, error, required);
       return undefined;
     } finally {
       clearTimeout(timer);
@@ -167,7 +167,7 @@ export function createSessionLifecycle(client, {
           rejection = error;
           return false;
         }
-      }, 2, deletionReserveMs);
+      }, 2, deletionReserveMs, { required: true });
       if (archived !== false) return;
       retrying = true;
       if (deadline - Date.now() <= reserveMs()) {
@@ -181,14 +181,14 @@ export function createSessionLifecycle(client, {
 
   function deleteFile(id) {
     if (!deletions.has(id)) {
-      deletions.set(id, attempt(`delete ${id}`, (options) => client.beta.files.delete(id, {}, options)));
+      deletions.set(id, attempt(`delete ${id}`, (options) => client.beta.files.delete(id, {}, options), 1, undefined, { required: true }));
     }
     return deletions.get(id);
   }
 
   async function shutdown() {
     if (pendingSetup.size) {
-      await attempt("settle in-flight setup", () => Promise.allSettled([...pendingSetup]), 6, undefined, { maxMs: Infinity });
+      await attempt("settle in-flight setup", () => Promise.allSettled([...pendingSetup]), 6, undefined, { maxMs: Infinity, required: true });
     }
     setupAbort.abort(new Error("Setup aborted by shutdown"));
 

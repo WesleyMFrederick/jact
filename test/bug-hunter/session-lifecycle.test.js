@@ -358,6 +358,28 @@ describe("Bug Hunter session lifecycle", () => {
     }
   });
 
+  it("confirms cleanup after one transient polling failure followed by idle and archival", async () => {
+    let reads = 0;
+    const fake = fakeClient({
+      create: async () => ({ status: "running" }),
+      interruptStops: false,
+      requireIdle: true,
+      retrieve: (_id, session) => {
+        if (++reads === 2) throw new Error("transient 503");
+        if (reads >= 3) session.status = "idle";
+      },
+    });
+    const { lines, log } = logger();
+    const life = createSessionLifecycle(fake.client, { ...SHORT, pollMs: 5, log });
+    await uploadTwo(life);
+    await life.createSession(params());
+    const result = await life.requestShutdown("fast");
+    expect(fake.ids("archived")).toEqual(["sesn_1"]);
+    expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+    expect(lines.join("\n")).toContain("transient 503");
+    expect(result).toEqual({ ok: true });
+  });
+
   it("waits for a delayed interrupt to make the session idle before fast archival", async () => {
     const fake = fakeClient({
       create: async () => ({ status: "running" }),
@@ -531,7 +553,7 @@ describe("Bug Hunter session lifecycle", () => {
     const life = createSessionLifecycle(fake.client, { gracefulMs: 1_000, fastMs: 400, requestMs: 60, pollMs: 10, log });
     await uploadTwo(life);
     await life.createSession(params());
-    expect(await within(life.requestShutdown("fast"), 650, "unknown status shutdown")).toEqual({ ok: false });
+    expect(await within(life.requestShutdown("fast"), 650, "unknown status shutdown")).toEqual({ ok: true });
     expect(fake.ops("send").some((call) => call.events.includes("user.interrupt"))).toBe(true);
     expect(fake.ids("archived")).toEqual(["sesn_1"]);
     expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
