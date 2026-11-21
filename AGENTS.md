@@ -50,7 +50,7 @@ Canonical operating doc for agents working in the jact repo. Referenced by the s
 
 ## Design-doc hygiene
 
-- **WHEN** committing markdown, **NEVER** keep editor stamps: `created:` or `last_modified:` in the YAML header, or Obsidian `%% *Last Modified: ...* %%` lines, **BECAUSE** they are local vault bookkeeping that leaks into PRs. The repo-root `.no-frontmatter-timestamps` marker turns off the stamp hook, and CI (`scripts/check-doc-frontmatter.mjs`) fails if a stamp slips through.
+- **WHEN** committing markdown, **NEVER** keep editor stamps: `created:` or `last_modified:` in the YAML header, or Obsidian `%% *Last Modified: ...* %%` lines, **BECAUSE** they are local vault bookkeeping that leaks into PRs. The repo-root `.no-frontmatter-timestamps` marker turns off the stamp hook, and CI (`scripts/check-doc-frontmatter.mjs`) rejects the YAML header keys `created` and `last_modified`; it does not check Obsidian body comments.
 - **WHEN** you have checked a doc against the current code and its claims still hold, **ALWAYS** record it with `doc-verify <file> --by agent` (a person who checks by hand uses `--by user`), **BECAUSE** an edit is not a check: `last_verified` and `verified_by` record the check itself, and `doc-verify` refuses to stamp a doc whose links fail `jact validate`.
 - **WHEN** choosing which docs to re-check, **ALWAYS** start from `doc-verify --stale .`, **BECAUSE** it lists the docs never verified or verified more than 30 days ago.
 

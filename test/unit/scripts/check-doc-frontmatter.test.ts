@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,6 +53,47 @@ describe("check-doc-frontmatter", () => {
 
 	it("given a padded closing fence, when checked, then body keys stay exempt", () => {
 		const dir = makeRepo({ "a.md": "---\nverified_by: agent\n--- \t\ncreated: prose\n---\n" });
+		expect(runCheck(dir).status).toBe(0);
+	});
+
+	it.each(['"created": x', "'last_modified': x", "created : x"])(
+		"given the YAML key spelling %s, when checked, then timestamps are rejected",
+		(key) => {
+			const dir = makeRepo({ "a.md": `---\n${key}\n---\n` });
+			expect(runCheck(dir).status).toBe(1);
+		},
+	);
+
+	it.each(["B.MD", "nested/c.markdown", "D.MARKDOWN"])(
+		"given a tracked %s file, when checked, then timestamps are rejected",
+		(path) => {
+			const dir = makeRepo({ [path]: "---\ncreated: x\n---\n" });
+			const { status, stderr } = runCheck(dir);
+			expect(status).toBe(1);
+			expect(stderr).toContain(`${path}: remove created`);
+		},
+	);
+
+	it("given a tracked file deleted locally, when checked, then it is skipped", () => {
+		const dir = makeRepo({ "gone.md": "---\ncreated: x\n---\n" });
+		rmSync(join(dir, "gone.md"));
+		expect(runCheck(dir)).toEqual({ status: 0, stderr: "" });
+	});
+
+	it("given a tracked markdown symlink to a directory, when checked, then it is skipped", () => {
+		const dir = makeRepo({ "directory.md": "# Placeholder\n" });
+		rmSync(join(dir, "directory.md"));
+		symlinkSync(".", join(dir, "directory.md"));
+		expect(runCheck(dir)).toEqual({ status: 0, stderr: "" });
+	});
+
+	it("given a YAML document-end marker, when checked, then header timestamps are rejected", () => {
+		const dir = makeRepo({ "a.md": "---\ncreated: x\n...\n# Body\n" });
+		expect(runCheck(dir).status).toBe(1);
+	});
+
+	it("given a YAML document-end marker before a horizontal rule, when checked, then body keys stay exempt", () => {
+		const dir = makeRepo({ "a.md": "---\nverified_by: agent\n... \t\ncreated: prose\n---\n" });
 		expect(runCheck(dir).status).toBe(0);
 	});
 

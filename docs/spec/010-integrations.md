@@ -51,7 +51,7 @@ Only the `.github/workflows/release.yml` workflow publishes the package. Contrac
 
 ## Documentation hygiene in CI
 
-`node scripts/check-doc-frontmatter.mjs` checks tracked `.md` files, except `test/fixtures/`, for the editor timestamp keys `created` and `last_modified` in their leading YAML header. It exits 1 and names offending files and keys; clean documentation exits 0. Verification keys `last_verified` and `verified_by`, and timestamp-like text in the body, are allowed.
+`node scripts/check-doc-frontmatter.mjs` checks tracked `.md` and `.markdown` files (case-insensitive), except `test/fixtures/`, for the editor timestamp keys `created` and `last_modified` in their leading YAML header. Missing paths and paths that do not resolve to regular files are skipped. It exits 1 and names offending files and keys; clean documentation exits 0. Verification keys `last_verified` and `verified_by`, and timestamp-like text in the body, are allowed.
 
-Header fences may have trailing spaces or tabs, and the opening fence may follow a leading byte-order mark. These variations do not bypass the check or extend it into the body.
+Header fences may have trailing spaces or tabs, and the opening fence may follow a leading byte-order mark. Both `---` and `...` close a header. Quoted keys and spaces before the colon do not bypass the check. These variations do not extend checking into the body.
 
