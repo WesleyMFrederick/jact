@@ -75,7 +75,7 @@ function build(identity, lock, resultPath) {
 async function main() {
   const { values } = parseArgs({ options: {
     repo: { type: "string" }, head: { type: "string" }, session: { type: "string" },
-    "lock-timeout-ms": { type: "string", default: "300000" },
+    "lock-timeout-ms": { type: "string", default: "240000" },
   } });
   if (!values.repo || !values.head || !values.session) throw new Error("Required arguments: --repo <path> --head <sha> --session <id>.");
   const timeout = Number(values["lock-timeout-ms"]);

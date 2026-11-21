@@ -182,6 +182,8 @@ if (args === 'run build') {
 import fs from 'node:fs';
 import { syncBuiltinESMExports } from 'node:module';
 const mkdir = fs.mkdirSync;
+let now = Date.now();
+if (process.env.BUILD_TEST_TICK_MS) Date.now = () => now;
 fs.mkdirSync = (...args) => {
   const lock = String(args[0]).endsWith('/bug-hunter-build.lock');
   try {
@@ -189,6 +191,7 @@ fs.mkdirSync = (...args) => {
     if (lock) process.send?.({ event: 'lock-owner', pid: process.pid });
     return made;
   } catch (error) {
+    if (lock && error.code === 'EEXIST') now += Number(process.env.BUILD_TEST_TICK_MS || 0);
     if (lock && error.code === 'EEXIST') process.send?.({ event: 'lock-wait', pid: process.pid });
     throw error;
   }
@@ -281,6 +284,18 @@ describe("shared prover build guard", () => {
     expect(callLog(result).outcome).toBe("timeout");
     await expect(readFile(join(root, "npm-calls"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
     await expect(mkdir(lock)).rejects.toMatchObject({ code: "EEXIST" });
+  });
+
+  it("reports a default lock timeout before the sandbox's 295s command cutoff", async () => {
+    await mkdir(join(repo, ".git", "bug-hunter-build.lock"));
+    // Advance the helper's clock at each failed lock attempt, not the test's wall clock.
+    const result = await run({ BUILD_TEST_BARRIER: "unused", BUILD_TEST_TICK_MS: "60000" });
+    expect(result.timedOut).toBe(false);
+    expect(result.code, result.stderr).toBe(124);
+    const log = callLog(result);
+    expect(log.outcome).toBe("timeout");
+    expect(log.duration_ms).toBeLessThan(295_000);
+    expect(result.stderr).toMatch(/timed out waiting/i);
   });
 
   it("fails rather than rebuilding output removed after readiness", async () => {
