@@ -1,6 +1,4 @@
 ---
-created: 2026-11-19T11:50:56
-last_modified: 2026-11-19T17:21:49
 ---
 # Bug Hunter
 

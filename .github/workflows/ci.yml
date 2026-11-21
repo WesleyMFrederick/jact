@@ -38,6 +38,9 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Reject editor timestamps in markdown front matter
+        run: node scripts/check-doc-frontmatter.mjs
+
       - name: Audit all dependencies
         run: npm audit
 
