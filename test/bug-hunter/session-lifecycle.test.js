@@ -299,6 +299,35 @@ describe("Bug Hunter session lifecycle", () => {
     );
   });
 
+  it.each(["upload", "create"])("waits for a 1.5s in-flight %s during graceful cleanup", async (stage) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const fake = fakeClient({
+        upload: () => (stage === "upload" ? sleep(1_500) : undefined),
+        create: () => sleep(1_500),
+      });
+      const { lines, log } = logger();
+      const life = createSessionLifecycle(fake.client, { log });
+      const pending = stage === "upload"
+        ? life.upload({ name: "helper.mjs" })
+        : life.createSession(params());
+      const stopping = life.requestShutdown("graceful");
+      // Attach before advancing: the old one-second cutoff rejects pending setup.
+      const setup = pending.catch(() => {});
+      await vi.advanceTimersByTimeAsync(1_500);
+      await setup;
+      expect(fake.ids(stage === "upload" ? "deleted" : "archived")).toEqual(
+        [stage === "upload" ? "file_1" : "sesn_1"],
+      );
+      expect(await stopping).toEqual({ ok: true });
+      expect(lines).toEqual([]);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it("waits for a delayed interrupt to make the session idle before fast archival", async () => {
     const fake = fakeClient({
       create: async () => ({ status: "running" }),

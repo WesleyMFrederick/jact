@@ -64,9 +64,9 @@ export function createSessionLifecycle(client, {
 
   // Reserve a share for later stages so a stalled request cannot consume the archive/delete window.
   // Each local deadline also moves earlier when graceful shutdown escalates to fast.
-  async function attempt(label, work, reserve = 1, retainMs) {
+  async function attempt(label, work, reserve = 1, retainMs, { maxMs = requestMs } = {}) {
     const controller = new AbortController();
-    let end = Date.now() + requestMs;
+    let end = Date.now() + maxMs;
     let timer;
     let expire;
     const timeout = new Promise((_, reject) => {
@@ -188,7 +188,7 @@ export function createSessionLifecycle(client, {
 
   async function shutdown() {
     if (pendingSetup.size) {
-      await attempt("settle in-flight setup", () => Promise.allSettled([...pendingSetup]), 6);
+      await attempt("settle in-flight setup", () => Promise.allSettled([...pendingSetup]), 6, undefined, { maxMs: Infinity });
     }
     setupAbort.abort(new Error("Setup aborted by shutdown"));
 
