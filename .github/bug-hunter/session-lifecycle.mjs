@@ -64,7 +64,7 @@ export function createSessionLifecycle(client, {
 
   // Reserve a share for later stages so a stalled request cannot consume the archive/delete window.
   // Each local deadline also moves earlier when graceful shutdown escalates to fast.
-  async function attempt(label, work, reserve = 1) {
+  async function attempt(label, work, reserve = 1, retainMs) {
     const controller = new AbortController();
     let end = Date.now() + requestMs;
     let timer;
@@ -77,13 +77,20 @@ export function createSessionLifecycle(client, {
       };
     });
     const arm = () => {
-      end = Math.min(end, Date.now() + Math.max(0, deadline - Date.now()) / reserve);
+      end = Math.min(
+        end, Date.now() + Math.max(0, deadline - Date.now()) / reserve,
+        deadline - (retainMs?.() ?? 0),
+      );
       clearTimeout(timer);
       timer = setTimeout(expire, Math.max(0, end - Date.now()));
     };
     changed.add(arm);
     arm();
     try {
+      if (end <= Date.now()) {
+        expire();
+        return await timeout;
+      }
       return await Promise.race([
         Promise.resolve().then(() => work({
           signal: controller.signal, timeout: Math.max(1, Math.ceil(end - Date.now())), maxRetries: 0,
@@ -121,31 +128,32 @@ export function createSessionLifecycle(client, {
   }
 
   async function stopAndArchive(id) {
-    let current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 5);
+    const deletionReserveMs = () => Math.min(requestMs, (mode === "fast" ? fastMs : gracefulMs) / 8);
+    let current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 5, deletionReserveMs);
     // A failed lookup is not evidence that the session stopped.
     const running = () => !current || current.status === "running" || current.status === "rescheduling";
     // Initially reserve archive and deletion time. A confirmed rejection can borrow the
     // archive half for more polling/retries, but must retain the deletion half.
     let retrying = false;
-    const reserveMs = () => Math.min(2 * requestMs, (mode === "fast" ? fastMs : gracefulMs) / 4) / (retrying ? 2 : 1);
+    const reserveMs = () => deletionReserveMs() * (retrying ? 1 : 2);
     let stopRequested = false;
     const stopRuns = async () => {
       stopRequested = true;
       await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
         events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
-      }, options), 5);
+      }, options), 5, deletionReserveMs);
     };
     if (running()) {
       await attempt(`interrupt ${id}`, (options) => client.beta.sessions.events.send(id, {
         events: [{ type: "user.interrupt" }],
-      }, options), 4);
+      }, options), 4, deletionReserveMs);
       // Interrupt ends a turn, not its workflows. Ask afterward so this request can take effect.
       await stopRuns();
     }
     for (;;) {
       while (running() && deadline - Date.now() > reserveMs()) {
         await pause(reserveMs());
-        current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3);
+        current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, deletionReserveMs);
       }
       let rejection;
       const archived = await attempt(`archive ${id}`, async (options) => {
@@ -158,7 +166,7 @@ export function createSessionLifecycle(client, {
           rejection = error;
           return false;
         }
-      }, 2);
+      }, 2, deletionReserveMs);
       if (archived !== false) return;
       retrying = true;
       if (deadline - Date.now() <= reserveMs()) {
@@ -168,7 +176,7 @@ export function createSessionLifecycle(client, {
       // Even an idle session can have paused workflows that prevent archival.
       if (!stopRequested) await stopRuns();
       await pause(reserveMs());
-      current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3);
+      current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, deletionReserveMs);
     }
   }
 

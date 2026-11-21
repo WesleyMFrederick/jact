@@ -332,6 +332,53 @@ describe("Bug Hunter session lifecycle", () => {
     }
   });
 
+  it.each(["archive", "poll"])("preserves 250ms for two 225ms deletes when the retry %s stalls at 1.6s", async (stage) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const deletionTimes = [];
+      const fake = fakeClient({
+        create: async () => ({ status: "running" }),
+        interruptStops: false,
+        requireIdle: true,
+        send: (_id, types, session) => {
+          if (types.includes("user.interrupt")) setTimeout(() => { session.status = "idle"; }, 1_600);
+        },
+        retrieve: () => (stage === "poll" && Date.now() >= 1_600 ? sleep(200) : undefined),
+        // Ignore abort: the local deadline must also protect against a stalled SDK.
+        archive: () => (stage === "archive" ? sleep(200) : undefined),
+        remove: async () => {
+          deletionTimes.push(Date.now());
+          await sleep(225);
+        },
+      });
+      const { lines, log } = logger();
+      const life = createSessionLifecycle(fake.client, { log });
+      await uploadTwo(life);
+      await life.createSession(params());
+      let result;
+      const stopping = life.requestShutdown("fast").then((value) => { result = value; });
+      await vi.advanceTimersByTimeAsync(1_500);
+      expect(fake.ops("archive")).toHaveLength(1); // Confirmed HTTP 400.
+      await vi.advanceTimersByTimeAsync(100); // Idle, but the retry or its poll now stalls.
+      expect(fake.ops("delete")).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(150);
+      expect(deletionTimes).toEqual([1_750, 1_750]);
+      const stalled = fake.ops(stage === "archive" ? "archive" : "retrieve").at(-1);
+      expect(stalled.options.signal.aborted).toBe(true);
+      await vi.advanceTimersByTimeAsync(225);
+      await stopping;
+      expect(Date.now()).toBe(1_975);
+      expect(result).toEqual({ ok: false }); // The timed-out service outcome remains visible.
+      expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+      expect(lines.join("\n")).not.toMatch(/delete file_/);
+      expect(lines.join("\n")).toContain(stage === "archive" ? "archive sesn_1" : "retrieve sesn_1");
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it.each(["running", "idle"])("stops open workflows in a %s session and retries confirmed archive rejection", async (status) => {
     let open = true;
     let attempts = 0;
