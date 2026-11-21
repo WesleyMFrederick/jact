@@ -10,10 +10,10 @@ Bug Hunter is a multi-agent PR review that runs on Claude Managed Agents and pos
 
 The slide's rule is "no agent reviews its own finding". Every step after the first uses fresh agents:
 
-1. **Split.** `bug-hunter.mjs` cuts the PR into at most 6 slices of whole files, about 400 changed lines each, in plain code. It skips lockfiles, `dist/`, snapshots, and planning docs (`docs/`, `design-docs/`, `.scratch/`). It uploads each slice as a diff file into the agent's sandbox. A PR with nothing left to review gets a short "nothing to review" comment and no session.
+1. **Split.** `bug-hunter.mjs` cuts the PR into at most 6 slices of whole files, about 400 changed lines each, in plain code. It skips lockfiles, `dist/`, snapshots, and planning docs (`docs/`, `design-docs/`, `.scratch/`). It uploads each slice as a diff file into the agent's sandbox, plus the build helper `ensure-jact-build.mjs` (see [Build once per session](#Build%20once%20per%20session)). A PR with nothing left to review gets a short "nothing to review" comment and no session.
 2. **Read.** One agent per slice reads its diff and the code around it, and lists at most 5 suspected bugs.
 3. **Pick.** Plain code merges the suspects, drops duplicates, and keeps the top 8.
-4. **Prove.** A fresh prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap. From the repo root, it runs `npm ci --ignore-scripts && npm run build` before `npx vitest run <file>`: install scripts stay disabled, and the explicit build produces the untracked `dist/` needed by native CLI execution.
+4. **Prove.** A fresh prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap. Before any test it runs the one build command from the manifest, then `npx vitest run <file>` from the repo root. It never runs `npm ci`, `npm run build`, or `npm run clean` itself.
 5. **Report.** Only confirmed findings come back.
 
 Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to%20work). The agent runs them as a Managed Agents **dynamic workflow**: a small program that runs many agents in phases, which the server runs in the background. The lead agent only gets a short manifest (title, description, slice paths), never the full diff, and is told to start the workflow before reading anything.
@@ -21,10 +21,21 @@ Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to
 `bug-hunter.mjs` handles the plumbing:
 
 - It finds or creates the agent and its cloud environment. Each name carries a hash of its config, so editing `system-prompt.md` creates a new agent instead of changing the old one.
-- It starts a session with the repo mounted at the PR head commit, the slice files beside it, and a cost cap.
+- It starts a session with the repo mounted at the PR head commit, the slice files and the build helper beside it, and a cost cap. The first message carries the exact build command for that session.
 - It polls until every workflow run has ended and the session is idle with `end_turn`. That is the documented definition of done. At 75% of the budget it tells the agent to stop its runs and report what is already confirmed.
 - If the CI job is cancelled or crashes, it stops and archives the session so nothing keeps spending. A job killed with no signal (SIGKILL, a lost runner) runs no cleanup: that session spends until its budget cap, or until the next Bug Hunter run for the same PR stops it.
 - It posts one PR review. Findings on changed lines become inline comments, and the rest go in the review body. It prints a cost table (per agent role and model) in the job log and the job summary.
+
+### Build once per session
+
+`npm run build` starts with `clean`, which deletes `dist/`. When several provers each built the repo, one prover's build could delete `dist/cli.js` while another was testing with it. So the build runs once per session, inside the sandbox, through one script:
+
+- The runner uploads `ensure-jact-build.mjs` as a session file. It lands at `/mnt/session/uploads/ensure-jact-build.mjs`, because file mounts sit under the session's uploads directory ([file paths](https://platform.claude.com/docs/en/managed-agents/files#file-paths)). The runner never runs the script and never builds the PR itself, and it deletes the upload with the slice files when the run ends.
+- The manifest gives the exact command: `node /mnt/session/uploads/ensure-jact-build.mjs --repo /workspace/repo --head <PR head sha> --session <session id>`. The lead copies it into every prover's prompt.
+- The first caller checks that the repo is at that head, takes a lock in the repo's git directory, and runs `npm ci --ignore-scripts`, then `npm run build`, exactly once. Every later caller waits for that build and reuses it. A `dist/` folder that was there before is never taken as proof of a build.
+- If install or build fails, that caller and every later one exit with the same failing code; nothing retries. A caller that waits on the lock longer than 5 minutes (the default) fails loudly instead of deleting it. If ready output goes missing, or a different head or session calls, the script fails instead of rebuilding. Each call logs one line with its outcome and exit code.
+
+**Limit.** The script decides how and when the build runs, but a model still has to call it. The system prompt tells provers to call it before any test and never to run `npm ci`, `npm run build`, or `npm run clean` directly, but nothing enforces that: a prover can skip the call or run a direct build, and that brings the race back. The options compared before this design was chosen are in [Bug Hunter: build-once options](../../docs/features/20261120T192002-bug-hunter-build-once/research/bug-hunter-build-once-options.md#Recommendation).
 
 ## Setup
 

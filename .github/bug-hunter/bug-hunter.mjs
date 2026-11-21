@@ -3,10 +3,13 @@
 //
 // 1. Splits the PR into slices here, in plain code, and uploads each slice as a diff file.
 //    Lockfiles, build output and planning docs are skipped. No reviewable change, no session.
+//    It also uploads ensure-jact-build.mjs, the one command provers run to install and build
+//    jact once per session. The runner itself never runs it and never builds the PR.
 // 2. Finds or creates the agent and its cloud environment. Both names carry a hash of
 //    their config, so a config change makes new ones.
-// 3. Starts a session with the repo mounted at the PR head, the slice files mounted beside
-//    it, and a short manifest as the first message. The agent runs a dynamic workflow:
+// 3. Starts a session with the repo mounted at the PR head, the slice files and the build helper
+//    mounted beside it, and a short manifest, with the exact helper command, as the first message.
+//    The agent runs a dynamic workflow:
 //    read each slice -> pick candidates -> prove each candidate -> report.
 // 4. Polls until every workflow run has ended and the session idles with end_turn.
 //    At 75% of the budget it asks the agent to stop its runs and report.
@@ -57,6 +60,11 @@ const REPORT_FILE = process.env.REPORT_FILE || undefined;
 const MOUNT_PATH = "/workspace/repo";
 const SLICE_DIR = "/workspace/slices";
 const POLL_MS = 15_000;
+// A file resource's mount_path is rooted under the session's uploads directory, so this mounts
+// the helper at BUILD_HELPER_PATH. https://platform.claude.com/docs/en/managed-agents/files#file-paths
+const BUILD_HELPER = new URL("./ensure-jact-build.mjs", import.meta.url);
+const BUILD_HELPER_MOUNT = "/ensure-jact-build.mjs";
+const BUILD_HELPER_PATH = "/mnt/session/uploads/ensure-jact-build.mjs";
 // After the last workflow run ends, the lead normally reports within seconds. Silence this long
 // means it froze (exam 1, sesn_0169BWdXnQa1HrxFhqPuvxR1), so the runner interrupts it once.
 const STALL_MS = 3 * 60_000;
@@ -226,10 +234,20 @@ async function ensureEnvironment() {
 
 // ---------- Session ----------
 
-function manifest(pr, slices, skipped) {
+// Leaves plain words as they are and single-quotes anything else, so the command is safe to paste.
+const shellArg = (value) => (/^[\w@%+=:,./-]+$/.test(value) ? value : `'${String(value).replaceAll("'", "'\\''")}'`);
+
+// The one setup command provers run before any test; see system-prompt.md.
+const buildCommand = (head, sessionId) =>
+  ["node", BUILD_HELPER_PATH, "--repo", MOUNT_PATH, "--head", head, "--session", sessionId].map(shellArg).join(" ");
+
+function manifest(pr, slices, skipped, sessionId) {
   return [
     TARGET.exam ? `Review the changes in ${REPO} from ${pr.base.sha} to ${pr.head.sha}.` : `Review pull request #${PR_NUMBER} in ${REPO}: "${pr.title}".`,
     `Repository: ${MOUNT_PATH}, checked out at the ${TARGET.exam ? "head" : "PR head"} commit ${pr.head.sha} (base ${pr.base.ref} at ${pr.base.sha}).`,
+    "",
+    "Build setup command (give it to every prover, copied exactly):",
+    buildCommand(pr.head.sha, sessionId),
     "",
     TARGET.exam ? "Change description:" : "PR description:",
     (pr.body || "(none)").slice(0, 4000),
@@ -369,6 +387,11 @@ let liveSession; // the session to stop if this process is cancelled or crashes
 // Files API uploads outlive their session, so every exit path deletes the ones that succeeded,
 // including uploads that finished before another setup step failed.
 const uploadedIds = [];
+async function upload(bytes, name, type) {
+  const u = await client.beta.files.upload({ file: await toFile(bytes, name, { type }) });
+  uploadedIds.push(u.id);
+  return u;
+}
 async function deleteUploads() {
   const ids = uploadedIds.splice(0);
   await Promise.all(ids.map((id) => client.beta.files.delete(id).catch(() => {})));
@@ -391,7 +414,7 @@ async function main() {
   const { slices, skipped } = planSlices(files);
   console.log(`Slices: ${slices.map((s) => `${s.id}=${s.lines} lines/${s.files.length} files`).join(", ") || "none"}; skipped ${skipped.length} files.`);
   if (PLAN_ONLY) {
-    console.log(`PLAN_ONLY: no session started.\n\n${manifest(pr, slices, skipped)}`);
+    console.log(`PLAN_ONLY: no session started.\n\n${manifest(pr, slices, skipped, "<session id>")}`);
     return;
   }
   if (!slices.length) {
@@ -401,15 +424,14 @@ async function main() {
     return;
   }
 
+  // Read before any Anthropic call, so a missing helper stops the run with nothing to clean up.
+  const helperBytes = readFileSync(BUILD_HELPER);
   await stopStaleSessions();
-  const [agentId, environmentId, uploads] = await Promise.all([
+  const [agentId, environmentId, helper, uploads] = await Promise.all([
     ensureAgent(),
     ensureEnvironment(),
-    Promise.all(slices.map(async (s) => {
-      const u = await client.beta.files.upload({ file: await toFile(Buffer.from(s.text), `${s.id}.diff`, { type: "text/plain" }) });
-      uploadedIds.push(u.id);
-      return u;
-    })),
+    upload(helperBytes, "ensure-jact-build.mjs", "text/javascript"),
+    Promise.all(slices.map((s) => upload(Buffer.from(s.text), `${s.id}.diff`, "text/plain"))),
   ]);
 
   const session = await client.beta.sessions.create({
@@ -425,12 +447,13 @@ async function main() {
         ...(REPO_TOKEN ? { authorization_token: REPO_TOKEN } : {}),
         checkout: { type: "commit", sha: pr.head.sha },
       },
+      { type: "file", file_id: helper.id, mount_path: BUILD_HELPER_MOUNT },
       ...uploads.map((u, i) => ({ type: "file", file_id: u.id, mount_path: `${SLICE_DIR}/${slices[i].id}.diff` })),
     ],
   });
   liveSession = session.id;
   console.log(`Session ${session.id} started: ${sessionPrefix(REPO, TARGET, PR_NUMBER).trim()} (budget ${dollars(BUDGET_CENTS)}).`);
-  await say(session.id, manifest(pr, slices, skipped));
+  await say(session.id, manifest(pr, slices, skipped, session.id));
 
   const deadline = Date.now() + TIMEOUT_MS;
   const wrapUpCents = Number(BUDGET_CENTS) * WRAP_UP_AT;

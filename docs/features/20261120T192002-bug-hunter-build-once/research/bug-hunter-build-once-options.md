@@ -4,11 +4,13 @@
 
 **Recommend option (f): upload one locked ensure-build script, and have provers call it before tests.** The AGENT selects the tool call; deterministic code owns installing dependencies, building once, waiting, reusing the result, logging, and returning an exit code. This is smaller than changing hosting or changing tests in every PR head. It also avoids the unresolved upload-to-repository placement question.
 
-This is a proposal, not an implemented fix or an approved decision. The remaining AI trigger is explicit: a prover can skip the call. A script cannot guarantee that every test went through it unless the HARNESS makes that entry point mandatory. Do not describe this option as zero-AI setup or as an enforced test gate without that additional mechanism.
+**Approved outcome (2026-11-20).** The USER approved option (f) for PR #137: the runner uploads `.github/bug-hunter/ensure-jact-build.mjs` as a session file, the first message gives every session its exact helper command, and the system prompt replaces the direct `npm ci`/`npm run build` instruction with that command. The [Bug Hunter README · Build once per session](../../../../.github/bug-hunter/README.md#Build%20once%20per%20session) is the implementation reference. The sections below stay as the research record of the alternatives.
+
+The remaining AI trigger is explicit: a prover can skip the call. A script cannot guarantee that every test went through it unless the HARNESS makes that entry point mandatory. Do not describe this option as zero-AI setup or as an enforced test gate without that additional mechanism.
 
 If **no AGENT-triggered setup at all** is required, choose (a), the self-hosted worker: its documented staging hook runs before any tool. If the separately gated mount-path probe is approved, run that small experiment before investing in a hosting change. A successful marker probe would not by itself prove dependency setup, a complete runtime upload, or a stable platform contract.
 
-Status: PR #137 remains draft; no source implementation, push, or paid session was performed for this report. The paid placement probe is awaiting a USER decision in ask A4. The latest A4 also considers the locked-script option; neither action is authorized by this document.
+Status: Option (f) is approved and implemented with local regression coverage. No paid session or placement probe was authorized or run; option (f) does not depend on the upload-to-repository probe, because its script needs only the documented uploads-root location. PR #137 records the final verification and publication state.
 
 ## Problem and checked contracts
 
@@ -90,7 +92,7 @@ The platform explicitly documents [staging files before any tool runs](https://p
 
 **What runs where.** The runner uploads one fixed, versioned `ensure-jact-build.mjs` as a file resource, mounted at `/mnt/session/uploads/ensure-jact-build.mjs`. It lives outside the frozen PR head, so no test migration or earlier merge is needed. Provers invoke it with the shared repository path and expected session/head identity. It installs dependencies and builds **inside the cloud repository**, preserving native `dist/cli.js` paths.
 
-**Proposed code contract, not an implementation:**
+**Code contract (the approved design; the README linked above describes what was built):**
 
 1. Use an atomic lock (`mkdir` without recursive success-on-existing behavior, or exclusive `open` with `wx`) and readiness state scoped to the same session, repository, and exact head. Store this state outside the directory that `clean` deletes.
 2. The first caller acquires the lock, verifies the head, runs `npm ci --ignore-scripts`, then `npm run build`. Suppressing install lifecycle scripts avoids a second implicit build from `prepare`.
@@ -184,6 +186,6 @@ done
 
 ## Verification boundary
 
-This document records primary-doc/SDK research and proposed interfaces. None of (a)–(f) was implemented or exercised for this report, and the paid probe was not run. The current draft's unsafe build prompt has not been removed in isolation; no partial build fix is being presented as ready. The existing [Bug Hunter operating instructions](../../../../.github/bug-hunter/README.md#How%20it%20works) remain the implementation reference until an approved option is built and verified.
+This document records primary-doc/SDK research and the interfaces proposed at the time. Of (a)–(f), only (f) was later approved and implemented; the others were not built or exercised, and the paid probe was not run. The implemented runner and helper are covered by local tests that replace the Anthropic and GitHub services, so no Managed Agents session has yet exercised the uploaded helper. The [Bug Hunter README · Build once per session](../../../../.github/bug-hunter/README.md#Build%20once%20per%20session) is the implementation reference.
 
 [^counts]: Local-only archived observation: `docs/features/20261120T192002-bug-hunter-build-once/evidence/sessions/2026-11-20T23-18-10-913Z_01a1fb40-cee1-749f-ab53-35a14301a186.03e1b80c47cf.jsonl:L740` records 476 tracked files and 96 built JavaScript files (command at L736). The same archive's L846 records 384 total build files: 96 JavaScript, 96 declaration files, and 192 maps. The archive is intentionally uncommitted and will not resolve from a clone. Reproduce the counts after building the chosen head with `git ls-files | wc -l`, `find dist -type f -name '*.js' | wc -l`, and `find dist -type f | wc -l`.
