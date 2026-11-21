@@ -1,3 +1,7 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # 010. Integrations
 
 **Status:** done
@@ -18,7 +22,7 @@ jact connects to four outside systems: agent harness hooks, AI agent sessions, t
 
 AI agent sessions use jact as a context tool: `jact outline <file>` shows the heading tree, then `jact extract header <file> "Section"` returns one section. Contract:
 
-- Input is Markdown only. A non-`.md` file returns an empty result with exit 0, not an error.
+- Input is Markdown only. jact does not reject a non-`.md` file; it parses the file as Markdown, so the result is empty or meaningless. For example, `jact outline` on a JSON file prints `No headings found` and exits 0.
 - `jact outline` prints its next-step reminders once per session, file, and file content when `JACT_SESSION_ID` or `CLAUDE_SESSION_ID` is set. `--cache-reset` shows them again.
 - `jact extract links --session <id>` skips extraction when that session already extracted the same file content.
 - Both session caches live in `.jact/claude-cache` under the working folder.

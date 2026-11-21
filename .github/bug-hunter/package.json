@@ -1,0 +1,9 @@
+{
+  "name": "jact-bug-hunter",
+  "private": true,
+  "type": "module",
+  "description": "CI runner for the Bug Hunter Managed Agents PR review. Kept apart from jact's own dependencies.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.11.0"
+  }
+}

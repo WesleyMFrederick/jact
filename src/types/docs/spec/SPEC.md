@@ -1,6 +1,10 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # `src/types` Living Specification
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Status:** done
 
 `src/types` is the shared type vocabulary of jact: TypeScript declarations that every layer imports to agree on data shapes. It holds no runtime code. The repository spec owns the meaning of each data shape; see the [jact Living Specification](../../../../docs/spec/SPEC.md#jact%20Living%20Specification).
@@ -47,6 +51,7 @@ These summaries show what the module is, is not, and guarantees.
 
 - The **data contracts** between the parser, validator, extractor, file cache, and command-line interface (CLI)
 - The **strategy contract** that each extraction eligibility rule implements
+- The **validation rule contract** that built-in rules and plugins implement
 - One **import point** for the dependency-injection interfaces that core components define
 - The **parser vocabulary**: the token names and syntax-tree node types that jact's Markdown extensions register with the micromark parser and the mdast tree format
 
@@ -71,3 +76,4 @@ Each row records one version of this module spec.
 |---------|---------|
 | 1.0.0 | Initial module spec for `src/types` |
 | 1.1.0 | 2026-10-07: Aligned to code; removed internal code names to reduce drift |
+| 1.2.0 | 2026-11-19: Added the validation rule contract (`validationRuleTypes.ts`) to the module map |

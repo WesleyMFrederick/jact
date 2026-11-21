@@ -1,12 +1,12 @@
+---
+last_verified: 2026-11-19
+verified_by: agent
+---
 # test/regressions/
-
-%% *Last Modified: 05/13/26 19:31:40* %%
 
 Bug-fix regression tests that prevent known bugs from returning silently.
 
 ## Naming Convention
-
-%% *Last Modified: 05/13/26 19:31:40* %%
 
 ```
 <issue-number>-<short-slug>.test.ts
@@ -14,17 +14,13 @@ Bug-fix regression tests that prevent known bugs from returning silently.
 
 Examples:
 - `37-enrichLinkObject-immutability.test.ts` — issue #37, `enrichLinkObject` mutated the original `LinkObject` in-place.
-- `99-some-other-bug.test.ts` — issue #99, short description of the bug.
+- `99-some-other-bug.test.ts` — hypothetical issue #99, short description of the bug.
 
 ## Purpose
-
-%% *Last Modified: 05/13/26 19:31:40* %%
 
 When a bug is fixed, the reproducer becomes a permanent test here. The issue number in the filename traces back to the original GitHub issue without opening the file. Future bisects find this test before the fix; the bug cannot silently return.
 
 ## Rules
-
-%% *Last Modified: 05/13/26 19:31:40* %%
 
 - Every file in this directory corresponds to exactly one GitHub issue.
 - The test must reproduce the original failure mode (it would have failed BEFORE the fix).
@@ -33,7 +29,5 @@ When a bug is fixed, the reproducer becomes a permanent test here. The issue num
 
 ## Source
 
-%% *Last Modified: 05/13/26 19:31:40* %%
-
-Testing Principles §Test Organization and Sprawl Prevention — `^test-regression-filename-convention`
-Testing Principles §Test Scope and Targets — `^test-regressions-promoted`
+- Naming convention: [007 · Directory Layout (`test/`)](../../docs/spec/007-testing.md#Directory%20Layout%20%28%60test/%60%29) records the `<issue-number>-<short-slug>.test.ts` rule for this folder.
+- The other rules (one issue per file, fails before the fix) come from the maintainer's Testing Principles (§Test Organization and Sprawl Prevention `^test-regression-filename-convention`; §Test Scope and Targets `^test-regressions-promoted`). That document lives in a private principles repository, so it cannot be followed from a clone. Tracked example of the rules in practice: `test/regressions/37-enrichLinkObject-immutability.test.ts`, which covers [issue #37](https://github.com/WesleyMFrederick/jact/issues/37).
