@@ -35,6 +35,11 @@ const fakeSdk = `
       files: {
         upload: async ({ file }) => {
           const id = 'file_' + ++uploads;
+          if (process.env.TEST_CANCEL_AT === 'upload' && file.name === 'ensure-jact-build.mjs') {
+            process.emit('SIGINT');
+            process.emit('SIGTERM');
+            await new Promise(setImmediate);
+          }
           if (process.env.TEST_SETUP_FAILURE && file.name === 'ensure-jact-build.mjs') await helperReleased;
           record({ op: 'upload', id, ...file });
           if (file.name !== 'ensure-jact-build.mjs') releaseSlice();
@@ -42,13 +47,26 @@ const fakeSdk = `
         },
         delete: async (id) => {
           record({ op: 'delete', id });
+          if (process.env.TEST_CANCEL_AT === 'delete') {
+            process.emit('SIGINT');
+            process.emit('SIGTERM');
+          }
+          if (process.env.TEST_CANCEL_AT) await new Promise(setImmediate);
           if (process.env.TEST_SETUP_FAILURE) await helperReleased;
+          record({ op: 'deleted', id });
         },
       },
       sessions: {
         list: none,
         create: async (params) => {
           record({ op: 'create', params });
+          if (process.env.TEST_CANCEL_AT === 'create') {
+            queueMicrotask(() => {
+              process.emit('SIGINT');
+              process.emit('SIGTERM');
+            });
+            await new Promise(setImmediate);
+          }
           return { id: process.env.TEST_SESSION_ID };
         },
         retrieve: async () => ({ status: 'idle', usage: { list_cost: { amount: '12' } } }),
@@ -151,6 +169,39 @@ describe("Bug Hunter build helper upload", () => {
     expect(calls.filter((c) => c.op === "delete").map((c) => c.id).sort()).toEqual(
       uploads.map((u) => u.id).sort(),
     );
+    expect(calls.some((c) => c.op === "create")).toBe(false);
+  });
+
+  it("cancels during an upload without creating or starting a session", () => {
+    const { result, calls } = review("sesn_cancel_upload", { TEST_CANCEL_AT: "upload" });
+    expect(result.status, result.stderr).toBe(2);
+    expect(calls.filter((c) => c.op === "upload").map((c) => c.name).sort()).toEqual(["ensure-jact-build.mjs", "s1.diff"]);
+    expect(calls.filter((c) => c.op === "deleted").map((c) => c.id).sort()).toEqual(
+      calls.filter((c) => c.op === "upload").map((c) => c.id).sort(),
+    );
+    expect(calls.some((c) => c.op === "create" || c.op === "send")).toBe(false);
+  });
+
+  it("waits for an in-flight creation and archives it without starting work after cancellation", () => {
+    const { result, calls } = review("sesn_cancel_create", { TEST_CANCEL_AT: "create" });
+    expect(result.status, result.stderr).toBe(2);
+    expect(calls.filter((c) => c.op === "create")).toHaveLength(1);
+    expect(calls.filter((c) => c.op === "archive")).toEqual([{ op: "archive", id: "sesn_cancel_create" }]);
+    expect(calls.some((c) => c.op === "send")).toBe(false);
+    const archived = calls.findIndex((c) => c.op === "archive");
+    for (const c of calls.filter((c) => c.op === "upload")) {
+      expect(calls.findIndex((d) => d.op === "deleted" && d.id === c.id)).toBeGreaterThan(archived);
+    }
+  });
+
+  it("finishes every deletion when setup failure and repeated cancellation share cleanup", () => {
+    const { result, calls } = review("sesn_cancel_cleanup", { TEST_SETUP_FAILURE: "1", TEST_CANCEL_AT: "delete" });
+    expect(result.status, result.stderr).toBe(2);
+    expect(result.stderr).toContain("environment creation failed");
+    const ids = calls.filter((c) => c.op === "upload").map((c) => c.id).sort();
+    expect(ids).toEqual(["file_1", "file_2"]);
+    expect(calls.filter((c) => c.op === "delete").map((c) => c.id).sort()).toEqual(ids);
+    expect(calls.filter((c) => c.op === "deleted").map((c) => c.id).sort()).toEqual(ids);
     expect(calls.some((c) => c.op === "create")).toBe(false);
   });
 

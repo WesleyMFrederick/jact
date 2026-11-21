@@ -23,7 +23,7 @@ Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to
 - It finds or creates the agent and its cloud environment. Each name carries a hash of its config, so editing `system-prompt.md` creates a new agent instead of changing the old one.
 - It starts a session with the repo mounted at the PR head commit, the slice files and the build helper beside it, and a cost cap. The first message carries the exact build command for that session.
 - It polls until every workflow run has ended and the session is idle with `end_turn`. That is the documented definition of done. At 75% of the budget it tells the agent to stop its runs and report what is already confirmed.
-- If the CI job is cancelled or crashes, it stops and archives the session so nothing keeps spending. A job killed with no signal (SIGKILL, a lost runner) runs no cleanup: that session spends until its budget cap, or until the next Bug Hunter run for the same PR stops it.
+- If the CI job is cancelled or crashes, it stops and archives the session so nothing keeps spending. Cancellation prevents setup from starting a session; a creation already in flight is awaited and archived without sending the review prompt. Repeated signals and setup failures share one shutdown, including upload deletion. A job killed with no signal (SIGKILL, a lost runner) runs no cleanup: that session spends until its budget cap, or until the next Bug Hunter run for the same PR stops it.
 - It posts one PR review. Findings on changed lines become inline comments, and the rest go in the review body. It prints a cost table (per agent role and model) in the job log and the job summary.
 
 ### Build once per session

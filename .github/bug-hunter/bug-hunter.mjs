@@ -384,6 +384,10 @@ async function postReview(pr, files, report, { sessionId, note, finished, cost }
 // ---------- Main ----------
 
 let liveSession; // the session to stop if this process is cancelled or crashes
+let stopping = false;
+let pendingSession;
+let shutdownPromise;
+let uploadCleanup;
 // Files API uploads outlive their session, so every exit path deletes the ones that succeeded,
 // including uploads still in flight when another setup step fails.
 const uploadedIds = [];
@@ -397,10 +401,26 @@ function upload(bytes, name, type) {
   pendingUploads.push(pending);
   return pending;
 }
-async function deleteUploads() {
-  await Promise.allSettled(pendingUploads);
-  const ids = uploadedIds.splice(0);
-  await Promise.all(ids.map((id) => client.beta.files.delete(id).catch(() => {})));
+function deleteUploads() {
+  return uploadCleanup ??= (async () => {
+    await Promise.allSettled(pendingUploads);
+    const ids = uploadedIds.splice(0);
+    await Promise.all(ids.map((id) => client.beta.files.delete(id).catch(() => {})));
+  })();
+}
+
+function shutdown({ quick = false } = {}) {
+  stopping = true;
+  return shutdownPromise ??= (async () => {
+    // Creation may finish after a signal, before main can publish the session id.
+    // Wait for that continuation before checking liveSession or deleting its files.
+    await pendingSession?.catch(() => {});
+    if (liveSession) {
+      await stopSession(liveSession, { quick });
+      liveSession = undefined;
+    }
+    await deleteUploads();
+  })();
 }
 
 // REPORT_FILE gets one JSON record per run, including runs that end before a session starts.
@@ -417,6 +437,7 @@ async function main() {
   await refreshGithubIdToken();
   setInterval(() => refreshGithubIdToken().catch((err) => console.log(`  OIDC refresh failed: ${err.message}`)), 4 * 60_000).unref();
   const { pr, files } = await loadTarget();
+  if (stopping) return;
   const { slices, skipped } = planSlices(files);
   console.log(`Slices: ${slices.map((s) => `${s.id}=${s.lines} lines/${s.files.length} files`).join(", ") || "none"}; skipped ${skipped.length} files.`);
   if (PLAN_ONLY) {
@@ -433,14 +454,16 @@ async function main() {
   // Read before any Anthropic call, so a missing helper stops the run with nothing to clean up.
   const helperBytes = readFileSync(BUILD_HELPER);
   await stopStaleSessions();
+  if (stopping) return;
   const [agentId, environmentId, helper, uploads] = await Promise.all([
     ensureAgent(),
     ensureEnvironment(),
     upload(helperBytes, "ensure-jact-build.mjs", "text/javascript"),
     Promise.all(slices.map((s) => upload(Buffer.from(s.text), `${s.id}.diff`, "text/plain"))),
   ]);
+  if (stopping) return;
 
-  const session = await client.beta.sessions.create({
+  pendingSession = client.beta.sessions.create({
     agent: agentId,
     environment_id: environmentId,
     title: `${sessionPrefix(REPO, TARGET, PR_NUMBER)}@ ${pr.head.sha.slice(0, 7)}`,
@@ -457,9 +480,13 @@ async function main() {
       ...uploads.map((u, i) => ({ type: "file", file_id: u.id, mount_path: `${SLICE_DIR}/${slices[i].id}.diff` })),
     ],
   });
+  const session = await pendingSession;
   liveSession = session.id;
+  pendingSession = undefined;
+  if (stopping) return;
   console.log(`Session ${session.id} started: ${sessionPrefix(REPO, TARGET, PR_NUMBER).trim()} (budget ${dollars(BUDGET_CENTS)}).`);
   await say(session.id, manifest(pr, slices, skipped, session.id));
+  if (stopping) return;
 
   const deadline = Date.now() + TIMEOUT_MS;
   const wrapUpCents = Number(BUDGET_CENTS) * WRAP_UP_AT;
@@ -469,9 +496,10 @@ async function main() {
   let verdict = { state: "working" };
   let events = [];
   let seen = 0;
-  while (Date.now() < deadline) {
+  while (!stopping && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_MS));
     const current = await client.beta.sessions.retrieve(session.id);
+    if (stopping) return;
     if (current.status === "terminated") throw new Error(`Session ${session.id} terminated.`);
     const spent = Number(current.usage?.list_cost?.amount ?? 0);
     if (!askedToWrapUp && spent >= wrapUpCents && current.status === "running") {
@@ -481,6 +509,7 @@ async function main() {
     }
     if (current.status !== "idle" && current.status !== "running") continue;
     events = await listEvents(session.id);
+    if (stopping) return;
     const fresh = events.slice(seen);
     seen = events.length;
     for (const e of fresh) {
@@ -507,6 +536,7 @@ async function main() {
     }
     if (verdict.state !== "working" && verdict.state !== "stalled") break;
   }
+  if (stopping) return;
 
   if (verdict.state === "working" && verdict.reason === "retries_exhausted") {
     const errors = events.filter((e) => e.type === "session.error").map((e) => JSON.stringify(e.error ?? e)).slice(-3);
@@ -555,11 +585,8 @@ async function main() {
 // GitHub sends SIGINT, then SIGTERM, when a newer run cancels this one.
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, async () => {
-    if (liveSession) {
-      console.log(`${signal}: stopping session ${liveSession}.`);
-      await stopSession(liveSession, { quick: true });
-    }
-    await deleteUploads();
+    if (liveSession) console.log(`${signal}: stopping session ${liveSession}.`);
+    await shutdown({ quick: true });
     process.exit(2);
   });
 }
@@ -567,7 +594,6 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 main().catch(async (err) => {
   console.error(`::error title=Bug Hunter failed::${err.message.split("\n")[0]}`);
   console.error(err);
-  if (liveSession) await stopSession(liveSession);
-  await deleteUploads();
+  await shutdown();
   process.exit(2);
 });

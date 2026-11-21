@@ -106,7 +106,8 @@ describe("shared prover build guard", () => {
     let release;
     const blocked = new Promise((resolve) => { release = resolve; });
     const timer = setTimeout(() => release(new Error("Five callers did not reach the held lock")), 5000);
-    const calls = Array.from({ length: 6 }, () => run({ BUILD_TEST_BARRIER: gate }, [], (message) => {
+    // Bound each waiter too: a dead lock owner must fail here, not at Vitest's timeout.
+    const calls = Array.from({ length: 6 }, () => run({ BUILD_TEST_BARRIER: gate }, ["--lock-timeout-ms", "5000"], (message) => {
       if (message.event === "lock-wait") waiting.add(message.pid);
       if (waiting.size === 5) release();
     }));
