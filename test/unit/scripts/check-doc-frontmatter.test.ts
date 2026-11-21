@@ -31,6 +31,18 @@ afterEach(() => {
 });
 
 describe("check-doc-frontmatter", () => {
+	it.each([{ flags: [] }, { flags: ["--preserve-symlinks-main"] }])(
+		"given a symlinked entry point with node flags $flags, when checked, then timestamps are rejected",
+		({ flags }) => {
+			const dir = makeRepo({ "a.md": "---\ncreated: x\n---\n" });
+			const script = join(dir, "check.mjs");
+			symlinkSync(SCRIPT, script);
+			const result = spawnSync("node", [...flags, script], { cwd: dir, encoding: "utf8" });
+			expect(result.status).toBe(1);
+			expect(result.stderr).toContain("a.md: remove created");
+		},
+	);
+
 	it("given a doc whose header has editor timestamps, when checked, then it fails and names the file and keys", () => {
 		const dir = makeRepo({
 			"docs/a.md": "---\ncreated: 2026-07-01T10:00:00\nlast_modified: 2026-11-19T09:00:00\n---\n# A\n",

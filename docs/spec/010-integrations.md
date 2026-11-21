@@ -55,3 +55,5 @@ Only the `.github/workflows/release.yml` workflow publishes the package. Contrac
 
 Header fences may have trailing spaces or tabs, and the opening fence may follow a leading byte-order mark. Both `---` and `...` close a header. Quoted keys and spaces before the colon do not bypass the check. These variations do not extend checking into the body.
 
+Invoking the script through a symlink runs the same check, including when Node preserves the entry-point symlink.
+

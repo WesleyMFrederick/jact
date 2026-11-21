@@ -8,9 +8,8 @@
 // Usage: node scripts/check-doc-frontmatter.mjs   (run from anywhere inside the repo)
 // Exit:  0 clean, 1 stamps found.
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 const BANNED_KEYS = ["created", "last_modified"];
 const SKIPPED_PREFIXES = ["test/fixtures/"];
@@ -49,4 +48,4 @@ function main() {
 	console.log(`check-doc-frontmatter: ${files.length} markdown files clean`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();
+if (process.argv[1] && realpathSync(new URL(import.meta.url)) === realpathSync(process.argv[1])) main();
