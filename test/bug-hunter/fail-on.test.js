@@ -5,17 +5,18 @@ import { describe, expect, it } from "vitest";
 const runner = fileURLToPath(new URL("../../.github/bug-hunter/bug-hunter.mjs", import.meta.url));
 // Keep the real CLI and exit handling; replace only external services. The SDK lives in
 // a separate CI package and is not installed by the repository's npm install.
+const sdkLoader = `
+  export function resolve(specifier, context, next) {
+    if (specifier === '@anthropic-ai/sdk') return {
+      url: 'data:text/javascript,export default class Anthropic {}; export const toFile = () => {};',
+      shortCircuit: true,
+    };
+    return next(specifier, context);
+  }
+`;
 const preload = `
-  import { registerHooks } from 'node:module';
-  registerHooks({
-    resolve(specifier, context, next) {
-      if (specifier === '@anthropic-ai/sdk') return {
-        url: 'data:text/javascript,export default class Anthropic {}; export const toFile = () => {};',
-        shortCircuit: true,
-      };
-      return next(specifier, context);
-    },
-  });
+  import { register } from 'node:module';
+  register(${JSON.stringify(`data:text/javascript,${encodeURIComponent(sdkLoader)}`)});
   globalThis.fetch = async (url) => {
     console.error('TEST_GITHUB_REQUEST');
     return { ok: true, json: async () => String(url).includes('/files?') ? [] : {
