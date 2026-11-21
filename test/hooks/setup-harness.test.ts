@@ -352,12 +352,27 @@ describe("setup for Antigravity CLI, whose hooks file is keyed by hook name", ()
 			"jact",
 		]);
 		expect(readJson(file()).jact.Stop[0].command).toBe(
-			"node /opt/jact/dist/cli.js hook antigravity --event Stop",
+			"node /opt/jact/dist/cli.js hook antigravity --event Stop # jact",
 		);
 
 		expect(removeHarness("antigravity", moved).action).toBe("removed");
 		expect(readJson(file())).toEqual(others);
 		expect(removeHarness("antigravity", moved).action).toBe("absent");
+	});
+
+	it.each([
+		{ PreToolUse: [{ type: "command", command: "my-own-script.sh" }] },
+		{ Stop: [{ type: "command", command: "my-own-script.sh" }] },
+		{ PostToolUse: [{ matcher: "*", hooks: [{ type: "command", command: "other-linter hook antigravity --event PostToolUse" }] }] },
+		{ PostToolUse: [{ matcher: "*", hooks: [{ type: "command", command: "jact hook antigravity --event PostToolUse" }, { type: "command", command: "my-own-script.sh" }] }] },
+	])("preserves a foreign or shared jact key: %j", (jact) => {
+		mkdirSync(join(options.cwd, ".agents"));
+		const before = JSON.stringify({ other: {}, jact });
+		writeFileSync(file(), before);
+		expect(() => plannedConfig("antigravity", options)).toThrow(/unmanaged/);
+		expect(() => installHarness("antigravity", options)).toThrow(/unmanaged/);
+		expect(removeHarness("antigravity", options).action).toBe("absent");
+		expect(readFileSync(file(), "utf8")).toBe(before);
 	});
 
 	it("refuses to touch a hooks file that is not valid JSON", () => {

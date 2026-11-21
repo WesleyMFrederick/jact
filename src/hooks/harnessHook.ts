@@ -113,19 +113,7 @@ function eventFolder(payload: JsonRecord): string {
 	);
 }
 
-function stringLeaves(value: unknown, depth = 0): string[] {
-	if (typeof value === "string") return [value];
-	if (depth > 2) return [];
-	if (Array.isArray(value))
-		return value.flatMap((item) => stringLeaves(item, depth + 1));
-	if (isRecord(value))
-		return Object.values(value).flatMap((item) =>
-			stringLeaves(item, depth + 1),
-		);
-	return [];
-}
-
-function candidatePaths(toolInput: unknown): string[] {
+function candidatePaths(toolInput: unknown, toolName: string): string[] {
 	if (!isRecord(toolInput)) return [];
 	const found: string[] = [];
 	for (const field of PATH_FIELDS) {
@@ -136,9 +124,11 @@ function candidatePaths(toolInput: unknown): string[] {
 	if (Array.isArray(pathList))
 		for (const value of pathList)
 			if (typeof value === "string") found.push(value);
-	for (const text of stringLeaves(toolInput))
-		for (const match of text.matchAll(PATCH_HEADER))
+	if (toolName === "apply_patch") {
+		const patch = firstText(toolInput["command"], toolInput["patch"], toolInput["input"]);
+		for (const match of (patch ?? "").matchAll(PATCH_HEADER))
 			if (match[1] !== undefined) found.push(match[1]);
+	}
 	return found;
 }
 
@@ -179,7 +169,7 @@ export function parseHookPayload(payloadText: string): HookRequest | undefined {
 	const cwd = eventFolder(payload);
 	const paths = [
 		...new Set(
-			candidatePaths(payload["tool_input"] ?? toolCall?.["args"])
+			candidatePaths(payload["tool_input"] ?? toolCall?.["args"], name)
 				.map((raw) => absoluteMarkdownPath(raw, cwd))
 				.filter((value): value is string => value !== undefined),
 		),

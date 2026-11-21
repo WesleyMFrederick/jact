@@ -168,7 +168,7 @@ export function hookCommand(harness: Harness, command: string): string {
 function antigravityHooks(command: string): JsonRecord {
 	const handler = (event: string, timeout: number) => ({
 		type: "command",
-		command: `${hookCommand("antigravity", command)} --event ${event}`,
+		command: `${hookCommand("antigravity", command)} --event ${event}${command === "jact" ? "" : " # jact"}`,
 		timeout,
 	});
 	return {
@@ -192,8 +192,22 @@ function isOwnHook(hook: unknown, harness: Harness, event?: string): boolean {
 	const text = command.trim();
 	// Custom commands carry a shell comment: a matching subcommand alone
 	// cannot distinguish jact from another program with its own hook command.
-	return text === `jact${suffix}` || text.endsWith(`${suffix} # jact`) ||
-		(harness === "antigravity" && text.endsWith(suffix));
+	return text === `jact${suffix}` || text.endsWith(`${suffix} # jact`);
+}
+
+function isOwnAntigravityHooks(value: unknown): boolean {
+	if (!isRecord(value)) return false;
+	const events = Object.entries(value);
+	return events.length > 0 && events.every(([event, groups]) => {
+		if (!["PostToolUse", "PreInvocation", "Stop"].includes(event) ||
+			!Array.isArray(groups) || groups.length === 0) return false;
+		return groups.every((group: unknown) => {
+			const hooks = event === "PostToolUse" && isRecord(group) ? group["hooks"] : [group];
+			return Array.isArray(hooks) && hooks.length > 0 &&
+				hooks.every((hook: unknown) => isRecord(hook) &&
+					hook["type"] === "command" && isOwnHook(hook, "antigravity", event));
+		});
+	});
 }
 
 function withoutOwnHooks(groups: unknown[], harness: Harness): unknown[] {
@@ -373,6 +387,8 @@ export function plannedConfig(
 	}
 	const config = readJsonConfig(configTarget.file);
 	if (configTarget.kind === "named") {
+		if (HOOK_NAME in config && !isOwnAntigravityHooks(config[HOOK_NAME]))
+			throw new Error(`Refusing to replace an unmanaged named hook: ${configTarget.file}. jact changed nothing.`);
 		const { [HOOK_NAME]: _replaced, ...others } = config;
 		return {
 			path: configTarget.file,
@@ -497,7 +513,7 @@ export function removeHarness(
 	}
 	const config = readJsonConfig(configTarget.file);
 	if (configTarget.kind === "named") {
-		if (!(HOOK_NAME in config))
+		if (!isOwnAntigravityHooks(config[HOOK_NAME]))
 			return { path: configTarget.file, action: "absent", notes: [] };
 		const { [HOOK_NAME]: _removed, ...others } = config;
 		writeConfigFile(configTarget.file, serialize(others));

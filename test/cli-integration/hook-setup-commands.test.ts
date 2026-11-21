@@ -55,7 +55,7 @@ afterEach(() => {
 });
 
 describe("hook argument errors never interrupt a harness", () => {
-	it.each([["hook"], ["hook", "bogus"], ["hook", "claude", "--bogus"], ["hook", "antigravity", "--event"]])(
+	it.each([["hook"], ["hook", "bogus"], ["hook", "claude", "--bogus"]])(
 		"quietly accepts malformed invocation %j",
 		(...args) => {
 			const result = run(args);
@@ -64,6 +64,25 @@ describe("hook argument errors never interrupt a harness", () => {
 			expect(result.stderr).toBe("");
 		},
 	);
+
+	it.each([
+		[["--bogus"], {}],
+		[["--event"], {}],
+		[["--event", "Stop", "--x"], { decision: "stop" }],
+		[["--event=Stop", "--x"], { decision: "stop" }],
+	] as const)("Antigravity answers JSON on malformed arguments: %j", (args, expected) => {
+		const result = run(["hook", "antigravity", ...args]);
+		expect(result.exitCode).toBe(0);
+		expect(result.stderr).toBe("");
+		expect(JSON.parse(result.stdout)).toEqual(expected);
+	});
+
+	it("Antigravity help stays help rather than a JSON fallback", () => {
+		const result = run(["hook", "antigravity", "--help"]);
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toContain("Usage:");
+		expect(result.stdout).not.toContain('{"decision":');
+	});
 });
 
 describe("jact setup", () => {

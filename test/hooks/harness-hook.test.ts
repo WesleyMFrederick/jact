@@ -103,6 +103,23 @@ describe("parseHookPayload reads each harness's tool event", () => {
 		);
 	});
 
+	it.each(["Write", "Edit", "MultiEdit", "write_file", "read_file", "view_file", "replace_file_content", "multi_replace_file_content"])(
+		"%s never treats patch headers in Markdown text as touched files",
+		(tool) => {
+			const text = "*** Update File: docs/other.md";
+			expect(parseHookPayload(event(tool, {
+				file_path: note, content: text, new_string: text, edits: [{ new_string: text }],
+			}))?.paths).toEqual([note]);
+		},
+	);
+
+	it.each(["command", "patch", "input"])("apply_patch scans only its %s patch field", (field) => {
+		expect(parseHookPayload(event("apply_patch", {
+			[field]: "*** Update File: docs/note.md",
+			content: "*** Update File: docs/other.md",
+		}))?.paths).toEqual([note]);
+	});
+
 	it("Codex: apply_patch names each changed file in the patch text", () => {
 		const patch = [
 			"*** Begin Patch",
