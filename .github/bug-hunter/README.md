@@ -23,7 +23,7 @@ Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to
 - It finds or creates the agent and its cloud environment. Each name carries a hash of its config, so editing `system-prompt.md` creates a new agent instead of changing the old one.
 - It starts a session with the repo mounted at the PR head commit, the slice files and the build helper beside it, and a cost cap. The first message carries the exact build command for that session.
 - It polls until every workflow run has ended and the session is idle with `end_turn`. That is the documented definition of done. At 75% of the budget it tells the agent to stop its runs and report what is already confirmed.
-- Finish, setup or polling failure, and cancellation all request the same shutdown. Its mode can only escalate: normal cleanup gets 30 seconds; a signal shortens the remaining time to at most 2 seconds, including requests already in flight. Archive and upload deletion run once, with bounded requests and no SDK retries; incomplete cleanup is logged and exits 2. This fits GitHub's [cancellation grace period](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation): 7.5 seconds after SIGINT, then 2.5 seconds after SIGTERM before the process tree is killed.
+- Finish, setup or polling failure, and cancellation all request the same shutdown. Its mode can only escalate: normal cleanup gets 30 seconds; a signal shortens the remaining time to at most 2 seconds, including requests already in flight. Shutdown interrupts potentially running sessions even when a status lookup fails, asks the agent to stop its workflows in either mode, and polls for idle. Archive has one shared operation: confirmed busy rejections can retry within the deadline; an unconfirmed request never does. Upload deletion runs once per file, with time reserved after archival. Requests are bounded with SDK retries disabled; incomplete cleanup is logged and exits 2. This fits GitHub's [cancellation grace period](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation): 7.5 seconds after SIGINT, then 2.5 seconds after SIGTERM before the process tree is killed. An interrupt stops a turn, not its workflows; see [Interrupt a session with runs open](https://platform.claude.com/docs/en/managed-agents/workflow-runs#interrupt-a-session-with-runs-open).
 - Cancellation prevents new setup work. An in-flight creation gets a bounded wait, then an abort and a bounded lookup by its exact title. A creation that appears only after that lookup, an unconfirmed archive, SIGKILL, or a lost runner can still leave a session spending until its budget cap or the next run for the same PR stops it. Cleanup does not claim that an aborted or timed-out request was confirmed by the service.
 - It posts one PR review. Findings on changed lines become inline comments, and the rest go in the review body. It prints a cost table (per agent role and model) in the job log and the job summary.
 
@@ -97,10 +97,10 @@ Each session has a hard cap (`BUDGET_CENTS`, default $15.00). At the cap the run
 ```bash
 cd .github/bug-hunter && npm ci --ignore-scripts
 ant auth login   # or any credential the SDK resolves; never write a key to a .env file
-GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=WesleyMFrederick/jact PR_NUMBER=128 DRY_RUN=1 node bug-hunter.mjs
+GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=WesleyMFrederick/jact PR_NUMBER=128 PLAN_ONLY=1 node bug-hunter.mjs
 ```
 
-`DRY_RUN=1` prints the review instead of posting it. `PLAN_ONLY=1` prints the slices and the agent's first message, then stops before any Anthropic call, so it costs nothing.
+`PLAN_ONLY=1` prints the slices and the agent's first message, then stops before any Anthropic call, so it costs nothing. `DRY_RUN=1` **starts a paid session**, even for a draft PR; it only prints the review instead of posting it. Draft skipping is enforced by the GitHub workflow, not by this local command.
 
 ### Exam mode: replay a fixed commit range
 

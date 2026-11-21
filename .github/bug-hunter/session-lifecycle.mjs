@@ -99,23 +99,75 @@ export function createSessionLifecycle(client, {
     }
   }
 
-  function pause() {
+  function pause(reserveMs) {
     return new Promise((resolve) => {
       const wake = () => {
         clearTimeout(timer);
         changed.delete(wake);
         resolve();
       };
-      const timer = setTimeout(wake, Math.min(pollMs, Math.max(0, deadline - Date.now() - 2 * requestMs)));
+      const timer = setTimeout(wake, Math.min(
+        pollMs, mode === "fast" ? 100 : pollMs, Math.max(0, deadline - Date.now() - reserveMs),
+      ));
       changed.add(wake);
     });
   }
 
   function archive(id) {
     if (!archivePromise) {
-      archivePromise = attempt(`archive ${id}`, (options) => client.beta.sessions.archive(id, {}, options), 2);
+      archivePromise = stopAndArchive(id);
     }
     return archivePromise;
+  }
+
+  async function stopAndArchive(id) {
+    let current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 5);
+    // A failed lookup is not evidence that the session stopped.
+    const running = () => !current || current.status === "running" || current.status === "rescheduling";
+    // Keep a tail for archive and deletion, scaled to the signal's shorter total budget.
+    const reserveMs = () => Math.min(2 * requestMs, (mode === "fast" ? fastMs : gracefulMs) / 4);
+    let stopRequested = false;
+    const stopRuns = async () => {
+      stopRequested = true;
+      await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
+        events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
+      }, options), 5);
+    };
+    if (running()) {
+      await attempt(`interrupt ${id}`, (options) => client.beta.sessions.events.send(id, {
+        events: [{ type: "user.interrupt" }],
+      }, options), 4);
+      // Interrupt ends a turn, not its workflows. Ask afterward so this request can take effect.
+      await stopRuns();
+    }
+    for (;;) {
+      while (running() && deadline - Date.now() > reserveMs()) {
+        await pause(reserveMs());
+        current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3);
+      }
+      if (running()) failure(`wait for idle ${id}`, new Error("deadline reached; attempting final archive"));
+      let rejection;
+      const archived = await attempt(`archive ${id}`, async (options) => {
+        try {
+          await client.beta.sessions.archive(id, {}, options);
+          return true;
+        } catch (error) {
+          // Only retry a confirmed rejection, never an unconfirmed in-flight request.
+          if (error.status !== 400 && error.status !== 409) throw error;
+          rejection = error;
+          return false;
+        }
+      }, 2);
+      if (archived !== false) return;
+      if (deadline - Date.now() <= reserveMs()) {
+        failure(`archive ${id}`, rejection);
+        return;
+      }
+      // Even an idle session can have paused workflows that prevent archival.
+      if (!stopRequested) await stopRuns();
+      await pause(reserveMs());
+      current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3);
+    }
   }
 
   function deleteFile(id) {
@@ -145,28 +197,8 @@ export function createSessionLifecycle(client, {
       }
     }
 
-    if (sessionId) {
-      const id = sessionId;
-      let current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 5);
-      const running = () => current?.status === "running" || current?.status === "rescheduling";
-      if (running()) {
-        if (mode === "graceful") {
-          await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
-            events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
-          }, options), 5);
-        }
-        await attempt(`interrupt ${id}`, (options) => client.beta.sessions.events.send(id, {
-          events: [{ type: "user.interrupt" }],
-        }, options), 4);
-        while (mode === "graceful" && running() && deadline - Date.now() > 2 * requestMs) {
-          await pause();
-          if (mode === "fast") break;
-          current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3);
-        }
-      }
-      // Await confirmation when available; a failure still leaves time to attempt every deletion.
-      await archive(id);
-    }
+    // Await archive confirmation when available; failures still leave a deletion window.
+    if (sessionId) await archive(sessionId);
 
     // Include IDs from late responses that arrived while stopping/archiving.
     for (;;) {

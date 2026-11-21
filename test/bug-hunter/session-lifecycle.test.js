@@ -51,7 +51,7 @@ async function until(check, label, ms = 2_000) {
 // Fake Anthropic client with the SDK's argument order: create/upload/list take options second;
 // retrieve/archive/delete/events.send take them third. SDK calls are recorded with `sdk: true`;
 // "uploaded", "created", "archived" and "deleted" mark the moment the service answered.
-function fakeClient({ upload, create, archive, remove, interruptStops = true, listTail = false } = {}) {
+function fakeClient({ upload, create, retrieve, send, archive, remove, interruptStops = true, requireIdle = false, listTail = false } = {}) {
   const calls = [];
   const server = new Map();
   let uploads = 0;
@@ -89,12 +89,16 @@ function fakeClient({ upload, create, archive, remove, interruptStops = true, li
       sdk("retrieve", id, options);
       const session = server.get(id);
       if (!session) throw Object.assign(new Error(`no session ${id}`), { status: 404 });
+      await retrieve?.(id, session, options);
       return { ...session };
     },
     async archive(id, _params, options) {
       sdk("archive", id, options);
-      await archive?.(id);
       const session = server.get(id);
+      if (requireIdle && session?.status !== "idle") {
+        throw Object.assign(new Error("session is running"), { status: 400 });
+      }
+      await archive?.(id, session, options);
       if (session) Object.assign(session, { status: "idle", archived_at: new Date().toISOString() });
       mark("archived", id);
       return { ...session };
@@ -118,6 +122,7 @@ function fakeClient({ upload, create, archive, remove, interruptStops = true, li
       async send(id, params, options) {
         const types = (params?.events ?? []).map((e) => e.type);
         sdk("send", id, options, { events: types });
+        await send?.(id, types, server.get(id), options);
         if (interruptStops && types.includes("user.interrupt")) {
           const session = server.get(id);
           if (session) session.status = "idle";
@@ -264,6 +269,91 @@ describe("Bug Hunter session lifecycle", () => {
     expect(life.requestShutdown("graceful")).toBe(stopping);
     await sleep(20);
     expect(fake.calls.slice(callCount).filter((c) => c.sdk)).toEqual([]);
+  });
+
+  it("waits for a delayed interrupt to make the session idle before fast archival", async () => {
+    const fake = fakeClient({
+      create: async () => ({ status: "running" }),
+      interruptStops: false,
+      requireIdle: true,
+      send: (_id, types, session) => {
+        if (types.includes("user.interrupt")) setTimeout(() => { session.status = "idle"; }, 50);
+      },
+    });
+    const { log } = logger();
+    const life = createSessionLifecycle(fake.client, { gracefulMs: 1_000, fastMs: 400, requestMs: 60, pollMs: 10, log });
+    await uploadTwo(life);
+    await life.createSession(params());
+    expect(await within(life.requestShutdown("fast"), 650, "delayed interrupt shutdown")).toEqual({ ok: true });
+    expect(fake.ids("archived")).toEqual(["sesn_1"]);
+    expect(fake.ids("archive")).toEqual(["sesn_1"]);
+    expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+  });
+
+  it.each(["running", "idle"])("stops open workflows in a %s session and retries confirmed archive rejection", async (status) => {
+    let open = true;
+    let attempts = 0;
+    const fake = fakeClient({
+      create: async () => ({ status }),
+      requireIdle: true,
+      send: (_id, types) => {
+        if (types.includes("user.message")) setTimeout(() => { open = false; }, 50);
+      },
+      archive: () => {
+        if (++attempts === 1 || open) {
+          throw Object.assign(new Error("workflow_run_open"), {
+            status: 400, error: { details: { error_code: "workflow_run_open" } },
+          });
+        }
+      },
+    });
+    const { log } = logger();
+    const life = createSessionLifecycle(fake.client, { gracefulMs: 1_000, fastMs: 400, requestMs: 60, pollMs: 10, log });
+    await uploadTwo(life);
+    await life.createSession(params());
+    const stopping = life.requestShutdown("fast");
+    expect(life.requestShutdown("fast")).toBe(stopping);
+    expect(await within(stopping, 650, "workflow shutdown")).toEqual({ ok: true });
+    expect(fake.ops("send").some((call) => call.events.includes("user.message"))).toBe(true);
+    expect(attempts).toBeGreaterThan(1);
+    expect(open).toBe(false);
+    expect(fake.ids("archived")).toEqual(["sesn_1"]);
+    expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+  });
+
+  it("interrupts a potentially running session when its initial status lookup never answers", async () => {
+    let reads = 0;
+    const fake = fakeClient({
+      create: async () => ({ status: "running" }),
+      retrieve: () => (++reads === 1 ? never() : undefined),
+      requireIdle: true,
+    });
+    const { lines, log } = logger();
+    const life = createSessionLifecycle(fake.client, { gracefulMs: 1_000, fastMs: 400, requestMs: 60, pollMs: 10, log });
+    await uploadTwo(life);
+    await life.createSession(params());
+    expect(await within(life.requestShutdown("fast"), 650, "unknown status shutdown")).toEqual({ ok: false });
+    expect(fake.ops("send").some((call) => call.events.includes("user.interrupt"))).toBe(true);
+    expect(fake.ids("archived")).toEqual(["sesn_1"]);
+    expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+    expect(lines.join("\n")).toContain("retrieve sesn_1");
+  });
+
+  it("bounds repeated busy archive responses and still deletes every upload", async () => {
+    const fake = fakeClient({
+      archive: () => { throw Object.assign(new Error("workflow_run_open"), { status: 400 }); },
+    });
+    const { lines, log } = logger();
+    const life = createSessionLifecycle(fake.client, { ...SHORT, pollMs: 5, log });
+    await uploadTwo(life);
+    await life.createSession(params());
+    expect(await within(life.requestShutdown("fast"), SHORT.fastMs + 250, "busy archive shutdown")).toEqual({ ok: false });
+    expect(fake.ops("archive").length).toBeGreaterThan(1);
+    expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+    expect(lines.join("\n")).toContain("archive sesn_1");
+    const count = fake.ops("archive").length;
+    await sleep(20);
+    expect(fake.ops("archive")).toHaveLength(count);
   });
 
   it("wakes a graceful stop that is waiting on a running session when a signal escalates it", async () => {
