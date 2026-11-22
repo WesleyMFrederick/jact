@@ -512,7 +512,6 @@ async function main() {
   const finished = verdict.state === "done";
   // Completion, errors, and signals all await this one resource owner.
   const cleanup = await lifecycle.requestShutdown("graceful");
-  if (!cleanup.ok) throw new Error("Session cleanup was not confirmed; see the shutdown errors.");
   if (lifecycle.mode === "fast") return;
   // A report can land between the last poll and the stop, so read the events once more.
   if (!finished) events = await listEvents(session.id).catch(() => events);
@@ -530,6 +529,7 @@ async function main() {
   }
   await postReview(pr, files, report, { sessionId: session.id, note, finished, cost });
   saveReport(pr, { session: session.id, agent: agentId, finished, note, cost_usd: cost.total === undefined ? null : Number(cost.total) / 100, report });
+  if (!cleanup.ok) throw new Error("Session cleanup was not confirmed; see the shutdown errors.");
 
   const threshold = SEVERITY_RANK[FAIL_ON];
   const blocking = report.findings.filter((f) => (SEVERITY_RANK[f.severity] ?? 0) >= threshold);

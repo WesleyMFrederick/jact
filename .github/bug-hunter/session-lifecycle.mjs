@@ -140,6 +140,7 @@ export function createSessionLifecycle(client, {
     let retrying = false;
     let stopRequested = false;
     const reserveMs = () => deletionReserveMs() * (retrying ? 1 : 2);
+    const pollingReserveMs = () => reserveMs() + (retrying ? Math.max(0, deadline - Date.now() - reserveMs()) / 2 : 0);
     if (running()) {
       await attempt(`interrupt ${id}`, (options) => client.beta.sessions.events.send(id, {
         events: [{ type: "user.interrupt" }],
@@ -147,7 +148,7 @@ export function createSessionLifecycle(client, {
     }
     for (;;) {
       while (running() && deadline - Date.now() > reserveMs()) {
-        await pause(reserveMs());
+        await pause(pollingReserveMs());
         current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, deletionReserveMs);
       }
       let rejection;
@@ -176,7 +177,7 @@ export function createSessionLifecycle(client, {
           events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
         }, options), 5, deletionReserveMs);
       }
-      await pause(reserveMs());
+      await pause(pollingReserveMs());
       current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, deletionReserveMs);
     }
   }

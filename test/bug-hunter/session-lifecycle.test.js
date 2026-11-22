@@ -344,6 +344,56 @@ describe("Bug Hunter session lifecycle", () => {
     }
   });
 
+  it.each([
+    { mode: "graceful", deadline: 30_000, archiveDelay: 0, stopDelay: 100, firstArchive: 22_500 },
+    { mode: "fast", deadline: 2_000, archiveDelay: 150, stopDelay: 25, firstArchive: 1_500 },
+  ])("reserves an archive retry after the stop fallback with default $mode timing", async ({ mode, deadline, archiveDelay, stopDelay, firstArchive }) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const archiveTimes = [];
+      let stopMessages = 0;
+      const fake = fakeClient({
+        create: () => ({ status: "running" }),
+        interruptStops: false,
+        send: (_id, types, session) => {
+          if (types.includes("user.message")) {
+            stopMessages++;
+            setTimeout(() => { session.status = "idle"; }, stopDelay);
+          }
+        },
+        archive: async () => {
+          archiveTimes.push(Date.now());
+          if (archiveTimes.length === 1) {
+            await sleep(archiveDelay);
+            throw Object.assign(new Error("open workflow"), {
+              status: 400, error: { error: { details: { error_code: "workflow_run_open" } } },
+            });
+          }
+        },
+      });
+      const { log } = logger();
+      const life = createSessionLifecycle(fake.client, { log });
+      await uploadTwo(life);
+      await life.createSession(params());
+      const stopping = life.requestShutdown(mode);
+      await vi.advanceTimersByTimeAsync(deadline);
+      expect(await stopping).toEqual({ ok: true });
+      expect(stopMessages).toBe(1);
+      expect(archiveTimes).toHaveLength(2);
+      expect(archiveTimes[0]).toBe(firstArchive);
+      expect(archiveTimes[1]).toBeLessThan(deadline - deadline / 8);
+      expect(fake.ids("archived")).toEqual(["sesn_1"]);
+      expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+      await vi.advanceTimersByTimeAsync(deadline);
+      expect(archiveTimes).toHaveLength(2);
+      expect(stopMessages).toBe(1);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it.each(["upload", "create"])("waits for a 1.5s in-flight %s during graceful cleanup", async (stage) => {
     vi.useFakeTimers();
     vi.setSystemTime(0);

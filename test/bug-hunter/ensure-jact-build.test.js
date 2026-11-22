@@ -169,6 +169,7 @@ if (args === 'ci --ignore-scripts' && process.env.BUILD_TEST_BARRIER) {
 }
 if (args === process.env.BUILD_TEST_FAIL) process.exit(23);
 if (args === 'run build') {
+  if (process.env.BUILD_TEST_NO_OUTPUT) process.exit(0);
   mkdirSync('dist', { recursive: true });
   if (process.env.BUILD_TEST_BAD_OUTPUT) symlinkSync('cli.js', join('dist', 'cli.js'));
   else writeFileSync(join('dist', 'cli.js'), 'built for test\\n');
@@ -252,6 +253,20 @@ describe("shared prover build guard", () => {
     const second = await run();
     expect(second.code, second.stderr).toBe(0);
     expect(callLog(second).outcome).toBe("reused");
+    expect(await commands()).toEqual(["ci --ignore-scripts", "run build"]);
+  });
+
+  it("rejects a successful build that leaves only a stale CLI", async () => {
+    await mkdir(join(repo, "dist"));
+    await writeFile(join(repo, "dist", "cli.js"), "stale output\n");
+    const failed = await run({ BUILD_TEST_NO_OUTPUT: "1" });
+    expect(failed.code, failed.stderr).toBe(1);
+    expect(failed.stderr).toContain("dist/cli.js is missing");
+    expect(callLog(failed).outcome).toBe("failed");
+    await expect(readFile(join(repo, "dist", "cli.js"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    const subsequent = await run();
+    expect(subsequent.code, subsequent.stderr).toBe(1);
+    expect(callLog(subsequent).outcome).toBe("failed");
     expect(await commands()).toEqual(["ci --ignore-scripts", "run build"]);
   });
 

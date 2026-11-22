@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -48,6 +50,7 @@ const fakeSdk = `
         },
         delete: async (id) => {
           record({ op: 'delete', id });
+          if (process.env.TEST_CLEANUP_FAILURE === 'delete') throw new Error('delete failed');
           if (process.env.TEST_CANCEL_AT === 'delete') {
             process.emit('SIGINT');
             process.emit('SIGTERM');
@@ -73,6 +76,7 @@ const fakeSdk = `
         retrieve: async () => ({ status: 'idle', usage: { list_cost: { amount: '12' } } }),
         archive: async (id) => {
           record({ op: 'archive', id });
+          if (process.env.TEST_CLEANUP_FAILURE === 'archive') throw new Error('archive failed');
           if (process.env.TEST_CANCEL_AT === 'archive') {
             if (archiving) throw new Error('archive already pending');
             archiving = true;
@@ -115,6 +119,10 @@ const preload = `
   const realSetTimeout = globalThis.setTimeout;
   globalThis.setTimeout = (fn, ms, ...args) => realSetTimeout(fn, ms === 15_000 ? 0 : ms, ...args);
   globalThis.fetch = async (url, init) => {
+    if (init?.method === 'POST' && String(url).endsWith('/reviews')) {
+      console.error('TEST_SDK ' + JSON.stringify({ op: 'review', body: JSON.parse(init.body) }));
+      return { ok: true, json: async () => ({ id: 1 }) };
+    }
     if (init?.method && init.method !== 'GET') throw new Error('unexpected GitHub write ' + url);
     return { ok: true, json: async () => String(url).includes('/files?') ? [
       { filename: 'src/cli.ts', status: 'modified', changes: 1, patch: '@@ -1 +1 @@\\n-old\\n+new' },
@@ -169,6 +177,32 @@ describe("Bug Hunter build helper upload", () => {
     expect(deleted.map((d) => d.id).sort()).toEqual(uploads.map((u) => u.id).sort());
     expect(archived).toBeGreaterThanOrEqual(0);
     for (const d of deleted) expect(d.i).toBeGreaterThan(archived);
+  });
+
+  it.each(["archive", "delete"])("publishes and saves a completed report before failing on %s cleanup", (stage) => {
+    const directory = mkdtempSync(join(tmpdir(), "bug-hunter-report-"));
+    const reportPath = join(directory, "report.json");
+    const report = {
+      summary: "Confirmed regression.",
+      findings: [{ title: "Confirmed bug", severity: "high", file: "src/cli.ts", line: 1, body: "Confirmed regression." }],
+    };
+    try {
+      const { result, calls } = review("sesn_cleanup_failure", {
+        DRY_RUN: "0",
+        REPORT_FILE: reportPath,
+        TEST_CLEANUP_FAILURE: stage,
+        TEST_FINAL_TEXT: ["```json", JSON.stringify(report), "```"].join("\n"),
+      });
+      expect(result.status, result.stderr).toBe(2);
+      const reviews = calls.filter((call) => call.op === "review");
+      expect(reviews, result.stderr).toHaveLength(1);
+      expect(reviews[0].body.comments).toHaveLength(1);
+      expect(reviews[0].body.comments[0].body).toContain("Confirmed regression.");
+      expect(JSON.parse(readFileSync(reportPath, "utf8")).report).toEqual(report);
+      expect(calls.filter((call) => call.op === "delete").map((call) => call.id).sort()).toEqual(["file_1", "file_2"]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it("deletes a helper upload that finishes after environment creation fails", () => {

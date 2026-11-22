@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, realpathSync, renameSync, rmdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, renameSync, rmSync, rmdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { parseArgs } from "node:util";
@@ -51,6 +51,7 @@ function build(identity, lock, resultPath) {
   // Another owner may have published between our last read and acquiring the lock.
   const existing = readResult(resultPath);
   if (existing) return consume(existing, identity);
+  rmSync(join(identity.repo, "dist", "cli.js"), { force: true });
   let exitCode = 0;
   let failure;
   for (const args of [["ci", "--ignore-scripts"], ["run", "build"]]) {
