@@ -394,6 +394,113 @@ describe("Bug Hunter session lifecycle", () => {
     }
   });
 
+  it.each([0, 2_000, 10_000])("sends the archive retry before the cutoff with a %ims fallback lookup", async (lookupDelay) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const archiveTimes = [];
+      const lookupTimes = [];
+      let stopMessages = 0;
+      const fake = fakeClient({
+        create: () => ({ status: "running" }),
+        interruptStops: false,
+        send: (_id, types, session) => {
+          if (types.includes("user.message")) {
+            stopMessages++;
+            setTimeout(() => { session.status = "idle"; }, 100);
+          }
+        },
+        retrieve: async (_id, _session, options) => {
+          if (stopMessages) {
+            lookupTimes.push({ at: Date.now(), options });
+            await sleep(lookupDelay);
+          }
+        },
+        archive: (_id, session) => {
+          archiveTimes.push(Date.now());
+          if (archiveTimes.length === 1 || session.status !== "idle") {
+            throw Object.assign(new Error("open workflow"), {
+              status: 400, error: { error: { details: { error_code: "workflow_run_open" } } },
+            });
+          }
+        },
+      });
+      const { log } = logger();
+      const life = createSessionLifecycle(fake.client, { log });
+      await uploadTwo(life);
+      await life.createSession(params());
+      const stopping = life.requestShutdown("graceful");
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(archiveTimes).toHaveLength(2);
+      expect(archiveTimes[0]).toBe(22_500);
+      expect(archiveTimes[1]).toBeGreaterThanOrEqual(22_600);
+      expect(archiveTimes[1]).toBeLessThan(26_250);
+      expect(lookupTimes.length).toBeGreaterThan(0);
+      expect(lookupTimes[0].at).toBeLessThan(archiveTimes[1]);
+      if (lookupDelay === 10_000) expect(lookupTimes[0].options.signal.aborted).toBe(true);
+      expect(await stopping).toEqual({ ok: true });
+      expect(stopMessages).toBe(1);
+      expect(fake.ids("archived")).toEqual(["sesn_1"]);
+      expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(archiveTimes).toHaveLength(2);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    { mode: "graceful", deadline: 30_000, archiveDelay: 0, stopDelay: 100 },
+    { mode: "fast", deadline: 2_000, archiveDelay: 150, stopDelay: 25 },
+  ])("reserves the archive retry when the $mode stop message never settles", async ({ mode, deadline, archiveDelay, stopDelay }) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    try {
+      const archiveTimes = [];
+      let stopMessages = 0;
+      let stopOptions;
+      const fake = fakeClient({
+        create: () => ({ status: "running" }),
+        interruptStops: false,
+        send: (_id, types, session, options) => {
+          if (types.includes("user.message")) {
+            stopMessages++;
+            stopOptions = options;
+            setTimeout(() => { session.status = "idle"; }, stopDelay);
+            return never();
+          }
+        },
+        archive: async (_id, session) => {
+          archiveTimes.push(Date.now());
+          if (archiveTimes.length === 1) {
+            await sleep(archiveDelay);
+            throw Object.assign(new Error("open workflow"), {
+              status: 400, error: { error: { details: { error_code: "workflow_run_open" } } },
+            });
+          }
+          expect(session.status).toBe("idle");
+        },
+      });
+      const { log } = logger();
+      const life = createSessionLifecycle(fake.client, { log });
+      await uploadTwo(life);
+      await life.createSession(params());
+      const stopping = life.requestShutdown(mode);
+      await vi.advanceTimersByTimeAsync(deadline);
+      expect(archiveTimes).toHaveLength(2);
+      expect(archiveTimes[1]).toBeLessThan(deadline - deadline / 8);
+      expect(stopMessages).toBe(1);
+      expect(stopOptions.signal.aborted).toBe(true);
+      expect(await stopping).toEqual({ ok: true });
+      expect(fake.ids("archived")).toEqual(["sesn_1"]);
+      expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
   it.each(["upload", "create"])("waits for a 1.5s in-flight %s during graceful cleanup", async (stage) => {
     vi.useFakeTimers();
     vi.setSystemTime(0);
@@ -511,8 +618,9 @@ describe("Bug Hunter session lifecycle", () => {
       await uploadTwo(life);
       await life.createSession(params());
       let result;
+      let completedAt;
       const stopping = life.requestShutdown("fast");
-      const settled = stopping.then((value) => { result = value; });
+      const settled = stopping.then((value) => { result = value; completedAt = Date.now(); });
       await vi.advanceTimersByTimeAsync(1_499);
       expect(fake.ops("archive")).toHaveLength(0);
       await vi.advanceTimersByTimeAsync(1);
@@ -520,10 +628,11 @@ describe("Bug Hunter session lifecycle", () => {
       expect(result, "the remaining half-second still permits recovery").toBeUndefined();
       expect(fake.ops("delete")).toHaveLength(0);
       expect(life.requestShutdown("fast")).toBe(stopping);
-      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(250);
       await settled;
       expect(result).toEqual({ ok: true });
-      expect(Date.now()).toBe(1_600);
+      expect(completedAt).toBeGreaterThanOrEqual(1_600);
+      expect(completedAt).toBeLessThan(1_750);
       expect(fake.ids("archive")).toEqual(["sesn_1", "sesn_1"]);
       expect(fake.ids("archived")).toEqual(["sesn_1"]);
       expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
@@ -590,13 +699,16 @@ describe("Bug Hunter session lifecycle", () => {
       await vi.advanceTimersByTimeAsync(100); // Idle, but the retry or its poll now stalls.
       expect(fake.ops("delete")).toHaveLength(0);
       await vi.advanceTimersByTimeAsync(150);
-      expect(deletionTimes).toEqual([1_750, 1_750]);
+      const deletionAt = stage === "archive" ? 1_750 : 1_625;
+      expect(deletionTimes).toEqual([deletionAt, deletionAt]);
       const stalled = fake.ops(stage === "archive" ? "archive" : "retrieve").at(-1);
       expect(stalled.options.signal.aborted).toBe(true);
       await vi.advanceTimersByTimeAsync(225);
       await stopping;
       expect(Date.now()).toBe(1_975);
-      expect(result).toEqual({ ok: false }); // The timed-out service outcome remains visible.
+      expect(result).toEqual({ ok: stage === "poll" });
+      expect(fake.ops("archive")).toHaveLength(2);
+      if (stage === "poll") expect(fake.ids("archived")).toEqual(["sesn_1"]);
       expect(fake.ids("deleted").sort()).toEqual(["file_1", "file_2"]);
       expect(lines.join("\n")).not.toMatch(/delete file_/);
       expect(lines.join("\n")).toContain(stage === "archive" ? "archive sesn_1" : "retrieve sesn_1");

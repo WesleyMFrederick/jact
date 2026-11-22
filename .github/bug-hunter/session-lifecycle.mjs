@@ -132,24 +132,25 @@ export function createSessionLifecycle(client, {
 
   async function stopAndArchive(id) {
     const deletionReserveMs = () => Math.min(requestMs, (mode === "fast" ? fastMs : gracefulMs) / 8);
-    let current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 5, deletionReserveMs);
-    // A failed lookup is not evidence that the session stopped.
-    const running = () => !current || current.status === "running" || current.status === "rescheduling";
-    // Initially reserve archive and deletion time. A confirmed rejection can borrow the
-    // archive half for more polling/retries, but must retain the deletion half.
     let retrying = false;
     let stopRequested = false;
-    const reserveMs = () => deletionReserveMs() * (retrying ? 1 : 2);
-    const pollingReserveMs = () => reserveMs() + (retrying ? Math.max(0, deadline - Date.now() - reserveMs()) / 2 : 0);
-    if (running()) {
+    let retryReserveMs = 0;
+    const reserveMs = () => deletionReserveMs() + (retrying ? Math.min(retryReserveMs, deletionReserveMs()) : deletionReserveMs());
+    const canWait = () => deadline - Date.now() - reserveMs() >= 1;
+    const pollingReserveMs = () => reserveMs() + (retrying ? Math.floor(Math.max(0, deadline - Date.now() - reserveMs()) / 2) : 0);
+    let current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 5, reserveMs);
+    // A failed lookup is not evidence that the session stopped.
+    const running = () => !current || current.status === "running" || current.status === "rescheduling";
+    if (running() && canWait()) {
       await attempt(`interrupt ${id}`, (options) => client.beta.sessions.events.send(id, {
         events: [{ type: "user.interrupt" }],
-      }, options), 4, deletionReserveMs);
+      }, options), 4, reserveMs);
     }
     for (;;) {
-      while (running() && deadline - Date.now() > reserveMs()) {
+      while (running() && canWait()) {
         await pause(pollingReserveMs());
-        current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, deletionReserveMs);
+        if (!canWait()) break;
+        current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, reserveMs);
       }
       let rejection;
       const archived = await attempt(`archive ${id}`, async (options) => {
@@ -164,21 +165,23 @@ export function createSessionLifecycle(client, {
         }
       }, 2, deletionReserveMs, { required: true });
       if (archived !== false) return;
-      retrying = true;
-      if (stopRequested || deadline - Date.now() <= reserveMs()) {
+      if (stopRequested || deadline - Date.now() <= deletionReserveMs()) {
         failure(`archive ${id}`, rejection);
         return;
       }
+      retrying = true;
+      retryReserveMs = Math.min(deletionReserveMs(), Math.ceil((deadline - Date.now() - deletionReserveMs()) / 2));
+      current = undefined;
       if (rejection.error?.error?.details?.error_code === "workflow_run_open") {
         // Only a confirmed open workflow justifies waking the lead. Give it one turn
         // to stop its runs, then retry archival once without restarting the deadline.
         stopRequested = true;
-        await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
-          events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
-        }, options), 5, deletionReserveMs);
+        if (canWait()) {
+          await attempt(`stop runs ${id}`, (options) => client.beta.sessions.events.send(id, {
+            events: [{ type: "user.message", content: [{ type: "text", text: "Stop all workflow runs now and start no new work." }] }],
+          }, options), 5, reserveMs);
+        }
       }
-      await pause(pollingReserveMs());
-      current = await attempt(`retrieve ${id}`, (options) => client.beta.sessions.retrieve(id, {}, options), 3, deletionReserveMs);
     }
   }
 
