@@ -10,10 +10,10 @@ Bug Hunter is a multi-agent PR review that runs on Claude Managed Agents and pos
 
 The slide's rule is "no agent reviews its own finding". Every step after the first uses fresh agents:
 
-1. **Split.** `bug-hunter.mjs` cuts the PR into at most 6 slices of whole files, about 400 changed lines each, in plain code. It skips lockfiles, `dist/`, snapshots, and planning docs (`docs/`, `design-docs/`, `.scratch/`). It uploads each slice as a diff file into the agent's sandbox. A PR with nothing left to review gets a short "nothing to review" comment and no session.
+1. **Split.** `bug-hunter.mjs` cuts the PR into at most 6 slices of whole files, about 400 changed lines each, in plain code. It skips lockfiles, `dist/`, snapshots, and planning docs (`docs/`, `design-docs/`, `.scratch/`). It uploads each slice as a diff file into the agent's sandbox, plus the build helper `ensure-jact-build.mjs` (see [Build once per session](#Build%20once%20per%20session)). A PR with nothing left to review gets a short "nothing to review" comment and no session.
 2. **Read.** One agent per slice reads its diff and the code around it, and lists at most 5 suspected bugs.
 3. **Pick.** Plain code merges the suspects, drops duplicates, and keeps the top 8.
-4. **Prove.** A fresh prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap.
+4. **Prove.** A fresh prover that sees only the claim tries to confirm it, running tests in the sandbox when cheap. Before any test it runs the one build command from the manifest, then `npx vitest run <file>` from the repo root. It never runs `npm ci`, `npm run build`, or `npm run clean` itself.
 5. **Report.** Only confirmed findings come back.
 
 Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to%20work). The agent runs them as a Managed Agents **dynamic workflow**: a small program that runs many agents in phases, which the server runs in the background. The lead agent only gets a short manifest (title, description, slice paths), never the full diff, and is told to start the workflow before reading anything.
@@ -21,10 +21,28 @@ Steps 2 to 5 live in [system-prompt.md · How to work](system-prompt.md#How%20to
 `bug-hunter.mjs` handles the plumbing:
 
 - It finds or creates the agent and its cloud environment. Each name carries a hash of its config, so editing `system-prompt.md` creates a new agent instead of changing the old one.
-- It starts a session with the repo mounted at the PR head commit, the slice files beside it, and a cost cap.
+- It starts a session with the repo mounted at the PR head commit, the slice files and the build helper beside it, and a cost cap. The first message carries the exact build command for that session.
 - It polls until every workflow run has ended and the session is idle with `end_turn`. That is the documented definition of done. At 75% of the budget it tells the agent to stop its runs and report what is already confirmed.
-- If the CI job is cancelled or crashes, it stops and archives the session so nothing keeps spending. A job killed with no signal (SIGKILL, a lost runner) runs no cleanup: that session spends until its budget cap, or until the next Bug Hunter run for the same PR stops it.
-- It posts one PR review. Findings on changed lines become inline comments, and the rest go in the review body. It prints a cost table (per agent role and model) in the job log and the job summary.
+- Finish, setup or polling failure, and cancellation all request the same shutdown. Its mode can only escalate: normal cleanup gets 30 seconds; a signal shortens the remaining time to at most 2 seconds, including requests already in flight. Shutdown interrupts potentially running sessions even when a status lookup fails and polls for idle. Archive has one shared operation: confirmed busy rejections can retry within the deadline; an unconfirmed request never retries. Stop and status requests share a cutoff before the reserved archive window; archive has its own cutoff before the deletion window. Every request is aborted and locally timed out at its cutoff even if the SDK ignores abort, and no request starts after that cutoff. Upload deletion runs once per file. Requests are bounded with SDK retries disabled; incomplete cleanup is logged and exits 2. This fits GitHub's [cancellation grace period](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation): 7.5 seconds after SIGINT, then 2.5 seconds after SIGTERM before the process tree is killed. An interrupt stops a turn, not its workflows; see [Interrupt a session with runs open](https://platform.claude.com/docs/en/managed-agents/workflow-runs#interrupt-a-session-with-runs-open).
+  The cutoff is checked at the SDK call itself, not before scheduling it. An event-loop stall can delay exit; when execution resumes, expired requests are skipped.
+  Cleanup sends no stop message unless archive returns `workflow_run_open`. Only that confirmed rejection permits one message asking the lead to stop its workflows, followed by one archive retry within the existing deadline. After a confirmed rejection, shutdown fixes a retry slot of half the remaining pre-deletion time, capped at the original archive reserve. Every intervening pause, poll, status lookup, and stop message must end before that slot. When no time remains before it, cleanup skips straight to the retry. Polling also leaves headroom for a status lookup within its earlier window. If the retry still fails, cleanup reports failure; it never sends another stop message.
+  The default request cap is 10 seconds, further limited by the remaining shutdown budget and reserved cleanup time; fast cancellation still shortens in-flight requests.
+  A failed status check or stop event is a warning if archival and file deletion are later confirmed. Unsettled setup, an unknown session ID, unconfirmed archive/deletion, or the total deadline still makes cleanup fail.
+- Cancellation prevents new setup work. An in-flight creation gets a bounded wait, then an abort and a bounded lookup by its exact title. A creation that appears only after that lookup, an unconfirmed archive, SIGKILL, or a lost runner can still leave a session spending until its budget cap or the next run for the same PR stops it. Cleanup does not claim that an aborted or timed-out request was confirmed by the service.
+  Setup settlement uses its share of the remaining shutdown budget rather than the per-request cap, leaving time to archive and delete after a delayed response.
+- It posts one PR review. Findings on changed lines become inline comments, and the rest go in the review body. It prints a cost table (per agent role and model) in the job log and the job summary. A cleanup failure still publishes and saves a completed report before exiting 2; cancellation does not publish.
+
+### Build once per session
+
+`npm run build` starts with `clean`, which deletes `dist/`. When several provers each built the repo, one prover's build could delete `dist/cli.js` while another was testing with it. So the build runs once per session, inside the sandbox, through one script:
+
+- The runner uploads `ensure-jact-build.mjs` as a session file. It lands at `/mnt/session/uploads/ensure-jact-build.mjs`, because file mounts sit under the session's uploads directory ([file paths](https://platform.claude.com/docs/en/managed-agents/files#file-paths)). The runner never runs the script and never builds the PR itself. Shutdown gives in-flight uploads a bounded wait, aborts unresolved requests, and deletes every upload whose ID it received, including when setup fails. An upload whose server response never arrives cannot be identified for deletion.
+- The manifest gives the exact command: `node /mnt/session/uploads/ensure-jact-build.mjs --repo /workspace/repo --head <PR head sha> --session <session id>`. The lead copies it into every prover's prompt.
+- The first caller checks that the repo is at that head, takes a lock in the repo's git directory, removes any existing `dist/cli.js`, and runs `npm ci --ignore-scripts`, then `npm run build`, exactly once. Every later caller waits for that build and reuses it. Readiness requires a newly produced `dist/cli.js`, not stale output left by a build that exits successfully without emitting it.
+- If install or build fails, that caller and every later one exit with the same failing code; nothing retries. A caller that waits on the lock longer than 4 minutes (the default) fails loudly instead of deleting it, leaving time to report before the sandbox command's approximately 295-second cutoff. If ready output goes missing, or a different head or session calls, the script fails instead of rebuilding. Each call logs one line with its outcome and exit code.
+- If an unexpected error prevents the build result from being recorded, the owner leaves the lock intact. Later callers time out instead of starting another destructive build.
+
+**Limit.** The script decides how and when the build runs, but a model still has to call it. The system prompt tells provers to call it before any test and never to run `npm ci`, `npm run build`, or `npm run clean` directly, but nothing enforces that: a prover can skip the call or run a direct build, and that brings the race back. The options compared before this design was chosen are in [Bug Hunter: build-once options](../../docs/features/20261120T192002-bug-hunter-build-once/research/bug-hunter-build-once-options.md#Recommendation).
 
 ## Setup
 
@@ -75,7 +93,7 @@ It does not run on every push, because each run spends API credit. Fork PRs are 
 | ---- | ----- | ------- |
 | 0 | pass | No confirmed finding at or above `FAIL_ON` severity. A budget stop or timeout also passes, but the review heading says "did not finish" and the job shows a warning. |
 | 1 | fail | A finished review has at least one confirmed finding at or above `FAIL_ON` severity. |
-| 2 | fail | Invalid configuration, or the review itself broke: a failed login, an agent stopped by repeated API errors (`retries_exhausted`), or a report that breaks the JSON schema. |
+| 2 | fail | Invalid configuration, incomplete cleanup, or the review itself broke: a failed login, an agent stopped by repeated API errors (`retries_exhausted`), or a report that breaks the JSON schema. |
 
 ## Cost
 
@@ -86,10 +104,10 @@ Each session has a hard cap (`BUDGET_CENTS`, default $15.00). At the cap the run
 ```bash
 cd .github/bug-hunter && npm ci --ignore-scripts
 ant auth login   # or any credential the SDK resolves; never write a key to a .env file
-GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=WesleyMFrederick/jact PR_NUMBER=128 DRY_RUN=1 node bug-hunter.mjs
+GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=WesleyMFrederick/jact PR_NUMBER=128 PLAN_ONLY=1 node bug-hunter.mjs
 ```
 
-`DRY_RUN=1` prints the review instead of posting it. `PLAN_ONLY=1` prints the slices and the agent's first message, then stops before any Anthropic call, so it costs nothing.
+`PLAN_ONLY=1` prints the slices and the agent's first message, then stops before any Anthropic call, so it costs nothing. `DRY_RUN=1` **starts a paid session**, even for a draft PR; it only prints the review instead of posting it. Draft skipping is enforced by the GitHub workflow, not by this local command.
 
 ### Exam mode: replay a fixed commit range
 
