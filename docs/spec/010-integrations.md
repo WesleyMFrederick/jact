@@ -6,15 +6,20 @@ verified_by: agent
 
 **Status:** done
 
-jact connects to four outside systems: editor hooks, AI agent sessions, the npm global link, and the npm release workflow. Each section states the contract that system relies on.
+jact connects to four outside systems: agent harness hooks, AI agent sessions, the npm global link, and the npm release workflow. Each section states the contract that system relies on.
 
-## Claude Code hook (primary integration)
+## Harness hooks (primary integration)
 
-An editor hook runs `jact validate` on each Markdown write. Contract:
+`jact setup <harness>` writes the wiring. The harness then runs `jact hook <harness>` after each file write or read. Steps for each harness: [Wire jact into an agent harness](../harness-hooks.md#Wire%20jact%20into%20an%20agent%20harness). Contract:
 
-- Input: a file path, or `--stdin` content with its intended path. jact infers the scope as described in [Scope Resolution Order](006-behavior.md#Scope%20Resolution%20Order).
-- Output: exit 0 allows the write; exit 1 blocks it. The error list (line, link, error, suggestion) goes to standard output.
-- Machine data: a caller that acts on a fix reads the `pathConversion` and `anchorConversion` fields of `--format json` output. It never parses the human `suggestion` text, which can change.
+- Input: the tool event as JSON on standard input. A Markdown write runs `jact validate`; a Markdown read runs `jact extract links`. File paths come from path fields; only `apply_patch` scans its patch text for file headers, never ordinary Markdown content.
+- Output: text for the model in that harness's format, or nothing. The exit code is always 0, including malformed hook arguments; Antigravity still receives JSON when argument parsing fails, except for help output. On runtime failure, Antigravity CLI uses the same event selection as on success: `--event`, else the input's `hookEventName`, else PostToolUse.
+- Antigravity CLI: its tool hook cannot answer the model. It atomically publishes separate entries under `.jact/hook-pending/` and prints `{}`. The next model-call hook consumes each entry at most once. `Stop` consumes only write reports and leaves linked sections for the next model call. Write reports are replaced per file, so separate successful fixes withdraw a multi-file report; failed validation does not withdraw one. A clean write creates no pending state and withdraws only that exact file's pending write records, leaving other files and read records unchanged.
+- Setup and removal keep other tools' hooks, including hooks in the same matcher group, unmanaged extension files, and a foreign or shared Antigravity `jact` key. Boolean `enabled` metadata does not change Antigravity hook ownership: disabled owned hooks can be updated or removed, but metadata alone or foreign handlers never establish ownership. Generated pi and omp extensions have an ownership header that survives template changes. Invalid JSON and wrongly typed hook containers are refused. Custom commands in JSON hook settings carry a `# jact` shell comment to identify ownership without claiming other programs' matching subcommands.
+- `setup --check` checks current wiring rather than JSON formatting or unrelated hook order; it recognizes custom commands without repeating `--command` and reports disabled Antigravity hooks as not installed. Unmanaged or outdated extensions return 1 without a replacement plan. `--remove` cannot be combined with `--print` or `--check`.
+- Generated pi and omp extensions enforce a 30-second deadline independently of process or pipe closure. On POSIX they isolate the command in a process group and kill that group at the deadline, with direct child termination as a portable fallback. Timeout clears the timer, destroys the command's pipe streams, and returns no result; partial or otherwise valid JSON from a timed-out command is never delivered.
+- Synthetic checks in `scripts/hooks-e2e.mjs` load the installed matchers and commands or extension, and reject failed commands even when they print valid JSON. Measurements in `scripts/measure-agent-value.mjs` explicitly report when no files qualify rather than emitting invalid statistics.
+- Machine data: a caller that acts on a fix reads `pathConversion` and `anchorConversion` from `jact validate --format json`. It never parses the human `suggestion` text, which can change.
 
 ## Agent workflows (orient-before-extract)
 

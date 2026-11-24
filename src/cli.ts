@@ -13,6 +13,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { Argument, Command, InvalidArgumentError, Option } from "commander";
 import { isDynamicPattern } from "tinyglobby";
@@ -21,6 +22,7 @@ import {
 	writeExtractCache,
 } from "./cache/checkExtractCache.js";
 import { RenameValidationError } from "./core/rename-markdown-file.js";
+import { createRuleSetResolver } from "./core/ValidationRules/loadConfig.js";
 import {
 	applyVaultLinkPlan,
 	createVaultSymlinks,
@@ -29,12 +31,29 @@ import {
 	vaultNote,
 } from "./core/VaultLink/vaultLink.js";
 import { resolveVaultTarget } from "./core/vaultEscape.js";
-import { createRuleSetResolver } from "./core/ValidationRules/loadConfig.js";
 import {
 	createMarkdownParser,
 	createValidationWorkflow,
 } from "./factories/componentFactory.js";
-import { formatContentMap, formatExtractResult } from "./formatExtractResult.js";
+import {
+	formatContentMap,
+	formatExtractResult,
+} from "./formatExtractResult.js";
+import {
+	HARNESSES,
+	type Harness,
+	namedEvent,
+	runHarnessHook,
+	silentHookOutput,
+} from "./hooks/harnessHook.js";
+import {
+	harnessConfigPath,
+	installHarness,
+	isInstalled,
+	plannedConfig,
+	removeHarness,
+	type SetupOptions,
+} from "./hooks/setupHarness.js";
 import { JactCli, linkedContentHints } from "./jact-cli.js";
 import { terminalText } from "./shellArgument.js";
 import type {
@@ -335,10 +354,7 @@ Exit Codes:
 					null,
 					null,
 					resolveRuleSet,
-				).validate(
-					{ kind: "file", filePath: file },
-					options,
-				);
+				).validate({ kind: "file", filePath: file }, options);
 				if (remaining.kind === "failed") {
 					console.log(`ERROR: ${remaining.error}`);
 				}
@@ -386,7 +402,12 @@ Exit Codes:
 			);
 
 			for (const filePath of files) await resolveRuleSet(filePath);
-			const workflow = createValidationWorkflow(null, null, null, resolveRuleSet);
+			const workflow = createValidationWorkflow(
+				null,
+				null,
+				null,
+				resolveRuleSet,
+			);
 			const validateOne: ValidateOneFn = async (filePath) => {
 				const outcome = await workflow.validate(
 					{ kind: "file", filePath },
@@ -932,7 +953,9 @@ const LINKED_CONTENT_OPTION = "--extract-linked-content [depth]";
 function parseLinkedContentDepth(value: string): number {
 	const depth = Number(value);
 	if (!Number.isInteger(depth) || depth < 1) {
-		throw new InvalidArgumentError("depth must be a whole number of 1 or more.");
+		throw new InvalidArgumentError(
+			"depth must be a whole number of 1 or more.",
+		);
 	}
 	return depth;
 }
@@ -1171,6 +1194,174 @@ Exit Codes:
 			console.error("ERROR:", errorMessage);
 			process.exitCode = 2;
 		}
+	});
+
+interface CliSetupOptions {
+	global: boolean;
+	print: boolean;
+	check: boolean;
+	remove: boolean;
+	command: string;
+}
+
+program
+	.command("setup")
+	.description(
+		"Wire jact into an agent harness: check Markdown links after each write and add linked sections after each read",
+	)
+	.addArgument(
+		new Argument("<harness>", "harness to set up").choices([...HARNESSES]),
+	)
+	.option(
+		"--global",
+		"write the user-level config instead of this project's config",
+		false,
+	)
+	.option("--print", "print what would be written and write nothing", false)
+	.option(
+		"--check",
+		"exit 0 when the wiring is installed, 1 when it is not",
+		false,
+	)
+	.option("--remove", "remove only the wiring jact wrote", false)
+	.option(
+		"--command <command>",
+		"command the harness runs to start jact",
+		"jact",
+	)
+	.addHelpText(
+		"after",
+		`
+Examples:
+    $ jact setup claude            # this project: .claude/settings.json
+    $ jact setup codex --global    # every project: ~/.codex/hooks.json
+    $ jact setup antigravity       # Antigravity CLI (agy): .agents/hooks.json
+    $ jact setup gemini --print    # show the file, write nothing
+    $ jact setup pi --check        # is it installed?
+    $ jact setup omp --remove      # take it out again
+
+Each harness then runs \`jact hook <harness>\` after a write or read.
+Hooks from other tools in the same file are kept.
+
+Google moved most accounts from Gemini CLI to Antigravity CLI in June 2026.
+Use \`antigravity\` for agy. Use \`gemini\` only where the gemini command still runs.
+
+Exit Codes:
+  0  Done, or --check found the wiring
+  1  --check did not find the wiring
+  2  The harness config could not be read or written
+`,
+	)
+	.action((harness: Harness, options: CliSetupOptions) => {
+		if (options.remove && (options.print || options.check)) {
+			console.error("ERROR: --remove cannot be combined with --print or --check");
+			process.exitCode = 2;
+			return;
+		}
+		const setup: SetupOptions = {
+			global: options.global,
+			command: options.command,
+			cwd: process.cwd(),
+			home: homedir(),
+		};
+		try {
+			if (options.check) {
+				const installed = isInstalled(harness, setup);
+				console.log(
+					`${harness}: ${installed ? "installed" : "not installed"} (${harnessConfigPath(harness, setup)})`,
+				);
+				process.exitCode = installed ? 0 : 1;
+				return;
+			}
+			if (options.print) {
+				const plan = plannedConfig(harness, setup);
+				console.error(`Would write ${plan.path}`);
+				process.stdout.write(plan.content);
+				process.exitCode = 0;
+				return;
+			}
+			const outcome = options.remove
+				? removeHarness(harness, setup)
+				: installHarness(harness, setup);
+			console.log(`${harness}: ${outcome.action} ${outcome.path}`);
+			for (const note of outcome.notes) console.log(`  note: ${note}`);
+			process.exitCode = 0;
+		} catch (error) {
+			console.error(
+				"ERROR:",
+				error instanceof Error ? error.message : String(error),
+			);
+			process.exitCode = 2;
+		}
+	});
+
+program
+	.command("hook")
+	// Argument and option errors must be as harmless as runtime hook failures.
+	.configureOutput({ writeErr: () => {} })
+	.exitOverride(function (this: Command, error) {
+		// A missing option value fails before this command has assigned its args.
+		const harness = this.args[0] ?? this.parent?.args[1];
+		if (error.exitCode !== 0 && harness === "antigravity") {
+			const output = silentHookOutput("antigravity", this.opts<{ event?: string }>().event);
+			process.stdout.write(`${output}\n`);
+		}
+		process.exit(0);
+	})
+	.description(
+		"Run as a harness hook: read one tool event as JSON on stdin and print what the harness should tell the model",
+	)
+	.addArgument(
+		new Argument("<harness>", "harness that calls this hook").choices([
+			...HARNESSES,
+		]),
+	)
+	.option(
+		"--event <name>",
+		"hook event (antigravity). Default: hookEventName in the input, else PostToolUse",
+	)
+	.addHelpText(
+		"after",
+		`
+Harnesses call this command; \`jact setup <harness>\` writes the call for you.
+
+A write or edit of a Markdown file runs validate. Broken links are reported
+to the model. A read of a Markdown file returns the sections it links to.
+Any other event prints nothing.
+
+    $ echo '{"tool_name":"Write","tool_input":{"file_path":"docs/a.md"},"cwd":"."}' | jact hook claude
+
+Antigravity CLI gives a tool hook no way to answer the model. There, the
+PostToolUse call holds the result and prints {}. The PreInvocation call hands
+it to the model before the next step. The Stop call makes the agent continue
+one time when a broken-link report was not handed over.
+
+    $ jact hook antigravity --event PostToolUse    # also: PreInvocation, Stop
+
+Set JACT_HOOK_LOG=<file> to append one line for each call.
+
+Exit Codes:
+  0  Always. A hook must never break the harness.
+`,
+	)
+	.action((harness: Harness, options: { event?: string }) => {
+		let output: string;
+		let event = options.event;
+		try {
+			const payload = readFileSync(0, "utf8");
+			event ??= namedEvent(payload);
+			output = runHarnessHook(
+				harness,
+				payload,
+				undefined,
+				event,
+			);
+		} catch {
+			// A hook that fails says nothing, so the harness keeps working.
+			output = silentHookOutput(harness, event);
+		}
+		if (output.length > 0) process.stdout.write(`${output}\n`);
+		process.exitCode = 0;
 	});
 
 // Run CLI unconditionally — this file IS the CLI entry point.

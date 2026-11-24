@@ -87,5 +87,6 @@ This specification is the **canonical source of truth** for how jact is designed
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.1 | 2026-11-21 | Clarified [harness ownership, event paths, checks, held report delivery, and measurements](010-integrations.md#Harness%20hooks%20%28primary%20integration%29) |
 | 1.1.0 | 2026-10-07 | Aligned to code; removed internal code names to reduce drift; added the contracts-not-code rule and module spec pointers |
 | 1.0.0-draft | 2026-07-01 | Initial living spec, replacing `design-docs/component-guides/` |
