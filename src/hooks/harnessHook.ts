@@ -358,6 +358,28 @@ function holdResult(conversation: Conversation, held: HeldResult): void {
 	}
 }
 
+/** Withdraw only this file's published write records; a clean write creates no state. */
+function withdrawWriteResult(conversation: Conversation, path: string): void {
+	const folder = heldFolder(conversation);
+	let names: string[];
+	try {
+		names = readdirSync(folder).filter((name) =>
+			name.startsWith("write-") && name.endsWith(".json"));
+	} catch {
+		return;
+	}
+	for (const name of names) {
+		try {
+			const file = join(folder, name);
+			const entry: unknown = JSON.parse(readFileSync(file, "utf8"));
+			if (isRecord(entry) && entry["key"] === `write:${path}`)
+				rmSync(file, { force: true });
+		} catch {
+			// A consumer may already have claimed this entry. Leave other records alone.
+		}
+	}
+}
+
 /** Claims complete entries individually; concurrent writers publish for this or the next call. */
 function takeHeldResults(conversation: Conversation, writesOnly = false): HeldResult[] {
 	const folder = heldFolder(conversation);
@@ -428,7 +450,8 @@ function runAntigravityHook(
 				const context = writeReport(path, validation);
 				failed ||= validation.status === 1;
 				contextChars += context.length;
-				holdResult(conversation, { key: `write:${path}`, context, failed: validation.status === 1 });
+				if (validation.status === 0) withdrawWriteResult(conversation, path);
+				else holdResult(conversation, { key: `write:${path}`, context, failed: true });
 			}
 		} else {
 			const result = extractReads(request, run);

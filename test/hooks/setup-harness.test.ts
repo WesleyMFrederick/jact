@@ -360,6 +360,40 @@ describe("setup for Antigravity CLI, whose hooks file is keyed by hook name", ()
 		expect(removeHarness("antigravity", moved).action).toBe("absent");
 	});
 
+	it("Given a disabled owned hook, When checked, Then it is not installed", () => {
+		// Given
+		installHarness("antigravity", options);
+		const config = readJson(file());
+		config.jact.enabled = false;
+		writeFileSync(file(), JSON.stringify(config));
+
+		// When / Then
+		expect(isInstalled("antigravity", options)).toBe(false);
+	});
+
+	it.each(["reinstall", "remove"] as const)(
+		"Given a disabled owned hook, When asked to %s, Then it remains manageable without touching other hooks",
+		(action) => {
+			// Given
+			installHarness("antigravity", options);
+			const config = readJson(file());
+			config.jact.enabled = false;
+			config.other = { Stop: [{ type: "command", command: "other-tool" }] };
+			writeFileSync(file(), JSON.stringify(config));
+
+			// When
+			const outcome = action === "reinstall"
+				? installHarness("antigravity", options)
+				: removeHarness("antigravity", options);
+
+			// Then
+			expect(outcome.action).toBe(action === "reinstall" ? "updated" : "removed");
+			expect(readJson(file()).other).toEqual(config.other);
+			expect(isInstalled("antigravity", options)).toBe(action === "reinstall");
+			if (action === "remove") expect(readJson(file())).not.toHaveProperty("jact");
+		},
+	);
+
 	it.each([
 		{ PreToolUse: [{ type: "command", command: "my-own-script.sh" }] },
 		{ Stop: [{ type: "command", command: "my-own-script.sh" }] },

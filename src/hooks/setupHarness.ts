@@ -197,7 +197,8 @@ function isOwnHook(hook: unknown, harness: Harness, event?: string): boolean {
 
 function isOwnAntigravityHooks(value: unknown): boolean {
 	if (!isRecord(value)) return false;
-	const events = Object.entries(value);
+	if ("enabled" in value && typeof value["enabled"] !== "boolean") return false;
+	const events = Object.entries(value).filter(([event]) => event !== "enabled");
 	return events.length > 0 && events.every(([event, groups]) => {
 		if (!["PostToolUse", "PreInvocation", "Stop"].includes(event) ||
 			!Array.isArray(groups) || groups.length === 0) return false;
@@ -304,22 +305,39 @@ const TIMEOUT_MS = 30000;
 
 function askJact(payload: unknown, cwd: string): Promise<{ context?: string; failed?: boolean }> {
 	return new Promise((done) => {
-		const child = spawn(COMMAND_LINE, { cwd, shell: true, stdio: ["pipe", "pipe", "ignore"] });
-		const timer = setTimeout(() => child.kill(), TIMEOUT_MS);
+		const child = spawn(COMMAND_LINE, { cwd, shell: true, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "ignore"] });
+		let settled = false;
+		const finish = (answer: { context?: string; failed?: boolean } = {}) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			child.stdin.destroy();
+			child.stdout.destroy();
+			done(answer);
+		};
+		const timer = setTimeout(() => {
+			try {
+				// The shell and every descendant share this isolated POSIX process group.
+				if (process.platform !== "win32" && child.pid)
+					process.kill(-child.pid, "SIGKILL");
+				else child.kill("SIGKILL");
+			} catch {
+				try { child.kill("SIGKILL"); } catch {}
+			}
+			// A descendant holding stdout must not delay or contribute a partial answer.
+			finish();
+		}, TIMEOUT_MS);
 		let output = "";
 		child.stdout.on("data", (chunk) => {
 			output += String(chunk);
 		});
-		child.on("error", () => {
-			clearTimeout(timer);
-			done({});
-		});
+		child.on("error", () => finish());
 		child.on("close", () => {
-			clearTimeout(timer);
+			if (settled) return;
 			try {
-				done(output.trim() ? JSON.parse(output) : {});
+				finish(output.trim() ? JSON.parse(output) : {});
 			} catch {
-				done({});
+				finish();
 			}
 		});
 		child.stdin.on("error", () => {});
@@ -447,7 +465,7 @@ export function isInstalled(harness: Harness, options: SetupOptions): boolean {
 			harness,
 		);
 	const named = config[HOOK_NAME];
-	if (!isRecord(named)) return false;
+	if (!isRecord(named) || named["enabled"] === false) return false;
 	return (
 		Array.isArray(named["PostToolUse"]) &&
 		hasWiring(

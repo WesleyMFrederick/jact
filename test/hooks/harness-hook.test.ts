@@ -1,6 +1,7 @@
 import {
 	appendFileSync,
 	closeSync,
+	existsSync,
 	openSync,
 	mkdirSync,
 	mkdtempSync,
@@ -454,6 +455,30 @@ describe("runHarnessHook for Antigravity CLI, whose tool hook cannot answer the 
 		expect(delivered.injectSteps[0].systemMessage.systemMessage).toContain(
 			"## Details\n\nThe answer.",
 		);
+	});
+
+	it("Given no pending failure, When Markdown validates cleanly, Then no pending state is created", () => {
+		// Given
+		const workspace = mkdtempSync(join(tmpdir(), "jact-clean-hook-"));
+		const path = join(workspace, "note.md");
+		writeFileSync(path, "# Clean note\n");
+		const payload = JSON.stringify({
+			conversationId: "clean-only",
+			workspacePaths: [workspace],
+			toolCall: { name: "write_to_file", args: { TargetFile: path } },
+			error: "",
+		});
+
+		try {
+			// When
+			const output = antigravityHook("PostToolUse", payload, clean);
+
+			// Then
+			expect(output).toBe("{}");
+			expect(existsSync(join(workspace, ".jact", "hook-pending"))).toBe(false);
+		} finally {
+			rmSync(workspace, { recursive: true, force: true });
+		}
 	});
 
 	it("withdraws a report when the same file is written again with valid links", () => {
